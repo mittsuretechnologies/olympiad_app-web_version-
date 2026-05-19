@@ -31,6 +31,7 @@ model School {
   pincode       String?
   username      String?                @unique
   password      String?
+  plainPassword String?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   olympiadIds   OlympiadIdAllocation[]
@@ -50,19 +51,27 @@ model Uploader {
 }
 
 model OlympiadIdAllocation {
-  id           String    @id @default(uuid())
-  code         String    @unique
-  prefix       String
-  sequence     Int
-  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  schoolId     String
-  status       String    @default("UNASSIGNED")
-  studentId    String?
-  studentName  String?
-  studentPhone String?
-  assignedAt   DateTime?
-  sentAt       DateTime?
-  createdAt    DateTime  @default(now())
+  id        String    @id @default(uuid())
+  code      String    @unique
+  prefix    String
+  sequence  Int
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId  String
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+  student   Student?
 
   @@index([schoolId])
+}
+
+model Student {
+  id           String               @id @default(uuid())
+  olympiadCode String               @unique
+  allocation   OlympiadIdAllocation @relation(fields: [olympiadCode], references: [code], onDelete: Cascade)
+  name         String
+  phone        String
+  password     String?
+  isVerified   Boolean              @default(false)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 }

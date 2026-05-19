@@ -44,18 +44,18 @@ export async function GET(
       return NextResponse.json({ message: 'Olympiad ID not found' }, { status: 404 });
     }
 
-    if (allocation.status !== 'ASSIGNED') {
+    if (!allocation.student) {
       return NextResponse.json(
-        { message: 'This Olympiad ID has not been assigned to a student yet.' },
+        { message: 'This Olympiad ID has not been registered by a student yet.' },
         { status: 400 }
       );
     }
 
     return NextResponse.json({
       code: allocation.code,
-      studentName: allocation.studentName,
-      studentPhone: allocation.studentPhone,
-      assignedAt: allocation.assignedAt,
+      studentName: allocation.student.name,
+      studentPhone: allocation.student.phone,
+      registeredAt: allocation.student.createdAt,
       school: allocation.school,
     });
   } catch (error) {

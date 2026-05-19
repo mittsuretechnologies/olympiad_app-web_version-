@@ -34,6 +34,7 @@ export async function POST(
       where: { id },
       data: {
         password: hashedPassword,
+        plainPassword: plainPassword,
         username: school.username || school.schoolId,
       },
       select: {

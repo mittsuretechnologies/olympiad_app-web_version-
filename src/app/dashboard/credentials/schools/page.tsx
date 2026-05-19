@@ -16,6 +16,7 @@ interface SchoolCred {
   email?: string;
   contactPerson?: string;
   username?: string;
+  plainPassword?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -129,10 +130,10 @@ export default function SchoolCredentialsPage() {
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">School ID</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">School Name</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Username</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Password</th>
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Current Password</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Email</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Last Updated</th>
-              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-32">Action</th>
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-40">Action</th>
             </tr>
           </thead>
           <tbody>
@@ -161,8 +162,14 @@ export default function SchoolCredentialsPage() {
                   <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E]">{r.schoolId}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 font-semibold text-gray-900">{r.name}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-gray-800">{r.username || '-'}</td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 text-gray-500 italic text-xs">
-                    Hidden (use Reset to view)
+                  <td className="px-4 py-2.5 border-r border-gray-200">
+                    {r.plainPassword ? (
+                      <span className="font-mono text-sm font-bold text-[#06013E] select-all">
+                        {r.plainPassword}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-400 italic">Reset to generate</span>
+                    )}
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">{r.email || '-'}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">
@@ -170,11 +177,11 @@ export default function SchoolCredentialsPage() {
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <button
-                      title="Reset password & reveal"
+                      title="Generate new password"
                       onClick={() => setResetTarget(r)}
                       className="inline-flex items-center gap-1.5 bg-[#06013E] text-white px-2.5 py-1 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
                     >
-                      <RotateCw className="w-3 h-3" /> Reset
+                      <RotateCw className="w-3 h-3" /> Reset Password
                     </button>
                   </td>
                 </tr>

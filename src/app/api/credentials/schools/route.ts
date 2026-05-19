@@ -13,6 +13,7 @@ export async function GET() {
       email: s.email,
       contactPerson: s.contactPerson,
       username: s.username,
+      plainPassword: s.plainPassword,
       updatedAt: s.updatedAt,
       createdAt: s.createdAt,
     }));

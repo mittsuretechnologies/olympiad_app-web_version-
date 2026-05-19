@@ -9,6 +9,9 @@ export async function GET() {
         school: {
           select: { schoolId: true, name: true, city: true, state: true },
         },
+        student: {
+          select: { name: true, phone: true, createdAt: true },
+        },
       },
     });
     return NextResponse.json(ids);

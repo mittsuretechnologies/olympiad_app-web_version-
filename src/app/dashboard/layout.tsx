@@ -17,6 +17,7 @@ import {
   Hash,
   UploadCloud,
   UserPlus,
+  GraduationCap,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -27,11 +28,12 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
 
-  type Section = 'schools' | 'uploaders' | 'credentials' | null;
+  type Section = 'schools' | 'uploaders' | 'students' | 'credentials' | null;
 
   const sectionForPath = (p: string): Section => {
     if (p.startsWith('/dashboard/schools')) return 'schools';
     if (p.startsWith('/dashboard/uploaders')) return 'uploaders';
+    if (p.startsWith('/dashboard/students')) return 'students';
     if (p.startsWith('/dashboard/credentials')) return 'credentials';
     return 'schools';
   };
@@ -44,6 +46,7 @@ export default function DashboardLayout({
 
   const schoolsOpen = openSection === 'schools';
   const uploadersOpen = openSection === 'uploaders';
+  const studentsOpen = openSection === 'students';
   const credentialsOpen = openSection === 'credentials';
 
   const handleLogout = () => {
@@ -61,6 +64,10 @@ export default function DashboardLayout({
   const uploaderSubItems = [
     { name: 'Register Uploader', href: '/dashboard/uploaders/register', icon: UserPlus },
     { name: 'View / Manage Uploaders', href: '/dashboard/uploaders', icon: Eye },
+  ];
+
+  const studentSubItems = [
+    { name: 'Registered Students', href: '/dashboard/students', icon: GraduationCap },
   ];
 
   const credentialsSubItems = [
@@ -195,6 +202,43 @@ export default function DashboardLayout({
                       <Link
                         key={item.name}
                         href={item.href}
+                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-100 text-sm ${isActive
+                          ? 'bg-white text-[#06013E] shadow-md font-semibold'
+                          : 'text-white/90 hover:bg-white/15'
+                          }`}
+                      >
+                        <Icon size={16} />
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Students - Expandable */}
+            <div>
+              <button
+                onClick={() => toggleSection('students')}
+                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors duration-100 group ${pathname.startsWith('/dashboard/students')
+                  ? 'bg-white/25 text-white'
+                  : 'text-white hover:bg-white/15'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <GraduationCap size={18} />
+                  <span className="font-semibold text-sm">Students</span>
+                </div>
+                <ChevronDown size={16} className={`transition-transform duration-150 ${studentsOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              <div className={`overflow-hidden transition-all duration-150 ease-out ${studentsOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                <div className="ml-4 pl-4 border-l-2 border-white/30 space-y-1">
+                  {studentSubItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link key={item.name} href={item.href}
                         className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-100 text-sm ${isActive
                           ? 'bg-white text-[#06013E] shadow-md font-semibold'
                           : 'text-white/90 hover:bg-white/15'

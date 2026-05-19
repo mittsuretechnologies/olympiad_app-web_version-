@@ -260,12 +260,10 @@ export default function SchoolsPage() {
   const exportAllocationsCSV = () => {
     if (!viewSchool || allocations.length === 0) return;
     const rows = [
-      ['Olympiad ID', 'Prefix', 'Sequence', 'Status', 'Allocated On'],
+      ['Olympiad ID', 'Delivery', 'Allocated On'],
       ...allocations.map((a) => [
         a.code,
-        a.prefix,
-        a.sequence,
-        a.status,
+        a.sentAt ? 'Delivered' : 'Pending',
         new Date(a.createdAt).toLocaleDateString(),
       ]),
     ];
@@ -1018,9 +1016,6 @@ export default function SchoolsPage() {
                           Olympiad ID
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300">
-                          Status
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300">
                           Delivery
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase">
@@ -1031,13 +1026,13 @@ export default function SchoolsPage() {
                     <tbody>
                       {allocLoading ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center">
+                          <td colSpan={4} className="py-8 text-center">
                             <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#06013E]" />
                           </td>
                         </tr>
                       ) : allocations.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-gray-500 text-sm">
+                          <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">
                             No Olympiad IDs allocated yet. Click "Allocate New IDs" to generate.
                           </td>
                         </tr>
@@ -1054,17 +1049,6 @@ export default function SchoolsPage() {
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200 font-mono font-semibold text-[#06013E]">
                               {a.code}
-                            </td>
-                            <td className="px-3 py-2 border-r border-gray-200">
-                              <span
-                                className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase ${
-                                  a.status === 'ASSIGNED'
-                                    ? 'bg-green-100 text-green-800 border border-green-300'
-                                    : 'bg-gray-100 text-gray-700 border border-gray-300'
-                                }`}
-                              >
-                                {a.status}
-                              </span>
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200">
                               {a.sentAt ? (
