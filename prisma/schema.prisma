@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model SuperAdmin {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model School {
+  id            String                 @id @default(uuid())
+  schoolId      String                 @unique
+  olympiadId    String
+  name          String
+  address       String?
+  email         String?
+  phone         String?
+  contactPerson String?
+  city          String?
+  state         String?
+  pincode       String?
+  username      String?                @unique
+  password      String?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+  olympiadIds   OlympiadIdAllocation[]
+}
+
+model Uploader {
+  id         String   @id @default(uuid())
+  uploaderId String   @unique
+  name       String
+  email      String?
+  phone      String?
+  username   String   @unique
+  password   String
+  status     String   @default("ACTIVE")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model OlympiadIdAllocation {
+  id           String    @id @default(uuid())
+  code         String    @unique
+  prefix       String
+  sequence     Int
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId     String
+  status       String    @default("UNASSIGNED")
+  studentId    String?
+  studentName  String?
+  studentPhone String?
+  assignedAt   DateTime?
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+
+  @@index([schoolId])
+}
