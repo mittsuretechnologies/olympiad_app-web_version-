@@ -111,7 +111,6 @@ export default function Dashboard() {
             <h3 className="font-black text-[#432818] mb-6 px-2 text-lg uppercase tracking-tight">Quick Shortcuts</h3>
             {[
               { label: 'Register New School', icon: School, color: 'text-orange-600', bg: 'bg-orange-50' },
-              { label: 'Export Student Lists', icon: Users, color: 'text-amber-600', bg: 'bg-amber-50' },
               { label: 'Financial Audit', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50' }
             ].map((action, i) => (
               <button key={i} className="w-full p-4 flex items-center gap-5 rounded-[1.5rem] hover:bg-orange-50/50 transition-all group text-left border-2 border-transparent hover:border-orange-100">

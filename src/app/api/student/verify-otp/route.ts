@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { otpStore } from '../register/route';
+import { otpStore } from '@/lib/otpStore';
 
 export async function POST(request: Request) {
   try {

@@ -48,7 +48,7 @@ export default function BulkUploadPage() {
     <div>
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-[#432818]">Bulk School Registration</h1>
-        <p className="text-sm text-[#432818]/60 mt-1">Upload an Excel file to register multiple schools at once</p>
+        <p className="text-sm text-[#432818]/60 mt-1">Upload an Excel file to register multiple schools at once. School Name, CRM ID, State, and District are required columns.</p>
       </div>
 
       <div className="max-w-2xl space-y-6">

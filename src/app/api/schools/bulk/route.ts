@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No school data provided' }, { status: 400 });
     }
 
-    const validSchools = schools.filter((s) => s.name && s.olympiadId);
+    const validSchools = schools.filter((s) => s.name && s.olympiadId && s.state && s.district);
 
     const created: Array<{ schoolId: string; name: string; username: string; password: string }> = [];
     const errors: Array<{ name: string; reason: string }> = [];
@@ -53,6 +53,7 @@ export async function POST(request: Request) {
               phone: school.phone || null,
               contactPerson: school.contactPerson || null,
               city: school.city || null,
+              district: school.district || null,
               state: school.state || null,
               pincode: school.pincode || null,
               username: schoolId,

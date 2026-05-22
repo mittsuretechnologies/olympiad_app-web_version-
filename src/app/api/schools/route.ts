@@ -51,14 +51,15 @@ export async function POST(request: Request) {
       phone,
       contactPerson,
       city,
+      district,
       state,
       pincode,
       studentCount,
     } = body;
 
-    if (!name || !olympiadId) {
+    if (!name || !olympiadId || !state || !district) {
       return NextResponse.json(
-        { message: 'School name and CRM ID are required' },
+        { message: 'School name, CRM ID, State, and District are required' },
         { status: 400 }
       );
     }
@@ -89,6 +90,7 @@ export async function POST(request: Request) {
             phone,
             contactPerson,
             city,
+            district,
             state,
             pincode,
             username: schoolId,

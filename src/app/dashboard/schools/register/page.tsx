@@ -11,6 +11,7 @@ export default function RegisterSchoolPage() {
     phone: '',
     address: '',
     city: '',
+    district: '',
     state: '',
     pincode: '',
     studentCount: '',
@@ -65,6 +66,7 @@ export default function RegisterSchoolPage() {
           phone: formData.phone,
           address: formData.address,
           city: formData.city,
+          district: formData.district,
           state: formData.state,
           pincode: formData.pincode,
           studentCount: count,
@@ -91,7 +93,7 @@ export default function RegisterSchoolPage() {
         }
         setFormData({
           schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-          address: '', city: '', state: '', pincode: '', studentCount: '',
+          address: '', city: '', district: '', state: '', pincode: '', studentCount: '',
         });
       }
     } catch {
@@ -234,7 +236,7 @@ export default function RegisterSchoolPage() {
             </div>
           </div>
 
-          {/* Row 3: Contact details (optional) */}
+          {/* Contact & Location Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
             <div>
               <label className={labelCls}>Principal / Contact Person</label>
@@ -270,6 +272,34 @@ export default function RegisterSchoolPage() {
               />
             </div>
             <div>
+              <label className={labelCls}>
+                State <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                name="state"
+                value={formData.state}
+                onChange={handleChange}
+                required
+                className={inputCls}
+                placeholder="State"
+              />
+            </div>
+            <div>
+              <label className={labelCls}>
+                District <span className="text-red-600">*</span>
+              </label>
+              <input
+                type="text"
+                name="district"
+                value={formData.district}
+                onChange={handleChange}
+                required
+                className={inputCls}
+                placeholder="District"
+              />
+            </div>
+            <div>
               <label className={labelCls}>City</label>
               <input
                 type="text"
@@ -278,17 +308,6 @@ export default function RegisterSchoolPage() {
                 onChange={handleChange}
                 className={inputCls}
                 placeholder="City"
-              />
-            </div>
-            <div>
-              <label className={labelCls}>State</label>
-              <input
-                type="text"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
-                className={inputCls}
-                placeholder="State"
               />
             </div>
             <div>
@@ -302,6 +321,17 @@ export default function RegisterSchoolPage() {
                 placeholder="XXXXXX"
               />
             </div>
+            <div className="md:col-span-2">
+              <label className={labelCls}>Full Address</label>
+              <input
+                type="text"
+                name="address"
+                value={formData.address}
+                onChange={handleChange}
+                className={inputCls}
+                placeholder="School building, street, area (optional)"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
@@ -309,7 +339,7 @@ export default function RegisterSchoolPage() {
               type="button"
               onClick={() => setFormData({
                 schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-                address: '', city: '', state: '', pincode: '', studentCount: '',
+                address: '', city: '', district: '', state: '', pincode: '', studentCount: '',
               })}
               disabled={loading}
               className="h-10 px-5 bg-white border border-gray-400 text-gray-700 font-semibold text-sm hover:bg-gray-100 disabled:opacity-50"
