@@ -37,6 +37,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   const navItems = [
     { name: 'Dashboard', href: '/school', icon: LayoutDashboard },
     { name: 'Olympiad IDs', href: '/school/olympiad-ids', icon: Hash },
+    { name: 'My Students', href: '/school/registered-students', icon: SchoolIcon },
   ];
 
   return (

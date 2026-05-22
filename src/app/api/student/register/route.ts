@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-
-// In-memory OTP store (replace with Redis/DB in production)
-const otpStore = new Map<string, { otp: string; expires: number; name: string; phone: string }>();
+import { otpStore } from '@/lib/otpStore';
 
 export async function POST(request: Request) {
   try {
@@ -48,5 +46,3 @@ export async function POST(request: Request) {
   }
 }
 
-// Export so verify route can access (module-level in same process)
-export { otpStore };

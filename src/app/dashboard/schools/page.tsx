@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   Plus,
   Upload,
@@ -42,6 +43,7 @@ interface School {
 }
 
 export default function SchoolsPage() {
+  const router = useRouter();
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -81,6 +83,10 @@ export default function SchoolsPage() {
     email: '',
     phone: '',
     contactPerson: '',
+    city: '',
+    district: '',
+    state: '',
+    pincode: '',
   });
 
   useEffect(() => {
@@ -117,7 +123,7 @@ export default function SchoolsPage() {
     }
   };
 
-  const openEditModal = (school: School) => {
+  const openEditModal = (school: any) => {
     setEditingSchool(school);
     setEditFormData({
       name: school.name || '',
@@ -126,6 +132,10 @@ export default function SchoolsPage() {
       email: school.email || '',
       phone: school.phone || '',
       contactPerson: school.contactPerson || '',
+      city: school.city || '',
+      district: school.district || '',
+      state: school.state || '',
+      pincode: school.pincode || '',
     });
     setIsEditModalOpen(true);
   };
@@ -160,14 +170,31 @@ export default function SchoolsPage() {
     setViewSchool(school);
     setShowAllocateForm(false);
     setAllocError(null);
-    setAllocPrefix(`${school.schoolId || 'SCH'}-${new Date().getFullYear() % 100}-`);
     setAllocCount(50);
-    setAllocPadding(4);
     setAllocLoading(true);
+
+    const crm = (school.olympiadId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase();
+    const nm = (school.name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
+    const defaultPrefix = (crm + nm).slice(0, 10);
+    
+    // Initial guess
+    setAllocPrefix(defaultPrefix);
+    setAllocPadding(2);
+
     try {
       const res = await fetch(`/api/schools/${school.id}/olympiad-ids`);
       const data = await res.json();
-      setAllocations(Array.isArray(data) ? data : []);
+      const loadedAllocations = Array.isArray(data) ? data : [];
+      setAllocations(loadedAllocations);
+
+      if (loadedAllocations.length > 0) {
+        const lastAlloc = loadedAllocations[loadedAllocations.length - 1];
+        if (lastAlloc.prefix) {
+          setAllocPrefix(lastAlloc.prefix);
+          const pad = lastAlloc.code.length - lastAlloc.prefix.length;
+          setAllocPadding(pad > 0 ? pad : 2);
+        }
+      }
     } catch (err) {
       console.error('Fetch allocations failed:', err);
       setAllocations([]);
@@ -181,7 +208,17 @@ export default function SchoolsPage() {
     try {
       const res = await fetch(`/api/schools/${schoolId}/olympiad-ids`);
       const data = await res.json();
-      setAllocations(Array.isArray(data) ? data : []);
+      const loaded = Array.isArray(data) ? data : [];
+      setAllocations(loaded);
+
+      if (loaded.length > 0) {
+        const lastAlloc = loaded[loaded.length - 1];
+        if (lastAlloc.prefix) {
+          setAllocPrefix(lastAlloc.prefix);
+          const pad = lastAlloc.code.length - lastAlloc.prefix.length;
+          setAllocPadding(pad > 0 ? pad : 2);
+        }
+      }
     } finally {
       setAllocLoading(false);
     }
@@ -318,6 +355,10 @@ export default function SchoolsPage() {
         email: item['Email'] || item['email'],
         phone: item['Phone'] || item['phone'],
         contactPerson: item['Contact Person'] || item['contactPerson'],
+        city: item['City'] || item['city'],
+        district: item['District'] || item['district'],
+        state: item['State'] || item['state'],
+        pincode: item['Pincode'] || item['pincode'],
       }));
 
       try {
@@ -336,6 +377,11 @@ export default function SchoolsPage() {
     };
     reader.readAsBinaryString(file);
   };
+
+  const lastAllocationWithPrefix = allocations
+    .filter((a) => a.prefix === allocPrefix)
+    .reduce((max, a) => (a.sequence > max ? a.sequence : max), 0);
+  const startSeq = lastAllocationWithPrefix + 1;
 
   const filteredSchools = Array.isArray(schools)
     ? schools.filter(
@@ -374,7 +420,7 @@ export default function SchoolsPage() {
             <Upload className="w-4 h-4" /> Bulk Register
           </button>
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={() => router.push('/dashboard/schools/register')}
             className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2 text-sm font-semibold hover:bg-[#0a0660] transition-colors"
           >
             <Plus className="w-4 h-4" /> Register School
@@ -640,7 +686,7 @@ export default function SchoolsPage() {
               <FileSpreadsheet className="w-4 h-4 text-yellow-700 mt-0.5 shrink-0" />
               <p>
                 Upload an Excel file (.xlsx) with required columns: School Name, CRM ID,
-                Address, Email, Phone, Contact Person.
+                State, District. Optional columns: Address, Email, Phone, Contact Person, City, Pincode.
               </p>
             </div>
 
@@ -732,6 +778,48 @@ export default function SchoolsPage() {
                 className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                 value={editFormData.email}
                 onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+                State <span className="text-red-600">*</span>
+              </label>
+              <Input
+                className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                value={editFormData.state}
+                onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+                District <span className="text-red-600">*</span>
+              </label>
+              <Input
+                className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                value={editFormData.district}
+                onChange={(e) => setEditFormData({ ...editFormData, district: e.target.value })}
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+                City
+              </label>
+              <Input
+                className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                value={editFormData.city}
+                onChange={(e) => setEditFormData({ ...editFormData, city: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+                Pincode
+              </label>
+              <Input
+                className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                value={editFormData.pincode}
+                onChange={(e) => setEditFormData({ ...editFormData, pincode: e.target.value })}
               />
             </div>
             <div className="col-span-2">
@@ -970,9 +1058,9 @@ export default function SchoolsPage() {
                       </label>
                       <div className="h-9 bg-white border border-gray-300 px-3 flex items-center text-sm font-mono text-gray-700">
                         {allocPrefix || '---'}
-                        {String(1).padStart(Math.max(allocPadding, 1), '0')} ...{' '}
+                        {String(startSeq).padStart(Math.max(allocPadding, 1), '0')} ...{' '}
                         {allocPrefix || '---'}
-                        {String(allocCount || 0).padStart(Math.max(allocPadding, 1), '0')}
+                        {String(startSeq + (allocCount || 1) - 1).padStart(Math.max(allocPadding, 1), '0')}
                       </div>
                     </div>
                   </div>

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { otpStore } from '../register/route';
+import { otpStore } from '@/lib/otpStore';
 
 export async function POST(request: Request) {
   try {
@@ -39,6 +39,7 @@ export async function POST(request: Request) {
         name: stored.name,
         phone: stored.phone,
         password: hashedPassword,
+        plainPassword: password,
         isVerified: true,
       },
     });
