@@ -3,32 +3,42 @@ import { prisma } from '@/lib/prisma';
 
 export async function GET() {
   try {
-    const students = await prisma.student.findMany({
+    const allocations = await prisma.olympiadIdAllocation.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
-        allocation: {
-          include: {
-            school: {
-              select: {
-                id: true,
-                schoolId: true,
-                name: true,
-                city: true,
-              },
-            },
+        school: {
+          select: {
+            id: true,
+            schoolId: true,
+            name: true,
+            city: true,
+          },
+        },
+        student: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            plainPassword: true,
+            isVerified: true,
+            createdAt: true,
           },
         },
       },
     });
 
-    const result = students.map((s) => ({
-      id: s.id,
-      name: s.name,
-      phone: s.phone,
-      olympiadCode: s.olympiadCode,
-      isVerified: s.isVerified,
-      createdAt: s.createdAt,
-      school: s.allocation?.school || null,
+    const result = allocations.map((a) => ({
+      id: a.id,
+      code: a.code,
+      school: a.school,
+      student: a.student ? {
+        id: a.student.id,
+        name: a.student.name,
+        phone: a.student.phone,
+        plainPassword: a.student.plainPassword,
+        isVerified: a.student.isVerified,
+        createdAt: a.student.createdAt,
+      } : null,
     }));
 
     return NextResponse.json(result);
@@ -40,3 +50,4 @@ export async function GET() {
     );
   }
 }
+

@@ -52,11 +52,10 @@ export default function SchoolOlympiadIdsPage() {
   const exportCSV = () => {
     if (filtered.length === 0) return;
     const rows = [
-      ['#', 'Olympiad ID', 'Status', 'Delivery'],
+      ['#', 'Olympiad ID', 'Delivery'],
       ...filtered.map((a, i) => [
         i + 1,
         a.code,
-        a.status,
         a.sentAt ? 'Sent' : 'Pending',
       ]),
     ];
@@ -121,20 +120,19 @@ export default function SchoolOlympiadIdsPage() {
             <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#06013E]">
               <th className="px-4 py-3 text-left text-xs font-bold uppercase border-r border-gray-300 w-12">#</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase border-r border-gray-300">Olympiad ID (Roll No.)</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase border-r border-gray-300">Delivery Status</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase">Delivered On</th>
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={4} className="py-16 text-center">
+              <tr><td colSpan={3} className="py-16 text-center">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#06013E] mb-2" />
                 <p className="text-gray-600 text-sm">Loading IDs...</p>
               </td></tr>
             ) : error ? (
-              <tr><td colSpan={4} className="py-16 text-center text-red-600 text-sm">{error}</td></tr>
+              <tr><td colSpan={3} className="py-16 text-center text-red-600 text-sm">{error}</td></tr>
             ) : filtered.length === 0 ? (
-              <tr><td colSpan={4} className="py-16 text-center text-gray-500 text-sm">
+              <tr><td colSpan={3} className="py-16 text-center text-gray-500 text-sm">
                 {allocations.length === 0
                   ? 'No Olympiad IDs allocated yet. Please contact your Mittsure coordinator.'
                   : 'No records match your filters.'}
@@ -144,15 +142,6 @@ export default function SchoolOlympiadIdsPage() {
                 <tr key={a.id} className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">{idx + 1}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E]">{a.code}</td>
-                  <td className="px-4 py-2.5 border-r border-gray-200">
-                    <span className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase ${
-                      a.sentAt
-                        ? 'bg-green-100 text-green-800 border border-green-300'
-                        : 'bg-orange-100 text-orange-800 border border-orange-300'
-                    }`}>
-                      {a.sentAt ? 'Delivered' : 'Pending'}
-                    </span>
-                  </td>
                   <td className="px-4 py-2.5 text-gray-700 text-xs">
                     {a.sentAt ? new Date(a.sentAt).toLocaleDateString() : '-'}
                   </td>

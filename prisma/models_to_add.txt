@@ -1,0 +1,22 @@
+// Add to schema.prisma
+/*
+model Video {
+  id           String   @id @default(uuid())
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id])
+  videoUrl     String
+  thumbnailUrl String?
+  caption      String?
+  category     String?
+  subCategory  String?
+  tags         String[]
+  isPublic     Boolean  @default(true)
+  status       String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  rejectionReason String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([studentId])
+  @@index([status])
+}
+*/

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { KeyRound, Loader2, Search, RotateCw, Copy, Check, X } from 'lucide-react';
+import { UserCheck, Loader2, Search, RotateCw, Copy, Check, X, Download } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,30 +9,27 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
-interface StudentCred {
-  id: string; // allocation ID
-  code: string; // Olympiad ID
+interface RegisteredStudent {
+  id: string; // student ID
+  name: string;
+  phone: string;
+  olympiadCode: string;
+  plainPassword?: string | null;
+  isVerified: boolean;
+  createdAt: string;
   school: {
     id: string;
     schoolId: string;
     name: string;
     city: string | null;
   } | null;
-  student: {
-    id: string;
-    name: string;
-    phone: string;
-    plainPassword?: string | null;
-    isVerified: boolean;
-    createdAt: string;
-  } | null;
 }
 
-export default function StudentCredentialsPage() {
-  const [rows, setRows] = useState<StudentCred[]>([]);
+export default function RegisteredStudentsPage() {
+  const [rows, setRows] = useState<RegisteredStudent[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [resetTarget, setResetTarget] = useState<StudentCred | null>(null);
+  const [resetTarget, setResetTarget] = useState<RegisteredStudent | null>(null);
   const [resetBusy, setResetBusy] = useState(false);
   const [newCreds, setNewCreds] = useState<{
     olympiadCode: string;
@@ -43,7 +40,7 @@ export default function StudentCredentialsPage() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetch('/api/credentials/students')
+    fetch('/api/credentials/registered-students')
       .then((res) => res.json())
       .then((data) => setRows(Array.isArray(data) ? data : []))
       .catch(() => setRows([]))
@@ -55,20 +52,20 @@ export default function StudentCredentialsPage() {
     const q = search.toLowerCase();
     return rows.filter(
       (r) =>
-        r.code?.toLowerCase().includes(q) ||
+        r.olympiadCode?.toLowerCase().includes(q) ||
+        r.name?.toLowerCase().includes(q) ||
+        r.phone?.toLowerCase().includes(q) ||
         r.school?.name?.toLowerCase().includes(q) ||
         r.school?.schoolId?.toLowerCase().includes(q) ||
-        r.school?.city?.toLowerCase().includes(q) ||
-        r.student?.name?.toLowerCase().includes(q) ||
-        r.student?.phone?.toLowerCase().includes(q)
+        r.school?.city?.toLowerCase().includes(q)
     );
   }, [rows, search]);
 
   const handleResetConfirm = async () => {
-    if (!resetTarget || !resetTarget.student) return;
+    if (!resetTarget) return;
     setResetBusy(true);
     try {
-      const res = await fetch(`/api/credentials/students/${resetTarget.student.id}/reset`, {
+      const res = await fetch(`/api/credentials/students/${resetTarget.id}/reset`, {
         method: 'POST',
       });
       const data = await res.json();
@@ -77,8 +74,8 @@ export default function StudentCredentialsPage() {
         return;
       }
       setNewCreds({
-        olympiadCode: resetTarget.code,
-        name: resetTarget.student.name,
+        olympiadCode: resetTarget.olympiadCode,
+        name: resetTarget.name,
         password: data.password,
         schoolName: resetTarget.school?.name,
       });
@@ -86,8 +83,8 @@ export default function StudentCredentialsPage() {
       // refresh plainPassword in local rows
       setRows((prev) =>
         prev.map((r) =>
-          r.id === resetTarget.id && r.student
-            ? { ...r, student: { ...r.student, plainPassword: data.password } }
+          r.id === resetTarget.id
+            ? { ...r, plainPassword: data.password }
             : r
         )
       );
@@ -106,30 +103,78 @@ export default function StudentCredentialsPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const exportCSV = () => {
+    if (filtered.length === 0) return;
+    const headers = [
+      'School ID',
+      'School Name',
+      'Olympiad ID (Username)',
+      'Student Name',
+      'Phone Number',
+      'Verification Status',
+      'Password',
+      'Registration Date'
+    ];
+    const dataRows = filtered.map((r) => [
+      r.school?.schoolId || '-',
+      r.school?.name || '-',
+      r.olympiadCode,
+      r.name,
+      r.phone,
+      r.isVerified ? 'Verified' : 'Pending Verification',
+      r.plainPassword || 'Reset to generate',
+      new Date(r.createdAt).toLocaleString(),
+    ]);
+
+    const csvContent = [
+      headers,
+      ...dataRows
+    ]
+      .map((row) => row.map((val) => `"${String(val).replace(/"/g, '""')}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `registered-students-credentials-${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="bg-white border border-gray-300 shadow-sm">
       <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
         <div className="flex items-center gap-3">
-          <KeyRound size={20} />
-          <h1 className="text-base font-bold uppercase tracking-wider">Manage Student Credentials</h1>
+          <UserCheck size={20} />
+          <h1 className="text-base font-bold uppercase tracking-wider">Registered Students</h1>
         </div>
-        <div className="text-xs text-gray-300">View all allocated Olympiad IDs and manage student credentials</div>
+        <div className="text-xs text-gray-300">View and manage credentials of students who completed registration</div>
       </div>
 
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
-          <span className="text-gray-600">Total Student IDs: </span>
+          <span className="text-gray-600">Total Registered Students: </span>
           <span className="font-bold text-[#06013E]">{rows.length}</span>
         </div>
-        <div className="relative max-w-md flex-1 min-w-[240px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            type="text"
-            placeholder="Search by Olympiad ID, student, school..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-gray-300 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-          />
+        <div className="flex items-center gap-3 flex-wrap">
+          <button
+            onClick={exportCSV}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center gap-2 bg-white border border-gray-400 text-[#06013E] px-4 py-2 text-sm font-semibold hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
+          <div className="relative max-w-md min-w-[240px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search by student, Olympiad ID, school..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+            />
+          </div>
         </div>
       </div>
 
@@ -140,9 +185,9 @@ export default function StudentCredentialsPage() {
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300 w-12">#</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">School ID & Name</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Olympiad ID (Username)</th>
-              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Registration Status</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Student Name</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Phone Number</th>
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Verification Status</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Password</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Registration Date</th>
               <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-40">Action</th>
@@ -153,14 +198,14 @@ export default function StudentCredentialsPage() {
               <tr>
                 <td colSpan={9} className="py-16 text-center">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#06013E] mb-2" />
-                  <p className="text-gray-600 text-sm">Loading credentials...</p>
+                  <p className="text-gray-600 text-sm">Loading registered students...</p>
                 </td>
               </tr>
             ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={9} className="py-16 text-center text-gray-500 text-sm">
                   {rows.length === 0
-                    ? 'No student IDs allocated yet.'
+                    ? 'No students registered yet.'
                     : 'No records match your search.'}
                 </td>
               </tr>
@@ -183,52 +228,40 @@ export default function StudentCredentialsPage() {
                       <span className="text-gray-400">-</span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E] select-all">{r.code}</td>
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E] select-all">{r.olympiadCode}</td>
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-semibold text-gray-900">{r.name}</td>
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-gray-800">{r.phone}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
-                    {r.student ? (
+                    {r.isVerified ? (
                       <span className="inline-flex items-center text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
-                        Registered
+                        Verified
                       </span>
                     ) : (
-                      <span className="inline-flex items-center text-xs font-bold text-orange-700 bg-orange-50 border border-orange-200 px-2 py-0.5 rounded-full">
-                        Pending Registration
+                      <span className="inline-flex items-center text-xs font-bold text-gray-700 bg-gray-50 border border-gray-200 px-2 py-0.5 rounded-full">
+                        Pending Verification
                       </span>
                     )}
                   </td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-semibold text-gray-900">
-                    {r.student ? r.student.name : <span className="text-gray-400 italic">-</span>}
-                  </td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-gray-800">
-                    {r.student ? r.student.phone : <span className="text-gray-400 italic">-</span>}
-                  </td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
-                    {r.student ? (
-                      r.student.plainPassword ? (
-                        <span className="font-mono text-sm font-bold text-[#06013E] select-all">
-                          {r.student.plainPassword}
-                        </span>
-                      ) : (
-                        <span className="text-xs text-gray-400 italic">Reset to generate</span>
-                      )
+                    {r.plainPassword ? (
+                      <span className="font-mono text-sm font-bold text-[#06013E] select-all">
+                        {r.plainPassword}
+                      </span>
                     ) : (
-                      <span className="text-gray-400 italic">-</span>
+                      <span className="text-xs text-gray-400 italic">Reset to generate</span>
                     )}
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">
-                    {r.student ? new Date(r.student.createdAt).toLocaleString() : <span className="text-gray-400 italic">-</span>}
+                    {new Date(r.createdAt).toLocaleString()}
                   </td>
                   <td className="px-4 py-2.5 text-center">
-                    {r.student ? (
-                      <button
-                        title="Generate new password"
-                        onClick={() => setResetTarget(r)}
-                        className="inline-flex items-center gap-1.5 bg-[#06013E] text-white px-2.5 py-1 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
-                      >
-                        <RotateCw className="w-3 h-3" /> Reset Password
-                      </button>
-                    ) : (
-                      <span className="text-gray-400 italic">-</span>
-                    )}
+                    <button
+                      title="Generate new password"
+                      onClick={() => setResetTarget(r)}
+                      className="inline-flex items-center gap-1.5 bg-[#06013E] text-white px-2.5 py-1 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
+                    >
+                      <RotateCw className="w-3 h-3" /> Reset Password
+                    </button>
                   </td>
                 </tr>
               ))
@@ -262,19 +295,19 @@ export default function StudentCredentialsPage() {
               </p>
             </div>
 
-            {resetTarget && resetTarget.student && (
+            {resetTarget && (
               <div className="mt-5 bg-gray-50 rounded-xl p-4 space-y-1.5">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Student Name</span>
-                  <span className="font-semibold text-gray-900 truncate ml-3 max-w-[200px]">{resetTarget.student.name}</span>
+                  <span className="font-semibold text-gray-900 truncate ml-3 max-w-[200px]">{resetTarget.name}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Username / Olympiad ID</span>
-                  <span className="font-semibold text-gray-900 font-mono">{resetTarget.code}</span>
+                  <span className="font-semibold text-gray-900 font-mono">{resetTarget.olympiadCode}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Phone</span>
-                  <span className="font-semibold text-gray-900 font-mono">{resetTarget.student.phone}</span>
+                  <span className="font-semibold text-gray-900 font-mono">{resetTarget.phone}</span>
                 </div>
               </div>
             )}

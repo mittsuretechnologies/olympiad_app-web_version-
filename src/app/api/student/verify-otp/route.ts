@@ -39,6 +39,7 @@ export async function POST(request: Request) {
         name: stored.name,
         phone: stored.phone,
         password: hashedPassword,
+        plainPassword: password,
         isVerified: true,
       },
     });

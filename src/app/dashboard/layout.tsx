@@ -17,6 +17,8 @@ import {
   UploadCloud,
   UserPlus,
   UserCheck,
+  Play,
+  Clock,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -27,12 +29,13 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
 
-  type Section = 'schools' | 'uploaders' | 'credentials' | null;
+  type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | null;
 
   const sectionForPath = (p: string): Section => {
     if (p.startsWith('/dashboard/schools')) return 'schools';
     if (p.startsWith('/dashboard/uploaders')) return 'uploaders';
     if (p.startsWith('/dashboard/credentials')) return 'credentials';
+    if (p.startsWith('/dashboard/videos')) return 'moderation';
     return 'schools';
   };
 
@@ -45,11 +48,17 @@ export default function DashboardLayout({
   const schoolsOpen = openSection === 'schools';
   const uploadersOpen = openSection === 'uploaders';
   const credentialsOpen = openSection === 'credentials';
+  const moderationOpen = openSection === 'moderation';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
     router.push('/login');
   };
+
+  const moderationSubItems = [
+    { name: 'Pending Approvals', href: '/dashboard/videos', icon: Clock },
+    // Later we can add 'All Archive', 'Flagged', etc.
+  ];
 
   const schoolSubItems = [
     { name: 'Register School', href: '/dashboard/schools/register', icon: PlusCircle },
@@ -68,97 +77,137 @@ export default function DashboardLayout({
   const credentialsSubItems = [
     { name: 'Manage School Credentials', href: '/dashboard/credentials/schools', icon: Users },
     { name: 'Manage Uploader Credentials', href: '/dashboard/credentials/uploaders', icon: UploadCloud },
-    { name: 'Manage Student Credentials', href: '/dashboard/credentials/students', icon: UserCheck },
+    { name: 'Manage Student Credentials', href: '/dashboard/credentials/students', icon: KeyRound },
+    { name: 'Registered Students', href: '/dashboard/credentials/registered-students', icon: UserCheck },
   ];
 
   return (
-    <div className="flex min-h-screen bg-[#DDE2F9] text-[#432818]">
-      <div className="bg-glow-warm"></div>
+    <div className="flex min-h-screen bg-[#F0F2F5] text-[#1F2937]">
 
       {/* Sidebar */}
-      <aside className="w-72 bg-[#06013E] flex flex-col fixed h-screen z-50 shadow-[10px_0_30px_rgba(6,1,62,0.25)] overflow-y-auto">
+      <aside 
+        style={{ scrollbarGutter: 'stable' }}
+        className="w-72 bg-white flex flex-col fixed h-screen z-50 border-r border-gray-200 overflow-x-hidden overflow-y-hidden hover:overflow-y-auto custom-scrollbar"
+      >
         {/* Banner Card */}
-        <div className="p-3">
-          <div className="bg-white rounded-2xl overflow-hidden shadow-md ring-1 ring-white/10">
-            <div className="relative w-full" style={{ aspectRatio: '16/10' }}>
-              <Image
-                src="/5852.jpg"
-                alt="Kids Celebration"
-                fill
-                className="object-contain"
-                priority
-              />
-              {/* Mittsure Logo Overlay */}
-              <div className="absolute" style={{ top: '-20px', right: '-20px' }}>
-                <div className="relative h-24 w-44">
-                  <Image
-                    src="/Mittsure_LOGO_updated_page-0001-removebg-preview.png"
-                    alt="Mittsure Logo"
-                    fill
-                    className="object-contain"
-                  />
-                </div>
-              </div>
-            </div>
+        <div className="relative w-full aspect-[16/10]">
+          <Image
+            src="/5852.jpg"
+            alt="Kids Celebration"
+            fill
+            className="object-cover"
+            priority
+          />
+          {/* Mittsure Logo Overlay */}
+          <div className="absolute top-[-17px] right-[-13px] h-20 w-40">
+            <Image
+              src="/Mittsure_LOGO_updated_page-0001-removebg-preview.png"
+              alt="Mittsure Logo"
+              fill
+              className="object-contain"
+            />
           </div>
         </div>
 
-        <div className="p-4 flex flex-col flex-1">
-          
-      
-          
+        <div className="p-4 pt-6 pb-2">
+          <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+            Main Menu
+          </p>
+        </div>
 
-          <nav className="flex-1 space-y-1">
+        <div className="px-4 flex flex-col flex-1">
+          <nav className="flex-1 space-y-2">
             {/* Dashboard Link */}
             <Link
               href="/dashboard"
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-colors duration-100 group ${pathname === '/dashboard'
-                ? 'bg-white text-[#06013E] shadow-lg'
-                : 'text-white hover:bg-white/15'
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname === '/dashboard'
+                ? 'bg-[#E9FCD4] text-black font-semibold'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-black'
                 }`}
             >
-              <LayoutDashboard size={18} className={pathname === '/dashboard' ? 'text-[#06013E]' : ''} />
-              <span className="font-semibold text-sm">Dashboard</span>
+              <LayoutDashboard size={20} />
+              <span className="text-sm">Dashboard</span>
             </Link>
 
-            {/* School Management - Expandable */}
+            {/* Moderation - Expandable */}
             <div>
               <button
-                onClick={() => toggleSection('schools')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors duration-100 group ${pathname.startsWith('/dashboard/schools')
-                  ? 'bg-white/25 text-white'
-                  : 'text-white hover:bg-white/15'
+                onClick={() => toggleSection('moderation')}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/videos')
+                  ? 'text-black font-semibold'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <School size={18} />
-                  <span className="font-semibold text-sm">School Management</span>
+                  <Play size={20} />
+                  <span className="text-sm">Moderation</span>
                 </div>
                 <ChevronDown
                   size={16}
-                  className={`transition-transform duration-150 ${schoolsOpen ? 'rotate-180' : ''}`}
+                  className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`}
                 />
               </button>
 
-              {/* Sub Items */}
               <div
-                className={`overflow-hidden transition-all duration-150 ease-out ${schoolsOpen ? 'max-h-80 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
               >
-                <div className="ml-4 pl-4 border-l-2 border-white/30 space-y-1">
-                  {schoolSubItems.map((item) => {
-                    const Icon = item.icon;
+                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
+                  {moderationSubItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-100 text-sm ${isActive
-                          ? 'bg-white text-[#06013E] shadow-md font-semibold'
-                          : 'text-white/90 hover:bg-white/15'
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-[#E9FCD4] text-black font-semibold'
+                          : 'text-gray-500 hover:text-black'
                           }`}
                       >
-                        <Icon size={16} />
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* School Management - Expandable */}
+            <div>
+              <button
+                onClick={() => toggleSection('schools')}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/schools')
+                  ? 'text-black font-semibold'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <School size={20} />
+                  <span className="text-sm">Schools</span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform duration-200 ${schoolsOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              {/* Sub Items */}
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${schoolsOpen ? 'max-h-80 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                  }`}
+              >
+                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
+                  {schoolSubItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-[#E9FCD4] text-black font-semibold'
+                          : 'text-gray-500 hover:text-black'
+                          }`}
+                      >
                         <span>{item.name}</span>
                       </Link>
                     );
@@ -171,39 +220,37 @@ export default function DashboardLayout({
             <div>
               <button
                 onClick={() => toggleSection('uploaders')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors duration-100 group ${pathname.startsWith('/dashboard/uploaders')
-                  ? 'bg-white/25 text-white'
-                  : 'text-white hover:bg-white/15'
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/uploaders')
+                  ? 'text-black font-semibold'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <UploadCloud size={18} />
-                  <span className="font-semibold text-sm">Uploaders</span>
+                  <UploadCloud size={20} />
+                  <span className="text-sm">Uploaders</span>
                 </div>
                 <ChevronDown
                   size={16}
-                  className={`transition-transform duration-150 ${uploadersOpen ? 'rotate-180' : ''}`}
+                  className={`transition-transform duration-200 ${uploadersOpen ? 'rotate-180' : ''}`}
                 />
               </button>
 
               <div
-                className={`overflow-hidden transition-all duration-150 ease-out ${uploadersOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${uploadersOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
               >
-                <div className="ml-4 pl-4 border-l-2 border-white/30 space-y-1">
+                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
                   {uploaderSubItems.map((item) => {
-                    const Icon = item.icon;
                     const isActive = pathname === item.href;
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-100 text-sm ${isActive
-                          ? 'bg-white text-[#06013E] shadow-md font-semibold'
-                          : 'text-white/90 hover:bg-white/15'
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-[#E9FCD4] text-black font-semibold'
+                          : 'text-gray-500 hover:text-black'
                           }`}
                       >
-                        <Icon size={16} />
                         <span>{item.name}</span>
                       </Link>
                     );
@@ -217,39 +264,37 @@ export default function DashboardLayout({
             <div>
               <button
                 onClick={() => toggleSection('credentials')}
-                className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-colors duration-100 group ${pathname.startsWith('/dashboard/credentials')
-                  ? 'bg-white/25 text-white'
-                  : 'text-white hover:bg-white/15'
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/credentials')
+                  ? 'text-black font-semibold'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
                   }`}
               >
                 <div className="flex items-center gap-3">
-                  <KeyRound size={18} />
-                  <span className="font-semibold text-sm">Credentials</span>
+                  <KeyRound size={20} />
+                  <span className="text-sm">Credentials</span>
                 </div>
                 <ChevronDown
                   size={16}
-                  className={`transition-transform duration-150 ${credentialsOpen ? 'rotate-180' : ''}`}
+                  className={`transition-transform duration-200 ${credentialsOpen ? 'rotate-180' : ''}`}
                 />
               </button>
 
               <div
-                className={`overflow-hidden transition-all duration-150 ease-out ${credentialsOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${credentialsOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
               >
-                <div className="ml-4 pl-4 border-l-2 border-white/30 space-y-1">
+                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
                   {credentialsSubItems.map((item) => {
-                    const Icon = item.icon;
                     const isActive = pathname === item.href;
                     return (
                       <Link
                         key={item.name}
                         href={item.href}
-                        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors duration-100 text-sm ${isActive
-                          ? 'bg-white text-[#06013E] shadow-md font-semibold'
-                          : 'text-white/90 hover:bg-white/15'
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-[#E9FCD4] text-black font-semibold'
+                          : 'text-gray-500 hover:text-black'
                           }`}
                       >
-                        <Icon size={16} />
                         <span>{item.name}</span>
                       </Link>
                     );
@@ -259,23 +304,22 @@ export default function DashboardLayout({
             </div>
           </nav>
 
-          <div className="mt-auto space-y-4 pt-6 border-t border-white/25">
+          {/* Logout Section */}
+          <div className="mt-auto py-8">
             <button
               onClick={handleLogout}
-              className="flex items-center gap-3 px-4 py-3 rounded-xl text-white hover:bg-white/15 transition-all w-full group"
+              className="w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors font-medium text-sm"
             >
-              <LogOut size={18} className="group-hover:rotate-12 transition-transform" />
-              <span className="font-semibold text-sm">Logout Session</span>
+              <LogOut size={18} />
+              <span>Logout</span>
             </button>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-72 px-6 pt-2 pb-10 relative min-h-screen">
-        <div className="max-w-7xl mx-auto">
-          {children}
-        </div>
+      <main className="flex-1 ml-72 min-h-screen relative p-8">
+        {children}
       </main>
     </div>
   );
