@@ -27,14 +27,14 @@ model School {
   phone         String?
   contactPerson String?
   city          String?
-  district      String?
   state         String?
   pincode       String?
-  username      String?                @unique
-  password      String?
-  plainPassword String?
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
+  password      String?
+  username      String?                @unique
+  plainPassword String?
+  district      String?
   olympiadIds   OlympiadIdAllocation[]
 }
 
@@ -56,10 +56,10 @@ model OlympiadIdAllocation {
   code      String    @unique
   prefix    String
   sequence  Int
-  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   schoolId  String
-  sentAt    DateTime?
   createdAt DateTime  @default(now())
+  sentAt    DateTime?
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   student   Student?
 
   @@index([schoolId])
@@ -68,31 +68,33 @@ model OlympiadIdAllocation {
 model Student {
   id            String               @id @default(uuid())
   olympiadCode  String               @unique
-  allocation    OlympiadIdAllocation @relation(fields: [olympiadCode], references: [code], onDelete: Cascade)
   name          String
   phone         String
   password      String?
-  plainPassword String?
   isVerified    Boolean              @default(false)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
+  plainPassword String?
+  allocation    OlympiadIdAllocation @relation(fields: [olympiadCode], references: [code], onDelete: Cascade)
   videos        Video[]
 }
 
 model Video {
   id              String   @id @default(uuid())
   studentId       String
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
   videoUrl        String
   thumbnailUrl    String?
   caption         String?
   category        String?
   subCategory     String?
-  tags            String?  // Stored as comma separated or JSON string depending on DB
-  status          String   @default("PENDING") // PENDING, APPROVED, REJECTED
+  tags            String?
+  status          String   @default("PENDING")
   rejectionReason String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+  isEvaluation    Boolean  @default(false)
+  isPublic        Boolean  @default(true)
+  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   @@index([studentId])
   @@index([status])

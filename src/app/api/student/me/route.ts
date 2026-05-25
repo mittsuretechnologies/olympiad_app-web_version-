@@ -25,6 +25,8 @@ export async function GET(request: Request) {
               select: {
                 name: true,
                 city: true,
+                district: true,
+                state: true,
                 schoolId: true,
               },
             },
@@ -43,7 +45,13 @@ export async function GET(request: Request) {
         name: student.name,
         olympiadCode: student.olympiadCode,
         phone: student.phone,
-        school: student.allocation.school,
+        school: {
+          name: student.allocation.school.name,
+          city: student.allocation.school.city,
+          district: student.allocation.school.district,
+          state: student.allocation.school.state,
+          schoolId: student.allocation.school.schoolId,
+        },
         isVerified: student.isVerified,
         createdAt: student.createdAt,
       },
