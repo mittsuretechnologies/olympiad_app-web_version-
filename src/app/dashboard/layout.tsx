@@ -75,10 +75,11 @@ export default function DashboardLayout({
 
 
   const credentialsSubItems = [
-    { name: 'Manage School Credentials', href: '/dashboard/credentials/schools', icon: Users },
-    { name: 'Manage Uploader Credentials', href: '/dashboard/credentials/uploaders', icon: UploadCloud },
-    { name: 'Manage Student Credentials', href: '/dashboard/credentials/students', icon: KeyRound },
-    { name: 'Registered Students', href: '/dashboard/credentials/registered-students', icon: UserCheck },
+    { name: 'Manage School Credentials',   href: '/dashboard/credentials/schools',             icon: Users },
+    { name: 'Manage Uploader Credentials', href: '/dashboard/credentials/uploaders',           icon: UploadCloud },
+    { name: 'Manage Student Credentials',  href: '/dashboard/credentials/students',            icon: KeyRound },
+    { name: 'Registered Students',         href: '/dashboard/credentials/registered-students', icon: UserCheck },
+    { name: 'Viewer App Accounts',         href: '/dashboard/credentials/viewers',             icon: Eye },
   ];
 
   return (

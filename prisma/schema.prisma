@@ -80,7 +80,7 @@ model Student {
 }
 
 model Video {
-  id              String   @id @default(uuid())
+  id              String      @id @default(uuid())
   studentId       String
   videoUrl        String
   thumbnailUrl    String?
@@ -88,16 +88,21 @@ model Video {
   category        String?
   subCategory     String?
   tags            String?
-  status          String   @default("PENDING")
+  status          String      @default("PENDING")
   rejectionReason String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  isEvaluation    Boolean  @default(false)
-  isPublic        Boolean  @default(true)
-  student         Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  isEvaluation    Boolean     @default(false)
+  isPublic        Boolean     @default(true)
+  likesCount      Int         @default(0)
+  viewsCount      Int         @default(0)
+  student         Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  likes           Like[]
+  views           VideoView[]
 
   @@index([studentId])
   @@index([status])
+  @@index([status, isPublic])
 }
 
 model Viewer {
@@ -107,4 +112,27 @@ model Viewer {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model Like {
+  id        String   @id @default(uuid())
+  videoId   String
+  userId    String
+  userType  String   // "student", "viewer", "anonymous"
+  createdAt DateTime @default(now())
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, userId])
+  @@index([videoId])
+}
+
+model VideoView {
+  id        String   @id @default(uuid())
+  videoId   String
+  sessionId String
+  createdAt DateTime @default(now())
+  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@index([videoId])
+  @@index([videoId, sessionId])
 }
