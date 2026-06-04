@@ -130,49 +130,6 @@ export default function DashboardLayout({
               <span className="text-sm">Dashboard</span>
             </Link>
 
-            {/* Moderation - Expandable */}
-            <div>
-              <button
-                onClick={() => toggleSection('moderation')}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/videos')
-                  ? 'text-black font-semibold'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
-                  }`}
-              >
-                <div className="flex items-center gap-3">
-                  <Play size={20} />
-                  <span className="text-sm">Moderation</span>
-                </div>
-                <ChevronDown
-                  size={16}
-                  className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`}
-                />
-              </button>
-
-              <div
-                className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
-                  }`}
-              >
-                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
-                  {moderationSubItems.map((item) => {
-                    const isActive = pathname === item.href;
-                    return (
-                      <Link
-                        key={item.name}
-                        href={item.href}
-                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#E9FCD4] text-black font-semibold'
-                          : 'text-gray-500 hover:text-black'
-                          }`}
-                      >
-                        <span>{item.name}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-
             {/* School Management - Expandable */}
             <div>
               <button
@@ -199,6 +156,49 @@ export default function DashboardLayout({
               >
                 <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
                   {schoolSubItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-[#E9FCD4] text-black font-semibold'
+                          : 'text-gray-500 hover:text-black'
+                          }`}
+                      >
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Moderation - Expandable */}
+            <div>
+              <button
+                onClick={() => toggleSection('moderation')}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/videos')
+                  ? 'text-black font-semibold'
+                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Play size={20} />
+                  <span className="text-sm">Moderation</span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                  }`}
+              >
+                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
+                  {moderationSubItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
                       <Link

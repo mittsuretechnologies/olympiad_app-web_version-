@@ -42,12 +42,38 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+
+    // The `sheets` table holds answer-sheets uploaded by this uploader and has a
+    // RESTRICT foreign key on uploader_id. Block deletion (with a clear message)
+    // while any uploaded sheets still exist, so moderation data is never orphaned.
+    const [{ count }] = await prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*) AS count FROM sheets WHERE uploader_id = ${id}
+    `;
+    const sheetCount = Number(count);
+    if (sheetCount > 0) {
+      return NextResponse.json(
+        {
+          message: `Cannot delete this uploader — ${sheetCount} answer-sheet${
+            sheetCount === 1 ? '' : 's'
+          } already uploaded by them. Deactivate the uploader instead, or remove their sheets first.`,
+        },
+        { status: 409 }
+      );
+    }
+
     await prisma.uploader.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('DELETE /api/uploaders/[id] failed:', error);
     if (error?.code === 'P2025') {
       return NextResponse.json({ message: 'Uploader not found' }, { status: 404 });
+    }
+    // Fallback in case some other FK still restricts the delete.
+    if (error?.code === 'P2003') {
+      return NextResponse.json(
+        { message: 'Cannot delete this uploader because other records depend on it.' },
+        { status: 409 }
+      );
     }
     return NextResponse.json({ message: 'Failed to delete uploader' }, { status: 500 });
   }

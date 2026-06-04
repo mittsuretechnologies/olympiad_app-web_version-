@@ -504,13 +504,13 @@ export default function SchoolsPage() {
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700">
                     {idx + 1}
                   </td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E]">
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E] tracking-tight tabular-nums">
                     {school.schoolId || '-'}
                   </td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-gray-700">
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-gray-600 tracking-tight tabular-nums text-[13px]">
                     {school.olympiadId}
                   </td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-semibold text-gray-900">
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-semibold text-gray-900 tracking-[-0.01em]">
                     {school.name}
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700">
