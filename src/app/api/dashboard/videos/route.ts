@@ -32,12 +32,25 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
+    // Resolve app user info for videos uploaded via the app (viewer/student path)
+    const appUserIds = [...new Set(
+      videos.filter(v => v.appUserId).map(v => v.appUserId as string)
+    )];
+    const appUsers = appUserIds.length > 0
+      ? await prisma.appUser.findMany({
+          where: { id: { in: appUserIds } },
+          select: { id: true, userId: true, email: true, mobile: true, olympiadId: true },
+        })
+      : [];
+    const appUserMap = Object.fromEntries(appUsers.map(u => [u.id, u]));
+
     // Rewrite stored video URLs to use localhost so the web dashboard can play them.
     // Stored URLs may contain 10.0.2.2 (Android emulator alias) or any other IP —
     // replace the host part so the browser can always reach the file.
     const normalized = (videos ?? []).map(v => ({
       ...v,
       videoUrl: v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.videoUrl,
+      appUser: v.appUserId ? (appUserMap[v.appUserId] ?? null) : null,
     }));
 
     return NextResponse.json(normalized);

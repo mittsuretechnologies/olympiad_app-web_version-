@@ -81,7 +81,9 @@ model Student {
 
 model Video {
   id              String      @id @default(uuid())
-  studentId       String
+  studentId       String?
+  appUserId       String?
+  uploaderType    String      @default("STUDENT")  // "STUDENT" | "VIEWER"
   videoUrl        String
   thumbnailUrl    String?
   caption         String?
@@ -96,11 +98,12 @@ model Video {
   isPublic        Boolean     @default(true)
   likesCount      Int         @default(0)
   viewsCount      Int         @default(0)
-  student         Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student         Student?    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes           Like[]
   views           VideoView[]
 
   @@index([studentId])
+  @@index([appUserId])
   @@index([status])
   @@index([status, isPublic])
 }
@@ -135,4 +138,31 @@ model VideoView {
 
   @@index([videoId])
   @@index([videoId, sessionId])
+}
+
+model AppUser {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  email          String?   @unique
+  mobile         String?   @unique
+  password       String
+  plainPassword  String?
+  termsAccepted  Boolean   @default(false)
+  otpHash        String?
+  otpExpiresAt   DateTime?
+  isVerified     Boolean   @default(false)
+  olympiadId     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([email])
+  @@index([mobile])
+}
+
+model AppOtp {
+  id         String   @id @default(uuid())
+  identifier String   @unique
+  otpHash    String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
 }

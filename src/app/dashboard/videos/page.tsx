@@ -18,6 +18,8 @@ interface Video {
   status: string;
   rejectionReason: string | null;
   createdAt: string;
+  uploaderType: string | null;
+  appUser: { userId: string; email: string | null; mobile: string | null; olympiadId: string | null } | null;
   student: {
     name: string;
     olympiadCode: string;
@@ -29,7 +31,7 @@ interface Video {
         state: string;
       };
     };
-  };
+  } | null;
 }
 
 type StatusFilter = 'PENDING' | 'APPROVED' | 'REJECTED';
@@ -233,17 +235,45 @@ export default function VideoModerationPage() {
                   <p className="text-[10px] text-gray-300 mt-0.5">{formatDate(video.createdAt)}</p>
                 </div>
 
-                {/* Student */}
+                {/* Uploader */}
                 <div className="min-w-0 px-2">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-6 h-6 rounded-full bg-[#014584]/10 flex items-center justify-center text-[9px] font-black text-[#014584] shrink-0">
-                      {video.student?.name?.[0] ?? <User size={10} />}
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-black text-[#06013E] truncate">{video.student?.name}</p>
-                      <p className="text-[10px] text-gray-400 font-mono truncate">{video.student?.olympiadCode}</p>
-                    </div>
+                  {/* Uploader type badge */}
+                  <div className="mb-1">
+                    {(video.uploaderType === 'STUDENT' || video.student) ? (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">
+                        🎓 STUDENT
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-0.5 text-[9px] font-black bg-blue-50 text-blue-600 border border-blue-200 px-1.5 py-0.5 rounded-full">
+                        👁 VIEWER
+                      </span>
+                    )}
                   </div>
+                  {/* Student record (school-registered) */}
+                  {video.student ? (
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-5 h-5 rounded-full bg-[#014584]/10 flex items-center justify-center text-[9px] font-black text-[#014584] shrink-0">
+                        {video.student.name?.[0] ?? <User size={9} />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-black text-[#06013E] truncate">{video.student.name}</p>
+                        <p className="text-[10px] text-gray-400 font-mono truncate">{video.student.olympiadCode}</p>
+                      </div>
+                    </div>
+                  ) : video.appUser ? (
+                    /* App user (viewer or student-via-app) */
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-gray-700 truncate font-mono">{video.appUser.userId}</p>
+                      <p className="text-[10px] text-gray-400 truncate">
+                        {video.appUser.email || video.appUser.mobile || '—'}
+                      </p>
+                      {video.appUser.olympiadId && (
+                        <p className="text-[10px] text-amber-600 font-mono truncate">{video.appUser.olympiadId}</p>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="text-[10px] text-gray-300">—</p>
+                  )}
                 </div>
 
                 {/* School */}
@@ -330,8 +360,28 @@ export default function VideoModerationPage() {
             <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-black text-[#06013E] text-sm">{previewVideo.student?.name}</p>
-                  <p className="text-[11px] text-gray-400 font-mono">{previewVideo.student?.olympiadCode}</p>
+                  {/* Uploader type badge */}
+                  <span className={`inline-flex items-center gap-0.5 text-[10px] font-black px-2 py-0.5 rounded-full mb-1 ${
+                    previewVideo.uploaderType === 'STUDENT' || previewVideo.student
+                      ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                      : 'bg-blue-50 text-blue-600 border border-blue-200'
+                  }`}>
+                    {(previewVideo.uploaderType === 'STUDENT' || previewVideo.student) ? '🎓 Student' : '👁 Viewer'}
+                  </span>
+                  {previewVideo.student ? (
+                    <>
+                      <p className="font-black text-[#06013E] text-sm">{previewVideo.student.name}</p>
+                      <p className="text-[11px] text-gray-400 font-mono">{previewVideo.student.olympiadCode}</p>
+                    </>
+                  ) : previewVideo.appUser ? (
+                    <>
+                      <p className="font-black text-[#06013E] text-sm font-mono">{previewVideo.appUser.userId}</p>
+                      <p className="text-[11px] text-gray-400">{previewVideo.appUser.email || previewVideo.appUser.mobile || '—'}</p>
+                      {previewVideo.appUser.olympiadId && (
+                        <p className="text-[11px] text-amber-600 font-mono">{previewVideo.appUser.olympiadId}</p>
+                      )}
+                    </>
+                  ) : null}
                   <p className="text-[11px] text-gray-500 mt-0.5">{previewVideo.subCategory} · {previewVideo.category}</p>
                   {previewVideo.caption && (
                     <p className="text-xs text-gray-500 mt-1.5 italic">"{previewVideo.caption}"</p>
