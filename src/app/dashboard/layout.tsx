@@ -19,6 +19,7 @@ import {
   UserCheck,
   Play,
   Clock,
+  Smartphone,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -79,7 +80,6 @@ export default function DashboardLayout({
     { name: 'Manage Uploader Credentials', href: '/dashboard/credentials/uploaders',           icon: UploadCloud },
     { name: 'Manage Student Credentials',  href: '/dashboard/credentials/students',            icon: KeyRound },
     { name: 'Registered Students',         href: '/dashboard/credentials/registered-students', icon: UserCheck },
-    { name: 'Viewer App Accounts',         href: '/dashboard/credentials/viewers',             icon: Eye },
   ];
 
   return (
@@ -303,6 +303,19 @@ export default function DashboardLayout({
                 </div>
               </div>
             </div>
+
+            {/* App Users */}
+            <Link
+              href="/dashboard/app-users"
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname === '/dashboard/app-users'
+                ? 'bg-[#E9FCD4] text-black font-semibold'
+                : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                }`}
+            >
+              <Smartphone size={20} />
+              <span className="text-sm">App Users</span>
+            </Link>
+
           </nav>
 
           {/* Logout Section */}

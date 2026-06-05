@@ -92,13 +92,13 @@ export async function GET(request: NextRequest) {
       viewsCount:   v.viewsCount,
       createdAt:    v.createdAt,
       isLiked:      likedIds.has(v.id),
-      student: {
+      student: v.student ? {
         id:         v.student.id,
         name:       v.student.name,
         schoolName: v.student.allocation?.school?.name ?? null,
         state:      v.student.allocation?.school?.state ?? null,
         city:       v.student.allocation?.school?.city ?? null,
-      },
+      } : null,
     }));
 
     return NextResponse.json({ videos: result, nextCursor, hasMore });
