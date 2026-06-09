@@ -11,13 +11,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'User ID and password are required' }, { status: 400 });
     }
 
-    const user = await prisma.appUser.findUnique({
-      where: { userId: userId.trim().toUpperCase() },
+    const user = await prisma.appUser.findFirst({
+      where: { userId: { equals: userId.trim(), mode: 'insensitive' } },
     });
 
     if (!user) {
       return NextResponse.json(
-        { message: `No account found with User ID "${userId.trim().toUpperCase()}". Please check your ID or sign up.` },
+        { message: `No account found with User ID "${userId.trim()}". Please check your ID or sign up.` },
         { status: 401 }
       );
     }
@@ -47,6 +47,7 @@ export async function POST(request: Request) {
         userId: user.userId,
         email: user.email,
         mobile: user.mobile,
+        avatarUrl: user.avatarUrl,
         olympiadId: user.olympiadId,
       },
     });
