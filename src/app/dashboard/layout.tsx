@@ -86,23 +86,26 @@ export default function DashboardLayout({
     <div className="flex min-h-screen bg-[#F0F2F5] text-[#1F2937]">
 
       {/* Sidebar */}
-      <aside 
+      <aside
         style={{ scrollbarGutter: 'stable' }}
-        className="w-72 bg-white flex flex-col fixed h-screen z-50 border-r border-gray-200 overflow-x-hidden overflow-y-hidden hover:overflow-y-auto custom-scrollbar"
+        className="w-72 bg-[#052E5C] flex flex-col fixed h-screen z-50 border-r border-[#04203f] overflow-x-hidden overflow-y-hidden hover:overflow-y-auto custom-scrollbar"
       >
-        {/* Banner Card */}
-        <div className="relative w-full aspect-[16/10]">
-          <Image
-            src="/5852.jpg"
-            alt="Kids Celebration"
-            fill
-            className="object-cover"
-            priority
-          />
-          {/* Mittsure Logo Overlay */}
-          <div className="absolute top-[-17px] right-[-13px] h-20 w-40">
+        {/* Banner Card — centered white card floating on the blue sidebar */}
+        <div className="relative px-4 pt-5 pb-2">
+          <div className="relative w-full aspect-[16/10] overflow-hidden rounded-2xl bg-white shadow-lg shadow-black/20">
             <Image
-              src="/Mittsure_LOGO_updated_page-0001-removebg-preview.png"
+              src="/banner.webp"
+              alt="Kids Celebration"
+              fill
+              sizes="280px"
+              className="object-cover object-center"
+              priority
+            />
+          </div>
+          {/* Mittsure Logo Overlay */}
+          <div className="absolute top-[2px] right-[6px] h-16 w-32">
+            <Image
+              src="/logo-color.webp"
               alt="Mittsure Logo"
               fill
               className="object-contain"
@@ -111,7 +114,7 @@ export default function DashboardLayout({
         </div>
 
         <div className="p-4 pt-6 pb-2">
-          <p className="px-4 text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2">
+          <p className="px-4 text-[11px] font-bold text-blue-200/70 uppercase tracking-wider mb-2">
             Main Menu
           </p>
         </div>
@@ -122,12 +125,12 @@ export default function DashboardLayout({
             <Link
               href="/dashboard"
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname === '/dashboard'
-                ? 'bg-[#E9FCD4] text-black font-semibold'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                ? 'bg-[#009846] text-white font-semibold'
+                : 'text-blue-100 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <LayoutDashboard size={20} />
-              <span className="text-sm">Dashboard</span>
+              <span className="text-sm font-semibold">Dashboard</span>
             </Link>
 
             {/* School Management - Expandable */}
@@ -135,13 +138,13 @@ export default function DashboardLayout({
               <button
                 onClick={() => toggleSection('schools')}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/schools')
-                  ? 'text-black font-semibold'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                  ? 'text-white font-semibold'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
                 <div className="flex items-center gap-3">
                   <School size={20} />
-                  <span className="text-sm">Schools</span>
+                  <span className="text-sm font-semibold">Schools</span>
                 </div>
                 <ChevronDown
                   size={16}
@@ -154,7 +157,7 @@ export default function DashboardLayout({
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${schoolsOpen ? 'max-h-80 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
               >
-                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
+                <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
                   {schoolSubItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
@@ -162,8 +165,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#E9FCD4] text-black font-semibold'
-                          : 'text-gray-500 hover:text-black'
+                          ? 'bg-[#009846] text-white font-semibold'
+                          : 'text-blue-200 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -179,13 +182,13 @@ export default function DashboardLayout({
               <button
                 onClick={() => toggleSection('moderation')}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/videos')
-                  ? 'text-black font-semibold'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                  ? 'text-white font-semibold'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
                 <div className="flex items-center gap-3">
                   <Play size={20} />
-                  <span className="text-sm">Moderation</span>
+                  <span className="text-sm font-semibold">Moderation</span>
                 </div>
                 <ChevronDown
                   size={16}
@@ -197,7 +200,7 @@ export default function DashboardLayout({
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
               >
-                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
+                <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
                   {moderationSubItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
@@ -205,8 +208,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#E9FCD4] text-black font-semibold'
-                          : 'text-gray-500 hover:text-black'
+                          ? 'bg-[#009846] text-white font-semibold'
+                          : 'text-blue-200 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -222,13 +225,13 @@ export default function DashboardLayout({
               <button
                 onClick={() => toggleSection('uploaders')}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/uploaders')
-                  ? 'text-black font-semibold'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                  ? 'text-white font-semibold'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
                 <div className="flex items-center gap-3">
                   <UploadCloud size={20} />
-                  <span className="text-sm">Uploaders</span>
+                  <span className="text-sm font-semibold">Uploaders</span>
                 </div>
                 <ChevronDown
                   size={16}
@@ -240,7 +243,7 @@ export default function DashboardLayout({
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${uploadersOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
               >
-                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
+                <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
                   {uploaderSubItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
@@ -248,8 +251,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#E9FCD4] text-black font-semibold'
-                          : 'text-gray-500 hover:text-black'
+                          ? 'bg-[#009846] text-white font-semibold'
+                          : 'text-blue-200 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -266,13 +269,13 @@ export default function DashboardLayout({
               <button
                 onClick={() => toggleSection('credentials')}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/credentials')
-                  ? 'text-black font-semibold'
-                  : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                  ? 'text-white font-semibold'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
                 <div className="flex items-center gap-3">
                   <KeyRound size={20} />
-                  <span className="text-sm">Credentials</span>
+                  <span className="text-sm font-semibold">Credentials</span>
                 </div>
                 <ChevronDown
                   size={16}
@@ -284,7 +287,7 @@ export default function DashboardLayout({
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${credentialsOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
                   }`}
               >
-                <div className="ml-6 pl-4 border-l border-gray-200 space-y-1 my-1">
+                <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
                   {credentialsSubItems.map((item) => {
                     const isActive = pathname === item.href;
                     return (
@@ -292,8 +295,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#E9FCD4] text-black font-semibold'
-                          : 'text-gray-500 hover:text-black'
+                          ? 'bg-[#009846] text-white font-semibold'
+                          : 'text-blue-200 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -308,12 +311,12 @@ export default function DashboardLayout({
             <Link
               href="/dashboard/app-users"
               className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname === '/dashboard/app-users'
-                ? 'bg-[#E9FCD4] text-black font-semibold'
-                : 'text-gray-500 hover:bg-gray-50 hover:text-black'
+                ? 'bg-[#009846] text-white font-semibold'
+                : 'text-blue-100 hover:bg-white/10 hover:text-white'
                 }`}
             >
               <Smartphone size={20} />
-              <span className="text-sm">App Users</span>
+              <span className="text-sm font-semibold">App Users</span>
             </Link>
 
           </nav>
@@ -322,7 +325,7 @@ export default function DashboardLayout({
           <div className="mt-auto py-8">
             <button
               onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 text-red-500 hover:bg-red-50 rounded-xl transition-colors font-medium text-sm"
+              className="w-full flex items-center gap-3 px-4 py-3 text-red-300 hover:bg-red-500/20 hover:text-red-200 rounded-xl transition-colors font-medium text-sm"
             >
               <LogOut size={18} />
               <span>Logout</span>

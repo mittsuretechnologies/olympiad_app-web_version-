@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { CLASSES } from '@/lib/classes';
 
 export default function RegisterSchoolPage() {
   const [formData, setFormData] = useState({
@@ -14,42 +15,65 @@ export default function RegisterSchoolPage() {
     district: '',
     state: '',
     pincode: '',
-    studentCount: '',
   });
+
+  // Per-class student counts, keyed by class name (e.g. "Class 5": "30").
+  // A class is "selected" once it has an entry in this map.
+  const [classCounts, setClassCounts] = useState<Record<string, string>>({});
+
+  const toggleClass = (name: string) => {
+    setClassCounts((prev) => {
+      const next = { ...prev };
+      if (name in next) {
+        delete next[name];
+      } else {
+        next[name] = '';
+      }
+      return next;
+    });
+  };
+
+  const setClassCount = (name: string, value: string) => {
+    setClassCounts((prev) => ({ ...prev, [name]: value.replace(/[^0-9]/g, '') }));
+  };
+
+  const selectedClasses = CLASSES.filter((c) => c.name in classCounts);
+  const totalStudents = selectedClasses.reduce(
+    (sum, c) => sum + (parseInt(classCounts[c.name] || '0', 10) || 0),
+    0
+  );
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [credentials, setCredentials] = useState<{
-    schoolId: string;
-    username: string;
-    password: string;
-    idsGenerated: number;
-    idPreview: string;
-  } | null>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
-  // Live preview of ID format
-  const previewId = (() => {
-    const crm = (formData.olympiadId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase();
-    const nm = (formData.schoolName || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
-    const count = parseInt(formData.studentCount || '0', 10);
-    const pad = count > 999 ? 4 : count > 99 ? 3 : 2;
-    const remaining = 12 - crm.length - nm.length;
-    const num = String(1).padStart(Math.min(pad, remaining), '0');
-    return crm + nm + num;
-  })();
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
-    setCredentials(null);
 
-    const count = parseInt(formData.studentCount || '0', 10);
-    if (!count || count < 1 || count > 2000) {
-      setMessage({ type: 'error', text: 'Student count must be between 1 and 2000.' });
+    if (selectedClasses.length === 0) {
+      setMessage({ type: 'error', text: 'Select at least one class and enter its student count.' });
+      setLoading(false);
+      return;
+    }
+
+    const classesPayload = selectedClasses.map((c) => ({
+      className: c.name,
+      count: parseInt(classCounts[c.name] || '0', 10),
+    }));
+
+    const emptyClass = classesPayload.find((c) => !c.count || c.count < 1);
+    if (emptyClass) {
+      setMessage({ type: 'error', text: `Enter a valid student count for ${emptyClass.className}.` });
+      setLoading(false);
+      return;
+    }
+
+    if (totalStudents < 1 || totalStudents > 2000) {
+      setMessage({ type: 'error', text: 'Total students (sum of all classes) must be between 1 and 2000.' });
       setLoading(false);
       return;
     }
@@ -69,7 +93,7 @@ export default function RegisterSchoolPage() {
           district: formData.district,
           state: formData.state,
           pincode: formData.pincode,
-          studentCount: count,
+          classes: classesPayload,
         }),
       });
 
@@ -82,19 +106,11 @@ export default function RegisterSchoolPage() {
           type: 'success',
           text: `School registered (${data.schoolId}) — ${data.olympiadIdsGenerated} Olympiad IDs generated.`,
         });
-        if (data.credentials) {
-          setCredentials({
-            schoolId: data.schoolId,
-            username: data.credentials.username,
-            password: data.credentials.password,
-            idsGenerated: data.olympiadIdsGenerated,
-            idPreview: data.olympiadIdPrefix,
-          });
-        }
         setFormData({
           schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-          address: '', city: '', district: '', state: '', pincode: '', studentCount: '',
+          address: '', city: '', district: '', state: '', pincode: '',
         });
+        setClassCounts({});
       }
     } catch {
       setMessage({ type: 'error', text: 'Network error. Please try again.' });
@@ -103,16 +119,16 @@ export default function RegisterSchoolPage() {
     }
   };
 
-  const labelCls = "block text-xs font-bold text-[#06013E] mb-1.5 uppercase tracking-wide";
-  const inputCls = "w-full h-10 border border-gray-300 rounded-none px-3 text-sm text-[#432818] placeholder:text-gray-400 focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E] bg-white";
+  const labelCls = "block text-xs font-bold text-black mb-1 uppercase tracking-wide";
+  const inputCls = "w-full h-9 border border-gray-300 rounded-none px-3 text-sm text-[#432818] placeholder:text-gray-400 focus:outline-none focus:border-[#009846] focus:ring-1 focus:ring-[#009846] bg-white";
 
   return (
-    <div className="bg-white border border-gray-300 shadow-sm max-w-4xl mx-auto">
-      <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000]">
+    <div className="bg-[#FFFEFE] border border-gray-300 shadow-sm max-w-4xl mx-auto">
+      <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
         <h1 className="text-base font-bold uppercase tracking-wider">Register New School</h1>
       </div>
 
-      <div className="p-6 bg-white">
+      <div className="p-5">
         {message && (
           <div className={`mb-5 px-4 py-3 text-sm font-medium border ${
             message.type === 'success'
@@ -123,53 +139,10 @@ export default function RegisterSchoolPage() {
           </div>
         )}
 
-        {credentials && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-300 p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-[#06013E] uppercase tracking-wider">
-                School Login Credentials — save now, password not shown again
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  const text = `School ID: ${credentials.schoolId}\nUsername: ${credentials.username}\nPassword: ${credentials.password}\nLogin URL: ${window.location.origin}/login`;
-                  navigator.clipboard.writeText(text);
-                }}
-                className="text-xs font-semibold text-[#06013E] underline"
-              >
-                Copy all
-              </button>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-              <div className="bg-white border border-gray-200 p-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase">School ID</div>
-                <div className="font-mono font-bold text-[#06013E]">{credentials.schoolId}</div>
-              </div>
-              <div className="bg-white border border-gray-200 p-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase">Username</div>
-                <div className="font-mono font-bold text-[#06013E]">{credentials.username}</div>
-              </div>
-              <div className="bg-white border border-gray-200 p-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase">Password</div>
-                <div className="font-mono font-bold text-[#06013E]">{credentials.password}</div>
-              </div>
-              <div className="bg-white border border-gray-200 p-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase">IDs Generated</div>
-                <div className="font-bold text-green-700">{credentials.idsGenerated} IDs</div>
-              </div>
-            </div>
-            <div className="bg-white border border-gray-200 p-2 text-xs">
-              <span className="text-gray-500 font-bold uppercase">ID Range: </span>
-              <span className="font-mono text-[#06013E]">
-                {credentials.idPreview}01 ... {credentials.idPreview}{String(credentials.idsGenerated).padStart(2, '0')}
-              </span>
-            </div>
-          </div>
-        )}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form onSubmit={handleSubmit} className="space-y-3.5">
           {/* Row 1: Name + CRM ID */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
             <div>
               <label className={labelCls}>
                 Official School Name <span className="text-red-600">*</span>
@@ -200,44 +173,65 @@ export default function RegisterSchoolPage() {
             </div>
           </div>
 
-          {/* Row 2: Student Count + ID Preview */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-            <div>
-              <label className={labelCls}>
-                Student Count <span className="text-red-600">*</span>
-              </label>
-              <input
-                type="number"
-                name="studentCount"
-                value={formData.studentCount}
-                onChange={handleChange}
-                required
-                min={1}
-                max={2000}
-                className={inputCls}
-                placeholder="Number of students (max 2000)"
-              />
+          {/* Row 2: Class selection + per-class counts */}
+          <div>
+            <label className={labelCls}>
+              Select Classes <span className="text-red-600">*</span>
+            </label>
+            <div className="flex flex-wrap gap-2 mb-2">
+              {CLASSES.map((c) => {
+                const active = c.name in classCounts;
+                return (
+                  <button
+                    key={c.name}
+                    type="button"
+                    onClick={() => toggleClass(c.name)}
+                    className={`px-3 h-9 text-sm font-semibold border transition-colors ${
+                      active
+                        ? 'bg-[#009846] text-white border-[#009846]'
+                        : 'bg-white text-black border-gray-300 hover:border-[#FFC107]'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                );
+              })}
             </div>
-            <div>
-              <label className={labelCls}>Olympiad ID Preview</label>
-              <div className="h-10 border border-gray-200 bg-gray-50 px-3 flex items-center gap-3">
-                <span className="font-mono text-sm text-[#06013E] font-bold">
-                  {previewId.length === 12 ? previewId : previewId || '---'}
-                </span>
-                {previewId.length < 12 && formData.olympiadId && (
-                  <span className="text-xs text-gray-400">
-                    ({previewId.length}/12 chars — fill CRM ID + Name)
+
+            {selectedClasses.length > 0 && (
+              <div className="border border-gray-300">
+                <div className="bg-gray-50 px-3 py-2 border-b border-gray-300 flex items-center justify-between">
+                  <span className="text-xs font-bold text-[#009846] uppercase tracking-wide">
+                    Students per Class
                   </span>
-                )}
-                {previewId.length === 12 && (
-                  <span className="text-xs text-green-600 font-semibold">✓ 12 chars</span>
-                )}
+                  <span className="text-xs font-bold text-green-700">
+                    Total: {totalStudents}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-3 p-3">
+                  {selectedClasses.map((c) => (
+                    <div key={c.name} className="flex items-center gap-3">
+                      <span className="w-24 shrink-0 flex items-center gap-1.5 text-sm font-semibold text-[#432818]">
+                        {c.name}
+                        <span className="font-mono text-[11px] text-gray-400">[{c.code}]</span>
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={classCounts[c.name]}
+                        onChange={(e) => setClassCount(c.name, e.target.value)}
+                        className="flex-1 min-w-0 h-9 border border-gray-300 px-2 text-sm text-[#432818] focus:outline-none focus:border-[#009846] focus:ring-1 focus:ring-[#009846]"
+                        placeholder="Count"
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Contact & Location Details */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
             <div>
               <label className={labelCls}>Principal / Contact Person</label>
               <input
@@ -337,10 +331,13 @@ export default function RegisterSchoolPage() {
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
             <button
               type="button"
-              onClick={() => setFormData({
-                schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-                address: '', city: '', district: '', state: '', pincode: '', studentCount: '',
-              })}
+              onClick={() => {
+                setFormData({
+                  schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
+                  address: '', city: '', district: '', state: '', pincode: '',
+                });
+                setClassCounts({});
+              }}
               disabled={loading}
               className="h-10 px-5 bg-white border border-gray-400 text-gray-700 font-semibold text-sm hover:bg-gray-100 disabled:opacity-50"
             >
@@ -349,7 +346,7 @@ export default function RegisterSchoolPage() {
             <button
               type="submit"
               disabled={loading}
-              className="h-10 px-6 bg-[#06013E] text-white font-semibold text-sm hover:bg-[#0a0660] disabled:opacity-50"
+              className="h-10 px-6 bg-[#009846] text-white font-semibold text-sm hover:bg-[#007a38] disabled:opacity-50"
             >
               {loading ? 'Registering...' : 'Register School & Generate IDs'}
             </button>

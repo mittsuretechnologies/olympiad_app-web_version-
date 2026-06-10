@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
 import { KeyRound, Loader2, Search, RotateCw, Copy, Check, X } from 'lucide-react';
 import {
   Dialog,
@@ -22,8 +24,8 @@ interface SchoolCred {
 }
 
 export default function SchoolCredentialsPage() {
-  const [rows, setRows] = useState<SchoolCred[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading, mutate } = useSWR<SchoolCred[]>('/api/credentials/schools', fetcher);
+  const rows: SchoolCred[] = Array.isArray(data) ? data : [];
   const [search, setSearch] = useState('');
   const [resetTarget, setResetTarget] = useState<SchoolCred | null>(null);
   const [resetBusy, setResetBusy] = useState(false);
@@ -35,13 +37,6 @@ export default function SchoolCredentialsPage() {
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/credentials/schools')
-      .then((res) => res.json())
-      .then((data) => setRows(Array.isArray(data) ? data : []))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
-  }, []);
 
   const filtered = useMemo(() => {
     if (!search) return rows;
@@ -74,12 +69,8 @@ export default function SchoolCredentialsPage() {
         password: data.password,
       });
       setResetTarget(null);
-      // refresh updatedAt
-      setRows((prev) =>
-        prev.map((r) =>
-          r.id === resetTarget.id ? { ...r, username: data.username, updatedAt: data.updatedAt } : r
-        )
-      );
+      // refresh the list (updatedAt / username)
+      mutate();
     } catch {
       alert('Network error');
     } finally {
@@ -97,12 +88,12 @@ export default function SchoolCredentialsPage() {
 
   return (
     <div className="bg-white border border-gray-300 shadow-sm">
-      <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
+      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
         <div className="flex items-center gap-3">
           <KeyRound size={20} />
           <h1 className="text-base font-bold uppercase tracking-wider">Manage School Credentials</h1>
         </div>
-        <div className="text-xs text-gray-300">Reset passwords and view login usernames</div>
+        <div className="text-xs text-gray-200">Reset passwords and view login usernames</div>
       </div>
 
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -177,11 +168,11 @@ export default function SchoolCredentialsPage() {
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <button
-                      title="Generate new password"
+                      title="Reset / generate new password"
                       onClick={() => setResetTarget(r)}
-                      className="inline-flex items-center gap-1.5 bg-[#06013E] text-white px-2.5 py-1 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
+                      className="inline-flex items-center justify-center w-8 h-8 bg-[#009846] text-white rounded hover:bg-[#007a38] transition-colors"
                     >
-                      <RotateCw className="w-3 h-3" /> Reset Password
+                      <RotateCw className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
@@ -191,7 +182,7 @@ export default function SchoolCredentialsPage() {
         </table>
       </div>
 
-      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-600 flex justify-between items-center">
+      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span>
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{rows.length}</span> schools
@@ -247,7 +238,7 @@ export default function SchoolCredentialsPage() {
               type="button"
               onClick={handleResetConfirm}
               disabled={resetBusy}
-              className="flex-1 h-11 rounded-lg bg-[#06013E] text-white font-semibold text-sm hover:bg-[#0a0660] transition-colors disabled:opacity-50"
+              className="flex-1 h-11 rounded-lg bg-[#009846] text-white font-semibold text-sm hover:bg-[#007a38] transition-colors disabled:opacity-50"
             >
               {resetBusy ? 'Resetting...' : 'Generate New Password'}
             </button>
@@ -261,7 +252,7 @@ export default function SchoolCredentialsPage() {
           <DialogHeader className="sr-only">
             <DialogTitle>New Credentials</DialogTitle>
           </DialogHeader>
-          <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
             <h2 className="text-sm font-bold uppercase tracking-wider">New Login Credentials</h2>
             <button onClick={() => setNewCreds(null)} className="text-white/80 hover:text-white">
               <X className="w-4 h-4" />
@@ -310,7 +301,7 @@ export default function SchoolCredentialsPage() {
                 </button>
                 <button
                   onClick={() => setNewCreds(null)}
-                  className="bg-[#06013E] text-white px-4 py-2 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
+                  className="bg-[#009846] text-white px-4 py-2 text-xs font-semibold hover:bg-[#007a38] transition-colors"
                 >
                   Done
                 </button>

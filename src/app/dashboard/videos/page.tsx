@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
 import {
   Play, CheckCircle, XCircle, Clock, MapPin, School,
   Eye, Globe, Lock, Award, RefreshCw, User,
@@ -37,28 +39,19 @@ interface Video {
 type StatusFilter = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export default function VideoModerationPage() {
-  const [videos, setVideos]             = useState<Video[]>([]);
-  const [loading, setLoading]           = useState(true);
   const [filter, setFilter]             = useState<StatusFilter>('PENDING');
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
   const [rejectModal, setRejectModal]   = useState<{ video: Video } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  useEffect(() => { fetchVideos(); }, [filter]);
-
-  const fetchVideos = async () => {
-    setLoading(true);
-    try {
-      const res  = await fetch(`/api/dashboard/videos?status=${filter}`);
-      const data = await res.json();
-      setVideos(Array.isArray(data) ? data : []);
-    } catch {
-      setVideos([]);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Key changes with the filter, so SWR caches each status separately.
+  const { data, isLoading: loading, mutate } = useSWR<Video[]>(
+    `/api/dashboard/videos?status=${filter}`,
+    fetcher
+  );
+  const videos: Video[] = Array.isArray(data) ? data : [];
+  const fetchVideos = () => mutate();
 
   const approve = async (video: Video) => {
     setProcessingId(video.id);
@@ -69,7 +62,7 @@ export default function VideoModerationPage() {
         body: JSON.stringify({ videoId: video.id, status: 'APPROVED' }),
       });
       if (res.ok) {
-        setVideos(vs => vs.filter(v => v.id !== video.id));
+        mutate((cur) => (cur ?? []).filter((v) => v.id !== video.id), { revalidate: false });
         if (previewVideo?.id === video.id) setPreviewVideo(null);
       } else alert('Failed to approve');
     } finally {
@@ -95,7 +88,7 @@ export default function VideoModerationPage() {
         body: JSON.stringify({ videoId: video.id, status: 'REJECTED', rejectionReason: rejectReason.trim() }),
       });
       if (res.ok) {
-        setVideos(vs => vs.filter(v => v.id !== video.id));
+        mutate((cur) => (cur ?? []).filter((v) => v.id !== video.id), { revalidate: false });
         if (previewVideo?.id === video.id) setPreviewVideo(null);
       } else alert('Failed to reject');
     } finally {
@@ -217,9 +210,9 @@ export default function VideoModerationPage() {
                     </span>
                   </div>
                   {video.caption ? (
-                    <p className="text-xs text-gray-600 truncate max-w-[260px] italic">"{video.caption}"</p>
+                    <p className="text-xs text-gray-200 truncate max-w-[260px] italic">"{video.caption}"</p>
                   ) : (
-                    <p className="text-xs text-gray-300 italic">No caption</p>
+                    <p className="text-xs text-gray-200 italic">No caption</p>
                   )}
                   {tagList.length > 0 && (
                     <div className="flex gap-1 mt-1 flex-wrap">

@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
 import { Smartphone, Loader2, Search, CheckCircle, XCircle, GraduationCap } from 'lucide-react';
 
 interface AppUser {
@@ -16,16 +18,9 @@ interface AppUser {
 }
 
 export default function AppUsersPage() {
-  const [users, setUsers] = useState<AppUser[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading } = useSWR<AppUser[]>('/api/app/users', fetcher);
+  const users: AppUser[] = Array.isArray(data) ? data : [];
   const [search, setSearch] = useState('');
-
-  useEffect(() => {
-    fetch('/api/app/users')
-      .then((r) => r.json())
-      .then((data) => setUsers(Array.isArray(data) ? data : []))
-      .finally(() => setLoading(false));
-  }, []);
 
   const filtered = useMemo(() => {
     if (!search) return users;
@@ -41,12 +36,12 @@ export default function AppUsersPage() {
 
   return (
     <div className="bg-white border border-gray-300 shadow-sm">
-      <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
+      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
         <div className="flex items-center gap-3">
           <Smartphone size={20} />
           <h1 className="text-base font-bold uppercase tracking-wider">App Users</h1>
         </div>
-        <div className="text-xs text-gray-300">All registered mobile app users</div>
+        <div className="text-xs text-gray-200">All registered mobile app users</div>
       </div>
 
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -147,7 +142,7 @@ export default function AppUsersPage() {
         </table>
       </div>
 
-      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-600 flex justify-between items-center">
+      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span className="flex items-center gap-4">
           <span>
             Showing <span className="font-bold">{filtered.length}</span> of{' '}
