@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
 import { KeyRound, Loader2, Search, RotateCw, Copy, Check, X } from 'lucide-react';
 import {
   Dialog,
@@ -29,8 +31,8 @@ interface StudentCred {
 }
 
 export default function StudentCredentialsPage() {
-  const [rows, setRows] = useState<StudentCred[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading, mutate } = useSWR<StudentCred[]>('/api/credentials/students', fetcher);
+  const rows: StudentCred[] = Array.isArray(data) ? data : [];
   const [search, setSearch] = useState('');
   const [resetTarget, setResetTarget] = useState<StudentCred | null>(null);
   const [resetBusy, setResetBusy] = useState(false);
@@ -42,13 +44,6 @@ export default function StudentCredentialsPage() {
   } | null>(null);
   const [copied, setCopied] = useState(false);
 
-  useEffect(() => {
-    fetch('/api/credentials/students')
-      .then((res) => res.json())
-      .then((data) => setRows(Array.isArray(data) ? data : []))
-      .catch(() => setRows([]))
-      .finally(() => setLoading(false));
-  }, []);
 
   const filtered = useMemo(() => {
     if (!search) return rows;
@@ -83,14 +78,7 @@ export default function StudentCredentialsPage() {
         schoolName: resetTarget.school?.name,
       });
       setResetTarget(null);
-      // refresh plainPassword in local rows
-      setRows((prev) =>
-        prev.map((r) =>
-          r.id === resetTarget.id && r.student
-            ? { ...r, student: { ...r.student, plainPassword: data.password } }
-            : r
-        )
-      );
+      mutate();
     } catch {
       alert('Network error');
     } finally {
@@ -108,12 +96,12 @@ export default function StudentCredentialsPage() {
 
   return (
     <div className="bg-white border border-gray-300 shadow-sm">
-      <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
+      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
         <div className="flex items-center gap-3">
           <KeyRound size={20} />
           <h1 className="text-base font-bold uppercase tracking-wider">Manage Student Credentials</h1>
         </div>
-        <div className="text-xs text-gray-300">View all allocated Olympiad IDs and manage student credentials</div>
+        <div className="text-xs text-gray-200">View all allocated Olympiad IDs and manage student credentials</div>
       </div>
 
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -222,7 +210,7 @@ export default function StudentCredentialsPage() {
                       <button
                         title="Generate new password"
                         onClick={() => setResetTarget(r)}
-                        className="inline-flex items-center gap-1.5 bg-[#06013E] text-white px-2.5 py-1 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
+                        className="inline-flex items-center gap-1.5 bg-[#009846] text-white px-2.5 py-1 text-xs font-semibold hover:bg-[#007a38] transition-colors"
                       >
                         <RotateCw className="w-3 h-3" /> Reset Password
                       </button>
@@ -237,7 +225,7 @@ export default function StudentCredentialsPage() {
         </table>
       </div>
 
-      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-600 flex justify-between items-center">
+      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span>
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{rows.length}</span> records
@@ -293,7 +281,7 @@ export default function StudentCredentialsPage() {
               type="button"
               onClick={handleResetConfirm}
               disabled={resetBusy}
-              className="flex-1 h-11 rounded-lg bg-[#06013E] text-white font-semibold text-sm hover:bg-[#0a0660] transition-colors disabled:opacity-50"
+              className="flex-1 h-11 rounded-lg bg-[#009846] text-white font-semibold text-sm hover:bg-[#007a38] transition-colors disabled:opacity-50"
             >
               {resetBusy ? 'Resetting...' : 'Generate New Password'}
             </button>
@@ -307,7 +295,7 @@ export default function StudentCredentialsPage() {
           <DialogHeader className="sr-only">
             <DialogTitle>New Credentials</DialogTitle>
           </DialogHeader>
-          <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
             <h2 className="text-sm font-bold uppercase tracking-wider">New Login Credentials</h2>
             <button onClick={() => setNewCreds(null)} className="text-white/80 hover:text-white">
               <X className="w-4 h-4" />
@@ -357,7 +345,7 @@ export default function StudentCredentialsPage() {
                 </button>
                 <button
                   onClick={() => setNewCreds(null)}
-                  className="bg-[#06013E] text-white px-4 py-2 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
+                  className="bg-[#009846] text-white px-4 py-2 text-xs font-semibold hover:bg-[#007a38] transition-colors"
                 >
                   Done
                 </button>

@@ -1,6 +1,8 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
 import { UploadCloud, Loader2, Search, Edit, Trash } from 'lucide-react';
 import {
   Dialog,
@@ -22,8 +24,8 @@ interface Uploader {
 }
 
 export default function UploadersPage() {
-  const [uploaders, setUploaders] = useState<Uploader[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading, mutate } = useSWR<Uploader[]>('/api/uploaders', fetcher);
+  const uploaders: Uploader[] = Array.isArray(data) ? data : [];
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Uploader | null>(null);
   const [deleting, setDeleting] = useState<Uploader | null>(null);
@@ -34,17 +36,7 @@ export default function UploadersPage() {
   const [editPhone, setEditPhone] = useState('');
   const [editStatus, setEditStatus] = useState('ACTIVE');
 
-  const load = () => {
-    setLoading(true);
-    fetch('/api/uploaders')
-      .then((r) => r.json())
-      .then((data) => setUploaders(Array.isArray(data) ? data : []))
-      .finally(() => setLoading(false));
-  };
-
-  useEffect(() => {
-    load();
-  }, []);
+  const load = () => mutate();
 
   const filtered = useMemo(() => {
     if (!search) return uploaders;
@@ -116,12 +108,12 @@ export default function UploadersPage() {
 
   return (
     <div className="bg-white border border-gray-300 shadow-sm">
-      <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
+      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
         <div className="flex items-center gap-3">
           <UploadCloud size={20} />
           <h1 className="text-base font-bold uppercase tracking-wider">Uploaders</h1>
         </div>
-        <div className="text-xs text-gray-300">Manage uploader accounts for the mobile app</div>
+        <div className="text-xs text-gray-200">Manage uploader accounts for the mobile app</div>
       </div>
 
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -221,7 +213,7 @@ export default function UploadersPage() {
         </table>
       </div>
 
-      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-600 flex justify-between items-center">
+      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span>
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{uploaders.length}</span> uploaders
@@ -232,7 +224,7 @@ export default function UploadersPage() {
       {/* Edit Modal */}
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
         <DialogContent className="p-0 border border-gray-300 rounded-none sm:!max-w-lg w-[min(90vw,32rem)]">
-          <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000]">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
             <DialogHeader>
               <DialogTitle className="text-base font-bold uppercase tracking-wider">
                 Edit Uploader {editing?.uploaderId ? `(${editing.uploaderId})` : ''}
@@ -292,7 +284,7 @@ export default function UploadersPage() {
                 <button
                   type="submit"
                   disabled={busy}
-                  className="h-10 px-5 bg-[#06013E] text-white font-semibold text-sm hover:bg-[#0a0660] disabled:opacity-50"
+                  className="h-10 px-5 bg-[#009846] text-white font-semibold text-sm hover:bg-[#007a38] disabled:opacity-50"
                 >
                   {busy ? 'Saving...' : 'Save Changes'}
                 </button>

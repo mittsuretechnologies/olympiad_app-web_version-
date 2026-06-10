@@ -19,8 +19,9 @@ function getAppUserFromToken(request: Request) {
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params;
   const appUser = getAppUserFromToken(request);
   if (!appUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -29,13 +30,13 @@ export async function DELETE(
   try {
     // Verify the video belongs to this app user
     const video = await prisma.video.findFirst({
-      where: { id: params.id, appUserId: appUser.id },
+      where: { id, appUserId: appUser.id },
     });
     if (!video) {
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
-    await prisma.video.delete({ where: { id: params.id } });
+    await prisma.video.delete({ where: { id } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('App video delete error:', error);

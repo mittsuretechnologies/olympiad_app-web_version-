@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
+import { fetcher } from '@/lib/swr';
 import {
   Plus,
   Upload,
@@ -44,8 +46,13 @@ interface School {
 
 export default function SchoolsPage() {
   const router = useRouter();
-  const [schools, setSchools] = useState<School[]>([]);
-  const [loading, setLoading] = useState(true);
+  const {
+    data: schoolsData,
+    isLoading: schoolsLoading,
+    mutate: mutateSchools,
+  } = useSWR<School[]>('/api/schools', fetcher);
+  const schools: School[] = Array.isArray(schoolsData) ? schoolsData : [];
+  const loading = schoolsLoading;
   const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
@@ -89,21 +96,8 @@ export default function SchoolsPage() {
     pincode: '',
   });
 
-  useEffect(() => {
-    fetchSchools();
-  }, []);
-
-  const fetchSchools = async () => {
-    try {
-      const res = await fetch('/api/schools');
-      const data = await res.json();
-      setSchools(Array.isArray(data) ? data : []);
-    } catch (error) {
-      console.error('Fetch error:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  // Re-fetch the schools list (used after add / edit / delete).
+  const fetchSchools = () => mutateSchools();
 
   const handleAddSchool = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -395,12 +389,12 @@ export default function SchoolsPage() {
   return (
     <div className="bg-white border border-gray-300 shadow-sm">
       {/* Title Bar */}
-      <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
+      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
         <div className="flex items-center gap-3">
           <SchoolIcon size={20} />
           <h1 className="text-base font-bold uppercase tracking-wider">School Directory</h1>
         </div>
-        <div className="text-xs text-gray-300">
+        <div className="text-xs text-gray-200">
           Manage partner institutions and registration IDs
         </div>
       </div>
@@ -421,7 +415,7 @@ export default function SchoolsPage() {
           </button>
           <button
             onClick={() => router.push('/dashboard/schools/register')}
-            className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2 text-sm font-semibold hover:bg-[#0a0660] transition-colors"
+            className="inline-flex items-center gap-2 bg-[#009846] text-white px-4 py-2 text-sm font-semibold hover:bg-[#007a38] transition-colors"
           >
             <Plus className="w-4 h-4" /> Register School
           </button>
@@ -558,7 +552,7 @@ export default function SchoolsPage() {
       </div>
 
       {/* Footer Row */}
-      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-600 flex justify-between items-center">
+      <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span>
           Showing <span className="font-bold">{filteredSchools.length}</span> of{' '}
           <span className="font-bold">{schools.length}</span> records
@@ -569,7 +563,7 @@ export default function SchoolsPage() {
       {/* Manual Registration Modal */}
       <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
         <DialogContent className="max-w-2xl p-0 border border-gray-300 rounded-none">
-          <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000]">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
             <DialogHeader>
               <DialogTitle className="text-base font-bold uppercase tracking-wider">
                 Register New School
@@ -661,7 +655,7 @@ export default function SchoolsPage() {
               </Button>
               <Button
                 type="submit"
-                className="rounded-none h-10 bg-[#06013E] hover:bg-[#0a0660] font-semibold"
+                className="rounded-none h-10 bg-[#009846] text-white hover:bg-[#007a38] font-semibold"
               >
                 Submit
               </Button>
@@ -673,7 +667,7 @@ export default function SchoolsPage() {
       {/* Bulk Upload Modal */}
       <Dialog open={isBulkModalOpen} onOpenChange={setIsBulkModalOpen}>
         <DialogContent className="max-w-md p-0 border border-gray-300 rounded-none">
-          <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000]">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
             <DialogHeader>
               <DialogTitle className="text-base font-bold uppercase tracking-wider">
                 Bulk Registration
@@ -715,7 +709,7 @@ export default function SchoolsPage() {
       {/* Edit Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
         <DialogContent className="p-0 border border-gray-300 rounded-none sm:!max-w-3xl !left-[calc(50%+9rem)] w-[min(90vw,48rem)]">
-          <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000]">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
             <DialogHeader>
               <DialogTitle className="text-base font-bold uppercase tracking-wider">
                 Edit School {editingSchool?.schoolId ? `(${editingSchool.schoolId})` : ''}
@@ -844,7 +838,7 @@ export default function SchoolsPage() {
               </Button>
               <Button
                 type="submit"
-                className="rounded-none h-10 bg-[#06013E] hover:bg-[#0a0660] font-semibold"
+                className="rounded-none h-10 bg-[#009846] text-white hover:bg-[#007a38] font-semibold"
                 disabled={actionBusy}
               >
                 {actionBusy ? 'Saving...' : 'Save Changes'}
@@ -922,7 +916,7 @@ export default function SchoolsPage() {
       {/* View / Allocate Modal */}
       <Dialog open={!!viewSchool} onOpenChange={(open) => !open && setViewSchool(null)}>
         <DialogContent className="p-0 border border-gray-300 rounded-none sm:!max-w-4xl !left-[calc(50%+9rem)] w-[min(92vw,56rem)] max-h-[85vh] overflow-y-auto">
-          <div className="bg-[#06013E] text-white px-6 py-3 border-b-4 border-[#FF9000] sticky top-0 z-10">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000] sticky top-0 z-10">
             <DialogHeader>
               <DialogTitle className="text-base font-bold uppercase tracking-wider">
                 School Details &amp; Olympiad ID Pool
@@ -990,7 +984,7 @@ export default function SchoolsPage() {
                         setShowAllocateForm(true);
                         setAllocError(null);
                       }}
-                      className="inline-flex items-center gap-1.5 bg-[#06013E] text-white px-3 py-1.5 text-xs font-semibold hover:bg-[#0a0660] transition-colors"
+                      className="inline-flex items-center gap-1.5 bg-[#009846] text-white px-3 py-1.5 text-xs font-semibold hover:bg-[#007a38] transition-colors"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Allocate New IDs
@@ -1083,7 +1077,7 @@ export default function SchoolsPage() {
                     <button
                       type="submit"
                       disabled={allocBusy}
-                      className="h-9 px-5 bg-[#06013E] text-white font-semibold text-xs hover:bg-[#0a0660] transition-colors disabled:opacity-50"
+                      className="h-9 px-5 bg-[#009846] text-white font-semibold text-xs hover:bg-[#007a38] transition-colors disabled:opacity-50"
                     >
                       {allocBusy ? 'Allocating...' : `Generate ${allocCount} IDs`}
                     </button>

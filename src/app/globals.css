@@ -1,4 +1,3 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 
 @theme {
@@ -10,6 +9,7 @@
   --color-sidebar: #FF9000;
   --color-card: #ffffff;
   --color-border: #f3d5b5;
+  --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
 }
 
 :root {
@@ -20,7 +20,7 @@
 body {
   background-color: #FFE4C7;
   color: #432818;
-  font-family: 'Poppins', sans-serif;
+  font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   min-height: 100vh;
   letter-spacing: -0.01em;
@@ -45,6 +45,31 @@ body {
   .input-field {
     @apply w-full bg-white border-2 border-primary/10 rounded-xl px-4 py-3 text-slate-900 focus:outline-none focus:border-primary focus:ring-4 focus:ring-primary/5 transition-all placeholder:text-slate-400;
   }
+}
+
+/* GPU-composited float animations for the login page decorations.
+   These run off the main thread (transform/opacity only), unlike JS-driven
+   animation, so they don't show up as "non-composited" main-thread work. */
+@keyframes float-bubble {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(8px, -18px, 0) scale(1.12); }
+}
+@keyframes float-orb {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(36px, 26px, 0) scale(1.1); }
+}
+.anim-bubble {
+  animation: float-bubble var(--dur, 9s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+}
+.anim-orb {
+  animation: float-orb var(--dur, 14s) ease-in-out infinite;
+  animation-delay: var(--delay, 0s);
+  will-change: transform;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-bubble, .anim-orb { animation: none; }
 }
 
 /* Custom Scrollbar for Sidebar */

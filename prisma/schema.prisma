@@ -56,6 +56,8 @@ model OlympiadIdAllocation {
   code      String    @unique
   prefix    String
   sequence  Int
+  classCode String?
+  className String?
   schoolId  String
   createdAt DateTime  @default(now())
   sentAt    DateTime?

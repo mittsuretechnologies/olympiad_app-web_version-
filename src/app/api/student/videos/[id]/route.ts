@@ -21,14 +21,14 @@ function getStudentFromToken(request: Request) {
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const student = getStudentFromToken(request);
   if (!student) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { id } = params;
+  const { id } = await params;
 
   try {
     // Fetch the video first — verify it belongs to this student
