@@ -22,6 +22,13 @@ function generatePassword(length = 10): string {
   return out;
 }
 
+function generateUsername(schoolName: string, schoolId: string): string {
+  const nameClean = schoolName.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+  const available = Math.max(0, 10 - schoolId.length);
+  const prefix = nameClean.slice(0, available);
+  return (prefix + schoolId).slice(0, 10);
+}
+
 export async function POST(request: Request) {
   try {
     const { schools } = await request.json();
@@ -56,11 +63,12 @@ export async function POST(request: Request) {
               district: school.district || null,
               state: school.state || null,
               pincode: school.pincode || null,
-              username: schoolId,
+              username: generateUsername(school.name, schoolId),
               password: hashedPassword,
             },
           });
-          created.push({ schoolId, name: school.name, username: schoolId, password: plainPassword });
+          const username = generateUsername(school.name, schoolId);
+          created.push({ schoolId, name: school.name, username, password: plainPassword });
           break;
         } catch (err: any) {
           if (err?.code === 'P2002' && attempts < 2) {

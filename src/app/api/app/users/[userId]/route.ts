@@ -21,11 +21,11 @@ function normalizeUrl(url: string | null) {
 }
 
 // GET /api/app/users/:userId — public profile by appUser UUID
-export async function GET(request: Request, { params }: { params: { userId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { userId } = params; // UUID (id field)
+  const { userId } = await params;
 
   try {
     const target = await prisma.appUser.findUnique({

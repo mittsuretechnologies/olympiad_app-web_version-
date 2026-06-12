@@ -18,6 +18,9 @@ import {
   Hash,
   Send,
   CheckCircle2,
+  ToggleLeft,
+  ToggleRight,
+  AlertTriangle,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
@@ -42,6 +45,7 @@ interface School {
   email?: string;
   phone?: string;
   contactPerson?: string;
+  isActive?: boolean;
 }
 
 export default function SchoolsPage() {
@@ -59,6 +63,7 @@ export default function SchoolsPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
+  const [toggleTarget, setToggleTarget] = useState<School | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
   // View / Allocation state
@@ -330,6 +335,29 @@ export default function SchoolsPage() {
     }
   };
 
+  const handleToggleActive = async () => {
+    if (!toggleTarget) return;
+    setActionBusy(true);
+    try {
+      const res = await fetch(`/api/schools/${toggleTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive: !toggleTarget.isActive }),
+      });
+      if (res.ok) {
+        setToggleTarget(null);
+        fetchSchools();
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.message || 'Failed to update status');
+      }
+    } catch (error) {
+      alert('Network error while updating status');
+    } finally {
+      setActionBusy(false);
+    }
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -488,18 +516,31 @@ export default function SchoolsPage() {
                 </td>
               </tr>
             ) : (
-              filteredSchools.map((school, idx) => (
+              filteredSchools.map((school, idx) => {
+                const inactive = school.isActive === false;
+                return (
                 <tr
                   key={school.id}
-                  className={`border-b border-gray-200 ${
-                    idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
-                  } hover:bg-yellow-50 transition-colors`}
+                  className={`border-b border-gray-200 transition-colors ${
+                    inactive
+                      ? 'bg-red-50/60 opacity-60 hover:opacity-80'
+                      : idx % 2 === 0 ? 'bg-white hover:bg-yellow-50' : 'bg-gray-50 hover:bg-yellow-50'
+                  }`}
                 >
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700">
                     {idx + 1}
                   </td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E] tracking-tight tabular-nums">
-                    {school.schoolId || '-'}
+                  <td className="px-4 py-2.5 border-r border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-semibold text-[#06013E] tracking-tight tabular-nums">
+                        {school.schoolId || '-'}
+                      </span>
+                      {inactive && (
+                        <span className="text-[9px] font-bold uppercase bg-red-100 text-red-600 border border-red-300 px-1.5 py-0.5 leading-none">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-gray-600 tracking-tight tabular-nums text-[13px]">
                     {school.olympiadId}
@@ -536,6 +577,17 @@ export default function SchoolsPage() {
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
+                        title={inactive ? 'Mark Active' : 'Mark Inactive'}
+                        onClick={() => setToggleTarget(school)}
+                        className={`p-1.5 border border-transparent transition-all ${
+                          inactive
+                            ? 'text-green-600 hover:bg-green-50 hover:border-green-200'
+                            : 'text-orange-500 hover:bg-orange-50 hover:border-orange-200'
+                        }`}
+                      >
+                        {inactive ? <ToggleLeft className="w-3.5 h-3.5" /> : <ToggleRight className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
                         title="Delete"
                         onClick={() => setDeleteTarget(school)}
                         className="p-1.5 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all"
@@ -545,7 +597,8 @@ export default function SchoolsPage() {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -908,6 +961,74 @@ export default function SchoolsPage() {
               className="flex-1 h-11 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 transition-colors disabled:opacity-50 shadow-sm shadow-red-600/20"
             >
               {actionBusy ? 'Deleting...' : 'Delete'}
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Toggle Active/Inactive Confirm Dialog */}
+      <Dialog open={!!toggleTarget} onOpenChange={(open) => !open && setToggleTarget(null)}>
+        <DialogContent className="max-w-md p-0 border border-gray-300 rounded-none shadow-lg overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Confirm Status Change</DialogTitle>
+          </DialogHeader>
+
+          <div className={`px-6 py-3 border-b-4 ${toggleTarget?.isActive === false ? 'bg-[#009846] border-[#FF9000]' : 'bg-orange-500 border-[#FF9000]'}`}>
+            <div className="flex items-center gap-2 text-white">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-base font-bold uppercase tracking-wider">
+                {toggleTarget?.isActive === false ? 'Activate School' : 'Deactivate School'}
+              </span>
+            </div>
+          </div>
+
+          <div className="bg-white px-6 py-5 space-y-4">
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {toggleTarget?.isActive === false
+                ? 'The school will be reactivated. Students and other users associated with it will regain full access to the app.'
+                : 'The school will be marked inactive. No student or any other user linked to this school will be able to use the app until it is reactivated.'}
+            </p>
+
+            {toggleTarget && (
+              <div className="bg-gray-50 border border-gray-200 p-3 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">School ID</span>
+                  <span className="font-bold text-[#06013E] font-mono">{toggleTarget.schoolId || '-'}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Name</span>
+                  <span className="font-bold text-gray-900 truncate ml-4 max-w-[210px] text-right">{toggleTarget.name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 font-medium">Current Status</span>
+                  <span className={`font-bold ${toggleTarget.isActive === false ? 'text-red-600' : 'text-green-600'}`}>
+                    {toggleTarget.isActive === false ? 'Inactive' : 'Active'}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex gap-3">
+            <button
+              type="button"
+              onClick={() => setToggleTarget(null)}
+              disabled={actionBusy}
+              className="flex-1 h-10 border border-gray-400 bg-white text-gray-700 font-semibold text-sm hover:bg-gray-100 transition-colors disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleActive}
+              disabled={actionBusy}
+              className={`flex-1 h-10 text-white font-semibold text-sm transition-colors disabled:opacity-50 ${
+                toggleTarget?.isActive === false
+                  ? 'bg-[#009846] hover:bg-[#007a38]'
+                  : 'bg-orange-500 hover:bg-orange-600'
+              }`}
+            >
+              {actionBusy ? 'Updating...' : toggleTarget?.isActive === false ? 'Yes, Activate' : 'Yes, Deactivate'}
             </button>
           </div>
         </DialogContent>

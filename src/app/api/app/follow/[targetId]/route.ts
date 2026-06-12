@@ -16,11 +16,11 @@ function getAppUserFromToken(request: Request) {
 }
 
 // GET /api/app/follow/:targetId — is the current user following targetId?
-export async function GET(request: Request, { params }: { params: { targetId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ targetId: string }> }) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { targetId } = params;
+  const { targetId } = await params;
   if (targetId === appUser.id) return NextResponse.json({ isFollowing: false });
 
   const follow = await prisma.follow.findUnique({
@@ -30,11 +30,11 @@ export async function GET(request: Request, { params }: { params: { targetId: st
 }
 
 // POST /api/app/follow/:targetId — follow
-export async function POST(request: Request, { params }: { params: { targetId: string } }) {
+export async function POST(request: Request, { params }: { params: Promise<{ targetId: string }> }) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { targetId } = params;
+  const { targetId } = await params;
   if (targetId === appUser.id) {
     return NextResponse.json({ error: 'Cannot follow yourself' }, { status: 400 });
   }
@@ -64,11 +64,11 @@ export async function POST(request: Request, { params }: { params: { targetId: s
 }
 
 // DELETE /api/app/follow/:targetId — unfollow
-export async function DELETE(request: Request, { params }: { params: { targetId: string } }) {
+export async function DELETE(request: Request, { params }: { params: Promise<{ targetId: string }> }) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { targetId } = params;
+  const { targetId } = await params;
 
   try {
     await prisma.follow.delete({

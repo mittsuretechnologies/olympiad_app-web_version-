@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
-import { UploadCloud, Loader2, Search, Edit, Trash } from 'lucide-react';
+import { UploadCloud, Loader2, Search, Edit, Trash, X, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -29,6 +29,7 @@ export default function UploadersPage() {
   const [search, setSearch] = useState('');
   const [editing, setEditing] = useState<Uploader | null>(null);
   const [deleting, setDeleting] = useState<Uploader | null>(null);
+  const [toggling, setToggling] = useState<Uploader | null>(null);
   const [busy, setBusy] = useState(false);
 
   const [editName, setEditName] = useState('');
@@ -79,6 +80,35 @@ export default function UploadersPage() {
       } else {
         const data = await res.json();
         alert(data.message || 'Failed to update');
+      }
+    } catch {
+      alert('Network error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleToggleStatus = async () => {
+    if (!toggling) return;
+    setBusy(true);
+    const newStatus = toggling.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+    try {
+      const res = await fetch(`/api/uploaders/${toggling.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: toggling.name,
+          email: toggling.email,
+          phone: toggling.phone,
+          status: newStatus,
+        }),
+      });
+      if (res.ok) {
+        setToggling(null);
+        load();
+      } else {
+        const data = await res.json();
+        alert(data.message || 'Failed to update status');
       }
     } catch {
       alert('Network error');
@@ -164,25 +194,38 @@ export default function UploadersPage() {
                 </td>
               </tr>
             ) : (
-              filtered.map((u, idx) => (
+              filtered.map((u, idx) => {
+                const inactive = u.status === 'INACTIVE';
+                return (
                 <tr
                   key={u.id}
-                  className={`border-b border-gray-200 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-yellow-50 transition-colors`}
+                  className={`border-b border-gray-200 transition-colors ${
+                    inactive
+                      ? 'bg-red-50/60 opacity-60 hover:opacity-80'
+                      : idx % 2 === 0 ? 'bg-white hover:bg-yellow-50' : 'bg-gray-50 hover:bg-yellow-50'
+                  }`}
                 >
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">{idx + 1}</td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-semibold text-[#06013E]">{u.uploaderId}</td>
+                  <td className="px-4 py-2.5 border-r border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-semibold text-[#06013E]">{u.uploaderId}</span>
+                      {inactive && (
+                        <span className="text-[9px] font-bold uppercase bg-red-100 text-red-600 border border-red-300 px-1.5 py-0.5 leading-none">
+                          Inactive
+                        </span>
+                      )}
+                    </div>
+                  </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 font-semibold text-gray-900">{u.name}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">{u.email || '-'}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs font-mono">{u.phone || '-'}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
-                    <span
-                      className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase ${
-                        u.status === 'ACTIVE'
-                          ? 'bg-green-100 text-green-800 border border-green-300'
-                          : 'bg-gray-100 text-gray-700 border border-gray-300'
-                      }`}
-                    >
-                      {u.status}
+                    <span className={`inline-block px-2 py-0.5 text-[10px] font-bold uppercase ${
+                      inactive
+                        ? 'bg-red-100 text-red-700 border border-red-300'
+                        : 'bg-green-100 text-green-800 border border-green-300'
+                    }`}>
+                      {inactive ? 'Inactive' : 'Active'}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">
@@ -198,6 +241,17 @@ export default function UploadersPage() {
                         <Edit className="w-3.5 h-3.5" />
                       </button>
                       <button
+                        title={inactive ? 'Mark Active' : 'Mark Inactive'}
+                        onClick={() => setToggling(u)}
+                        className={`p-1.5 border border-transparent transition-all ${
+                          inactive
+                            ? 'text-green-600 hover:bg-green-50 hover:border-green-200'
+                            : 'text-orange-500 hover:bg-orange-50 hover:border-orange-200'
+                        }`}
+                      >
+                        {inactive ? <ToggleLeft className="w-3.5 h-3.5" /> : <ToggleRight className="w-3.5 h-3.5" />}
+                      </button>
+                      <button
                         title="Delete"
                         onClick={() => setDeleting(u)}
                         className="p-1.5 text-red-600 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all"
@@ -207,7 +261,8 @@ export default function UploadersPage() {
                     </div>
                   </td>
                 </tr>
-              ))
+                );
+              })
             )}
           </tbody>
         </table>
@@ -221,71 +276,49 @@ export default function UploadersPage() {
         <span className="italic">© Mittsure Olympiad Portal</span>
       </div>
 
-      {/* Edit Modal */}
+      {/* Edit Dialog */}
       <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
-        <DialogContent className="p-0 border border-gray-300 rounded-none sm:!max-w-lg w-[min(90vw,32rem)]">
-          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
-            <DialogHeader>
-              <DialogTitle className="text-base font-bold uppercase tracking-wider">
-                Edit Uploader {editing?.uploaderId ? `(${editing.uploaderId})` : ''}
-              </DialogTitle>
-            </DialogHeader>
+        <DialogContent className="max-w-sm p-0 border-0 rounded-none shadow-2xl overflow-hidden [&>button]:hidden">
+          <DialogHeader className="sr-only"><DialogTitle>Edit Uploader</DialogTitle></DialogHeader>
+          <div className="bg-[#009846] text-white px-5 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider">Edit Uploader</p>
+              {editing && <p className="text-xs text-white/70 mt-0.5">{editing.uploaderId} — {editing.name}</p>}
+            </div>
+            <button onClick={() => setEditing(null)} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
           {editing && (
-            <form onSubmit={handleSaveEdit} className="p-6 space-y-4">
+            <form onSubmit={handleSaveEdit} className="p-5 space-y-3 bg-white">
               <div>
-                <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">Name *</label>
-                <input
-                  type="text"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                  required
-                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                />
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Name <span className="text-red-500">*</span></label>
+                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} required autoComplete="off"
+                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#009846] focus:ring-1 focus:ring-[#009846]" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">Email</label>
-                <input
-                  type="email"
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                />
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Email</label>
+                <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} autoComplete="off"
+                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#009846] focus:ring-1 focus:ring-[#009846]" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">Phone</label>
-                <input
-                  type="tel"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                />
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Phone</label>
+                <input type="tel" value={editPhone} onChange={e => setEditPhone(e.target.value)} autoComplete="off"
+                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#009846] focus:ring-1 focus:ring-[#009846]" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">Status</label>
-                <select
-                  value={editStatus}
-                  onChange={(e) => setEditStatus(e.target.value)}
-                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                >
+                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">Status</label>
+                <select value={editStatus} onChange={e => setEditStatus(e.target.value)}
+                  className="w-full h-10 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#009846] focus:ring-1 focus:ring-[#009846]">
                   <option value="ACTIVE">ACTIVE</option>
                   <option value="INACTIVE">INACTIVE</option>
                 </select>
               </div>
-              <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
-                <button
-                  type="button"
-                  onClick={() => setEditing(null)}
-                  disabled={busy}
-                  className="h-10 px-4 bg-white border border-gray-400 text-gray-700 font-semibold text-sm hover:bg-gray-100"
-                >
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setEditing(null)} disabled={busy}
+                  className="flex-1 h-10 border border-gray-300 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50">
                   Cancel
                 </button>
-                <button
-                  type="submit"
-                  disabled={busy}
-                  className="h-10 px-5 bg-[#009846] text-white font-semibold text-sm hover:bg-[#007a38] disabled:opacity-50"
-                >
+                <button type="submit" disabled={busy}
+                  className="flex-1 h-10 bg-[#009846] text-white text-sm font-semibold hover:bg-[#007a38] transition-colors disabled:opacity-50">
                   {busy ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
@@ -294,50 +327,99 @@ export default function UploadersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirm */}
-      <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
-        <DialogContent className="max-w-md p-0 border-0 rounded-2xl shadow-2xl overflow-hidden">
-          <DialogHeader className="sr-only">
-            <DialogTitle>Delete uploader</DialogTitle>
-          </DialogHeader>
-          <div className="bg-white px-7 pt-7 pb-6">
-            <div className="flex flex-col items-center text-center">
-              <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4 ring-8 ring-red-50/40">
-                <Trash className="w-7 h-7 text-red-600" strokeWidth={2.2} />
-              </div>
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Delete this uploader?</h2>
-              <p className="text-sm text-gray-500 max-w-xs">
-                This will permanently remove the uploader and their login access.
-              </p>
+      {/* Toggle Status Dialog */}
+      <Dialog open={!!toggling} onOpenChange={(open) => !open && setToggling(null)}>
+        <DialogContent className="max-w-sm p-0 border border-gray-300 rounded-none shadow-lg overflow-hidden [&>button]:hidden">
+          <DialogHeader className="sr-only"><DialogTitle>Change Uploader Status</DialogTitle></DialogHeader>
+          <div className={`px-5 py-3 border-b-4 border-[#FF9000] flex items-center justify-between ${toggling?.status === 'INACTIVE' ? 'bg-[#009846]' : 'bg-orange-500'}`}>
+            <div className="flex items-center gap-2 text-white">
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-sm font-bold uppercase tracking-wider">
+                {toggling?.status === 'INACTIVE' ? 'Activate Uploader' : 'Deactivate Uploader'}
+              </span>
             </div>
-            {deleting && (
-              <div className="mt-5 bg-gray-50 rounded-xl p-4 space-y-1.5 text-sm">
+            <button onClick={() => setToggling(null)} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="p-5 bg-white space-y-4">
+            <p className="text-sm text-gray-600 leading-relaxed">
+              {toggling?.status === 'INACTIVE'
+                ? 'This uploader will be reactivated and will regain login access to the app.'
+                : 'This uploader will be marked inactive and will lose login access to the app until reactivated.'}
+            </p>
+            {toggling && (
+              <div className="bg-gray-50 border border-gray-200 px-4 py-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Uploader ID</span>
-                  <span className="font-mono font-semibold">{deleting.uploaderId}</span>
+                  <span className="font-mono font-bold text-[#06013E]">{toggling.uploaderId}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Name</span>
-                  <span className="font-semibold">{deleting.name}</span>
+                  <span className="font-semibold text-gray-900">{toggling.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-500">Current Status</span>
+                  <span className={`font-bold ${toggling.status === 'INACTIVE' ? 'text-red-600' : 'text-green-600'}`}>
+                    {toggling.status === 'INACTIVE' ? 'Inactive' : 'Active'}
+                  </span>
                 </div>
               </div>
             )}
+            <div className="flex gap-2">
+              <button onClick={() => setToggling(null)} disabled={busy}
+                className="flex-1 h-10 border border-gray-300 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleToggleStatus} disabled={busy}
+                className={`flex-1 h-10 text-white text-sm font-semibold transition-colors disabled:opacity-50 ${
+                  toggling?.status === 'INACTIVE'
+                    ? 'bg-[#009846] hover:bg-[#007a38]'
+                    : 'bg-orange-500 hover:bg-orange-600'
+                }`}>
+                {busy ? 'Updating...' : toggling?.status === 'INACTIVE' ? 'Yes, Activate' : 'Yes, Deactivate'}
+              </button>
+            </div>
           </div>
-          <div className="px-7 py-4 bg-gray-50 border-t border-gray-100 flex gap-3">
-            <button
-              onClick={() => setDeleting(null)}
-              disabled={busy}
-              className="flex-1 h-11 rounded-lg border border-gray-300 bg-white text-gray-700 font-semibold text-sm hover:bg-gray-100"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleDelete}
-              disabled={busy}
-              className="flex-1 h-11 rounded-lg bg-red-600 text-white font-semibold text-sm hover:bg-red-700 disabled:opacity-50"
-            >
-              {busy ? 'Deleting...' : 'Delete'}
-            </button>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Dialog */}
+      <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
+        <DialogContent className="max-w-sm p-0 border-0 rounded-none shadow-2xl overflow-hidden [&>button]:hidden">
+          <DialogHeader className="sr-only"><DialogTitle>Delete Uploader</DialogTitle></DialogHeader>
+          <div className="bg-red-600 text-white px-5 py-3 border-b-4 border-red-800 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider">Delete Uploader</p>
+              {deleting && <p className="text-xs text-white/70 mt-0.5">{deleting.name}</p>}
+            </div>
+            <button onClick={() => setDeleting(null)} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="p-5 bg-white space-y-4">
+            <div className="flex items-start gap-3 bg-red-50 border border-red-200 px-4 py-3 rounded-lg">
+              <AlertTriangle size={16} className="text-red-500 shrink-0 mt-0.5" />
+              <p className="text-sm text-red-700">This will permanently remove the uploader and their login access.</p>
+            </div>
+            {deleting && (
+              <div className="text-sm space-y-1.5 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Uploader ID</span>
+                  <span className="font-mono font-semibold text-gray-700">{deleting.uploaderId}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-400">Name</span>
+                  <span className="font-semibold text-gray-700">{deleting.name}</span>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => setDeleting(null)} disabled={busy}
+                className="flex-1 h-10 border border-gray-300 text-gray-600 text-sm font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50">
+                Cancel
+              </button>
+              <button onClick={handleDelete} disabled={busy}
+                className="flex-1 h-10 bg-red-600 text-white text-sm font-semibold hover:bg-red-700 transition-colors disabled:opacity-50">
+                {busy ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

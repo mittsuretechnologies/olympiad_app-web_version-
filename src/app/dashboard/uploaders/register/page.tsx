@@ -8,17 +8,11 @@ export default function RegisterUploaderPage() {
   const [phone, setPhone] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [credentials, setCredentials] = useState<{
-    uploaderId: string;
-    username: string;
-    password: string;
-  } | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setMessage(null);
-    setCredentials(null);
     try {
       const res = await fetch('/api/uploaders', {
         method: 'POST',
@@ -33,13 +27,6 @@ export default function RegisterUploaderPage() {
           type: 'success',
           text: `Uploader registered successfully! Assigned ID: ${data.uploaderId}`,
         });
-        if (data.credentials) {
-          setCredentials({
-            uploaderId: data.uploaderId,
-            username: data.credentials.username,
-            password: data.credentials.password,
-          });
-        }
         setName('');
         setEmail('');
         setPhone('');
@@ -74,39 +61,6 @@ export default function RegisterUploaderPage() {
           </div>
         )}
 
-        {credentials && (
-          <div className="mb-6 bg-yellow-50 border border-yellow-300 p-4">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-xs font-bold text-[#06013E] uppercase tracking-wider">
-                Uploader Login Credentials (save now — password will not be shown again)
-              </h3>
-              <button
-                type="button"
-                onClick={() => {
-                  const text = `Uploader ID: ${credentials.uploaderId}\nUsername: ${credentials.username}\nPassword: ${credentials.password}`;
-                  navigator.clipboard.writeText(text);
-                }}
-                className="text-xs font-semibold text-[#06013E] underline hover:text-[#0a0660]"
-              >
-                Copy all
-              </button>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm">
-              <div className="bg-white border border-gray-200 p-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Uploader ID</div>
-                <div className="font-mono font-bold text-[#06013E]">{credentials.uploaderId}</div>
-              </div>
-              <div className="bg-white border border-gray-200 p-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Username</div>
-                <div className="font-mono font-bold text-[#06013E]">{credentials.username}</div>
-              </div>
-              <div className="bg-white border border-gray-200 p-2">
-                <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Password</div>
-                <div className="font-mono font-bold text-[#06013E]">{credentials.password}</div>
-              </div>
-            </div>
-          </div>
-        )}
 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-x-6 gap-y-4">

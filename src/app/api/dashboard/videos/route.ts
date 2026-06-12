@@ -6,11 +6,23 @@ export const dynamic = 'force-dynamic';
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get('status');
+    const status    = searchParams.get('status');
+    const category  = searchParams.get('category') || undefined;
+    const uploaderT = searchParams.get('uploaderType') || undefined;
+    const search    = searchParams.get('search')?.trim() || undefined;
 
-    const where = status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)
-      ? { status }
-      : undefined;
+    // ── Counts for all three statuses (always returned) ──────────────────────
+    const [pendingCount, approvedCount, rejectedCount] = await Promise.all([
+      prisma.video.count({ where: { status: 'PENDING' } }),
+      prisma.video.count({ where: { status: 'APPROVED' } }),
+      prisma.video.count({ where: { status: 'REJECTED' } }),
+    ]);
+
+    // ── Build where clause ────────────────────────────────────────────────────
+    const where: Record<string, any> = {};
+    if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) where.status = status;
+    if (category) where.subCategory = category;
+    if (uploaderT && ['STUDENT', 'VIEWER'].includes(uploaderT)) where.uploaderType = uploaderT;
 
     const videos = await prisma.video.findMany({
       where,
@@ -32,7 +44,7 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Resolve app user info for videos uploaded via the app (viewer/student path)
+    // ── Resolve appUser info ──────────────────────────────────────────────────
     const appUserIds = [...new Set(
       videos.filter(v => v.appUserId).map(v => v.appUserId as string)
     )];
@@ -42,21 +54,55 @@ export async function GET(request: Request) {
           select: { id: true, userId: true, email: true, mobile: true, olympiadId: true },
         })
       : [];
-    const appUserMap = Object.fromEntries(appUsers.map(u => [u.id, u]));
 
-    // Rewrite stored video URLs to use localhost so the web dashboard can play them.
-    // Stored URLs may contain 10.0.2.2 (Android emulator alias) or any other IP —
-    // replace the host part so the browser can always reach the file.
-    const normalized = (videos ?? []).map(v => ({
+    // Resolve school for appUsers via their olympiadId → OlympiadIdAllocation → School
+    const olympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
+    const allocations = olympiadCodes.length > 0
+      ? await prisma.olympiadIdAllocation.findMany({
+          where: { code: { in: olympiadCodes } },
+          select: {
+            code: true,
+            school: { select: { name: true, city: true, district: true, state: true } },
+          },
+        })
+      : [];
+    const allocationMap = Object.fromEntries(allocations.map(a => [a.code, a.school]));
+
+    const appUserMap = Object.fromEntries(appUsers.map(u => [u.id, {
+      ...u,
+      school: u.olympiadId ? (allocationMap[u.olympiadId] ?? null) : null,
+    }]));
+
+    // ── Normalise URLs ────────────────────────────────────────────────────────
+    let normalized = (videos ?? []).map(v => ({
       ...v,
-      videoUrl: v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.videoUrl,
+      videoUrl:     v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.videoUrl,
+      thumbnailUrl: v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.thumbnailUrl,
       appUser: v.appUserId ? (appUserMap[v.appUserId] ?? null) : null,
     }));
 
-    return NextResponse.json(normalized);
+    // ── Client-side search filter (name / olympiadCode / caption) ─────────────
+    if (search) {
+      const q = search.toLowerCase();
+      normalized = normalized.filter(v =>
+        v.caption?.toLowerCase().includes(q) ||
+        v.student?.name?.toLowerCase().includes(q) ||
+        v.student?.olympiadCode?.toLowerCase().includes(q) ||
+        v.student?.allocation?.school?.name?.toLowerCase().includes(q) ||
+        v.appUser?.userId?.toLowerCase().includes(q) ||
+        (v.appUser as any)?.school?.name?.toLowerCase().includes(q) ||
+        v.subCategory?.toLowerCase().includes(q) ||
+        v.category?.toLowerCase().includes(q)
+      );
+    }
+
+    return NextResponse.json({
+      videos: normalized,
+      counts: { PENDING: pendingCount, APPROVED: approvedCount, REJECTED: rejectedCount },
+    });
   } catch (error: any) {
     console.error('Fetch videos error:', error);
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json({ videos: [], counts: { PENDING: 0, APPROVED: 0, REJECTED: 0 } }, { status: 200 });
   }
 }
 
@@ -81,11 +127,26 @@ export async function DELETE(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { videoId, status, rejectionReason } = await request.json();
+    const { videoId, videoIds, status, rejectionReason } = await request.json();
 
-    if (!videoId || !['APPROVED', 'REJECTED'].includes(status)) {
-      return NextResponse.json({ message: 'Invalid request' }, { status: 400 });
+    if (!['APPROVED', 'REJECTED'].includes(status)) {
+      return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
     }
+
+    // ── Bulk action: videoIds array ───────────────────────────────────────────
+    if (Array.isArray(videoIds) && videoIds.length > 0) {
+      await prisma.video.updateMany({
+        where: { id: { in: videoIds } },
+        data: {
+          status,
+          rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
+        },
+      });
+      return NextResponse.json({ message: `${videoIds.length} video(s) ${status.toLowerCase()}` });
+    }
+
+    // ── Single action: videoId ────────────────────────────────────────────────
+    if (!videoId) return NextResponse.json({ message: 'videoId required' }, { status: 400 });
 
     const video = await prisma.video.update({
       where: { id: videoId },

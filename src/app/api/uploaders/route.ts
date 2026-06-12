@@ -32,6 +32,13 @@ function generatePassword(length = 10): string {
   return out;
 }
 
+// e.g. "Tushar Joshi" + "UPL001" → "TUS001" (name prefix + numeric suffix)
+function generateUsername(name: string, uploaderId: string): string {
+  const numPart = uploaderId.replace(/[^0-9]/g, ''); // "001"
+  const namePart = name.replace(/[^A-Za-z]/g, '').toUpperCase().slice(0, 10 - numPart.length);
+  return (namePart + numPart).slice(0, 10);
+}
+
 export async function POST(request: Request) {
   try {
     const body = await request.json();
@@ -55,7 +62,7 @@ export async function POST(request: Request) {
             name,
             email: email || null,
             phone: phone || null,
-            username: uploaderId,
+            username: generateUsername(name, uploaderId),
             password: hashedPassword,
           },
         });
@@ -63,7 +70,7 @@ export async function POST(request: Request) {
         return NextResponse.json({
           ...uploader,
           credentials: {
-            username: uploaderId,
+            username: uploader.username,
             password: plainPassword,
           },
         });

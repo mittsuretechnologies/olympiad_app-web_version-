@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 import {
   OLYMPIAD_CAT_A_SUBS,
   OLYMPIAD_CAT_B_SUBS,
-} from '../olympiad-video-slots/route';
+} from '@/lib/olympiad-categories';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -54,7 +54,7 @@ export async function POST(request: Request) {
 
     // ---------- Student path ----------
     let studentId: string | null = null;
-    let schoolAutoTags: string[] = [];
+    const schoolAutoTags: string[] = [];
 
     if (olympiadCode) {
       // Validate allocation exists

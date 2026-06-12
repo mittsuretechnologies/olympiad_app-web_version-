@@ -17,11 +17,11 @@ function getAppUserFromToken(request: Request) {
 
 // GET /api/app/users/:userId/followers
 // Returns the list of AppUsers who follow :userId
-export async function GET(request: Request, { params }: { params: { userId: string } }) {
+export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { userId } = params;
+  const { userId } = await params;
 
   try {
     // Get Follow records where followingId = userId (people who follow this user)

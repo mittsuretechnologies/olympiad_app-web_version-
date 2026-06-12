@@ -20,6 +20,8 @@ import {
   Play,
   Clock,
   Smartphone,
+  BarChart2,
+  Building2,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -30,13 +32,16 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
 
-  type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | null;
+  type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | 'reports' | null;
 
   const sectionForPath = (p: string): Section => {
     if (p.startsWith('/dashboard/schools')) return 'schools';
     if (p.startsWith('/dashboard/uploaders')) return 'uploaders';
+    if (p.startsWith('/dashboard/credentials/registered')) return 'reports';
     if (p.startsWith('/dashboard/credentials')) return 'credentials';
     if (p.startsWith('/dashboard/videos')) return 'moderation';
+    if (p.startsWith('/dashboard/reports')) return 'reports';
+    if (p.startsWith('/dashboard/app-users')) return 'reports';
     return 'schools';
   };
 
@@ -50,6 +55,7 @@ export default function DashboardLayout({
   const uploadersOpen = openSection === 'uploaders';
   const credentialsOpen = openSection === 'credentials';
   const moderationOpen = openSection === 'moderation';
+  const reportsOpen = openSection === 'reports';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -76,10 +82,15 @@ export default function DashboardLayout({
 
 
   const credentialsSubItems = [
-    { name: 'Manage School Credentials',   href: '/dashboard/credentials/schools',             icon: Users },
-    { name: 'Manage Uploader Credentials', href: '/dashboard/credentials/uploaders',           icon: UploadCloud },
-    { name: 'Manage Student Credentials',  href: '/dashboard/credentials/students',            icon: KeyRound },
-    { name: 'Registered Students',         href: '/dashboard/credentials/registered-students', icon: UserCheck },
+    { name: 'Manage School Credentials',   href: '/dashboard/credentials/schools',   icon: Users },
+    { name: 'Manage Uploader Credentials', href: '/dashboard/credentials/uploaders', icon: UploadCloud },
+    { name: 'Manage Student Credentials',  href: '/dashboard/credentials/students',  icon: KeyRound },
+  ];
+
+  const reportsSubItems = [
+    { name: 'Student Report', href: '/dashboard/credentials/registered-students', icon: UserCheck },
+    { name: 'School Report',  href: '/dashboard/reports/schools',                 icon: Building2 },
+    { name: 'App Users',      href: '/dashboard/app-users',                       icon: Smartphone },
   ];
 
   return (
@@ -138,7 +149,7 @@ export default function DashboardLayout({
               <button
                 onClick={() => toggleSection('schools')}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/schools')
-                  ? 'text-white font-semibold'
+                  ? 'bg-[#009846] text-white font-semibold'
                   : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
@@ -165,8 +176,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#009846] text-white font-semibold'
-                          : 'text-blue-200 hover:text-white'
+                          ? 'bg-white text-[#06013E] font-semibold'
+                          : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -182,7 +193,7 @@ export default function DashboardLayout({
               <button
                 onClick={() => toggleSection('moderation')}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/videos')
-                  ? 'text-white font-semibold'
+                  ? 'bg-[#009846] text-white font-semibold'
                   : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
@@ -208,8 +219,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#009846] text-white font-semibold'
-                          : 'text-blue-200 hover:text-white'
+                          ? 'bg-white text-[#06013E] font-semibold'
+                          : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -225,7 +236,7 @@ export default function DashboardLayout({
               <button
                 onClick={() => toggleSection('uploaders')}
                 className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/uploaders')
-                  ? 'text-white font-semibold'
+                  ? 'bg-[#009846] text-white font-semibold'
                   : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
@@ -251,8 +262,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#009846] text-white font-semibold'
-                          : 'text-blue-200 hover:text-white'
+                          ? 'bg-white text-[#06013E] font-semibold'
+                          : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -268,8 +279,8 @@ export default function DashboardLayout({
             <div>
               <button
                 onClick={() => toggleSection('credentials')}
-                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/credentials')
-                  ? 'text-white font-semibold'
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/credentials') && !pathname.startsWith('/dashboard/credentials/registered')
+                  ? 'bg-[#009846] text-white font-semibold'
                   : 'text-blue-100 hover:bg-white/10 hover:text-white'
                   }`}
               >
@@ -295,8 +306,8 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-[#009846] text-white font-semibold'
-                          : 'text-blue-200 hover:text-white'
+                          ? 'bg-white text-[#06013E] font-semibold'
+                          : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
                         <span>{item.name}</span>
@@ -307,17 +318,46 @@ export default function DashboardLayout({
               </div>
             </div>
 
-            {/* App Users */}
-            <Link
-              href="/dashboard/app-users"
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname === '/dashboard/app-users'
-                ? 'bg-[#009846] text-white font-semibold'
-                : 'text-blue-100 hover:bg-white/10 hover:text-white'
-                }`}
-            >
-              <Smartphone size={20} />
-              <span className="text-sm font-semibold">App Users</span>
-            </Link>
+            {/* Reports - Expandable */}
+            <div>
+              <button
+                onClick={() => toggleSection('reports')}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/reports') || pathname.startsWith('/dashboard/credentials/registered') || pathname.startsWith('/dashboard/app-users')
+                  ? 'bg-[#009846] text-white font-semibold'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <BarChart2 size={20} />
+                  <span className="text-sm font-semibold">Reports</span>
+                </div>
+                <ChevronDown
+                  size={16}
+                  className={`transition-transform duration-200 ${reportsOpen ? 'rotate-180' : ''}`}
+                />
+              </button>
+              <div
+                className={`overflow-hidden transition-all duration-300 ease-in-out ${reportsOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}
+              >
+                <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  {reportsSubItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link
+                        key={item.name}
+                        href={item.href}
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-white text-[#06013E] font-semibold'
+                          : 'text-blue-200 hover:bg-white/10 hover:text-white'
+                          }`}
+                      >
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
 
           </nav>
 

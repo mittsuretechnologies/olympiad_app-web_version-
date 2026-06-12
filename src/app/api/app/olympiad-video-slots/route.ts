@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -16,35 +17,6 @@ function getAppUserFromToken(request: Request) {
     return null;
   }
 }
-
-// Category A subcategories (Performing Art + Dance + Music)
-export const OLYMPIAD_CAT_A_SUBS = [
-  'Rhymes Recitation',
-  'Poem Recitation',
-  'Story Telling',
-  'Classical Dance Basics',
-  'Free Style Dance',
-  'Yoga Performance',
-  'Singing',
-  'Prayer Singing',
-  'Musical Instrument Playing',
-];
-
-// Category B subcategories (Creative + Communication)
-export const OLYMPIAD_CAT_B_SUBS = [
-  'Craft Making',
-  'Clay Modeling',
-  'Paper Folding (Origami)',
-  'Best Out of Waste',
-  'Finger Painting',
-  'Hand Printing Art',
-  'Good Manners Presentation',
-  'Mini Speech (My Family / My School)',
-  'About Myself',
-];
-
-export const OLYMPIAD_CAT_A_LABEL = 'Performing Art, Dance & Music';
-export const OLYMPIAD_CAT_B_LABEL = 'Creative Art & Communication';
 
 // Returns how many olympiad evaluation videos this user has uploaded per category slot.
 export async function GET(request: Request) {

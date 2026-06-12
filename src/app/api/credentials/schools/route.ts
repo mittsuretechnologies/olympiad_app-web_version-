@@ -9,6 +9,7 @@ export async function GET() {
     const result = schools.map((s) => ({
       id: s.id,
       schoolId: s.schoolId,
+      olympiadId: s.olympiadId,
       name: s.name,
       email: s.email,
       contactPerson: s.contactPerson,
