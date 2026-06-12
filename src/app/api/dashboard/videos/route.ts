@@ -60,6 +60,25 @@ export async function GET(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  try {
+    const { videoIds } = await request.json();
+
+    if (!Array.isArray(videoIds) || videoIds.length === 0) {
+      return NextResponse.json({ message: 'No video IDs provided' }, { status: 400 });
+    }
+
+    const { count } = await prisma.video.deleteMany({
+      where: { id: { in: videoIds } },
+    });
+
+    return NextResponse.json({ message: `${count} video(s) deleted successfully`, count });
+  } catch (error) {
+    console.error('Delete videos error:', error);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const { videoId, status, rejectionReason } = await request.json();
