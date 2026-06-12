@@ -40,32 +40,34 @@ export async function GET(request: Request) {
         isVerified: true,
         NOT: { id: appUser.id },
       },
-      select: {
-        id: true,
-        userId: true,
-        avatarUrl: true,
-        olympiadId: true,
-        _count: { select: { followers: true, following: true } },
-      },
+      select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
       take: 10,
     });
 
-    // Check which of these users the current user already follows
     const userIds = usersRaw.map(u => u.id);
-    const existingFollows = await prisma.follow.findMany({
-      where: { followerId: appUser.id, followingId: { in: userIds } },
-      select: { followingId: true },
-    });
-    const followingSet = new Set(existingFollows.map(f => f.followingId));
+
+    // Explicit counts: followingId = user's id means people who follow them
+    const [followerCounts, followingCounts, existingFollows] = await Promise.all([
+      Promise.all(userIds.map(id => prisma.follow.count({ where: { followingId: id } }))),
+      Promise.all(userIds.map(id => prisma.follow.count({ where: { followerId:  id } }))),
+      prisma.follow.findMany({
+        where: { followerId: appUser.id, followingId: { in: userIds } },
+        select: { followingId: true },
+      }),
+    ]);
+
+    const followerCountMap  = new Map(userIds.map((id, i) => [id, followerCounts[i]]));
+    const followingCountMap = new Map(userIds.map((id, i) => [id, followingCounts[i]]));
+    const followingSet      = new Set(existingFollows.map(f => f.followingId));
 
     const users = usersRaw.map(u => ({
-      id:            u.id,
-      userId:        u.userId,
-      avatarUrl:     u.avatarUrl,
-      olympiadId:    u.olympiadId,
-      followersCount: u._count.followers,
-      followingCount: u._count.following,
-      isFollowing:   followingSet.has(u.id),
+      id:             u.id,
+      userId:         u.userId,
+      avatarUrl:      u.avatarUrl,
+      olympiadId:     u.olympiadId,
+      followersCount: followerCountMap.get(u.id)  ?? 0,
+      followingCount: followingCountMap.get(u.id) ?? 0,
+      isFollowing:    followingSet.has(u.id),
     }));
 
     // Search schools by name

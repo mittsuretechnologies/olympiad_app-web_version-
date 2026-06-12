@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import {
   Play, CheckCircle, XCircle, Clock, MapPin, School,
-  Eye, Globe, Lock, Award, RefreshCw, User,
+  Eye, Globe, Lock, Award, RefreshCw, User, Trash2,
 } from 'lucide-react';
 
 interface Video {
@@ -45,14 +45,35 @@ export default function VideoModerationPage() {
   const [rejectModal, setRejectModal]   = useState<{ video: Video } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
 
-  // Key changes with the filter, so SWR caches each status separately.
+  // Selection state
+  const [selected, setSelected]         = useState<Set<string>>(new Set());
+  const [deleteModal, setDeleteModal]   = useState<{ ids: string[] } | null>(null);
+  const [deleting, setDeleting]         = useState(false);
+
   const { data, isLoading: loading, mutate } = useSWR<Video[]>(
     `/api/dashboard/videos?status=${filter}`,
     fetcher
   );
   const videos: Video[] = Array.isArray(data) ? data : [];
-  const fetchVideos = () => mutate();
+  const fetchVideos = () => { mutate(); setSelected(new Set()); };
 
+  // ── Selection helpers ────────────────────────────────────────────────────────
+  const allSelected  = videos.length > 0 && videos.every(v => selected.has(v.id));
+  const someSelected = videos.some(v => selected.has(v.id));
+
+  const toggleOne = (id: string) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  const toggleAll = () => {
+    setSelected(allSelected ? new Set() : new Set(videos.map(v => v.id)));
+  };
+
+  // ── Approve / Reject ─────────────────────────────────────────────────────────
   const approve = async (video: Video) => {
     setProcessingId(video.id);
     try {
@@ -63,6 +84,7 @@ export default function VideoModerationPage() {
       });
       if (res.ok) {
         mutate((cur) => (cur ?? []).filter((v) => v.id !== video.id), { revalidate: false });
+        setSelected(prev => { const n = new Set(prev); n.delete(video.id); return n; });
         if (previewVideo?.id === video.id) setPreviewVideo(null);
       } else alert('Failed to approve');
     } finally {
@@ -89,6 +111,7 @@ export default function VideoModerationPage() {
       });
       if (res.ok) {
         mutate((cur) => (cur ?? []).filter((v) => v.id !== video.id), { revalidate: false });
+        setSelected(prev => { const n = new Set(prev); n.delete(video.id); return n; });
         if (previewVideo?.id === video.id) setPreviewVideo(null);
       } else alert('Failed to reject');
     } finally {
@@ -96,6 +119,33 @@ export default function VideoModerationPage() {
     }
   };
 
+  // ── Delete ───────────────────────────────────────────────────────────────────
+  const openDeleteModal = (ids: string[]) => setDeleteModal({ ids });
+
+  const confirmDelete = async () => {
+    if (!deleteModal) return;
+    setDeleting(true);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoIds: deleteModal.ids }),
+      });
+      if (res.ok) {
+        const deleted = new Set(deleteModal.ids);
+        mutate((cur) => (cur ?? []).filter(v => !deleted.has(v.id)), { revalidate: false });
+        setSelected(prev => { const n = new Set(prev); deleted.forEach(id => n.delete(id)); return n; });
+        if (previewVideo && deleted.has(previewVideo.id)) setPreviewVideo(null);
+      } else {
+        alert('Failed to delete video(s).');
+      }
+    } finally {
+      setDeleting(false);
+      setDeleteModal(null);
+    }
+  };
+
+  // ── Misc ─────────────────────────────────────────────────────────────────────
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 
@@ -104,6 +154,8 @@ export default function VideoModerationPage() {
     APPROVED: { icon: CheckCircle,   activeClass: 'bg-green-600 text-white shadow-md' },
     REJECTED: { icon: XCircle,       activeClass: 'bg-red-600   text-white shadow-md' },
   };
+
+  const selectedIds = [...selected].filter(id => videos.some(v => v.id === id));
 
   return (
     <div className="space-y-5">
@@ -129,7 +181,7 @@ export default function VideoModerationPage() {
           return (
             <button
               key={s}
-              onClick={() => setFilter(s)}
+              onClick={() => { setFilter(s); setSelected(new Set()); }}
               className={`flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all ${
                 filter === s ? TAB_CFG[s].activeClass : 'text-gray-400 hover:text-gray-700'
               }`}
@@ -139,6 +191,29 @@ export default function VideoModerationPage() {
           );
         })}
       </div>
+
+      {/* Bulk action bar — shown when anything is selected */}
+      {someSelected && (
+        <div className="flex items-center justify-between bg-red-50 border border-red-200 rounded-2xl px-4 py-2.5">
+          <span className="text-sm font-black text-red-700">
+            {selectedIds.length} video{selectedIds.length !== 1 ? 's' : ''} selected
+          </span>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSelected(new Set())}
+              className="px-3 py-1.5 text-xs font-bold text-gray-500 border border-gray-200 bg-white rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Deselect all
+            </button>
+            <button
+              onClick={() => openDeleteModal(selectedIds)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-black text-white bg-red-600 hover:bg-red-700 rounded-xl transition-colors"
+            >
+              <Trash2 size={13} /> Delete {selectedIds.length} selected
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Content */}
       {loading ? (
@@ -157,7 +232,16 @@ export default function VideoModerationPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
 
           {/* Table header */}
-          <div className="grid grid-cols-[80px_1fr_160px_130px_120px] gap-0 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+          <div className="grid grid-cols-[36px_80px_1fr_160px_130px_140px] gap-0 px-4 py-2.5 bg-gray-50 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+            {/* Select-all checkbox */}
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={toggleAll}
+                className="w-3.5 h-3.5 rounded accent-red-600 cursor-pointer"
+              />
+            </div>
             <span>Thumbnail</span>
             <span>Details</span>
             <span>Student</span>
@@ -167,17 +251,28 @@ export default function VideoModerationPage() {
 
           {/* Rows */}
           {videos.map((video, idx) => {
-            const school  = video.student?.allocation?.school;
-            const busy    = processingId === video.id;
-            const tagList = video.tags ? video.tags.split(',').filter(Boolean) : [];
-            const isLast  = idx === videos.length - 1;
+            const school   = video.student?.allocation?.school;
+            const busy     = processingId === video.id;
+            const tagList  = video.tags ? video.tags.split(',').filter(Boolean) : [];
+            const isLast   = idx === videos.length - 1;
+            const isChecked = selected.has(video.id);
 
             return (
               <div
                 key={video.id}
-                className={`grid grid-cols-[80px_1fr_160px_130px_120px] gap-0 px-4 py-3 items-center hover:bg-gray-50/60 transition-colors ${!isLast ? 'border-b border-gray-100' : ''}`}
+                className={`grid grid-cols-[36px_80px_1fr_160px_130px_140px] gap-0 px-4 py-3 items-center transition-colors ${!isLast ? 'border-b border-gray-100' : ''} ${isChecked ? 'bg-red-50/40' : 'hover:bg-gray-50/60'}`}
               >
-                {/* Thumbnail — fixed 80×56 */}
+                {/* Row checkbox */}
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={isChecked}
+                    onChange={() => toggleOne(video.id)}
+                    className="w-3.5 h-3.5 rounded accent-red-600 cursor-pointer"
+                  />
+                </div>
+
+                {/* Thumbnail */}
                 <div
                   className="w-[68px] h-[50px] rounded-lg overflow-hidden bg-black relative cursor-pointer group shrink-0"
                   onClick={() => setPreviewVideo(video)}
@@ -230,7 +325,6 @@ export default function VideoModerationPage() {
 
                 {/* Uploader */}
                 <div className="min-w-0 px-2">
-                  {/* Uploader type badge */}
                   <div className="mb-1">
                     {(video.uploaderType === 'STUDENT' || video.student) ? (
                       <span className="inline-flex items-center gap-0.5 text-[9px] font-black bg-amber-50 text-amber-700 border border-amber-200 px-1.5 py-0.5 rounded-full">
@@ -242,7 +336,6 @@ export default function VideoModerationPage() {
                       </span>
                     )}
                   </div>
-                  {/* Student record (school-registered) */}
                   {video.student ? (
                     <div className="flex items-center gap-1.5">
                       <div className="w-5 h-5 rounded-full bg-[#014584]/10 flex items-center justify-center text-[9px] font-black text-[#014584] shrink-0">
@@ -254,7 +347,6 @@ export default function VideoModerationPage() {
                       </div>
                     </div>
                   ) : video.appUser ? (
-                    /* App user (viewer or student-via-app) */
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-gray-700 truncate font-mono">{video.appUser.userId}</p>
                       <p className="text-[10px] text-gray-400 truncate">
@@ -323,6 +415,16 @@ export default function VideoModerationPage() {
                       </button>
                     </>
                   )}
+
+                  {/* Per-row delete button */}
+                  <button
+                    onClick={() => openDeleteModal([video.id])}
+                    disabled={busy}
+                    title="Delete"
+                    className="p-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors disabled:opacity-40"
+                  >
+                    <Trash2 size={13} />
+                  </button>
                 </div>
               </div>
             );
@@ -340,7 +442,6 @@ export default function VideoModerationPage() {
             className="bg-white rounded-2xl overflow-hidden w-full max-w-xl shadow-2xl"
             onClick={e => e.stopPropagation()}
           >
-            {/* Video — capped height so portrait videos don't overflow */}
             <div className="bg-black flex items-center justify-center" style={{ maxHeight: 360 }}>
               <video
                 src={previewVideo.videoUrl}
@@ -353,7 +454,6 @@ export default function VideoModerationPage() {
             <div className="p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  {/* Uploader type badge */}
                   <span className={`inline-flex items-center gap-0.5 text-[10px] font-black px-2 py-0.5 rounded-full mb-1 ${
                     previewVideo.uploaderType === 'STUDENT' || previewVideo.student
                       ? 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -393,24 +493,33 @@ export default function VideoModerationPage() {
                 </div>
               </div>
 
-              {filter === 'PENDING' && (
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={() => approve(previewVideo)}
-                    disabled={processingId === previewVideo.id}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40"
-                  >
-                    <CheckCircle size={15} /> Approve
-                  </button>
-                  <button
-                    onClick={() => openRejectModal(previewVideo)}
-                    disabled={processingId === previewVideo.id}
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40"
-                  >
-                    <XCircle size={15} /> Reject
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-2 mt-4">
+                {filter === 'PENDING' && (
+                  <>
+                    <button
+                      onClick={() => approve(previewVideo)}
+                      disabled={processingId === previewVideo.id}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40"
+                    >
+                      <CheckCircle size={15} /> Approve
+                    </button>
+                    <button
+                      onClick={() => openRejectModal(previewVideo)}
+                      disabled={processingId === previewVideo.id}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40"
+                    >
+                      <XCircle size={15} /> Reject
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => { setPreviewVideo(null); openDeleteModal([previewVideo.id]); }}
+                  disabled={processingId === previewVideo.id}
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 rounded-xl font-black text-sm transition-colors disabled:opacity-40"
+                >
+                  <Trash2 size={15} /> Delete
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -441,6 +550,40 @@ export default function VideoModerationPage() {
                 className="flex-1 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-black transition-colors"
               >
                 Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirmation modal ── */}
+      {deleteModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-6">
+          <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-red-600" />
+              </div>
+              <div>
+                <h2 className="text-base font-black text-[#06013E]">Delete {deleteModal.ids.length > 1 ? `${deleteModal.ids.length} Videos` : 'Video'}?</h2>
+                <p className="text-xs text-gray-400">This action cannot be undone.</p>
+              </div>
+            </div>
+            <div className="flex gap-2 mt-4">
+              <button
+                onClick={() => setDeleteModal(null)}
+                disabled={deleting}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-sm font-bold text-gray-500 hover:bg-gray-50 transition-colors disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-black transition-colors disabled:opacity-40"
+              >
+                {deleting ? <Clock size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>

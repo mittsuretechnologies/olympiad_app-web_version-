@@ -38,14 +38,14 @@ export async function GET(request: Request, { params }: { params: { userId: stri
     // Fetch the actual user records
     const users = await prisma.appUser.findMany({
       where: { id: { in: followerIds } },
-      select: {
-        id: true,
-        userId: true,
-        avatarUrl: true,
-        olympiadId: true,
-        _count: { select: { followers: true } },
-      },
+      select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
     });
+
+    // Count how many followers each of these users has (followingId = their id)
+    const followerCounts = await Promise.all(
+      followerIds.map(id => prisma.follow.count({ where: { followingId: id } }))
+    );
+    const followerCountMap = new Map(followerIds.map((id, i) => [id, followerCounts[i]]));
 
     // Which of these does the current viewer follow?
     const myFollows = await prisma.follow.findMany({
@@ -65,7 +65,7 @@ export async function GET(request: Request, { params }: { params: { userId: stri
           userId:         u.userId,
           avatarUrl:      u.avatarUrl,
           olympiadId:     u.olympiadId,
-          followersCount: u._count.followers,
+          followersCount: followerCountMap.get(u.id) ?? 0,
           isFollowing:    myFollowSet.has(u.id),
           isOwnProfile:   u.id === appUser.id,
         };

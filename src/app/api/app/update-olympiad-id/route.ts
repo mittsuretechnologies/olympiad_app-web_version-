@@ -58,6 +58,23 @@ export async function POST(request: Request) {
       );
     }
 
+    // Once the user has uploaded any olympiad evaluation video, the ID is locked
+    const currentUser = await prisma.appUser.findUnique({
+      where: { id: appUser.id },
+      select: { olympiadId: true },
+    });
+    if (currentUser?.olympiadId && currentUser.olympiadId !== code) {
+      const hasOlympiadVideo = await prisma.video.findFirst({
+        where: { appUserId: appUser.id, isEvaluation: true },
+      });
+      if (hasOlympiadVideo) {
+        return NextResponse.json(
+          { message: 'Olympiad ID cannot be changed after submitting an Olympiad video.' },
+          { status: 403 }
+        );
+      }
+    }
+
     const updated = await prisma.appUser.update({
       where: { id: appUser.id },
       data: { olympiadId: code },

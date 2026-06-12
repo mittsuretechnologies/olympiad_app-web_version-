@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import {
+  OLYMPIAD_CAT_A_SUBS,
+  OLYMPIAD_CAT_B_SUBS,
+} from '../olympiad-video-slots/route';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -27,6 +31,7 @@ export async function POST(request: Request) {
     const {
       videoUrl, caption, category, subCategory,
       tags, isPublic, isEvaluation, olympiadId: bodyOlympiadId,
+      isOlympiadUpload,
     } = await request.json();
 
     if (!videoUrl || !category || !subCategory) {
@@ -74,8 +79,8 @@ export async function POST(request: Request) {
       });
       studentId = student?.id ?? null;
 
-      // If the body supplied an olympiadId that's different from profile, save it
-      if (bodyOlympiadId && olympiadCode !== user?.olympiadId) {
+      // Save olympiadId to profile only if not already set (locked after first olympiad video)
+      if (bodyOlympiadId && !user?.olympiadId) {
         await prisma.appUser.update({
           where: { id: appUser.id },
           data: { olympiadId: olympiadCode },
@@ -91,6 +96,34 @@ export async function POST(request: Request) {
     }
 
     const uploaderType = olympiadCode ? 'STUDENT' : 'VIEWER';
+
+    // Olympiad upload: auto-set isEvaluation and enforce 1-per-category slot limit
+    let finalIsEvaluation = isEvaluation !== undefined ? Boolean(isEvaluation) : false;
+    if (isOlympiadUpload) {
+      finalIsEvaluation = true;
+      const isSubCatA = OLYMPIAD_CAT_A_SUBS.includes(subCategory);
+      const isSubCatB = OLYMPIAD_CAT_B_SUBS.includes(subCategory);
+
+      if (isSubCatA || isSubCatB) {
+        const existingOlympiadVideos = await prisma.video.findMany({
+          where: { appUserId: appUser.id, isEvaluation: true },
+          select: { subCategory: true, status: true },
+        });
+        // Only block if there's an active (non-rejected) video for this category
+        const slotTaken = existingOlympiadVideos.some(v =>
+          v.status !== 'REJECTED' &&
+          (isSubCatA
+            ? OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '')
+            : OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? ''))
+        );
+        if (slotTaken) {
+          return NextResponse.json(
+            { error: 'You have already submitted an Olympiad video for this category.' },
+            { status: 409 }
+          );
+        }
+      }
+    }
 
     // Merge school tags + user custom tags; school tags always go to backend
     const userTags: string[] = tags
@@ -109,7 +142,7 @@ export async function POST(request: Request) {
         subCategory,
         tags:         mergedTags,
         isPublic:     isPublic     !== undefined ? Boolean(isPublic)     : true,
-        isEvaluation: isEvaluation !== undefined ? Boolean(isEvaluation) : false,
+        isEvaluation: finalIsEvaluation,
         status: 'PENDING',
       },
     });
