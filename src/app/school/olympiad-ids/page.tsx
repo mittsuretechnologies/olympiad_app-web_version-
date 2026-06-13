@@ -267,7 +267,7 @@ export default function SchoolOlympiadIdsPage() {
 
                 {!isCollapsed && (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-sm border-collapse">
+                    <table className="w-full text-sm border-collapse table-fixed">
                       <thead>
                         <tr className="border-b border-gray-100 bg-gray-50 text-gray-400">
                           <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase w-10">#</th>

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Hash, LayoutDashboard, Users, UserCircle, ChevronRight } from 'lucide-react';
+import { LogOut, Hash, LayoutDashboard, Users, UserCircle, ChevronRight, UploadCloud } from 'lucide-react';
 import Image from 'next/image';
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
@@ -36,10 +36,11 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   if (!ready) return null;
 
   const navItems = [
-    { name: 'Dashboard',     href: '/school',                       icon: LayoutDashboard },
-    { name: 'Olympiad IDs',  href: '/school/olympiad-ids',          icon: Hash },
-    { name: 'My Students',   href: '/school/registered-students',   icon: Users },
-    { name: 'School Profile', href: '/school/profile',              icon: UserCircle },
+    { name: 'Dashboard',      href: '/school',                       icon: LayoutDashboard },
+    { name: 'Olympiad IDs',   href: '/school/olympiad-ids',          icon: Hash },
+    { name: 'My Students',    href: '/school/registered-students',   icon: Users },
+    { name: 'Upload Video',   href: '/school/upload-video',          icon: UploadCloud },
+    { name: 'School Profile', href: '/school/profile',               icon: UserCircle },
   ];
 
   const initials = (user?.name || 'S')
@@ -49,7 +50,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
 
   return (
-    <div className="flex min-h-screen bg-[#F0F2FB]">
+    <div className="flex min-h-screen bg-[#F6F9FF]">
 
       {/* ── Sidebar ── */}
       <aside className="w-60 flex flex-col fixed h-screen z-50 bg-white border-r border-gray-200 shadow-sm">
@@ -135,6 +136,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
               {pathname === '/school' ? 'Dashboard'
                 : pathname.startsWith('/school/olympiad-ids') ? 'Olympiad IDs'
                 : pathname.startsWith('/school/registered-students') ? 'My Students'
+                : pathname.startsWith('/school/upload-video') ? 'Upload Video'
                 : pathname.startsWith('/school/profile') ? 'School Profile'
                 : ''}
             </span>

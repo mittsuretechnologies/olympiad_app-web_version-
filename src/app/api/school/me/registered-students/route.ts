@@ -19,38 +19,61 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
-    const students = await prisma.student.findMany({
-      where: {
-        allocation: { schoolId: payload.id },
-        isVerified: true,
-      },
+    // Fetch all sent allocations for this school
+    const allocations = await prisma.olympiadIdAllocation.findMany({
+      where: { schoolId: payload.id, sentAt: { not: null } },
+      select: { code: true, classCode: true, className: true },
+    });
+    const codes = allocations.map(a => a.code);
+    const allocationByCode = new Map(allocations.map(a => [a.code, a]));
+
+    // Web-registered students (Student table)
+    const webStudents = await prisma.student.findMany({
+      where: { allocation: { schoolId: payload.id }, isVerified: true },
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true,
-        name: true,
-        phone: true,
-        olympiadCode: true,
-        isVerified: true,
-        createdAt: true,
-        allocation: {
-          select: {
-            classCode: true,
-            className: true,
-          },
-        },
+        id: true, name: true, phone: true, olympiadCode: true,
+        isVerified: true, createdAt: true,
+        allocation: { select: { classCode: true, className: true } },
       },
     });
+    const webCodes = new Set(webStudents.map(s => s.olympiadCode));
 
-    const result = students.map(s => ({
-      id: s.id,
-      name: s.name,
-      phone: s.phone,
-      olympiadCode: s.olympiadCode,
-      isVerified: s.isVerified,
-      createdAt: s.createdAt,
-      classCode: s.allocation?.classCode || null,
-      className: s.allocation?.className || null,
-    }));
+    // App-registered users (AppUser table) — only those not already in Student table
+    const appUsers = await prisma.appUser.findMany({
+      where: { olympiadId: { in: codes }, isVerified: true },
+      select: { id: true, userId: true, mobile: true, olympiadId: true, isVerified: true, createdAt: true },
+    });
+
+    const result = [
+      ...webStudents.map(s => ({
+        id: s.id,
+        name: s.name,
+        phone: s.phone,
+        olympiadCode: s.olympiadCode,
+        isVerified: s.isVerified,
+        createdAt: s.createdAt,
+        classCode: s.allocation?.classCode || null,
+        className: s.allocation?.className || null,
+        source: 'web' as const,
+      })),
+      ...appUsers
+        .filter(u => !webCodes.has(u.olympiadId!))
+        .map(u => {
+          const alloc = allocationByCode.get(u.olympiadId!);
+          return {
+            id: u.id,
+            name: u.userId,
+            phone: u.mobile || '-',
+            olympiadCode: u.olympiadId!,
+            isVerified: u.isVerified,
+            createdAt: u.createdAt,
+            classCode: alloc?.classCode || null,
+            className: alloc?.className || null,
+            source: 'app' as const,
+          };
+        }),
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return NextResponse.json(result);
   } catch (error) {
