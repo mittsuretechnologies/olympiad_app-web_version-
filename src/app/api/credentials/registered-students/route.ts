@@ -14,6 +14,9 @@ export async function GET() {
                 schoolId: true,
                 name: true,
                 city: true,
+                state: true,
+                district: true,
+                olympiadId: true,
               },
             },
           },
@@ -29,7 +32,17 @@ export async function GET() {
       plainPassword: s.plainPassword,
       isVerified: s.isVerified,
       createdAt: s.createdAt,
-      school: s.allocation?.school || null,
+      school: s.allocation?.school
+        ? {
+            id: s.allocation.school.id,
+            schoolId: s.allocation.school.schoolId,
+            name: s.allocation.school.name,
+            city: s.allocation.school.city,
+            state: s.allocation.school.state,
+            district: s.allocation.school.district,
+            olympiadId: s.allocation.school.olympiadId,
+          }
+        : null,
     }));
 
     return NextResponse.json(result);

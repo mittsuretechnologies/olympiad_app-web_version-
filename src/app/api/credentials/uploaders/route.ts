@@ -12,6 +12,7 @@ export async function GET() {
         email: true,
         phone: true,
         username: true,
+        plainPassword: true,
         status: true,
         updatedAt: true,
         createdAt: true,

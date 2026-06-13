@@ -32,6 +32,7 @@ export async function GET(request: NextRequest) {
         likesCount:   true,
         viewsCount:   true,
         createdAt:    true,
+        appUserId:    true,
         student: {
           select: {
             id:   true,
@@ -63,6 +64,16 @@ export async function GET(request: NextRequest) {
       likedIds = new Set(userLikes.map(l => l.videoId));
     }
 
+    // Batch-fetch AppUsers for videos uploaded by app users
+    const appUserIds = [...new Set(items.map(v => v.appUserId).filter(Boolean))] as string[];
+    const appUsersRaw = appUserIds.length > 0
+      ? await prisma.appUser.findMany({
+          where: { id: { in: appUserIds } },
+          select: { id: true, userId: true, avatarUrl: true },
+        })
+      : [];
+    const appUserMap = new Map(appUsersRaw.map(u => [u.id, u]));
+
     const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
 
     // Rewrite the host:port of any stored URL to the current SERVER_URL so devices can stream them.
@@ -92,13 +103,18 @@ export async function GET(request: NextRequest) {
       viewsCount:   v.viewsCount,
       createdAt:    v.createdAt,
       isLiked:      likedIds.has(v.id),
-      student: {
+      student: v.student ? {
         id:         v.student.id,
         name:       v.student.name,
         schoolName: v.student.allocation?.school?.name ?? null,
         state:      v.student.allocation?.school?.state ?? null,
         city:       v.student.allocation?.school?.city ?? null,
-      },
+      } : null,
+      appUser: v.appUserId && appUserMap.has(v.appUserId) ? {
+        id:        appUserMap.get(v.appUserId)!.id,
+        userId:    appUserMap.get(v.appUserId)!.userId,
+        avatarUrl: fixUrl(appUserMap.get(v.appUserId)!.avatarUrl),
+      } : null,
     }));
 
     return NextResponse.json({ videos: result, nextCursor, hasMore });

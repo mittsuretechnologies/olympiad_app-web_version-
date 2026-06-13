@@ -35,20 +35,22 @@ model School {
   username      String?                @unique
   plainPassword String?
   district      String?
+  isActive      Boolean                @default(true)
   olympiadIds   OlympiadIdAllocation[]
 }
 
 model Uploader {
-  id         String   @id @default(uuid())
-  uploaderId String   @unique
-  name       String
-  email      String?
-  phone      String?
-  username   String   @unique
-  password   String
-  status     String   @default("ACTIVE")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id            String   @id @default(uuid())
+  uploaderId    String   @unique
+  name          String
+  email         String?
+  phone         String?
+  username      String   @unique
+  password      String
+  plainPassword String?
+  status        String   @default("ACTIVE")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model OlympiadIdAllocation {
@@ -56,6 +58,8 @@ model OlympiadIdAllocation {
   code      String    @unique
   prefix    String
   sequence  Int
+  classCode String?
+  className String?
   schoolId  String
   createdAt DateTime  @default(now())
   sentAt    DateTime?
@@ -71,6 +75,7 @@ model Student {
   name          String
   phone         String
   password      String?
+  username      String?              @unique
   isVerified    Boolean              @default(false)
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
@@ -81,7 +86,9 @@ model Student {
 
 model Video {
   id              String      @id @default(uuid())
-  studentId       String
+  studentId       String?
+  appUserId       String?
+  uploaderType    String      @default("STUDENT")  // "STUDENT" | "VIEWER"
   videoUrl        String
   thumbnailUrl    String?
   caption         String?
@@ -96,11 +103,12 @@ model Video {
   isPublic        Boolean     @default(true)
   likesCount      Int         @default(0)
   viewsCount      Int         @default(0)
-  student         Student     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student         Student?    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes           Like[]
   views           VideoView[]
 
   @@index([studentId])
+  @@index([appUserId])
   @@index([status])
   @@index([status, isPublic])
 }
@@ -135,4 +143,49 @@ model VideoView {
 
   @@index([videoId])
   @@index([videoId, sessionId])
+}
+
+model AppUser {
+  id             String    @id @default(uuid())
+  userId         String    @unique
+  email          String?   @unique
+  mobile         String?   @unique
+  avatarUrl      String?
+  password       String
+  plainPassword  String?
+  termsAccepted  Boolean   @default(false)
+  otpHash        String?
+  otpExpiresAt   DateTime?
+  isVerified     Boolean   @default(false)
+  olympiadId     String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  followers      Follow[]  @relation("UserFollowers")
+  following      Follow[]  @relation("UserFollowing")
+
+  @@index([email])
+  @@index([mobile])
+}
+
+model AppOtp {
+  id         String   @id @default(uuid())
+  identifier String   @unique
+  otpHash    String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+}
+
+model Follow {
+  id          String   @id @default(uuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower    AppUser  @relation("UserFollowers", fields: [followerId],  references: [id], onDelete: Cascade)
+  following   AppUser  @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followerId])
+  @@index([followingId])
 }

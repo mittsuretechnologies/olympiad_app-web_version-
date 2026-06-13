@@ -54,6 +54,31 @@ export async function PUT(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params;
+    const body = await request.json();
+    const { isActive } = body;
+    if (typeof isActive !== 'boolean') {
+      return NextResponse.json({ message: 'isActive must be a boolean' }, { status: 400 });
+    }
+    const updated = await prisma.school.update({
+      where: { id },
+      data: { isActive },
+    });
+    return NextResponse.json(updated);
+  } catch (error: any) {
+    console.error('PATCH /api/schools/[id] failed:', error);
+    if (error?.code === 'P2025') {
+      return NextResponse.json({ message: 'School not found' }, { status: 404 });
+    }
+    return NextResponse.json({ message: 'Failed to update school status' }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   _request: Request,
   { params }: { params: Promise<{ id: string }> }

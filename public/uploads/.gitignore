@@ -1,3 +1,0 @@
-# Ignore all uploaded video files — keep only the folder structure
-videos/**/*
-!videos/.gitkeep
