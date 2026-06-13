@@ -1,16 +1,41 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { School, Users, Trophy, TrendingUp, ArrowUpRight, Activity, Calendar, Bell, Search } from 'lucide-react';
 import { motion } from 'framer-motion';
 import Image from 'next/image';
 
+type DashboardStats = {
+  registeredSchools: number;
+  totalStudents: number;
+  activeOlympiads: number | null;
+  revenue: number | null;
+};
+
 export default function Dashboard() {
+  const [data, setData] = useState<DashboardStats | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/dashboard/stats')
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(setData)
+      .catch(() => setData(null))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // "—" while loading or unavailable; real number once fetched.
+  const num = (v: number | null | undefined) =>
+    loading ? '…' : v === null || v === undefined ? '—' : v.toLocaleString('en-IN');
+
   const stats = [
-    { label: 'Registered Schools', value: '0', icon: School, color: 'text-orange-600', bg: 'bg-orange-50', trend: '+12%' },
-    { label: 'Total Students', value: '0', icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', trend: '+5%' },
-    { label: 'Active Olympiads', value: '0', icon: Trophy, color: 'text-orange-700', bg: 'bg-orange-100', trend: 'New' },
-    { label: 'Revenue', value: '₹0', icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '0%' },
+    { label: 'Registered Schools', value: num(data?.registeredSchools), icon: School, color: 'text-orange-600', bg: 'bg-orange-50', trend: 'Live' },
+    { label: 'Total Students', value: num(data?.totalStudents), icon: Users, color: 'text-amber-600', bg: 'bg-amber-50', trend: 'Live' },
+    { label: 'Active Olympiads', value: num(data?.activeOlympiads), icon: Trophy, color: 'text-orange-700', bg: 'bg-orange-100', trend: 'New' },
+    { label: 'Revenue', value: data?.revenue == null ? '—' : `₹${data.revenue.toLocaleString('en-IN')}`, icon: TrendingUp, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '0%' },
   ];
+
+  const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase();
 
   return (
     <div className="space-y-10">
@@ -53,7 +78,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2 bg-white px-5 py-2.5 rounded-2xl border-2 border-white shadow-xl shadow-orange-500/5 text-sm font-black text-[#FF9000]">
           <Calendar size={18} />
-          MAY 15, 2026
+          {today}
         </div>
       </div>
 
