@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# user-uploaded runtime content (avatars, videos) — NOT source code.
+# These are generated at runtime, may contain user PII, and bloat the repo. Served from
+# disk/S3 in deployment, never committed.
+/public/uploads/
+
+# stray dev artifacts / screenshots accidentally dropped in public/ — not real assets
+/public/naya.png
+/public/ChatGPT Image*.png
