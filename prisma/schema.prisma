@@ -54,17 +54,19 @@ model Uploader {
 }
 
 model OlympiadIdAllocation {
-  id        String    @id @default(uuid())
-  code      String    @unique
-  prefix    String
-  sequence  Int
-  classCode String?
-  className String?
-  schoolId  String
-  createdAt DateTime  @default(now())
-  sentAt    DateTime?
-  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-  student   Student?
+  id           String    @id @default(uuid())
+  code         String    @unique
+  prefix       String
+  sequence     Int
+  classCode    String?
+  className    String?
+  schoolId     String
+  createdAt    DateTime  @default(now())
+  sentAt       DateTime?
+  assignedName String?
+  assignedAt   DateTime?
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  student      Student?
 
   @@index([schoolId])
 }
