@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Hash, Loader2, Search, Download,
-  Clock, BookOpen, ChevronDown, ChevronUp, UserPlus, X, Pencil, Trash2
+  Clock, BookOpen, ChevronDown, ChevronUp, UserPlus, X, Pencil, Trash2, CheckCircle, Phone, Eye, EyeOff
 } from 'lucide-react';
 
 interface Allocation {
@@ -16,6 +16,7 @@ interface Allocation {
   assignedName: string | null;
   assignedAt: string | null;
   student?: { name: string; isVerified: boolean } | null;
+  hasAppUser?: boolean;
 }
 
 type StatusFilter = 'ALL' | 'ASSIGNED' | 'PENDING';
@@ -29,11 +30,21 @@ export default function SchoolOlympiadIdsPage() {
   const [activeClass, setActiveClass] = useState<string>('ALL');
   const [collapsedClasses, setCollapsedClasses] = useState<Set<string>>(new Set());
 
-  // Modal state
+  // Assign modal
   const [modal, setModal] = useState<{ code: string; current: string | null } | null>(null);
   const [assignName, setAssignName] = useState('');
   const [assigning, setAssigning] = useState(false);
   const [assignError, setAssignError] = useState('');
+
+  // Register modal
+  const [regModal, setRegModal] = useState<{ code: string; assignedName: string } | null>(null);
+  const [regName, setRegName] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const [regError, setRegError] = useState('');
+  const [regSuccess, setRegSuccess] = useState<{ userId: string } | null>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('schoolToken') : '';
 
@@ -51,6 +62,7 @@ export default function SchoolOlympiadIdsPage() {
 
   useEffect(() => { fetchAllocations(); }, []);
 
+  // Assign handlers
   const openModal = (code: string, current: string | null) => {
     setModal({ code, current });
     setAssignName(current || '');
@@ -97,6 +109,47 @@ export default function SchoolOlympiadIdsPage() {
     }
   };
 
+  // Register handlers
+  const openRegModal = (code: string, assignedName: string) => {
+    setRegModal({ code, assignedName });
+    setRegName(assignedName);
+    setRegPhone('');
+    setRegPassword('');
+    setRegError('');
+    setRegSuccess(null);
+  };
+  const closeRegModal = () => {
+    setRegModal(null); setRegName(''); setRegPhone('');
+    setRegPassword(''); setRegError(''); setRegSuccess(null);
+  };
+
+  const handleRegister = async () => {
+    if (!regName.trim()) { setRegError('Student name is required'); return; }
+    if (!regPhone.trim() || regPhone.trim().length < 10) { setRegError('Valid phone number is required'); return; }
+    if (!regPassword.trim() || regPassword.trim().length < 6) { setRegError('Password must be at least 6 characters'); return; }
+    setRegistering(true); setRegError('');
+    try {
+      const res = await fetch(`/api/school/me/olympiad-ids/${regModal!.code}/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: regName.trim(), phone: regPhone.trim(), password: regPassword.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      // Mark as registered (hasAppUser = true) in local state
+      setAllocations(prev => prev.map(a =>
+        a.code === regModal!.code
+          ? { ...a, assignedName: regName.trim(), hasAppUser: true }
+          : a
+      ));
+      setRegSuccess({ userId: data.userId });
+    } catch (e: any) {
+      setRegError(e.message);
+    } finally {
+      setRegistering(false);
+    }
+  };
+
   const classes = useMemo(() => {
     const map = new Map<string, string>();
     for (const a of allocations) {
@@ -133,6 +186,7 @@ export default function SchoolOlympiadIdsPage() {
   const stats = useMemo(() => ({
     total: allocations.length,
     assigned: allocations.filter(a => a.assignedName).length,
+    registered: allocations.filter(a => a.student).length,
     pending: allocations.filter(a => !a.assignedName).length,
   }), [allocations]);
 
@@ -187,6 +241,11 @@ export default function SchoolOlympiadIdsPage() {
             <UserPlus size={14} className="text-purple-600" />
             <span className="text-xl font-black text-purple-700">{stats.assigned}</span>
             <span className="text-xs text-gray-400">Assigned</span>
+          </div>
+          <div className="flex items-center gap-2 px-5 py-3">
+            <CheckCircle size={14} className="text-green-600" />
+            <span className="text-xl font-black text-green-700">{stats.registered}</span>
+            <span className="text-xs text-gray-400">Registered</span>
           </div>
           <div className="flex items-center gap-2 px-5 py-3">
             <Clock size={14} className="text-orange-500" />
@@ -247,6 +306,7 @@ export default function SchoolOlympiadIdsPage() {
           {grouped.map(({ code, label, items }) => {
             const isCollapsed = collapsedClasses.has(code);
             const classAssigned = items.filter(a => a.assignedName).length;
+            const classRegistered = items.filter(a => a.student).length;
 
             return (
               <div key={code} className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
@@ -258,8 +318,11 @@ export default function SchoolOlympiadIdsPage() {
                     <span className="text-[10px] text-gray-500 font-mono bg-white px-2 py-0.5 rounded">{items.length} IDs</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <div className="hidden sm:flex items-center gap-2 text-xs">
+                    <div className="hidden sm:flex items-center gap-3 text-xs">
                       <span className="text-gray-400 text-[11px]">{classAssigned}/{items.length} assigned</span>
+                      {classRegistered > 0 && (
+                        <span className="text-green-600 text-[11px] font-semibold">{classRegistered} registered</span>
+                      )}
                     </div>
                     {isCollapsed ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronUp size={14} className="text-gray-400" />}
                   </div>
@@ -271,10 +334,10 @@ export default function SchoolOlympiadIdsPage() {
                       <thead>
                         <tr className="border-b border-gray-100 bg-gray-50 text-gray-400">
                           <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase w-10">#</th>
-                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase w-48">Olympiad ID</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase w-44">Olympiad ID</th>
                           <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase">Assigned To</th>
-                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase w-32">Status</th>
-                          <th className="px-4 py-2.5 text-center text-[10px] font-bold uppercase w-24">Action</th>
+                          <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase w-36">Status</th>
+                          <th className="px-4 py-2.5 text-center text-[10px] font-bold uppercase w-36">Action</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -290,7 +353,15 @@ export default function SchoolOlympiadIdsPage() {
                               )}
                             </td>
                             <td className="px-4 py-3">
-                              {a.assignedName ? (
+                              {a.student ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded">
+                                  <CheckCircle size={9} /> Registered
+                                </span>
+                              ) : a.hasAppUser ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded">
+                                  <CheckCircle size={9} /> On App
+                                </span>
+                              ) : a.assignedName ? (
                                 <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 rounded">
                                   <UserPlus size={9} /> Assigned
                                 </span>
@@ -301,18 +372,27 @@ export default function SchoolOlympiadIdsPage() {
                               )}
                             </td>
                             <td className="px-4 py-3 text-center">
-                              {a.assignedName ? (
-                                <div className="flex items-center justify-center gap-2">
+                              {(a.student || a.hasAppUser) ? (
+                                // Already registered (web or app) — nothing to do
+                                <span className="text-[10px] text-gray-300 italic">—</span>
+                              ) : a.assignedName ? (
+                                // Assigned but not registered — show Register + edit/delete
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <button onClick={() => openRegModal(a.code, a.assignedName!)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white text-[10px] font-bold rounded-lg hover:bg-green-700 transition-colors">
+                                    <UserPlus size={10} /> Register
+                                  </button>
                                   <button onClick={() => openModal(a.code, a.assignedName)}
-                                    className="p-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors" title="Edit">
-                                    <Pencil size={12} />
+                                    className="p-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 transition-colors" title="Edit name">
+                                    <Pencil size={11} />
                                   </button>
                                   <button onClick={() => handleUnassign(a.code)}
                                     className="p-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors" title="Remove">
-                                    <Trash2 size={12} />
+                                    <Trash2 size={11} />
                                   </button>
                                 </div>
                               ) : (
+                                // Not assigned yet
                                 <button onClick={() => openModal(a.code, null)}
                                   className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#06013E] text-white text-[10px] font-bold rounded-lg hover:bg-[#1a0f6e] transition-colors">
                                   <UserPlus size={10} /> Assign
@@ -369,7 +449,7 @@ export default function SchoolOlympiadIdsPage() {
                 {assignError && <p className="text-xs text-red-500 mt-1">{assignError}</p>}
               </div>
               <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2.5 text-xs text-blue-700 leading-relaxed">
-                Student will use this Olympiad ID to register on the app. Their name will be pre-linked to this ID.
+                After assigning, use the Register button to create their account directly.
               </div>
               <div className="flex gap-2">
                 <button onClick={closeModal}
@@ -383,6 +463,112 @@ export default function SchoolOlympiadIdsPage() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Register Modal */}
+      {regModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="bg-green-700 px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Register Student</p>
+                <p className="text-white font-bold text-sm mt-0.5 font-mono">{regModal.code}</p>
+              </div>
+              <button onClick={closeRegModal} className="text-white/50 hover:text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {regSuccess ? (
+              /* ── Success screen ── */
+              <div className="p-6 text-center space-y-4">
+                <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
+                  <CheckCircle className="w-7 h-7 text-green-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-gray-900 text-base">Account Created!</p>
+                  <p className="text-xs text-gray-400 mt-1">Share these login details with the student</p>
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-left space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-semibold uppercase tracking-wide">User ID</span>
+                    <span className="font-mono font-bold text-[#06013E]">{regSuccess.userId}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-semibold uppercase tracking-wide">Olympiad ID</span>
+                    <span className="font-mono font-bold text-[#06013E]">{regModal.code}</span>
+                  </div>
+                  <div className="flex justify-between text-xs">
+                    <span className="text-gray-400 font-semibold uppercase tracking-wide">Phone</span>
+                    <span className="font-mono text-gray-700">{regPhone}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-blue-600 bg-blue-50 border border-blue-100 rounded-lg px-3 py-2">
+                  Student can now log in to the app using their phone number and password.
+                </p>
+                <button onClick={closeRegModal}
+                  className="w-full py-2.5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-colors">
+                  Done
+                </button>
+              </div>
+            ) : (
+              /* ── Form ── */
+              <div className="p-5 space-y-3.5">
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Student Name</label>
+                  <input
+                    type="text" placeholder="Full name" value={regName}
+                    onChange={e => setRegName(e.target.value)} autoFocus
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Phone Number</label>
+                  <div className="relative">
+                    <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="tel" placeholder="10-digit mobile" value={regPhone}
+                      onChange={e => setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      className="w-full pl-8 pr-3 border border-gray-200 rounded-lg py-2.5 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Password</label>
+                  <div className="relative">
+                    <input
+                      type={showRegPassword ? 'text' : 'password'}
+                      placeholder="Min 6 characters"
+                      value={regPassword}
+                      onChange={e => setRegPassword(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleRegister()}
+                      className="w-full pr-10 pl-3 border border-gray-200 rounded-lg py-2.5 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    />
+                    <button type="button" onClick={() => setShowRegPassword(v => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      {showRegPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
+                {regError && <p className="text-xs text-red-500">{regError}</p>}
+                <div className="bg-blue-50 border border-blue-100 rounded-lg px-3 py-2 text-xs text-blue-700">
+                  Account will be created on the app. Student can log in with their phone + password.
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button onClick={closeRegModal}
+                    className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={handleRegister} disabled={registering}
+                    className="flex-1 py-2.5 bg-green-600 text-white text-sm font-bold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    {registering ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
+                    Register
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

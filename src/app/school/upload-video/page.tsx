@@ -1,16 +1,13 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown } from 'lucide-react';
+import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw } from 'lucide-react';
 
 const CATEGORIES = [
   {
     label: 'Cat A — Performing Art, Dance & Music',
     value: 'Cat A',
     icon: Music,
-    color: 'from-purple-500 to-pink-500',
-    lightColor: 'bg-purple-50 border-purple-200 text-purple-700',
-    activeColor: 'bg-gradient-to-br from-purple-500 to-pink-500',
     subCategories: [
       'Classical Dance', 'Folk Dance', 'Contemporary Dance',
       'Classical Vocal Music', 'Light Vocal Music', 'Instrumental Music',
@@ -21,9 +18,6 @@ const CATEGORIES = [
     label: 'Cat B — Creative Art & Communication',
     value: 'Cat B',
     icon: Palette,
-    color: 'from-orange-400 to-yellow-400',
-    lightColor: 'bg-orange-50 border-orange-200 text-orange-700',
-    activeColor: 'bg-gradient-to-br from-orange-400 to-yellow-400',
     subCategories: [
       'Drawing & Painting', 'Sculpture & Clay Art', 'Digital Art',
       'Collage & Mixed Media', 'Photography', 'Craft & DIY',
@@ -32,40 +26,58 @@ const CATEGORIES = [
   },
 ];
 
-type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null };
+type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
+type Slots = { slotA: boolean; slotB: boolean; rejectedA: boolean; rejectedB: boolean; approvedCount: number };
 
 const AVATAR_COLORS = ['bg-violet-500','bg-blue-500','bg-emerald-500','bg-rose-500','bg-amber-500','bg-cyan-500'];
 
 export default function UploadVideoPage() {
-  const [students, setStudents]             = useState<Student[]>([]);
+  const [students, setStudents]               = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
-  const [studentSearch, setStudentSearch]   = useState('');
-  const [showDropdown, setShowDropdown]     = useState(false);
+  const [studentSearch, setStudentSearch]     = useState('');
+  const [showDropdown, setShowDropdown]       = useState(false);
 
-  const [videoFile, setVideoFile]           = useState<File | null>(null);
-  const [videoPreview, setVideoPreview]     = useState<string | null>(null);
-  const [dragOver, setDragOver]             = useState(false);
+  const [slots, setSlots]           = useState<Slots | null>(null);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
-  const [category, setCategory]             = useState('');
-  const [subCategory, setSubCategory]       = useState('');
-  const [caption, setCaption]               = useState('');
+  const [videoFile, setVideoFile]   = useState<File | null>(null);
+  const [videoPreview, setVideoPreview] = useState<string | null>(null);
+  const [dragOver, setDragOver]     = useState(false);
 
-  const [uploadState, setUploadState]       = useState<UploadState>('idle');
-  const [progress, setProgress]             = useState(0);
-  const [errorMsg, setErrorMsg]             = useState('');
-  const [lastVideoMeta, setLastVideoMeta]   = useState<{ isEvaluation: boolean; category: string; subCategory: string } | null>(null);
+  const [category, setCategory]     = useState('');
+  const [subCategory, setSubCategory] = useState('');
+  const [caption, setCaption]       = useState('');
+
+  const [uploadState, setUploadState] = useState<UploadState>('idle');
+  const [progress, setProgress]     = useState(0);
+  const [errorMsg, setErrorMsg]     = useState('');
+  const [lastVideoMeta, setLastVideoMeta] = useState<{ isEvaluation: boolean; category: string; subCategory: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('schoolToken') || '' : '';
 
   useEffect(() => {
-    fetch('/api/school/me/registered-students', { headers: { Authorization: `Bearer ${token}` } })
+    fetch('/api/school/me/upload-students', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
       .then(setStudents)
       .finally(() => setLoadingStudents(false));
   }, [token]);
+
+  // Fetch slots whenever student changes
+  useEffect(() => {
+    if (!selectedStudent) { setSlots(null); return; }
+    setSlotsLoading(true);
+    fetch(`/api/school/me/student-slots?studentId=${selectedStudent.id}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setSlots(data); })
+      .finally(() => setSlotsLoading(false));
+    // Reset category when student changes
+    setCategory(''); setSubCategory('');
+  }, [selectedStudent, token]);
 
   const filtered = students.filter(s =>
     s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
@@ -73,6 +85,19 @@ export default function UploadVideoPage() {
   );
 
   const selectedCat = CATEGORIES.find(c => c.value === category);
+
+  // Both slots approved → only general feed
+  const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
+
+  const getCatStatus = (catValue: string) => {
+    if (!slots) return 'available';
+    const isA = catValue === 'Cat A';
+    const filled = isA ? slots.slotA : slots.slotB;
+    const rejected = isA ? slots.rejectedA : slots.rejectedB;
+    if (filled && !rejected) return 'filled';     // submitted (pending/approved)
+    if (rejected) return 'rejected';               // rejected → re-upload allowed
+    return 'available';
+  };
 
   function handleFile(file: File) {
     if (!file.type.startsWith('video/')) { setErrorMsg('Please select a valid video file.'); return; }
@@ -127,6 +152,7 @@ export default function UploadVideoPage() {
     setSelectedStudent(null); setStudentSearch(''); setVideoFile(null); setVideoPreview(null);
     setCategory(''); setSubCategory(''); setCaption('');
     setUploadState('idle'); setProgress(0); setErrorMsg(''); setLastVideoMeta(null);
+    setSlots(null);
   }
 
   /* ── Done screen ── */
@@ -144,7 +170,6 @@ export default function UploadVideoPage() {
             {lastVideoMeta?.subCategory ? ` · ${lastVideoMeta.subCategory}` : ''}
           </p>
 
-          {/* Video type badge */}
           {isEval ? (
             <div className="mx-auto mb-5 inline-flex flex-col items-center gap-2 bg-[#06013E]/5 border border-[#06013E]/20 rounded-2xl px-6 py-4">
               <span className="text-xs font-bold uppercase tracking-widest text-[#06013E]/50">Video Type</span>
@@ -258,6 +283,40 @@ export default function UploadVideoPage() {
                   )}
                 </div>
               )}
+
+              {/* Slot status banner */}
+              {selectedStudent && (
+                <div className="mt-3">
+                  {slotsLoading ? (
+                    <div className="h-8 bg-gray-100 rounded-lg animate-pulse" />
+                  ) : slots && (
+                    isGeneralOnly ? (
+                      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs text-blue-700 font-semibold">
+                        <CheckCircle className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                        Both olympiad slots filled — this video will go to General Feed
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        {(['Cat A', 'Cat B'] as const).map((cat) => {
+                          const status = getCatStatus(cat);
+                          return (
+                            <div key={cat} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
+                              status === 'filled'    ? 'bg-green-50 border-green-200 text-green-700' :
+                              status === 'rejected'  ? 'bg-red-50 border-red-200 text-red-600' :
+                              'bg-gray-50 border-gray-200 text-gray-500'
+                            }`}>
+                              {status === 'filled'   && <CheckCircle className="w-3 h-3" />}
+                              {status === 'rejected' && <RefreshCw className="w-3 h-3" />}
+                              {status === 'available' && <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />}
+                              {cat} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Video drop zone */}
@@ -286,9 +345,7 @@ export default function UploadVideoPage() {
                   onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
                   onClick={() => fileInputRef.current?.click()}
                   className={`rounded-xl border-2 border-dashed p-12 text-center cursor-pointer transition-all ${
-                    dragOver
-                      ? 'border-[#06013E] bg-[#06013E]/5 scale-[1.01]'
-                      : 'border-gray-200 hover:border-[#06013E]/30 hover:bg-[#F6F9FF]'
+                    dragOver ? 'border-[#06013E] bg-[#06013E]/5 scale-[1.01]' : 'border-gray-200 hover:border-[#06013E]/30 hover:bg-[#F6F9FF]'
                   }`}
                 >
                   <div className={`w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all ${dragOver ? 'bg-[#06013E] text-white' : 'bg-gray-100 text-gray-400'}`}>
@@ -319,6 +376,16 @@ export default function UploadVideoPage() {
           {/* ── RIGHT column (2/5) ── */}
           <div className="xl:col-span-2 space-y-5">
 
+            {/* General feed notice */}
+            {isGeneralOnly && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700">
+                <p className="font-bold mb-1">General Feed Upload</p>
+                <p className="text-xs text-blue-500 leading-relaxed">
+                  This student has 2 approved olympiad videos. Any further uploads will go to the general feed — not olympiad evaluation.
+                </p>
+              </div>
+            )}
+
             {/* Category */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
               <p className="text-sm font-bold text-gray-700 mb-3">
@@ -328,25 +395,53 @@ export default function UploadVideoPage() {
                 {CATEGORIES.map(cat => {
                   const Icon = cat.icon;
                   const isSelected = category === cat.value;
+                  const status = getCatStatus(cat.value);
+                  const isFilled = status === 'filled';
+                  const isRejected = status === 'rejected';
+
                   return (
-                    <button key={cat.value} type="button" onClick={() => { setCategory(cat.value); setSubCategory(''); }}
+                    <button
+                      key={cat.value}
+                      type="button"
+                      disabled={isFilled}
+                      onClick={() => {
+                        if (isFilled) return;
+                        setCategory(isSelected ? '' : cat.value);
+                        setSubCategory('');
+                      }}
                       className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 text-left transition-all ${
-                        isSelected
-                          ? 'border-[#06013E] bg-[#06013E]/5'
-                          : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                        isFilled
+                          ? 'border-green-200 bg-green-50 opacity-60 cursor-not-allowed'
+                          : isSelected
+                            ? 'border-[#06013E] bg-[#06013E]/5'
+                            : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                       }`}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 bg-gradient-to-br ${cat.color}`}>
-                        <Icon className="w-4 h-4 text-white" />
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                        isFilled ? 'bg-green-100' : cat.value === 'Cat A' ? 'bg-purple-100' : 'bg-orange-100'
+                      }`}>
+                        {isFilled
+                          ? <Lock className="w-4 h-4 text-green-600" />
+                          : <Icon className={`w-4 h-4 ${cat.value === 'Cat A' ? 'text-purple-600' : 'text-orange-500'}`} />
+                        }
                       </div>
-                      <span className={`text-sm font-semibold leading-tight ${isSelected ? 'text-[#06013E]' : 'text-gray-600'}`}>
-                        {cat.label}
-                      </span>
-                      {isSelected && (
-                        <div className="ml-auto w-5 h-5 rounded-full bg-[#06013E] flex items-center justify-center flex-shrink-0">
-                          <CheckCircle className="w-3 h-3 text-white" />
-                        </div>
-                      )}
+                      <div className="flex-1 min-w-0">
+                        <span className={`text-sm font-semibold leading-tight block ${
+                          isFilled ? 'text-green-700' : isSelected ? 'text-[#06013E]' : 'text-gray-600'
+                        }`}>
+                          {cat.label}
+                        </span>
+                        {isFilled && <span className="text-[11px] text-green-600">Already submitted</span>}
+                        {isRejected && !isFilled && <span className="text-[11px] text-red-500 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5" /> Re-upload available</span>}
+                      </div>
+                      {isFilled
+                        ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        : isSelected
+                          ? <div className="w-5 h-5 rounded-full bg-[#06013E] flex items-center justify-center flex-shrink-0">
+                              <CheckCircle className="w-3 h-3 text-white" />
+                            </div>
+                          : null
+                      }
                     </button>
                   );
                 })}
