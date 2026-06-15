@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, School as SchoolIcon, Hash, LayoutDashboard } from 'lucide-react';
+import { LogOut, Hash, LayoutDashboard, Users, UserCircle, ChevronRight } from 'lucide-react';
+import Image from 'next/image';
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -35,58 +36,120 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   if (!ready) return null;
 
   const navItems = [
-    { name: 'Dashboard', href: '/school', icon: LayoutDashboard },
-    { name: 'Olympiad IDs', href: '/school/olympiad-ids', icon: Hash },
-    { name: 'My Students', href: '/school/registered-students', icon: SchoolIcon },
+    { name: 'Dashboard',     href: '/school',                       icon: LayoutDashboard },
+    { name: 'Olympiad IDs',  href: '/school/olympiad-ids',          icon: Hash },
+    { name: 'My Students',   href: '/school/registered-students',   icon: Users },
+    { name: 'School Profile', href: '/school/profile',              icon: UserCircle },
   ];
 
+  const initials = (user?.name || 'S')
+    .split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+
   return (
-    <div className="flex min-h-screen bg-[#DDE2F9] text-[#432818]">
-      <aside className="w-64 bg-[#06013E] flex flex-col fixed h-screen z-50 shadow-[10px_0_30px_rgba(6,1,62,0.25)]">
-        <div className="px-5 py-5 border-b border-white/10">
-          <div className="flex items-center gap-2 text-white/70 text-[10px] uppercase tracking-[0.15em] font-bold mb-1">
-            <SchoolIcon size={14} /> School Panel
-          </div>
-          <h2 className="text-white font-bold text-base leading-tight truncate">
-            {user?.name || 'School'}
-          </h2>
-          <p className="text-white/60 text-xs font-mono mt-1">{user?.schoolId}</p>
+    <div className="flex min-h-screen bg-[#F0F2FB]">
+
+      {/* ── Sidebar ── */}
+      <aside className="w-60 flex flex-col fixed h-screen z-50 bg-white border-r border-gray-200 shadow-sm">
+
+        {/* Logo */}
+        <div className="px-4 border-b border-gray-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
+          <Image
+            src="/logo-CW-uU9TX.jpg"
+            alt="Mittsure Technologies"
+            width={160}
+            height={52}
+            className="object-contain w-28 scale-[1.5] mix-blend-multiply -mt-3 -mb-3"
+            priority
+          />
         </div>
 
-        <nav className="flex-1 p-3 space-y-1">
+        {/* School identity card */}
+        <div className="mx-3 mt-3 mb-2 rounded-xl bg-gradient-to-br from-[#06013E] to-[#1a0f6e] p-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-[#FF9000] text-[#06013E] font-black text-sm flex items-center justify-center flex-shrink-0">
+              {initials}
+            </div>
+            <div className="min-w-0">
+              <p className="text-white font-bold text-xs leading-tight truncate">{user?.name || 'School'}</p>
+              <p className="text-white/50 text-[10px] font-mono mt-0.5">{user?.schoolId}</p>
+            </div>
+            <div className="ml-auto flex-shrink-0">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+            </div>
+          </div>
+        </div>
+
+        {/* Nav items */}
+        <nav className="flex-1 px-3 space-y-0.5 overflow-y-auto pt-1">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href;
+            const isActive = item.href === '/school'
+              ? pathname === '/school'
+              : pathname.startsWith(item.href);
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-md transition-colors ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group relative ${
                   isActive
-                    ? 'bg-white text-[#06013E] shadow-sm font-semibold'
-                    : 'text-white hover:bg-white/10'
+                    ? 'bg-[#06013E] text-white shadow-sm'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-[#06013E]'
                 }`}
               >
-                <Icon size={16} />
-                <span className="font-semibold text-sm">{item.name}</span>
+                {/* active accent */}
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#FF9000] rounded-r-full" />
+                )}
+                <Icon size={15} className={isActive ? 'text-[#FF9000]' : 'text-gray-400 group-hover:text-[#06013E]'} />
+                <span className={`text-sm font-semibold flex-1 ${isActive ? 'text-white' : ''}`}>
+                  {item.name}
+                </span>
+                {isActive && <ChevronRight size={12} className="text-white/40" />}
               </Link>
             );
           })}
         </nav>
 
-        <div className="p-3 border-t border-white/10">
+        {/* Logout */}
+        <div className="p-3 border-t border-gray-100 flex-shrink-0">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md text-white hover:bg-white/10 transition-colors"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all group"
           >
-            <LogOut size={16} />
-            <span className="font-semibold text-sm">Logout</span>
+            <LogOut size={15} className="group-hover:text-red-500" />
+            <span className="text-sm font-semibold">Logout</span>
           </button>
         </div>
       </aside>
 
-      <main className="flex-1 ml-64 px-6 pt-4 pb-10 min-h-screen">
-        <div className="max-w-7xl mx-auto">{children}</div>
+      {/* ── Main content ── */}
+      <main className="flex-1 ml-60 min-h-screen flex flex-col">
+
+        {/* Top bar */}
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 sticky top-0 z-40">
+          <div className="flex items-center gap-2">
+            <span className="text-base font-black text-[#06013E]">
+              {pathname === '/school' ? 'Dashboard'
+                : pathname.startsWith('/school/olympiad-ids') ? 'Olympiad IDs'
+                : pathname.startsWith('/school/registered-students') ? 'My Students'
+                : pathname.startsWith('/school/profile') ? 'School Profile'
+                : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-400 hidden sm:block">{user?.name}</span>
+            <div className="w-7 h-7 rounded-full bg-[#06013E] text-[#FF9000] font-black text-[11px] flex items-center justify-center">
+              {initials}
+            </div>
+          </div>
+        </header>
+
+        <div className="flex-1 px-6 py-5">
+          <div className="max-w-7xl mx-auto">{children}</div>
+        </div>
       </main>
     </div>
   );

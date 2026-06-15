@@ -19,42 +19,31 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
-    const students = await prisma.student.findMany({
-      where: {
-        allocation: { schoolId: payload.id },
-        isVerified: true,
-      },
-      orderBy: { createdAt: 'desc' },
+    const school = await prisma.school.findUnique({
+      where: { id: payload.id },
       select: {
         id: true,
+        schoolId: true,
+        olympiadId: true,
         name: true,
+        address: true,
+        email: true,
         phone: true,
-        olympiadCode: true,
-        isVerified: true,
+        contactPerson: true,
+        city: true,
+        district: true,
+        state: true,
+        pincode: true,
+        isActive: true,
         createdAt: true,
-        allocation: {
-          select: {
-            classCode: true,
-            className: true,
-          },
-        },
       },
     });
 
-    const result = students.map(s => ({
-      id: s.id,
-      name: s.name,
-      phone: s.phone,
-      olympiadCode: s.olympiadCode,
-      isVerified: s.isVerified,
-      createdAt: s.createdAt,
-      classCode: s.allocation?.classCode || null,
-      className: s.allocation?.className || null,
-    }));
+    if (!school) return NextResponse.json({ message: 'School not found' }, { status: 404 });
 
-    return NextResponse.json(result);
+    return NextResponse.json(school);
   } catch (error) {
-    console.error('GET school registered-students failed:', error);
-    return NextResponse.json({ message: 'Failed to fetch students' }, { status: 500 });
+    console.error('GET school/me/profile failed:', error);
+    return NextResponse.json({ message: 'Failed to fetch profile' }, { status: 500 });
   }
 }
