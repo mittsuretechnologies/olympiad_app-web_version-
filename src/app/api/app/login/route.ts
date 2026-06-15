@@ -39,6 +39,16 @@ export async function POST(request: Request) {
       { expiresIn: '30d' }
     );
 
+    // Resolve student name from olympiadId allocation
+    let studentName: string | null = null;
+    if (user.olympiadId) {
+      const allocation = await prisma.olympiadIdAllocation.findUnique({
+        where:  { code: user.olympiadId },
+        select: { assignedName: true, student: { select: { name: true } } },
+      });
+      studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
+    }
+
     return NextResponse.json({
       message: 'Login successful',
       token,
@@ -49,6 +59,7 @@ export async function POST(request: Request) {
         mobile: user.mobile,
         avatarUrl: user.avatarUrl,
         olympiadId: user.olympiadId,
+        studentName,
       },
     });
   } catch (error) {
