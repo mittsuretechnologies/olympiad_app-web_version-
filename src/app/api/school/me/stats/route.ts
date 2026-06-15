@@ -29,8 +29,16 @@ export async function GET(request: Request) {
       orderBy: [{ prefix: 'asc' }, { sequence: 'asc' }],
     });
 
+    // Also fetch AppUsers who registered via mobile app using these olympiad codes
+    const codes = allocations.map((a: any) => a.code);
+    const appUsers = await prisma.appUser.findMany({
+      where: { olympiadId: { in: codes }, isVerified: true },
+      select: { id: true, userId: true, olympiadId: true, isVerified: true, createdAt: true },
+    });
+    const appUserByCode = new Map(appUsers.map((u: any) => [u.olympiadId, u]));
+
     const totalAllocated = allocations.length;
-    const totalRegistered = allocations.filter(a => a.student !== null).length;
+    const totalRegistered = allocations.filter((a: any) => a.student !== null || appUserByCode.has(a.code)).length;
     const totalPending = totalAllocated - totalRegistered;
     const registrationRate = totalAllocated > 0 ? Math.round((totalRegistered / totalAllocated) * 100) : 0;
 
@@ -44,7 +52,7 @@ export async function GET(request: Request) {
       }
       const entry = classMap.get(key)!;
       entry.allocated += 1;
-      if (a.student) entry.registered += 1;
+      if (a.student || appUserByCode.has(a.code)) entry.registered += 1;
     }
 
     const classwiseBreakdown = Array.from(classMap.values())
@@ -55,17 +63,30 @@ export async function GET(request: Request) {
       }))
       .sort((a, b) => a.className.localeCompare(b.className));
 
-    // Recent registrations (last 5)
-    const recentRegistrations = allocations
-      .filter(a => a.student !== null)
-      .sort((a, b) => new Date(b.student!.createdAt).getTime() - new Date(a.student!.createdAt).getTime())
+    // Recent registrations (last 5) — merge Student + AppUser
+    const recentList: { studentName: string; olympiadCode: string; className: string; registeredAt: Date }[] = [];
+    for (const a of allocations) {
+      if (a.student) {
+        recentList.push({
+          studentName: a.student.name,
+          olympiadCode: a.code,
+          className: a.className || a.classCode || '-',
+          registeredAt: a.student.createdAt,
+        });
+      } else if (appUserByCode.has(a.code)) {
+        const u = appUserByCode.get(a.code)!;
+        recentList.push({
+          studentName: u.userId,
+          olympiadCode: a.code,
+          className: a.className || a.classCode || '-',
+          registeredAt: u.createdAt,
+        });
+      }
+    }
+    const recentRegistrations = recentList
+      .sort((a, b) => new Date(b.registeredAt).getTime() - new Date(a.registeredAt).getTime())
       .slice(0, 5)
-      .map(a => ({
-        studentName: a.student!.name,
-        olympiadCode: a.code,
-        className: a.className || a.classCode || '-',
-        registeredAt: a.student!.createdAt,
-      }));
+      .map(r => ({ ...r, registeredAt: r.registeredAt.toISOString() }));
 
     return NextResponse.json({
       totalAllocated,
