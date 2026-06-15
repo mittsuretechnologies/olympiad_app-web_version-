@@ -56,6 +56,11 @@ export async function GET(request: NextRequest) {
     const studentIds = students.map(s => s.id);
     const studentMap = new Map(students.map(s => [s.id, s]));
 
+    // If no members found for this school, return empty
+    if (appUserIds.length === 0 && studentIds.length === 0) {
+      return NextResponse.json({ videos: [], school: await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true, city: true, state: true } }) });
+    }
+
     // Fetch approved public videos from both appUsers and students
     const videos = await prisma.video.findMany({
       where: {
@@ -72,6 +77,7 @@ export async function GET(request: NextRequest) {
         videoUrl:     true,
         thumbnailUrl: true,
         caption:      true,
+        tags:         true,
         category:     true,
         subCategory:  true,
         likesCount:   true,
@@ -97,6 +103,7 @@ export async function GET(request: NextRequest) {
         videoUrl:     fixUrl(v.videoUrl) ?? v.videoUrl,
         thumbnailUrl: fixUrl(v.thumbnailUrl),
         caption:      v.caption,
+        tags:         v.tags,
         category:     v.category,
         subCategory:  v.subCategory,
         likesCount:   v.likesCount,

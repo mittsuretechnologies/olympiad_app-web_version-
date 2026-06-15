@@ -41,6 +41,16 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
 
     if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
+    // Resolve student name: prefer Student.name, fall back to allocation.assignedName
+    let studentName: string | null = null;
+    if (target.olympiadId) {
+      const allocation = await prisma.olympiadIdAllocation.findUnique({
+        where:   { code: target.olympiadId },
+        select:  { assignedName: true, student: { select: { name: true } } },
+      });
+      studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
+    }
+
     // Use raw counts to avoid any relation-mapping issues
     const [followersCount, followingCount, videosCount] = await Promise.all([
       prisma.follow.count({ where: { followingId: target.id } }),
@@ -63,6 +73,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         videoUrl: true,
         thumbnailUrl: true,
         caption: true,
+        tags: true,
         category: true,
         subCategory: true,
         isEvaluation: true,
@@ -79,6 +90,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         userId:         target.userId,
         avatarUrl:      target.avatarUrl,
         olympiadId:     target.olympiadId,
+        studentName,
         followersCount,
         followingCount,
         videosCount,
