@@ -181,12 +181,6 @@ export default function UploadVideoPage() {
   /* ── Main ── */
   return (
     <div className="min-h-screen bg-[#F6F9FF]">
-      {/* Page header */}
-      <div className="mb-6">
-        <h1 className="text-xl font-black text-[#06013E]">Upload Video</h1>
-        <p className="text-gray-400 text-sm mt-0.5">Upload an olympiad video on behalf of a registered student</p>
-      </div>
-
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
 

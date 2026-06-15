@@ -22,6 +22,7 @@ import {
   Smartphone,
   BarChart2,
   Building2,
+  Trophy,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -88,9 +89,10 @@ export default function DashboardLayout({
   ];
 
   const reportsSubItems = [
-    { name: 'Student Report', href: '/dashboard/credentials/registered-students', icon: UserCheck },
-    { name: 'School Report',  href: '/dashboard/reports/schools',                 icon: Building2 },
-    { name: 'App Users',      href: '/dashboard/app-users',                       icon: Smartphone },
+    { name: 'Student Report',         href: '/dashboard/credentials/registered-students', icon: UserCheck },
+    { name: 'Olympiad Completions',   href: '/dashboard/reports/olympiad-completions',    icon: Trophy },
+    { name: 'School Report',          href: '/dashboard/reports/schools',                 icon: Building2 },
+    { name: 'App Users',              href: '/dashboard/app-users',                       icon: Smartphone },
   ];
 
   return (
@@ -375,7 +377,7 @@ export default function DashboardLayout({
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-72 min-h-screen relative p-8">
+      <main className="flex-1 ml-72 min-h-screen relative px-8 pt-3 pb-8">
         {children}
       </main>
     </div>

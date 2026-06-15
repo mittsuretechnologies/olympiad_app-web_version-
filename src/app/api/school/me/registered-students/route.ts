@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     // Fetch all sent allocations for this school
     const allocations = await prisma.olympiadIdAllocation.findMany({
       where: { schoolId: payload.id, sentAt: { not: null } },
-      select: { code: true, classCode: true, className: true },
+      select: { code: true, classCode: true, className: true, assignedName: true },
     });
     const codes = allocations.map(a => a.code);
     const allocationByCode = new Map(allocations.map(a => [a.code, a]));
@@ -45,6 +45,26 @@ export async function GET(request: Request) {
       select: { id: true, userId: true, mobile: true, olympiadId: true, isVerified: true, createdAt: true },
     });
 
+    // Olympiad video counts — web students (studentId) + app users (appUserId)
+    const webStudentIds = webStudents.map(s => s.id);
+    const appUserIds    = appUsers.filter(u => !webCodes.has(u.olympiadId!)).map(u => u.id);
+
+    const [webVideoCounts, appVideoCounts] = await Promise.all([
+      prisma.video.groupBy({
+        by: ['studentId'],
+        where: { studentId: { in: webStudentIds }, isEvaluation: true, status: 'APPROVED' },
+        _count: { id: true },
+      }),
+      prisma.video.groupBy({
+        by: ['appUserId'],
+        where: { appUserId: { in: appUserIds }, isEvaluation: true, status: 'APPROVED' },
+        _count: { id: true },
+      }),
+    ]);
+
+    const webVideoCountById  = new Map(webVideoCounts.map((r: any) => [r.studentId, r._count.id]));
+    const appVideoCountById  = new Map(appVideoCounts.map((r: any) => [r.appUserId,  r._count.id]));
+
     const result = [
       ...webStudents.map(s => ({
         id: s.id,
@@ -56,6 +76,7 @@ export async function GET(request: Request) {
         classCode: s.allocation?.classCode || null,
         className: s.allocation?.className || null,
         source: 'web' as const,
+        olympiadVideos: webVideoCountById.get(s.id) || 0,
       })),
       ...appUsers
         .filter(u => !webCodes.has(u.olympiadId!))
@@ -63,7 +84,7 @@ export async function GET(request: Request) {
           const alloc = allocationByCode.get(u.olympiadId!);
           return {
             id: u.id,
-            name: u.userId,
+            name: (allocationByCode.get(u.olympiadId!) as any)?.assignedName || u.userId,
             phone: u.mobile || '-',
             olympiadCode: u.olympiadId!,
             isVerified: u.isVerified,
@@ -71,6 +92,7 @@ export async function GET(request: Request) {
             classCode: alloc?.classCode || null,
             className: alloc?.className || null,
             source: 'app' as const,
+            olympiadVideos: appVideoCountById.get(u.id) || 0,
           };
         }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

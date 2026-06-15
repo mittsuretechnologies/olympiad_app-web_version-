@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Hash, LayoutDashboard, Users, UserCircle, ChevronRight, UploadCloud } from 'lucide-react';
+import { LogOut, Hash, LayoutDashboard, Users, UserCircle, ChevronRight, UploadCloud, PlaySquare } from 'lucide-react';
 import Image from 'next/image';
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
@@ -39,6 +39,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     { name: 'Dashboard',      href: '/school',                       icon: LayoutDashboard },
     { name: 'Olympiad IDs',   href: '/school/olympiad-ids',          icon: Hash },
     { name: 'My Students',    href: '/school/registered-students',   icon: Users },
+    { name: 'Student Videos', href: '/school/student-videos',        icon: PlaySquare },
     { name: 'Upload Video',   href: '/school/upload-video',          icon: UploadCloud },
     { name: 'School Profile', href: '/school/profile',               icon: UserCircle },
   ];
@@ -132,10 +133,11 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
         {/* Top bar */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 sticky top-0 z-40">
           <div className="flex items-center gap-2">
-            <span className="text-base font-black text-[#06013E]">
+            <span className="text-base font-medium text-[#06013E]">
               {pathname === '/school' ? 'Dashboard'
                 : pathname.startsWith('/school/olympiad-ids') ? 'Olympiad IDs'
                 : pathname.startsWith('/school/registered-students') ? 'My Students'
+                : pathname.startsWith('/school/student-videos') ? 'Student Videos'
                 : pathname.startsWith('/school/upload-video') ? 'Upload Video'
                 : pathname.startsWith('/school/profile') ? 'School Profile'
                 : ''}

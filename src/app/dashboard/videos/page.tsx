@@ -253,8 +253,7 @@ export default function VideoModerationPage() {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-black text-[#06013E]">Video Moderation</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Review, approve or reject student submissions</p>
+          <h1 className="text-2xl font-medium text-[#06013E]">Video Moderation</h1>
         </div>
         <button
           onClick={fetchVideos}

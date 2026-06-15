@@ -43,11 +43,9 @@ export default function RegisterUploaderPage() {
     'w-full h-10 border border-gray-300 rounded-none px-3 text-sm text-[#432818] placeholder:text-gray-400 focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E] transition-all bg-white';
 
   return (
-    <div className="bg-[#FFFEFE] border border-gray-300 shadow-sm max-w-3xl mx-auto">
-      <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
-        <h1 className="text-base font-bold uppercase tracking-wider">Register New Uploader</h1>
-      </div>
-
+    <div className="space-y-3">
+      <h1 className="text-2xl font-medium text-[#06013E]">Register New Uploader</h1>
+      <div className="max-w-3xl bg-[#FFFEFE] border border-gray-300 shadow-sm">
       <div className="p-6">
         {message && (
           <div
@@ -125,6 +123,7 @@ export default function RegisterUploaderPage() {
             </button>
           </div>
         </form>
+      </div>
       </div>
     </div>
   );

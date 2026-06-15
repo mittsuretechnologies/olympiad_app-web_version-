@@ -88,16 +88,12 @@ export default function SchoolReportPage() {
   const sel = "h-9 border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E] w-full";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#06013E] flex items-center gap-2">
-            <School size={21} className="text-[#009846]" />
-            School Report
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">School-wise allocation, registration and verification summary</p>
+          <h1 className="text-2xl font-medium text-[#06013E]">School Report</h1>
         </div>
         <button onClick={exportCSV} disabled={filtered.length === 0}
           className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#09025c] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">

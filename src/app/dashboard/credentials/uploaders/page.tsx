@@ -91,22 +91,15 @@ export default function UploaderCredentialsPage() {
   };
 
   return (
-    <div className="bg-white border border-gray-300 shadow-sm">
+    <div className="space-y-4">
+      <h1 className="text-2xl font-medium text-[#06013E]">Manage Uploader Credentials</h1>
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#009846] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold">
           <CheckCircle size={16} />
           {toast}
         </div>
       )}
-
-      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
-        <div className="flex items-center gap-3">
-          <KeyRound size={20} />
-          <h1 className="text-base font-bold uppercase tracking-wider">Manage Uploader Credentials</h1>
-        </div>
-        <div className="text-xs text-gray-200">Reset passwords for mobile app login</div>
-      </div>
-
+    <div className="bg-white border border-gray-300 shadow-sm">
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
           <span className="text-gray-600">Total Uploaders: </span>
@@ -281,6 +274,7 @@ export default function UploaderCredentialsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

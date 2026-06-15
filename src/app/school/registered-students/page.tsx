@@ -13,6 +13,7 @@ interface Student {
   classCode: string | null;
   className: string | null;
   source?: 'web' | 'app';
+  olympiadVideos?: number;
 }
 
 export default function SchoolRegisteredStudentsPage() {
@@ -103,7 +104,7 @@ export default function SchoolRegisteredStudentsPage() {
         <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
           <div className="flex items-center gap-3">
             <Users size={18} />
-            <h1 className="text-sm font-bold uppercase tracking-wider">My Registered Students</h1>
+            <h1 className="text-base font-medium">My Registered Students</h1>
           </div>
           <button
             onClick={exportCSV}
@@ -200,6 +201,7 @@ export default function SchoolRegisteredStudentsPage() {
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Class</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Phone</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Joined On</th>
+                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">🏅 Videos</th>
                   <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">Status</th>
                   <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">Via</th>
                 </tr>
@@ -227,6 +229,18 @@ export default function SchoolRegisteredStudentsPage() {
                     <td className="px-4 py-3 text-sm text-gray-500 font-mono">{s.phone}</td>
                     <td className="px-4 py-3 text-xs text-gray-500">
                       {new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {(() => {
+                        const count = s.olympiadVideos ?? 0;
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-black ${
+                            count >= 2 ? 'bg-green-100 text-green-700' : count === 1 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            {count}/2
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded">
@@ -266,6 +280,14 @@ export default function SchoolRegisteredStudentsPage() {
                   <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded">
                     <CheckCircle2 size={8} /> Verified
                   </span>
+                  {(() => {
+                    const count = s.olympiadVideos ?? 0;
+                    return (
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
+                        count >= 2 ? 'bg-green-100 text-green-700' : count === 1 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'
+                      }`}>🏅 {count}/2</span>
+                    );
+                  })()}
                   {s.source === 'app'
                     ? <span className="text-[9px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded">App</span>
                     : <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded">Web</span>

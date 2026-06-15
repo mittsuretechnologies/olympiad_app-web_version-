@@ -168,7 +168,7 @@ export default function SchoolOlympiadIdsPage() {
         <div className="bg-[#06013E] text-white px-6 py-3 rounded-t-xl flex items-center justify-between border-b-4 border-[#FF9000]">
           <div className="flex items-center gap-3">
             <Hash size={18} />
-            <h1 className="text-sm font-bold uppercase tracking-wider">Allocated Olympiad IDs</h1>
+            <h1 className="text-base font-medium">Allocated Olympiad IDs</h1>
           </div>
           <button onClick={exportCSV} disabled={filtered.length === 0}
             className="inline-flex items-center gap-1.5 bg-[#FF9000] text-[#06013E] px-3 py-1.5 text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-40">

@@ -15,7 +15,7 @@ interface StudentCred {
   school: { id: string; schoolId: string; name: string; city: string | null } | null;
   student: {
     id: string; name: string; phone: string; username?: string | null;
-    plainPassword?: string | null; isVerified: boolean; createdAt: string;
+    plainPassword?: string | null; isVerified: boolean; createdAt: string; source?: string;
   } | null;
 }
 
@@ -141,23 +141,14 @@ export default function StudentCredentialsPage() {
   const totalStudents = rows.filter(r => r.student).length;
 
   return (
-    <div className="bg-white border border-gray-300 shadow-sm">
-
+    <div className="space-y-4">
+      <h1 className="text-2xl font-medium text-[#06013E]">Student Credentials</h1>
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#009846] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold">
           <CheckCircle size={16} /> {toast}
         </div>
       )}
-
-      {/* Header */}
-      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
-        <div className="flex items-center gap-3">
-          <KeyRound size={20} />
-          <h1 className="text-base font-bold uppercase tracking-wider">Student Credentials</h1>
-        </div>
-        <div className="text-xs text-gray-200">School-wise Olympiad IDs &amp; passwords</div>
-      </div>
-
+    <div className="bg-white border border-gray-300 shadow-sm">
       {/* Toolbar */}
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-4 text-sm">
@@ -285,7 +276,9 @@ export default function StudentCredentialsPage() {
                           {r.student ? (
                             r.student.plainPassword
                               ? <span className="font-mono font-bold text-[#06013E] select-all text-sm">{r.student.plainPassword}</span>
-                              : <span className="text-xs text-gray-300 italic">Reset to generate</span>
+                              : r.student.source === 'app'
+                                ? <span className="text-xs text-purple-500 font-semibold">App Login</span>
+                                : <span className="text-xs text-gray-300 italic">Reset to generate</span>
                           ) : '-'}
                         </td>
                         <td className="px-3 py-2 border-r border-gray-100">
@@ -426,6 +419,7 @@ export default function StudentCredentialsPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }
