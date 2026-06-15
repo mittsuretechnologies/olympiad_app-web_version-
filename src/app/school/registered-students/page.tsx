@@ -12,6 +12,7 @@ interface Student {
   createdAt: string;
   classCode: string | null;
   className: string | null;
+  source?: 'web' | 'app';
 }
 
 export default function SchoolRegisteredStudentsPage() {
@@ -200,6 +201,7 @@ export default function SchoolRegisteredStudentsPage() {
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Phone</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Joined On</th>
                   <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">Status</th>
+                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">Via</th>
                 </tr>
               </thead>
               <tbody>
@@ -231,6 +233,12 @@ export default function SchoolRegisteredStudentsPage() {
                         <CheckCircle2 size={9} /> Verified
                       </span>
                     </td>
+                    <td className="px-4 py-3 text-center">
+                      {s.source === 'app'
+                        ? <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200 rounded">App</span>
+                        : <span className="inline-flex items-center px-2 py-0.5 text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 rounded">Web</span>
+                      }
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -254,9 +262,15 @@ export default function SchoolRegisteredStudentsPage() {
                   <p className="font-bold text-[#06013E] truncate">{s.name}</p>
                   <p className="font-mono text-xs text-gray-400">{s.olympiadCode}</p>
                 </div>
-                <span className="ml-auto inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded flex-shrink-0">
-                  <CheckCircle2 size={8} /> OK
-                </span>
+                <div className="ml-auto flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 bg-green-50 text-green-700 border border-green-200 rounded">
+                    <CheckCircle2 size={8} /> Verified
+                  </span>
+                  {s.source === 'app'
+                    ? <span className="text-[9px] font-bold px-1.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded">App</span>
+                    : <span className="text-[9px] font-bold px-1.5 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded">Web</span>
+                  }
+                </div>
               </div>
               <div className="flex flex-col gap-1.5 text-xs text-gray-500">
                 {(s.className || s.classCode) && (

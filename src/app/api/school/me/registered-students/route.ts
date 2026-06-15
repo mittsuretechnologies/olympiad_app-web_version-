@@ -24,8 +24,8 @@ export async function GET(request: Request) {
       where: { schoolId: payload.id, sentAt: { not: null } },
       select: { code: true, classCode: true, className: true },
     });
-    const codes = allocations.map((a: any) => a.code);
-    const allocationByCode = new Map(allocations.map((a: any) => [a.code, a]));
+    const codes = allocations.map(a => a.code);
+    const allocationByCode = new Map(allocations.map(a => [a.code, a]));
 
     // Web-registered students (Student table)
     const webStudents = await prisma.student.findMany({
@@ -37,16 +37,16 @@ export async function GET(request: Request) {
         allocation: { select: { classCode: true, className: true } },
       },
     });
-    const webCodes = new Set(webStudents.map((s: any) => s.olympiadCode));
+    const webCodes = new Set(webStudents.map(s => s.olympiadCode));
 
-    // App-registered users (AppUser table) — those not already in Student table
+    // App-registered users (AppUser table) — only those not already in Student table
     const appUsers = await prisma.appUser.findMany({
       where: { olympiadId: { in: codes }, isVerified: true },
       select: { id: true, userId: true, mobile: true, olympiadId: true, isVerified: true, createdAt: true },
     });
 
     const result = [
-      ...webStudents.map((s: any) => ({
+      ...webStudents.map(s => ({
         id: s.id,
         name: s.name,
         phone: s.phone,
@@ -55,25 +55,25 @@ export async function GET(request: Request) {
         createdAt: s.createdAt,
         classCode: s.allocation?.classCode || null,
         className: s.allocation?.className || null,
-        source: 'web',
+        source: 'web' as const,
       })),
       ...appUsers
-        .filter((u: any) => !webCodes.has(u.olympiadId))
-        .map((u: any) => {
-          const alloc = allocationByCode.get(u.olympiadId) as any;
+        .filter(u => !webCodes.has(u.olympiadId!))
+        .map(u => {
+          const alloc = allocationByCode.get(u.olympiadId!);
           return {
             id: u.id,
             name: u.userId,
             phone: u.mobile || '-',
-            olympiadCode: u.olympiadId,
+            olympiadCode: u.olympiadId!,
             isVerified: u.isVerified,
             createdAt: u.createdAt,
             classCode: alloc?.classCode || null,
             className: alloc?.className || null,
-            source: 'app',
+            source: 'app' as const,
           };
         }),
-    ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return NextResponse.json(result);
   } catch (error) {

@@ -30,15 +30,15 @@ export async function GET(request: Request) {
     });
 
     // Also fetch AppUsers who registered via mobile app using these olympiad codes
-    const codes = allocations.map((a: any) => a.code);
+    const codes = allocations.map(a => a.code);
     const appUsers = await prisma.appUser.findMany({
       where: { olympiadId: { in: codes }, isVerified: true },
       select: { id: true, userId: true, olympiadId: true, isVerified: true, createdAt: true },
     });
-    const appUserByCode = new Map(appUsers.map((u: any) => [u.olympiadId, u]));
+    const appUserByCode = new Map(appUsers.map(u => [u.olympiadId, u]));
 
     const totalAllocated = allocations.length;
-    const totalRegistered = allocations.filter((a: any) => a.student !== null || appUserByCode.has(a.code)).length;
+    const totalRegistered = allocations.filter(a => a.student !== null || appUserByCode.has(a.code)).length;
     const totalPending = totalAllocated - totalRegistered;
     const registrationRate = totalAllocated > 0 ? Math.round((totalRegistered / totalAllocated) * 100) : 0;
 
@@ -67,20 +67,10 @@ export async function GET(request: Request) {
     const recentList: { studentName: string; olympiadCode: string; className: string; registeredAt: Date }[] = [];
     for (const a of allocations) {
       if (a.student) {
-        recentList.push({
-          studentName: a.student.name,
-          olympiadCode: a.code,
-          className: a.className || a.classCode || '-',
-          registeredAt: a.student.createdAt,
-        });
+        recentList.push({ studentName: a.student.name, olympiadCode: a.code, className: a.className || a.classCode || '-', registeredAt: a.student.createdAt });
       } else if (appUserByCode.has(a.code)) {
         const u = appUserByCode.get(a.code)!;
-        recentList.push({
-          studentName: u.userId,
-          olympiadCode: a.code,
-          className: a.className || a.classCode || '-',
-          registeredAt: u.createdAt,
-        });
+        recentList.push({ studentName: u.userId, olympiadCode: a.code, className: a.className || a.classCode || '-', registeredAt: u.createdAt });
       }
     }
     const recentRegistrations = recentList
