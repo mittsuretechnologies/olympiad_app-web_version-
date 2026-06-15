@@ -35,16 +35,9 @@ export default function ViewerCredentialsPage() {
   }, [rows, search]);
 
   return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-medium text-[#06013E]">Viewer App Accounts</h1>
     <div className="bg-white border border-gray-300 shadow-sm">
-      {/* Header */}
-      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
-        <div className="flex items-center gap-3">
-          <Eye size={20} />
-          <h1 className="text-base font-bold uppercase tracking-wider">Viewer App Accounts</h1>
-        </div>
-        <div className="text-xs text-gray-200">Viewers who signed up via the mobile app</div>
-      </div>
-
       {/* Toolbar */}
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
@@ -124,6 +117,7 @@ export default function ViewerCredentialsPage() {
         </span>
         <span className="italic">© Mittsure Olympiad Portal</span>
       </div>
+    </div>
     </div>
   );
 }

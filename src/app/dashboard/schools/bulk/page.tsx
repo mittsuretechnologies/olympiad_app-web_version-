@@ -306,12 +306,9 @@ export default function BulkUploadPage() {
   const labelCls = 'block text-xs font-bold text-black mb-1 uppercase tracking-wide';
 
   return (
-    <div className="bg-[#FFFEFE] border border-gray-300 shadow-sm max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
-        <h1 className="text-base font-bold uppercase tracking-wider">Bulk School Registration</h1>
-      </div>
-
+    <div className="space-y-3">
+      <h1 className="text-2xl font-medium text-[#06013E]">Bulk School Registration</h1>
+      <div className="max-w-5xl bg-[#FFFEFE] border border-gray-300 shadow-sm">
       <div className="p-5 space-y-5">
 
         {/* Step 1: Download Template */}
@@ -568,6 +565,7 @@ export default function BulkUploadPage() {
             </button>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

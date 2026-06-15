@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import {
   UserCheck, Loader2, Search, Download,
-  Users, CheckCircle2, Clock3, Building2, Filter, X
+  Users, Building2, Filter, X, Video
 } from 'lucide-react';
 
 interface RegisteredStudent {
@@ -13,8 +13,11 @@ interface RegisteredStudent {
   name: string;
   phone: string;
   olympiadCode: string;
+  username: string | null;
   isVerified: boolean;
   createdAt: string;
+  source?: string;
+  totalVideos?: number;
   school: {
     id: string;
     schoolId: string;
@@ -35,7 +38,7 @@ export default function StudentReportPage() {
   const [filterDistrict, setFilterDistrict] = useState('All');
   const [filterCity, setFilterCity] = useState('All');
   const [filterSchool, setFilterSchool] = useState('All');
-  const [filterVerified, setFilterVerified] = useState('All');
+
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
 
@@ -63,12 +66,12 @@ export default function StudentReportPage() {
     return [['All', 'All Schools'], ...unique] as [string, string][];
   }, [rows, filterState, filterDistrict, filterCity]);
 
-  const activeFilterCount = [filterState, filterDistrict, filterCity, filterVerified, filterSchool].filter(v => v !== 'All').length
+  const activeFilterCount = [filterState, filterDistrict, filterCity, filterSchool].filter(v => v !== 'All').length
     + (filterDateFrom ? 1 : 0) + (filterDateTo ? 1 : 0);
 
   const clearFilters = () => {
     setFilterState('All'); setFilterDistrict('All'); setFilterCity('All');
-    setFilterVerified('All'); setFilterSchool('All');
+    setFilterSchool('All');
     setFilterDateFrom(''); setFilterDateTo(''); setSearch('');
   };
 
@@ -78,8 +81,7 @@ export default function StudentReportPage() {
       if (filterDistrict !== 'All' && r.school?.district !== filterDistrict) return false;
       if (filterCity !== 'All' && r.school?.city !== filterCity) return false;
       if (filterSchool !== 'All' && r.school?.schoolId !== filterSchool) return false;
-      if (filterVerified === 'Verified' && !r.isVerified) return false;
-      if (filterVerified === 'Pending' && r.isVerified) return false;
+
       if (filterDateFrom && new Date(r.createdAt) < new Date(filterDateFrom)) return false;
       if (filterDateTo && new Date(r.createdAt) > new Date(filterDateTo + 'T23:59:59')) return false;
       if (search) {
@@ -88,23 +90,26 @@ export default function StudentReportPage() {
           !r.olympiadCode?.toLowerCase().includes(q) &&
           !r.name?.toLowerCase().includes(q) &&
           !r.phone?.toLowerCase().includes(q) &&
+          !r.username?.toLowerCase().includes(q) &&
           !r.school?.name?.toLowerCase().includes(q) &&
           !r.school?.schoolId?.toLowerCase().includes(q)
         ) return false;
       }
       return true;
     });
-  }, [rows, filterState, filterDistrict, filterCity, filterSchool, filterVerified, filterDateFrom, filterDateTo, search]);
+  }, [rows, filterState, filterDistrict, filterCity, filterSchool, filterDateFrom, filterDateTo, search]);
 
-  const verifiedCount = filtered.filter(r => r.isVerified).length;
   const schoolCount = new Set(filtered.map(r => r.school?.schoolId).filter(Boolean)).size;
+  const totalVideos = filtered.reduce((sum, r) => sum + (r.totalVideos || 0), 0);
 
   const exportCSV = () => {
     if (filtered.length === 0) return;
-    const headers = ['#', 'Student Name', 'Phone', 'Olympiad ID', 'Verified', 'School ID', 'School Name', 'City', 'State', 'Registration Date'];
+    const headers = ['#', 'Student Name', 'Username', 'Phone', 'Olympiad ID', 'Videos', 'Verified', 'Source', 'School ID', 'School Name', 'City', 'State', 'Registration Date'];
     const dataRows = filtered.map((r, i) => [
-      i + 1, r.name, r.phone, r.olympiadCode,
+      i + 1, r.name, r.username || '-', r.phone, r.olympiadCode,
+      r.totalVideos ?? 0,
       r.isVerified ? 'Yes' : 'No',
+      r.source || 'web',
       r.school?.schoolId || '-', r.school?.name || '-',
       r.school?.city || '-', r.school?.state || '-',
       new Date(r.createdAt).toLocaleDateString(),
@@ -122,16 +127,12 @@ export default function StudentReportPage() {
   const sel = "h-9 border border-gray-200 bg-white px-3 text-sm text-gray-700 focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E] w-full";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2">
 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#06013E] flex items-center gap-2">
-            <UserCheck size={21} className="text-[#009846]" />
-            Student Report
-          </h1>
-          <p className="text-xs text-gray-400 mt-0.5">Students registered on the mobile app</p>
+          <h1 className="text-2xl font-medium text-[#06013E]">Student Report</h1>
         </div>
         <button onClick={exportCSV} disabled={filtered.length === 0}
           className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#09025c] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -178,17 +179,12 @@ export default function StudentReportPage() {
               {schools.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
             </select>
           </div>
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
-            <select value={filterVerified} onChange={e => setFilterVerified(e.target.value)} className={sel}>
-              <option>All</option><option>Verified</option><option>Pending</option>
-            </select>
-          </div>
+
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Search</label>
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-              <input type="text" placeholder="Name / ID / Phone..." value={search} onChange={e => setSearch(e.target.value)} autoComplete="off"
+              <input type="text" placeholder="Name / ID / User..." value={search} onChange={e => setSearch(e.target.value)} autoComplete="off"
                 className="h-9 w-full border border-gray-200 pl-8 pr-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]" />
             </div>
           </div>
@@ -212,20 +208,16 @@ export default function StudentReportPage() {
           <span className="text-2xl font-bold text-[#06013E]">{filtered.length}</span>
           <span className="text-sm text-gray-400">Students</span>
         </div>
-        <div className="flex items-center gap-3 px-6 py-3">
-          <CheckCircle2 size={17} className="text-green-600" />
-          <span className="text-2xl font-bold text-green-700">{verifiedCount}</span>
-          <span className="text-sm text-gray-400">Verified</span>
-        </div>
-        <div className="flex items-center gap-3 px-6 py-3">
-          <Clock3 size={17} className="text-orange-500" />
-          <span className="text-2xl font-bold text-orange-600">{filtered.length - verifiedCount}</span>
-          <span className="text-sm text-gray-400">Unverified</span>
-        </div>
+
         <div className="flex items-center gap-3 px-6 py-3">
           <Building2 size={17} className="text-amber-600" />
           <span className="text-2xl font-bold text-amber-700">{schoolCount}</span>
           <span className="text-sm text-gray-400">Schools</span>
+        </div>
+        <div className="flex items-center gap-3 px-6 py-3">
+          <Video size={17} className="text-purple-600" />
+          <span className="text-2xl font-bold text-purple-700">{totalVideos}</span>
+          <span className="text-sm text-gray-400">Total Videos</span>
         </div>
       </div>
 
@@ -243,9 +235,11 @@ export default function StudentReportPage() {
               <tr className="border-b border-gray-200 bg-gray-50 text-gray-500">
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider w-10">S.No</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Student Name</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Username</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Phone</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Olympiad ID</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Status</th>
+                <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider">Videos</th>
+
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">School</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">City</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Reg. Date</th>
@@ -253,26 +247,42 @@ export default function StudentReportPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={8} className="py-16 text-center">
+                <tr><td colSpan={9} className="py-16 text-center">
                   <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#06013E] mb-2" />
                   <p className="text-gray-400 text-sm">Loading...</p>
                 </td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={8} className="py-16 text-center text-gray-400 text-sm">
+                <tr><td colSpan={9} className="py-16 text-center text-gray-400 text-sm">
                   {rows.length === 0 ? 'No students registered yet.' : 'No records match your filters.'}
                 </td></tr>
               ) : filtered.map((r, idx) => (
                 <tr key={r.id} className={`border-b border-gray-100 hover:bg-blue-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                   <td className="px-4 py-2.5 text-gray-400 text-xs">{idx + 1}</td>
-                  <td className="px-4 py-2.5 font-semibold text-gray-900">{r.name}</td>
-                  <td className="px-4 py-2.5 font-mono text-gray-500 text-xs">{r.phone}</td>
-                  <td className="px-4 py-2.5 font-mono font-bold text-[#06013E] select-all text-sm">{r.olympiadCode}</td>
                   <td className="px-4 py-2.5">
-                    {r.isVerified
-                      ? <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5"><CheckCircle2 size={10} />Verified</span>
-                      : <span className="inline-flex items-center gap-1 text-[11px] font-bold text-orange-600 bg-orange-50 border border-orange-200 px-2 py-0.5"><Clock3 size={10} />Pending</span>
+                    <span className={`font-semibold ${r.source === 'app' && r.name === r.username ? 'text-gray-400 italic' : 'text-gray-900'}`}>
+                      {r.name}
+                    </span>
+                    {r.source === 'app' && r.name === r.username && (
+                      <span className="ml-1.5 text-[10px] text-orange-400 font-normal">(no name set)</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-2.5">
+                    {r.username
+                      ? <span className="font-mono text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5">{r.username}</span>
+                      : <span className="text-gray-300 text-xs">-</span>
                     }
                   </td>
+                  <td className="px-4 py-2.5 font-mono text-gray-500 text-xs">{r.phone}</td>
+                  <td className="px-4 py-2.5 font-mono font-bold text-[#06013E] select-all text-sm">{r.olympiadCode}</td>
+                  <td className="px-4 py-2.5 text-center">
+                    {(r.totalVideos ?? 0) > 0
+                      ? <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 bg-purple-50 border border-purple-200 px-2 py-0.5">
+                          <Video size={10} />{r.totalVideos}
+                        </span>
+                      : <span className="text-gray-300 text-xs">0</span>
+                    }
+                  </td>
+
                   <td className="px-4 py-2.5">
                     {r.school
                       ? <div className="flex items-center gap-1.5">

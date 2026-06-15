@@ -415,17 +415,9 @@ export default function SchoolsPage() {
     : [];
 
   return (
+    <div className="space-y-3">
+      <h1 className="text-2xl font-medium text-[#06013E]">School Directory</h1>
     <div className="bg-white border border-gray-300 shadow-sm">
-      {/* Title Bar */}
-      <div className="bg-[#009846] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
-        <div className="flex items-center gap-3">
-          <SchoolIcon size={20} />
-          <h1 className="text-base font-bold uppercase tracking-wider">School Directory</h1>
-        </div>
-        <div className="text-xs text-gray-200">
-          Manage partner institutions and registration IDs
-        </div>
-      </div>
 
       {/* Action Bar */}
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
@@ -1281,6 +1273,7 @@ export default function SchoolsPage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

@@ -19,7 +19,7 @@ export async function GET() {
         createdAt: true,
         olympiadIds: {
           select: {
-            id: true,
+            code: true,
             student: {
               select: { id: true, isVerified: true },
             },
@@ -28,22 +28,45 @@ export async function GET() {
       },
     });
 
-    const result = schools.map(s => ({
-      id: s.id,
-      schoolId: s.schoolId,
-      olympiadId: s.olympiadId,
-      name: s.name,
-      city: s.city,
-      state: s.state,
-      district: s.district,
-      contactPerson: s.contactPerson,
-      phone: s.phone,
-      email: s.email,
-      createdAt: s.createdAt,
-      allocated: s.olympiadIds.length,
-      registered: s.olympiadIds.filter(o => o.student !== null).length,
-      verified: s.olympiadIds.filter(o => o.student?.isVerified).length,
-    }));
+    // Fetch all AppUsers whose olympiadId matches any allocation code
+    const allCodes = schools.flatMap(s => s.olympiadIds.map(o => o.code));
+    const appUsers = await prisma.appUser.findMany({
+      where: { olympiadId: { in: allCodes }, isVerified: true },
+      select: { olympiadId: true, isVerified: true },
+    });
+    const appUserByCode = new Map(appUsers.map(u => [u.olympiadId!, u]));
+
+    const result = schools.map(s => {
+      const allocated = s.olympiadIds.length;
+
+      let registered = 0;
+      let verified = 0;
+
+      for (const o of s.olympiadIds) {
+        const hasWebStudent = o.student !== null;
+        const hasAppUser = appUserByCode.has(o.code);
+
+        if (hasWebStudent || hasAppUser) registered++;
+        if (o.student?.isVerified || (hasAppUser && appUserByCode.get(o.code)?.isVerified)) verified++;
+      }
+
+      return {
+        id: s.id,
+        schoolId: s.schoolId,
+        olympiadId: s.olympiadId,
+        name: s.name,
+        city: s.city,
+        state: s.state,
+        district: s.district,
+        contactPerson: s.contactPerson,
+        phone: s.phone,
+        email: s.email,
+        createdAt: s.createdAt,
+        allocated,
+        registered,
+        verified,
+      };
+    });
 
     return NextResponse.json(result);
   } catch (error: any) {
