@@ -43,23 +43,24 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
 
-    // If user has an olympiadId, resolve the linked school for auto-hashtags
+    // If user has an olympiadId, resolve the linked school and student name
+    // Prefer Student.name, fall back to allocation.assignedName (set by school admin)
     let school: { name: string | null; state: string | null; district: string | null; schoolId: string } | null = null;
+    let studentName: string | null = null;
     if (user.olympiadId) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
-        where: { code: user.olympiadId },
-        include: {
-          school: {
-            select: { name: true, state: true, district: true, schoolId: true },
-          },
+        where:  { code: user.olympiadId },
+        select: {
+          assignedName: true,
+          school:  { select: { name: true, state: true, district: true, schoolId: true } },
+          student: { select: { name: true } },
         },
       });
-      if (allocation?.school) {
-        school = allocation.school;
-      }
+      if (allocation?.school) school = allocation.school;
+      studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
     }
 
-    return NextResponse.json({ user, school });
+    return NextResponse.json({ user, school, studentName });
   } catch (error: any) {
     console.error('app/me error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

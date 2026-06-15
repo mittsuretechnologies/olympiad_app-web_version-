@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
   try {
     const {
-      videoUrl, caption, category, subCategory,
+      videoUrl, thumbnailUrl, caption, category, subCategory,
       tags, isPublic, isEvaluation, olympiadId: bodyOlympiadId,
       isOlympiadUpload,
     } = await request.json();
@@ -137,6 +137,7 @@ export async function POST(request: Request) {
         appUserId:    appUser.id,
         uploaderType,
         videoUrl,
+        thumbnailUrl: thumbnailUrl ?? null,
         caption,
         category,
         subCategory,
