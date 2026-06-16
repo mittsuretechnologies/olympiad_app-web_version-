@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import { Users, Loader2, Search, Download, CheckCircle2, BookOpen, Calendar, Phone } from 'lucide-react';
@@ -109,7 +109,7 @@ export default function SchoolRegisteredStudentsPage() {
           <button
             onClick={exportCSV}
             disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 bg-[#FF9000] text-[#06013E] px-3 py-1.5 text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 bg-[#FF9000] text-[#004f9f] px-3 py-1.5 text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-40"
           >
             <Download size={13} /> Export CSV
           </button>
@@ -126,8 +126,8 @@ export default function SchoolRegisteredStudentsPage() {
             const count = students.filter(s => (s.classCode || 'UNKNOWN') === cls.code).length;
             return (
               <div key={cls.code} className="flex items-center gap-2 px-5 py-3">
-                <BookOpen size={13} className="text-[#06013E]/50" />
-                <span className="text-lg font-black text-[#06013E]">{count}</span>
+                <BookOpen size={13} className="text-[#004f9f]/50" />
+                <span className="text-lg font-black text-[#004f9f]">{count}</span>
                 <span className="text-xs text-gray-400">{cls.name}</span>
               </div>
             );
@@ -177,7 +177,7 @@ export default function SchoolRegisteredStudentsPage() {
       {/* Content */}
       {loading ? (
         <div className="bg-white border border-gray-200 py-20 flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[#06013E]" />
+          <Loader2 className="w-6 h-6 animate-spin text-[#004f9f]" />
           <p className="text-sm text-gray-400">Loading student records...</p>
         </div>
       ) : error ? (
@@ -194,14 +194,14 @@ export default function SchoolRegisteredStudentsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#06013E]">
+                <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#004f9f]">
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase w-10">#</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Student</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Olympiad ID</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Class</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Phone</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Joined On</th>
-                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">🏅 Videos</th>
+                  <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">ðŸ… Videos</th>
                   <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">Status</th>
                   <th className="px-4 py-3 text-center text-[10px] font-bold uppercase">Via</th>
                 </tr>
@@ -215,13 +215,13 @@ export default function SchoolRegisteredStudentsPage() {
                         <div className={`w-7 h-7 rounded-full ${avatarColors[i % avatarColors.length]} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>
                           {getInitials(s.name)}
                         </div>
-                        <span className="font-semibold text-[#06013E] text-sm">{s.name}</span>
+                        <span className="font-semibold text-[#004f9f] text-sm">{s.name}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs font-bold text-gray-700">{s.olympiadCode}</td>
                     <td className="px-4 py-3">
                       {s.className || s.classCode ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-[#E8EAF6] text-[#06013E] rounded">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-[#E8EAF6] text-[#004f9f] rounded">
                           <BookOpen size={8} /> {s.className || s.classCode}
                         </span>
                       ) : <span className="text-gray-300 text-xs">-</span>}
@@ -260,7 +260,7 @@ export default function SchoolRegisteredStudentsPage() {
           </div>
           <div className="px-5 py-2.5 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
             <span>Showing <span className="font-semibold text-gray-600">{filtered.length}</span> of <span className="font-semibold text-gray-600">{students.length}</span> students</span>
-            <span className="italic">© Mittsure Olympiad Portal</span>
+            <span className="italic">Â© Mittsure Olympiad Portal</span>
           </div>
         </div>
       ) : (
@@ -273,7 +273,7 @@ export default function SchoolRegisteredStudentsPage() {
                   {getInitials(s.name)}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-[#06013E] truncate">{s.name}</p>
+                  <p className="font-bold text-[#004f9f] truncate">{s.name}</p>
                   <p className="font-mono text-xs text-gray-400">{s.olympiadCode}</p>
                 </div>
                 <div className="ml-auto flex flex-col items-end gap-1 flex-shrink-0">
@@ -285,7 +285,7 @@ export default function SchoolRegisteredStudentsPage() {
                     return (
                       <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full ${
                         count >= 2 ? 'bg-green-100 text-green-700' : count === 1 ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-400'
-                      }`}>🏅 {count}/2</span>
+                      }`}>ðŸ… {count}/2</span>
                     );
                   })()}
                   {s.source === 'app'
@@ -297,16 +297,16 @@ export default function SchoolRegisteredStudentsPage() {
               <div className="flex flex-col gap-1.5 text-xs text-gray-500">
                 {(s.className || s.classCode) && (
                   <div className="flex items-center gap-2">
-                    <BookOpen size={11} className="text-[#06013E]/40 flex-shrink-0" />
+                    <BookOpen size={11} className="text-[#004f9f]/40 flex-shrink-0" />
                     <span>{s.className || s.classCode}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <Phone size={11} className="text-[#06013E]/40 flex-shrink-0" />
+                  <Phone size={11} className="text-[#004f9f]/40 flex-shrink-0" />
                   <span className="font-mono">{s.phone}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Calendar size={11} className="text-[#06013E]/40 flex-shrink-0" />
+                  <Calendar size={11} className="text-[#004f9f]/40 flex-shrink-0" />
                   <span>{new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 </div>
               </div>
@@ -317,3 +317,4 @@ export default function SchoolRegisteredStudentsPage() {
     </div>
   );
 }
+

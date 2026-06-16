@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -225,7 +225,7 @@ export default function SchoolOlympiadIdsPage() {
             <h1 className="text-base font-medium">Allocated Olympiad IDs</h1>
           </div>
           <button onClick={exportCSV} disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 bg-[#FF9000] text-[#06013E] px-3 py-1.5 text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-40">
+            className="inline-flex items-center gap-1.5 bg-[#FF9000] text-[#004f9f] px-3 py-1.5 text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-40">
             <Download size={13} /> Export CSV
           </button>
         </div>
@@ -292,7 +292,7 @@ export default function SchoolOlympiadIdsPage() {
       {/* Content */}
       {loading ? (
         <div className="bg-white rounded-xl border border-gray-100 py-20 flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[#06013E]" />
+          <Loader2 className="w-6 h-6 animate-spin text-[#004f9f]" />
           <p className="text-sm text-gray-400">Loading...</p>
         </div>
       ) : error ? (
@@ -313,8 +313,8 @@ export default function SchoolOlympiadIdsPage() {
                 <button onClick={() => toggleCollapse(code)}
                   className="w-full flex items-center justify-between px-5 py-3 bg-[#E8EAF6] hover:bg-[#dde0f5] transition-colors border-b border-gray-200">
                   <div className="flex items-center gap-3">
-                    <BookOpen size={14} className="text-[#06013E]" />
-                    <span className="text-sm font-bold text-[#06013E]">{label}</span>
+                    <BookOpen size={14} className="text-[#004f9f]" />
+                    <span className="text-sm font-bold text-[#004f9f]">{label}</span>
                     <span className="text-[10px] text-gray-500 font-mono bg-white px-2 py-0.5 rounded">{items.length} IDs</span>
                   </div>
                   <div className="flex items-center gap-3">
@@ -344,7 +344,7 @@ export default function SchoolOlympiadIdsPage() {
                         {items.map((a, idx) => (
                           <tr key={a.id} className={`border-b border-gray-50 hover:bg-blue-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                             <td className="px-4 py-3 text-gray-400 text-xs">{idx + 1}</td>
-                            <td className="px-4 py-3 font-mono font-bold text-[#06013E]">{a.code}</td>
+                            <td className="px-4 py-3 font-mono font-bold text-[#004f9f]">{a.code}</td>
                             <td className="px-4 py-3">
                               {a.assignedName ? (
                                 <span className="font-semibold text-purple-700">{a.assignedName}</span>
@@ -373,10 +373,10 @@ export default function SchoolOlympiadIdsPage() {
                             </td>
                             <td className="px-4 py-3 text-center">
                               {(a.student || a.hasAppUser) ? (
-                                // Already registered (web or app) — nothing to do
-                                <span className="text-[10px] text-gray-300 italic">—</span>
+                                // Already registered (web or app) â€” nothing to do
+                                <span className="text-[10px] text-gray-300 italic">â€”</span>
                               ) : a.assignedName ? (
-                                // Assigned but not registered — show Register + edit/delete
+                                // Assigned but not registered â€” show Register + edit/delete
                                 <div className="flex items-center justify-center gap-1.5">
                                   <button onClick={() => openRegModal(a.code, a.assignedName!)}
                                     className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-green-600 text-white text-[10px] font-bold rounded-lg hover:bg-green-700 transition-colors">
@@ -413,7 +413,7 @@ export default function SchoolOlympiadIdsPage() {
 
       {!loading && filtered.length > 0 && (
         <div className="text-xs text-gray-400 text-right italic px-1">
-          Showing {filtered.length} of {allocations.length} IDs · © Mittsure Olympiad Portal
+          Showing {filtered.length} of {allocations.length} IDs Â· Â© Mittsure Olympiad Portal
         </div>
       )}
 
@@ -482,7 +482,7 @@ export default function SchoolOlympiadIdsPage() {
             </div>
 
             {regSuccess ? (
-              /* ── Success screen ── */
+              /* â”€â”€ Success screen â”€â”€ */
               <div className="p-6 text-center space-y-4">
                 <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto">
                   <CheckCircle className="w-7 h-7 text-green-600" />
@@ -494,11 +494,11 @@ export default function SchoolOlympiadIdsPage() {
                 <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 text-left space-y-2">
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400 font-semibold uppercase tracking-wide">User ID</span>
-                    <span className="font-mono font-bold text-[#06013E]">{regSuccess.userId}</span>
+                    <span className="font-mono font-bold text-[#004f9f]">{regSuccess.userId}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400 font-semibold uppercase tracking-wide">Olympiad ID</span>
-                    <span className="font-mono font-bold text-[#06013E]">{regModal.code}</span>
+                    <span className="font-mono font-bold text-[#004f9f]">{regModal.code}</span>
                   </div>
                   <div className="flex justify-between text-xs">
                     <span className="text-gray-400 font-semibold uppercase tracking-wide">Phone</span>
@@ -514,7 +514,7 @@ export default function SchoolOlympiadIdsPage() {
                 </button>
               </div>
             ) : (
-              /* ── Form ── */
+              /* â”€â”€ Form â”€â”€ */
               <div className="p-5 space-y-3.5">
                 <div>
                   <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Student Name</label>
@@ -575,3 +575,4 @@ export default function SchoolOlympiadIdsPage() {
     </div>
   );
 }
+

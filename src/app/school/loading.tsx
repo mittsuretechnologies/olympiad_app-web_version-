@@ -1,4 +1,4 @@
-export default function SchoolLoading() {
+﻿export default function SchoolLoading() {
   return (
     <div className="space-y-4 animate-pulse">
       <div className="bg-white border border-gray-300 shadow-sm">
@@ -13,3 +13,4 @@ export default function SchoolLoading() {
     </div>
   );
 }
+

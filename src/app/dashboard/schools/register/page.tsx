@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { CLASSES } from '@/lib/classes';
@@ -104,7 +104,7 @@ export default function RegisterSchoolPage() {
       } else {
         setMessage({
           type: 'success',
-          text: `School registered (${data.schoolId}) — ${data.olympiadIdsGenerated} Olympiad IDs generated.`,
+          text: `School registered (${data.schoolId}) â€” ${data.olympiadIdsGenerated} Olympiad IDs generated.`,
         });
         setFormData({
           schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
@@ -124,7 +124,7 @@ export default function RegisterSchoolPage() {
 
   return (
     <div className="space-y-3">
-      <h1 className="text-2xl font-medium text-[#06013E]">Register New School</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">Register New School</h1>
       <div className="max-w-4xl bg-[#FFFEFE] border border-gray-300 shadow-sm">
       <div className="p-5">
         {message && (
@@ -355,3 +355,4 @@ export default function RegisterSchoolPage() {
     </div>
   );
 }
+

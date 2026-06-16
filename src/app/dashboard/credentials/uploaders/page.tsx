@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -92,7 +92,7 @@ export default function UploaderCredentialsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-medium text-[#06013E]">Manage Uploader Credentials</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">Manage Uploader Credentials</h1>
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#009846] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold">
           <CheckCircle size={16} />
@@ -103,7 +103,7 @@ export default function UploaderCredentialsPage() {
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
           <span className="text-gray-600">Total Uploaders: </span>
-          <span className="font-bold text-[#06013E]">{rows.length}</span>
+          <span className="font-bold text-[#004f9f]">{rows.length}</span>
         </div>
         <div className="relative max-w-md flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -121,7 +121,7 @@ export default function UploaderCredentialsPage() {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#06013E]">
+            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#004f9f]">
               <th className="px-4 py-3 text-left text-xs font-bold uppercase border-r border-gray-300 w-12">#</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase border-r border-gray-300">Uploader ID</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase border-r border-gray-300">Name</th>
@@ -135,7 +135,7 @@ export default function UploaderCredentialsPage() {
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={9} className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#06013E] mb-2" /></td></tr>
+              <tr><td colSpan={9} className="py-16 text-center"><Loader2 className="w-6 h-6 animate-spin mx-auto text-[#004f9f] mb-2" /></td></tr>
             ) : filtered.length === 0 ? (
               <tr><td colSpan={9} className="py-16 text-center text-gray-500 text-sm">{rows.length === 0 ? 'No uploaders registered yet.' : 'No matches.'}</td></tr>
             ) : (
@@ -144,10 +144,10 @@ export default function UploaderCredentialsPage() {
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-400 text-xs">{idx + 1}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-xs text-gray-400">{r.uploaderId}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-sm text-gray-400">{r.name}</td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-bold text-[#06013E]">{r.username}</td>
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-bold text-[#004f9f]">{r.username}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
                     {r.plainPassword
-                      ? <span className="font-mono font-bold text-[#06013E] select-all">{r.plainPassword}</span>
+                      ? <span className="font-mono font-bold text-[#004f9f] select-all">{r.plainPassword}</span>
                       : <span className="text-xs text-gray-400 italic">Reset to generate</span>}
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-400 text-xs">{r.email || '-'}</td>
@@ -172,7 +172,7 @@ export default function UploaderCredentialsPage() {
 
       <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span>Showing <span className="font-bold">{filtered.length}</span> of <span className="font-bold">{rows.length}</span></span>
-        <span className="italic">© Mittsure Olympiad Portal</span>
+        <span className="italic">Â© Mittsure Olympiad Portal</span>
       </div>
 
       {/* Dialog */}
@@ -278,3 +278,4 @@ export default function UploaderCredentialsPage() {
     </div>
   );
 }
+

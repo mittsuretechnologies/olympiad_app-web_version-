@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -84,7 +84,7 @@ export default function AppUsersPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-medium text-[#06013E]">App Users Report</h1>
+          <h1 className="text-2xl font-medium text-[#004f9f]">App Users Report</h1>
         </div>
         <button onClick={exportCSV} disabled={filtered.length === 0}
           className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#09025c] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -138,8 +138,8 @@ export default function AppUsersPage() {
       {/* Stats */}
       <div className="flex items-stretch border border-gray-200 bg-white divide-x divide-gray-200">
         <div className="flex items-center gap-3 px-6 py-3">
-          <Users size={17} className="text-[#06013E]" />
-          <span className="text-2xl font-bold text-[#06013E]">{filtered.length}</span>
+          <Users size={17} className="text-[#004f9f]" />
+          <span className="text-2xl font-bold text-[#004f9f]">{filtered.length}</span>
           <span className="text-sm text-gray-400">Total Users</span>
         </div>
         <div className="flex items-center gap-3 px-6 py-3">
@@ -158,7 +158,7 @@ export default function AppUsersPage() {
       <div className="bg-white border border-gray-200">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-600">
-            <span className="text-[#06013E]">{filtered.length}</span> users
+            <span className="text-[#004f9f]">{filtered.length}</span> users
           </p>
           {loading && <Loader2 size={14} className="animate-spin text-gray-400" />}
         </div>
@@ -178,7 +178,7 @@ export default function AppUsersPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={7} className="py-16 text-center">
-                  <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#06013E] mb-2" />
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#004f9f] mb-2" />
                   <p className="text-gray-400 text-sm">Loading...</p>
                 </td></tr>
               ) : filtered.length === 0 ? (
@@ -193,7 +193,7 @@ export default function AppUsersPage() {
                       ? <span className="font-semibold text-amber-700">{u.olympiadId}</span>
                       : <span className="text-gray-300">-</span>}
                   </td>
-                  <td className="px-4 py-2.5 font-mono font-bold text-[#06013E] text-sm">{u.userId}</td>
+                  <td className="px-4 py-2.5 font-mono font-bold text-[#004f9f] text-sm">{u.userId}</td>
                   <td className="px-4 py-2.5">
                     {u.olympiadId
                       ? <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5"><GraduationCap size={10} />Student</span>
@@ -213,10 +213,11 @@ export default function AppUsersPage() {
         {!loading && users.length > 0 && (
           <div className="px-5 py-2.5 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
             <span>Showing <span className="font-semibold text-gray-600">{filtered.length}</span> of <span className="font-semibold text-gray-600">{users.length}</span> users</span>
-            <span className="italic">© Mittsure Olympiad Portal</span>
+            <span className="italic">Â© Mittsure Olympiad Portal</span>
           </div>
         )}
       </div>
     </div>
   );
 }
+

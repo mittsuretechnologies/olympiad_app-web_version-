@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -138,12 +138,12 @@ export default function UploadersPage() {
 
   return (
     <div className="space-y-3">
-      <h1 className="text-2xl font-medium text-[#06013E]">Uploaders</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">Uploaders</h1>
     <div className="bg-white border border-gray-300 shadow-sm">
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
           <span className="text-gray-600">Total Uploaders: </span>
-          <span className="font-bold text-[#06013E]">{uploaders.length}</span>
+          <span className="font-bold text-[#004f9f]">{uploaders.length}</span>
         </div>
         <div className="relative max-w-md flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -160,7 +160,7 @@ export default function UploadersPage() {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#06013E]">
+            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#004f9f]">
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300 w-12">#</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Uploader ID</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">Name</th>
@@ -175,7 +175,7 @@ export default function UploadersPage() {
             {loading ? (
               <tr>
                 <td colSpan={8} className="py-16 text-center">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#06013E] mb-2" />
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#004f9f] mb-2" />
                   <p className="text-gray-600 text-sm">Loading uploaders...</p>
                 </td>
               </tr>
@@ -202,7 +202,7 @@ export default function UploadersPage() {
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700 text-xs">{idx + 1}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-semibold text-[#06013E]">{u.uploaderId}</span>
+                      <span className="font-mono font-semibold text-[#004f9f]">{u.uploaderId}</span>
                       {inactive && (
                         <span className="text-[9px] font-bold uppercase bg-red-100 text-red-600 border border-red-300 px-1.5 py-0.5 leading-none">
                           Inactive
@@ -230,7 +230,7 @@ export default function UploadersPage() {
                       <button
                         title="Edit"
                         onClick={() => openEdit(u)}
-                        className="p-1.5 text-[#06013E] hover:bg-[#06013E]/10 border border-transparent hover:border-[#06013E]/20 transition-all"
+                        className="p-1.5 text-[#004f9f] hover:bg-[#06013E]/10 border border-transparent hover:border-[#06013E]/20 transition-all"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
@@ -267,7 +267,7 @@ export default function UploadersPage() {
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{uploaders.length}</span> uploaders
         </span>
-        <span className="italic">© Mittsure Olympiad Portal</span>
+        <span className="italic">Â© Mittsure Olympiad Portal</span>
       </div>
 
       {/* Edit Dialog */}
@@ -277,7 +277,7 @@ export default function UploadersPage() {
           <div className="bg-[#009846] text-white px-5 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-wider">Edit Uploader</p>
-              {editing && <p className="text-xs text-white/70 mt-0.5">{editing.uploaderId} — {editing.name}</p>}
+              {editing && <p className="text-xs text-white/70 mt-0.5">{editing.uploaderId} â€” {editing.name}</p>}
             </div>
             <button onClick={() => setEditing(null)} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
@@ -344,7 +344,7 @@ export default function UploadersPage() {
               <div className="bg-gray-50 border border-gray-200 px-4 py-3 space-y-1.5 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Uploader ID</span>
-                  <span className="font-mono font-bold text-[#06013E]">{toggling.uploaderId}</span>
+                  <span className="font-mono font-bold text-[#004f9f]">{toggling.uploaderId}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-500">Name</span>
@@ -421,3 +421,4 @@ export default function UploadersPage() {
     </div>
   );
 }
+

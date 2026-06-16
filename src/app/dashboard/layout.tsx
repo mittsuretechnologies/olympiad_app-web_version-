@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -103,7 +103,7 @@ export default function DashboardLayout({
         style={{ scrollbarGutter: 'stable' }}
         className="w-72 bg-[#052E5C] flex flex-col fixed h-screen z-50 border-r border-[#04203f] overflow-x-hidden overflow-y-hidden hover:overflow-y-auto custom-scrollbar"
       >
-        {/* Banner Card — centered white card floating on the blue sidebar */}
+        {/* Banner Card â€” centered white card floating on the blue sidebar */}
         <div className="relative px-4 pt-5 pb-2">
           <div className="relative w-full aspect-[16/10] overflow-hidden rounded-2xl bg-white shadow-lg shadow-black/20">
             <Image
@@ -178,7 +178,7 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-white text-[#06013E] font-semibold'
+                          ? 'bg-white text-[#004f9f] font-semibold'
                           : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
@@ -221,7 +221,7 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-white text-[#06013E] font-semibold'
+                          ? 'bg-white text-[#004f9f] font-semibold'
                           : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
@@ -264,7 +264,7 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-white text-[#06013E] font-semibold'
+                          ? 'bg-white text-[#004f9f] font-semibold'
                           : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
@@ -308,7 +308,7 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-white text-[#06013E] font-semibold'
+                          ? 'bg-white text-[#004f9f] font-semibold'
                           : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
@@ -349,7 +349,7 @@ export default function DashboardLayout({
                         key={item.name}
                         href={item.href}
                         className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
-                          ? 'bg-white text-[#06013E] font-semibold'
+                          ? 'bg-white text-[#004f9f] font-semibold'
                           : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
@@ -383,3 +383,4 @@ export default function DashboardLayout({
     </div>
   );
 }
+

@@ -1,11 +1,11 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw } from 'lucide-react';
 
 const CATEGORIES = [
   {
-    label: 'Cat A — Performing Art, Dance & Music',
+    label: 'Cat A â€” Performing Art, Dance & Music',
     value: 'Cat A',
     icon: Music,
     subCategories: [
@@ -15,7 +15,7 @@ const CATEGORIES = [
     ],
   },
   {
-    label: 'Cat B — Creative Art & Communication',
+    label: 'Cat B â€” Creative Art & Communication',
     value: 'Cat B',
     icon: Palette,
     subCategories: [
@@ -86,7 +86,7 @@ export default function UploadVideoPage() {
 
   const selectedCat = CATEGORIES.find(c => c.value === category);
 
-  // Both slots approved → only general feed
+  // Both slots approved â†’ only general feed
   const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
 
   const getCatStatus = (catValue: string) => {
@@ -95,7 +95,7 @@ export default function UploadVideoPage() {
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
     if (filled && !rejected) return 'filled';     // submitted (pending/approved)
-    if (rejected) return 'rejected';               // rejected → re-upload allowed
+    if (rejected) return 'rejected';               // rejected â†’ re-upload allowed
     return 'available';
   };
 
@@ -155,7 +155,7 @@ export default function UploadVideoPage() {
     setSlots(null);
   }
 
-  /* ── Done screen ── */
+  /* â”€â”€ Done screen â”€â”€ */
   if (uploadState === 'done') {
     const isEval = lastVideoMeta?.isEvaluation ?? true;
     return (
@@ -167,15 +167,15 @@ export default function UploadVideoPage() {
           <h2 className="text-2xl font-black text-gray-900 mb-1">Video Uploaded!</h2>
           <p className="text-gray-500 text-sm mb-5">
             For <span className="font-semibold text-gray-800">{selectedStudent?.name}</span>
-            {lastVideoMeta?.subCategory ? ` · ${lastVideoMeta.subCategory}` : ''}
+            {lastVideoMeta?.subCategory ? ` Â· ${lastVideoMeta.subCategory}` : ''}
           </p>
 
           {isEval ? (
             <div className="mx-auto mb-5 inline-flex flex-col items-center gap-2 bg-[#06013E]/5 border border-[#06013E]/20 rounded-2xl px-6 py-4">
-              <span className="text-xs font-bold uppercase tracking-widest text-[#06013E]/50">Video Type</span>
+              <span className="text-xs font-bold uppercase tracking-widest text-[#004f9f]/50">Video Type</span>
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#FF9000] animate-pulse flex-shrink-0" />
-                <span className="text-base font-black text-[#06013E]">Olympiad Evaluation</span>
+                <span className="text-base font-black text-[#004f9f]">Olympiad Evaluation</span>
               </div>
               <p className="text-xs text-gray-400 leading-snug max-w-[220px]">
                 This video will be reviewed and scored as an olympiad participation entry.
@@ -203,13 +203,13 @@ export default function UploadVideoPage() {
     );
   }
 
-  /* ── Main ── */
+  /* â”€â”€ Main â”€â”€ */
   return (
     <div className="min-h-screen bg-[#F6F9FF]">
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
 
-          {/* ── LEFT column (3/5) ── */}
+          {/* â”€â”€ LEFT column (3/5) â”€â”€ */}
           <div className="xl:col-span-3 space-y-5">
 
             {/* Student selector */}
@@ -237,7 +237,7 @@ export default function UploadVideoPage() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 text-sm truncate">{selectedStudent.name}</p>
-                          <p className="text-xs text-gray-400">{selectedStudent.olympiadCode}{selectedStudent.className ? ` · ${selectedStudent.className}` : ''}</p>
+                          <p className="text-xs text-gray-400">{selectedStudent.olympiadCode}{selectedStudent.className ? ` Â· ${selectedStudent.className}` : ''}</p>
                         </div>
                         <button type="button" onClick={e => { e.stopPropagation(); setSelectedStudent(null); }} className="text-gray-300 hover:text-gray-500 p-1">
                           <X className="w-4 h-4" />
@@ -273,7 +273,7 @@ export default function UploadVideoPage() {
                               </div>
                               <div>
                                 <p className="font-medium text-gray-900 text-sm">{s.name}</p>
-                                <p className="text-xs text-gray-400">{s.olympiadCode}{s.className ? ` · ${s.className}` : ''}</p>
+                                <p className="text-xs text-gray-400">{s.olympiadCode}{s.className ? ` Â· ${s.className}` : ''}</p>
                               </div>
                             </button>
                           ))
@@ -293,7 +293,7 @@ export default function UploadVideoPage() {
                     isGeneralOnly ? (
                       <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs text-blue-700 font-semibold">
                         <CheckCircle className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                        Both olympiad slots filled — this video will go to General Feed
+                        Both olympiad slots filled â€” this video will go to General Feed
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
@@ -308,7 +308,7 @@ export default function UploadVideoPage() {
                               {status === 'filled'   && <CheckCircle className="w-3 h-3" />}
                               {status === 'rejected' && <RefreshCw className="w-3 h-3" />}
                               {status === 'available' && <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />}
-                              {cat} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
+                              {cat} â€” {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
                             </div>
                           );
                         })}
@@ -335,7 +335,7 @@ export default function UploadVideoPage() {
                   <div className="mt-2 flex items-center gap-2 px-1">
                     <Video className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
                     <p className="text-xs text-gray-500 truncate">{videoFile?.name}</p>
-                    <span className="text-xs text-gray-400 flex-shrink-0">· {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB</span>
+                    <span className="text-xs text-gray-400 flex-shrink-0">Â· {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB</span>
                   </div>
                 </div>
               ) : (
@@ -354,7 +354,7 @@ export default function UploadVideoPage() {
                   <p className="font-semibold text-gray-600 text-sm mb-1">
                     {dragOver ? 'Drop it here!' : 'Click to select or drag & drop'}
                   </p>
-                  <p className="text-xs text-gray-400">MP4, MOV, AVI · Max 150 MB</p>
+                  <p className="text-xs text-gray-400">MP4, MOV, AVI Â· Max 150 MB</p>
                   <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
                 </div>
@@ -373,7 +373,7 @@ export default function UploadVideoPage() {
             </div>
           </div>
 
-          {/* ── RIGHT column (2/5) ── */}
+          {/* â”€â”€ RIGHT column (2/5) â”€â”€ */}
           <div className="xl:col-span-2 space-y-5">
 
             {/* General feed notice */}
@@ -381,7 +381,7 @@ export default function UploadVideoPage() {
               <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700">
                 <p className="font-bold mb-1">General Feed Upload</p>
                 <p className="text-xs text-blue-500 leading-relaxed">
-                  This student has 2 approved olympiad videos. Any further uploads will go to the general feed — not olympiad evaluation.
+                  This student has 2 approved olympiad videos. Any further uploads will go to the general feed â€” not olympiad evaluation.
                 </p>
               </div>
             )}
@@ -427,7 +427,7 @@ export default function UploadVideoPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <span className={`text-sm font-semibold leading-tight block ${
-                          isFilled ? 'text-green-700' : isSelected ? 'text-[#06013E]' : 'text-gray-600'
+                          isFilled ? 'text-green-700' : isSelected ? 'text-[#004f9f]' : 'text-gray-600'
                         }`}>
                           {cat.label}
                         </span>
@@ -485,7 +485,7 @@ export default function UploadVideoPage() {
                   <span className="text-sm font-semibold text-gray-700">
                     {uploadState === 'uploading' ? 'Uploading...' : 'Saving details...'}
                   </span>
-                  <span className="text-sm font-bold text-[#06013E]">{progress}%</span>
+                  <span className="text-sm font-bold text-[#004f9f]">{progress}%</span>
                 </div>
                 <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
                   <div
@@ -513,3 +513,4 @@ export default function UploadVideoPage() {
     </div>
   );
 }
+

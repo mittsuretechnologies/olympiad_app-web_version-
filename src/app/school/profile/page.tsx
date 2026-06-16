@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import {
@@ -28,11 +28,11 @@ function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value
   return (
     <div className="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0">
       <div className="w-7 h-7 rounded-lg bg-[#E8EAF6] flex items-center justify-center flex-shrink-0 mt-0.5">
-        <Icon size={13} className="text-[#06013E]" />
+        <Icon size={13} className="text-[#004f9f]" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">{label}</p>
-        <p className="text-sm font-semibold text-[#06013E] break-words">
+        <p className="text-sm font-semibold text-[#004f9f] break-words">
           {value || <span className="text-gray-300 font-normal italic">Not provided</span>}
         </p>
       </div>
@@ -62,7 +62,7 @@ export default function SchoolProfilePage() {
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-        <Loader2 className="w-7 h-7 animate-spin text-[#06013E]" />
+        <Loader2 className="w-7 h-7 animate-spin text-[#004f9f]" />
         <p className="text-sm text-gray-400">Loading profile...</p>
       </div>
     );
@@ -104,8 +104,8 @@ export default function SchoolProfilePage() {
         {/* Identity */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <ShieldCheck size={13} className="text-[#06013E]" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#06013E]">School Identity</h2>
+            <ShieldCheck size={13} className="text-[#004f9f]" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">School Identity</h2>
           </div>
           <div className="px-5">
             <InfoRow icon={Hash} label="School ID (Login)" value={profile.schoolId} />
@@ -121,8 +121,8 @@ export default function SchoolProfilePage() {
         {/* Contact & Location */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <MapPin size={13} className="text-[#06013E]" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#06013E]">Contact & Location</h2>
+            <MapPin size={13} className="text-[#004f9f]" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">Contact & Location</h2>
           </div>
           <div className="px-5">
             <InfoRow icon={Phone} label="Phone" value={profile.phone} />
@@ -138,11 +138,12 @@ export default function SchoolProfilePage() {
 
       {/* Notice */}
       <div className="bg-[#E8EAF6] border border-[#06013E]/10 px-5 py-4 flex items-start gap-3">
-        <AlertCircle size={14} className="text-[#06013E]/50 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-[#06013E]/60 leading-relaxed">
+        <AlertCircle size={14} className="text-[#004f9f]/50 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-[#004f9f]/60 leading-relaxed">
           To update any school details, please contact your Mittsure coordinator. Schools cannot self-edit profile information.
         </p>
       </div>
     </div>
   );
 }
+

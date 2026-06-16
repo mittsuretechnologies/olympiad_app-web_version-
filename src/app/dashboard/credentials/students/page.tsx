@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import React, { useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -142,7 +142,7 @@ export default function StudentCredentialsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-medium text-[#06013E]">Student Credentials</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">Student Credentials</h1>
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#009846] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold">
           <CheckCircle size={16} /> {toast}
@@ -154,12 +154,12 @@ export default function StudentCredentialsPage() {
         <div className="flex items-center gap-4 text-sm">
           <span>
             <span className="text-gray-500">Schools: </span>
-            <span className="font-bold text-[#06013E]">{schools.length}</span>
+            <span className="font-bold text-[#004f9f]">{schools.length}</span>
           </span>
           <span className="text-gray-300">|</span>
           <span>
             <span className="text-gray-500">Allocated IDs: </span>
-            <span className="font-bold text-[#06013E]">{rows.length}</span>
+            <span className="font-bold text-[#004f9f]">{rows.length}</span>
           </span>
           <span className="text-gray-300">|</span>
           <span>
@@ -192,7 +192,7 @@ export default function StudentCredentialsPage() {
       <div className="overflow-x-auto">
         {loading ? (
           <div className="py-16 text-center">
-            <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#06013E] mb-2" />
+            <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#004f9f] mb-2" />
             <p className="text-gray-500 text-sm">Loading credentials...</p>
           </div>
         ) : schools.length === 0 ? (
@@ -213,15 +213,15 @@ export default function StudentCredentialsPage() {
                       onClick={() => toggle(school.schoolId)}
                       className="cursor-pointer select-none border-b border-gray-300 bg-[#E8EAF6] hover:bg-[#D9DCF3] transition-colors"
                     >
-                      <td className="w-10 px-3 py-3 text-[#06013E]">
+                      <td className="w-10 px-3 py-3 text-[#004f9f]">
                         {isOpen
-                          ? <ChevronDown size={16} className="text-[#06013E]" />
+                          ? <ChevronDown size={16} className="text-[#004f9f]" />
                           : <ChevronRight size={16} className="text-gray-500" />}
                       </td>
                       <td className="py-3 pr-4" colSpan={8}>
                         <div className="flex items-center gap-3 flex-wrap">
-                          <Building2 size={15} className="text-[#06013E] shrink-0" />
-                          <span className="font-bold text-[#06013E] text-sm">{school.name}</span>
+                          <Building2 size={15} className="text-[#004f9f] shrink-0" />
+                          <span className="font-bold text-[#004f9f] text-sm">{school.name}</span>
                           <span className="font-mono text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">{school.schoolId}</span>
                           {school.city && <span className="text-xs text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5">{school.city}</span>}
                           <span className="ml-auto flex items-center gap-2 text-xs">
@@ -257,7 +257,7 @@ export default function StudentCredentialsPage() {
                         <td className="w-10 px-3 border-l-4 border-l-[#009846]/30" />
                         <td className="px-3 py-2 text-gray-400 text-xs border-r border-gray-100 w-8">{ri + 1}</td>
                         <td className="px-3 py-2 border-r border-gray-100">
-                          <span className="font-mono font-bold text-[#06013E] text-sm select-all">{r.code}</span>
+                          <span className="font-mono font-bold text-[#004f9f] text-sm select-all">{r.code}</span>
                         </td>
                         <td className="px-3 py-2 border-r border-gray-100 font-semibold text-gray-800 text-sm">
                           {r.student ? r.student.name : <span className="text-gray-300">-</span>}
@@ -265,17 +265,17 @@ export default function StudentCredentialsPage() {
                         <td className="px-3 py-2 border-r border-gray-100 font-mono text-xs text-gray-400">
                           {r.student ? r.student.phone : '-'}
                         </td>
-                        <td className="px-3 py-2 border-r border-gray-100 font-mono text-sm font-bold text-[#06013E] select-all">
+                        <td className="px-3 py-2 border-r border-gray-100 font-mono text-sm font-bold text-[#004f9f] select-all">
                           {r.student
                             ? r.student.username
                               ? r.student.username
-                              : <span className="text-gray-300 italic text-xs">—</span>
-                            : <span className="text-gray-300 italic text-xs">—</span>}
+                              : <span className="text-gray-300 italic text-xs">â€”</span>
+                            : <span className="text-gray-300 italic text-xs">â€”</span>}
                         </td>
                         <td className="px-3 py-2 border-r border-gray-100">
                           {r.student ? (
                             r.student.plainPassword
-                              ? <span className="font-mono font-bold text-[#06013E] select-all text-sm">{r.student.plainPassword}</span>
+                              ? <span className="font-mono font-bold text-[#004f9f] select-all text-sm">{r.student.plainPassword}</span>
                               : r.student.source === 'app'
                                 ? <span className="text-xs text-purple-500 font-semibold">App Login</span>
                                 : <span className="text-xs text-gray-300 italic">Reset to generate</span>
@@ -298,7 +298,7 @@ export default function StudentCredentialsPage() {
                               <RotateCw size={13} />
                             </button>
                           ) : (
-                            <span className="text-gray-200">—</span>
+                            <span className="text-gray-200">â€”</span>
                           )}
                         </td>
                       </tr>
@@ -318,7 +318,7 @@ export default function StudentCredentialsPage() {
 
       {/* Footer */}
       <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-500 flex justify-end items-center">
-        <span className="italic">© Mittsure Olympiad Portal</span>
+        <span className="italic">Â© Mittsure Olympiad Portal</span>
       </div>
 
       {/* Reset Dialog */}
@@ -330,7 +330,7 @@ export default function StudentCredentialsPage() {
               <p className="text-sm font-bold uppercase tracking-wider">
                 {resetAction === 'choose' ? 'Edit Credentials' : resetAction === 'username' ? 'Change Username' : 'Set Password'}
               </p>
-              {resetTarget?.student && <p className="text-xs text-white/70 mt-0.5">{resetTarget.student.name} — {resetTarget.code}</p>}
+              {resetTarget?.student && <p className="text-xs text-white/70 mt-0.5">{resetTarget.student.name} â€” {resetTarget.code}</p>}
             </div>
             <button onClick={closeDialog} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
@@ -345,7 +345,7 @@ export default function StudentCredentialsPage() {
                   <KeyRound size={18} className="text-[#009846] shrink-0" />
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Change Username</p>
-                    <p className="text-xs text-gray-400">Current: <span className="font-mono">{resetTarget?.student?.username || '—'}</span></p>
+                    <p className="text-xs text-gray-400">Current: <span className="font-mono">{resetTarget?.student?.username || 'â€”'}</span></p>
                   </div>
                 </button>
                 <button onClick={() => setResetAction('password')} className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:border-[#009846] hover:bg-green-50 transition-all text-left">
@@ -423,3 +423,4 @@ export default function StudentCredentialsPage() {
     </div>
   );
 }
+
