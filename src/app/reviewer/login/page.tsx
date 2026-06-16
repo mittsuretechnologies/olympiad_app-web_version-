@@ -25,8 +25,8 @@ export default function ReviewerLoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       localStorage.setItem('reviewerToken', data.token);
-      localStorage.setItem('reviewerUser', JSON.stringify(data.reviewer));
-      router.replace('/reviewer');
+      localStorage.setItem('reviewerData', JSON.stringify(data.reviewer));
+      router.replace('/dashboard');
     } catch (e: any) {
       setError(e.message);
     } finally {

@@ -25,7 +25,7 @@ export default function EvaluatorLoginPage() {
       if (!res.ok) throw new Error(data.message);
       localStorage.setItem('evaluatorToken', data.token);
       localStorage.setItem('evaluatorData', JSON.stringify(data.evaluator));
-      router.push('/evaluator');
+      router.push('/dashboard');
     } catch (e: any) {
       setError(e.message);
     } finally {
