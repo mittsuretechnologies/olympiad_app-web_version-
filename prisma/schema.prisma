@@ -1,11 +1,13 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
+  schemas   = ["public"]
 }
 
 model SuperAdmin {
@@ -15,6 +17,8 @@ model SuperAdmin {
   name      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("public")
 }
 
 model School {
@@ -37,6 +41,8 @@ model School {
   district      String?
   isActive      Boolean                @default(true)
   olympiadIds   OlympiadIdAllocation[]
+
+  @@schema("public")
 }
 
 model Uploader {
@@ -51,6 +57,8 @@ model Uploader {
   status        String   @default("ACTIVE")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+
+  @@schema("public")
 }
 
 model OlympiadIdAllocation {
@@ -69,6 +77,7 @@ model OlympiadIdAllocation {
   student      Student?
 
   @@index([schoolId])
+  @@schema("public")
 }
 
 model Student {
@@ -84,13 +93,15 @@ model Student {
   plainPassword String?
   allocation    OlympiadIdAllocation @relation(fields: [olympiadCode], references: [code], onDelete: Cascade)
   videos        Video[]
+
+  @@schema("public")
 }
 
 model Video {
   id              String      @id @default(uuid())
   studentId       String?
   appUserId       String?
-  uploaderType    String      @default("STUDENT")  // "STUDENT" | "VIEWER"
+  uploaderType    String      @default("STUDENT")
   videoUrl        String
   thumbnailUrl    String?
   caption         String?
@@ -113,6 +124,7 @@ model Video {
   @@index([appUserId])
   @@index([status])
   @@index([status, isPublic])
+  @@schema("public")
 }
 
 model Viewer {
@@ -122,18 +134,74 @@ model Viewer {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@schema("public")
+}
+
+model Reviewer {
+  id                   String                 @id @default(uuid())
+  reviewerId           String                 @unique
+  name                 String
+  email                String                 @unique
+  password             String
+  plainPassword        String?
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  individualPermission IndividualPermissions?
+
+  @@schema("public")
+}
+
+model TalentEvaluator {
+  id                   String                 @id @default(uuid())
+  evaluatorId          String                 @unique
+  name                 String
+  email                String                 @unique
+  password             String
+  plainPassword        String?
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  individualPermission IndividualPermissions?
+
+  @@schema("public")
+}
+
+model RolePermissions {
+  id             String   @id @default(uuid())
+  role           String   @unique
+  allowedModules String[]
+  updatedAt      DateTime @updatedAt
+
+  @@schema("public")
+}
+
+model IndividualPermissions {
+  id             String           @id @default(uuid())
+  memberId       String           @unique
+  role           String
+  allowedModules String[]
+  reviewerId     String?          @unique
+  evaluatorId    String?          @unique
+  updatedAt      DateTime         @updatedAt
+  reviewer       Reviewer?        @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
+  evaluator      TalentEvaluator? @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+
+  @@schema("public")
 }
 
 model Like {
   id        String   @id @default(uuid())
   videoId   String
   userId    String
-  userType  String   // "student", "viewer", "anonymous"
+  userType  String
   createdAt DateTime @default(now())
   video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@unique([videoId, userId])
   @@index([videoId])
+  @@schema("public")
 }
 
 model VideoView {
@@ -145,29 +213,30 @@ model VideoView {
 
   @@index([videoId])
   @@index([videoId, sessionId])
+  @@schema("public")
 }
 
 model AppUser {
-  id             String    @id @default(uuid())
-  userId         String    @unique
-  email          String?   @unique
-  mobile         String?   @unique
-  avatarUrl      String?
-  password       String
-  plainPassword  String?
-  termsAccepted  Boolean   @default(false)
-  otpHash        String?
-  otpExpiresAt   DateTime?
-  isVerified     Boolean   @default(false)
-  olympiadId     String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  followers      Follow[]  @relation("UserFollowers")
-  following      Follow[]  @relation("UserFollowing")
+  id            String    @id @default(uuid())
+  userId        String    @unique
+  email         String?   @unique
+  mobile        String?   @unique
+  avatarUrl     String?
+  password      String
+  plainPassword String?
+  termsAccepted Boolean   @default(false)
+  otpHash       String?
+  otpExpiresAt  DateTime?
+  isVerified    Boolean   @default(false)
+  olympiadId    String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  followers     Follow[]  @relation("UserFollowers")
+  following     Follow[]  @relation("UserFollowing")
 
   @@index([email])
   @@index([mobile])
+  @@schema("public")
 }
 
 model AppOtp {
@@ -176,6 +245,8 @@ model AppOtp {
   otpHash    String
   expiresAt  DateTime
   createdAt  DateTime @default(now())
+
+  @@schema("public")
 }
 
 model Follow {
@@ -183,11 +254,11 @@ model Follow {
   followerId  String
   followingId String
   createdAt   DateTime @default(now())
-
   follower    AppUser  @relation("UserFollowers", fields: [followerId],  references: [id], onDelete: Cascade)
   following   AppUser  @relation("UserFollowing", fields: [followingId], references: [id], onDelete: Cascade)
 
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+  @@schema("public")
 }

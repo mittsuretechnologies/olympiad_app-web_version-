@@ -2,27 +2,20 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw } from 'lucide-react';
+import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 
 const CATEGORIES = [
   {
-    label: 'Cat A â€” Performing Art, Dance & Music',
+    label: 'Cat A – Performing Art, Dance & Music',
     value: 'Cat A',
     icon: Music,
-    subCategories: [
-      'Classical Dance', 'Folk Dance', 'Contemporary Dance',
-      'Classical Vocal Music', 'Light Vocal Music', 'Instrumental Music',
-      'Drama / Skit', 'Mime / Puppetry', 'Stand-up / Poetry',
-    ],
+    subCategories: OLYMPIAD_CAT_A_SUBS,
   },
   {
-    label: 'Cat B â€” Creative Art & Communication',
+    label: 'Cat B – Creative Art & Communication',
     value: 'Cat B',
     icon: Palette,
-    subCategories: [
-      'Drawing & Painting', 'Sculpture & Clay Art', 'Digital Art',
-      'Collage & Mixed Media', 'Photography', 'Craft & DIY',
-      'Short Film / Animation', 'Public Speaking / Debate', 'News Reading / Anchoring',
-    ],
+    subCategories: OLYMPIAD_CAT_B_SUBS,
   },
 ];
 
