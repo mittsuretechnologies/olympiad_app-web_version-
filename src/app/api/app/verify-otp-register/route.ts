@@ -2,16 +2,12 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { generateUserId } from '@/lib/generateUserId';
 
 function isEmail(val: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
 }
 
-function generateUserId(): string {
-  const prefix = 'TO';
-  const num = Math.floor(100000 + Math.random() * 900000);
-  return `${prefix}${num}`;
-}
 
 export async function POST(request: Request) {
   try {
@@ -41,13 +37,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid OTP. Please check and try again.' }, { status: 400 });
     }
 
-    // Generate unique userId
-    let userId = generateUserId();
-    let attempt = 0;
-    while (await prisma.appUser.findUnique({ where: { userId } })) {
-      userId = generateUserId();
-      if (++attempt > 10) throw new Error('Could not generate unique userId');
-    }
+    // Self-signup: name unknown at this point → mittsure_xxxx prefix
+    const userId = await generateUserId(null);
 
     const passwordHash = await bcrypt.hash(password, 10);
 
