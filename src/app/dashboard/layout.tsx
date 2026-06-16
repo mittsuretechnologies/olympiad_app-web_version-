@@ -23,6 +23,7 @@ import {
   BarChart2,
   Building2,
   Trophy,
+  Star,
 } from 'lucide-react';
 
 export default function DashboardLayout({
@@ -33,16 +34,19 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
 
-  type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | 'reports' | null;
+  type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | 'reports' | 'reviewer' | 'evaluator' | null;
 
   const sectionForPath = (p: string): Section => {
     if (p.startsWith('/dashboard/schools')) return 'schools';
     if (p.startsWith('/dashboard/uploaders')) return 'uploaders';
     if (p.startsWith('/dashboard/credentials/registered')) return 'reports';
+    if (p.startsWith('/dashboard/credentials/evaluators')) return 'evaluator';
     if (p.startsWith('/dashboard/credentials')) return 'credentials';
     if (p.startsWith('/dashboard/videos')) return 'moderation';
     if (p.startsWith('/dashboard/reports')) return 'reports';
     if (p.startsWith('/dashboard/app-users')) return 'reports';
+    if (p.startsWith('/dashboard/reviewer')) return 'reviewer';
+    if (p.startsWith('/dashboard/evaluator')) return 'evaluator';
     return 'schools';
   };
 
@@ -57,6 +61,8 @@ export default function DashboardLayout({
   const credentialsOpen = openSection === 'credentials';
   const moderationOpen = openSection === 'moderation';
   const reportsOpen = openSection === 'reports';
+  const reviewerOpen = openSection === 'reviewer';
+  const evaluatorOpen = openSection === 'evaluator';
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -83,9 +89,20 @@ export default function DashboardLayout({
 
 
   const credentialsSubItems = [
-    { name: 'Manage School Credentials',   href: '/dashboard/credentials/schools',   icon: Users },
-    { name: 'Manage Uploader Credentials', href: '/dashboard/credentials/uploaders', icon: UploadCloud },
-    { name: 'Manage Student Credentials',  href: '/dashboard/credentials/students',  icon: KeyRound },
+    { name: 'Manage School Credentials',    href: '/dashboard/credentials/schools',    icon: Users },
+    { name: 'Manage Uploader Credentials',  href: '/dashboard/credentials/uploaders',  icon: UploadCloud },
+    { name: 'Manage Student Credentials',   href: '/dashboard/credentials/students',   icon: KeyRound },
+    { name: 'Reviewer Credentials',         href: '/dashboard/credentials/reviewers',  icon: UserCheck },
+  ];
+
+  const reviewerSubItems = [
+    { name: 'Manage Reviewers',  href: '/dashboard/reviewer/manage',         icon: UserCheck },
+    { name: 'Review Content',    href: '/dashboard/reviewer/review-content',  icon: Play },
+  ];
+
+  const evaluatorSubItems = [
+    { name: 'Manage Evaluators',     href: '/dashboard/evaluator/manage',         icon: UserCheck },
+    { name: 'Evaluator Credentials', href: '/dashboard/credentials/evaluators',   icon: KeyRound },
   ];
 
   const reportsSubItems = [
@@ -312,6 +329,72 @@ export default function DashboardLayout({
                           : 'text-blue-200 hover:bg-white/10 hover:text-white'
                           }`}
                       >
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Reviewer - Expandable */}
+            <div>
+              <button
+                onClick={() => toggleSection('reviewer')}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/reviewer')
+                  ? 'bg-[#009846] text-white font-semibold'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <UserCheck size={20} />
+                  <span className="text-sm font-semibold">Reviewer</span>
+                </div>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${reviewerOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${reviewerOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  {reviewerSubItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link key={item.name} href={item.href}
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-white text-[#004f9f] font-semibold'
+                          : 'text-blue-200 hover:bg-white/10 hover:text-white'
+                          }`}>
+                        <span>{item.name}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Evaluator - Expandable */}
+            <div>
+              <button
+                onClick={() => toggleSection('evaluator')}
+                className={`w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 group ${pathname.startsWith('/dashboard/evaluator') || pathname.startsWith('/dashboard/credentials/evaluators')
+                  ? 'bg-[#009846] text-white font-semibold'
+                  : 'text-blue-100 hover:bg-white/10 hover:text-white'
+                  }`}
+              >
+                <div className="flex items-center gap-3">
+                  <Star size={20} />
+                  <span className="text-sm font-semibold">Evaluator</span>
+                </div>
+                <ChevronDown size={16} className={`transition-transform duration-200 ${evaluatorOpen ? 'rotate-180' : ''}`} />
+              </button>
+              <div className={`overflow-hidden transition-all duration-300 ease-in-out ${evaluatorOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  {evaluatorSubItems.map((item) => {
+                    const isActive = pathname === item.href;
+                    return (
+                      <Link key={item.name} href={item.href}
+                        className={`flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive
+                          ? 'bg-white text-[#004f9f] font-semibold'
+                          : 'text-blue-200 hover:bg-white/10 hover:text-white'
+                          }`}>
                         <span>{item.name}</span>
                       </Link>
                     );

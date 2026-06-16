@@ -124,6 +124,30 @@ model Viewer {
   updatedAt DateTime @updatedAt
 }
 
+model Reviewer {
+  id            String   @id @default(uuid())
+  reviewerId    String   @unique
+  name          String
+  email         String   @unique
+  password      String
+  plainPassword String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model TalentEvaluator {
+  id            String   @id @default(uuid())
+  evaluatorId   String   @unique
+  name          String
+  email         String   @unique
+  password      String
+  plainPassword String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
 model Like {
   id        String   @id @default(uuid())
   videoId   String
