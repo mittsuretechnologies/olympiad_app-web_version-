@@ -77,9 +77,10 @@ export default function SchoolDashboardPage() {
       label: 'Total Allocated IDs',
       value: stats?.totalAllocated ?? 0,
       icon: Hash,
-      color: 'bg-blue-600',
+      color: 'bg-blue-200',
       textColor: 'text-blue-700',
-      bg: 'bg-blue-50',
+      bg: 'bg-blue-100',
+      cardBg: 'bg-blue-50',
       link: '/school/olympiad-ids',
       linkText: 'View All IDs',
     },
@@ -87,9 +88,10 @@ export default function SchoolDashboardPage() {
       label: 'Registered Students',
       value: stats?.totalRegistered ?? 0,
       icon: CheckCircle2,
-      color: 'bg-green-600',
+      color: 'bg-green-200',
       textColor: 'text-green-700',
-      bg: 'bg-green-50',
+      bg: 'bg-green-100',
+      cardBg: 'bg-green-50',
       link: '/school/registered-students',
       linkText: 'View Students',
     },
@@ -97,9 +99,10 @@ export default function SchoolDashboardPage() {
       label: 'Pending Registrations',
       value: stats?.totalPending ?? 0,
       icon: AlertCircle,
-      color: 'bg-orange-500',
+      color: 'bg-orange-200',
       textColor: 'text-orange-600',
-      bg: 'bg-orange-50',
+      bg: 'bg-orange-100',
+      cardBg: 'bg-orange-50',
       link: '/school/olympiad-ids',
       linkText: 'View Pending IDs',
     },
@@ -113,7 +116,7 @@ export default function SchoolDashboardPage() {
         {topStatCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="bg-white rounded-xl border border-gray-100 shadow-sm relative overflow-hidden group">
+            <div key={card.label} className={`${card.cardBg} rounded-xl border border-gray-100 shadow-sm relative overflow-hidden group`}>
               <div className={`absolute top-0 left-0 w-1 h-full ${card.color}`} />
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
@@ -142,7 +145,7 @@ export default function SchoolDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Ring Chart */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-6 px-4">
+        <div className="bg-blue-50 rounded-xl border border-blue-100 shadow-sm flex flex-col items-center justify-center py-6 px-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Registration Rate</p>
           <div className="relative">
             <RingChart rate={stats?.registrationRate ?? 0} />
@@ -164,8 +167,8 @@ export default function SchoolDashboardPage() {
         </div>
 
         {/* Class-wise Breakdown */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+        <div className="lg:col-span-2 bg-green-50 rounded-xl border border-green-100 shadow-sm">
+          <div className="px-5 py-3 border-b border-green-100 flex items-center gap-2">
             <BookOpen size={14} className="text-[#004f9f]" />
             <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">Class-wise Registration Progress</h2>
           </div>
@@ -213,8 +216,8 @@ export default function SchoolDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Recent Registrations */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-purple-50 rounded-xl border border-purple-100 shadow-sm">
+          <div className="px-5 py-3 border-b border-purple-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity size={14} className="text-[#004f9f]" />
               <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">Recent Registrations</h2>
@@ -266,8 +269,8 @@ export default function SchoolDashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+        <div className="bg-orange-50 rounded-xl border border-orange-100 shadow-sm">
+          <div className="px-5 py-3 border-b border-orange-100 flex items-center gap-2">
             <TrendingUp size={14} className="text-[#004f9f]" />
             <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">Quick Actions</h2>
           </div>
