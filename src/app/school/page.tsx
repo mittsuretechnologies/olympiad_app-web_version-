@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -77,9 +77,10 @@ export default function SchoolDashboardPage() {
       label: 'Total Allocated IDs',
       value: stats?.totalAllocated ?? 0,
       icon: Hash,
-      color: 'bg-blue-600',
+      color: 'bg-blue-200',
       textColor: 'text-blue-700',
-      bg: 'bg-blue-50',
+      bg: 'bg-blue-100',
+      cardBg: 'bg-blue-50',
       link: '/school/olympiad-ids',
       linkText: 'View All IDs',
     },
@@ -87,9 +88,10 @@ export default function SchoolDashboardPage() {
       label: 'Registered Students',
       value: stats?.totalRegistered ?? 0,
       icon: CheckCircle2,
-      color: 'bg-green-600',
+      color: 'bg-green-200',
       textColor: 'text-green-700',
-      bg: 'bg-green-50',
+      bg: 'bg-green-100',
+      cardBg: 'bg-green-50',
       link: '/school/registered-students',
       linkText: 'View Students',
     },
@@ -97,9 +99,10 @@ export default function SchoolDashboardPage() {
       label: 'Pending Registrations',
       value: stats?.totalPending ?? 0,
       icon: AlertCircle,
-      color: 'bg-orange-500',
+      color: 'bg-orange-200',
       textColor: 'text-orange-600',
-      bg: 'bg-orange-50',
+      bg: 'bg-orange-100',
+      cardBg: 'bg-orange-50',
       link: '/school/olympiad-ids',
       linkText: 'View Pending IDs',
     },
@@ -113,7 +116,7 @@ export default function SchoolDashboardPage() {
         {topStatCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className="bg-white rounded-xl border border-gray-100 shadow-sm relative overflow-hidden group">
+            <div key={card.label} className={`${card.cardBg} rounded-xl border border-gray-100 shadow-sm relative overflow-hidden group`}>
               <div className={`absolute top-0 left-0 w-1 h-full ${card.color}`} />
               <div className="p-5">
                 <div className="flex items-start justify-between mb-3">
@@ -129,7 +132,7 @@ export default function SchoolDashboardPage() {
                     <Icon size={22} className={card.textColor} />
                   </div>
                 </div>
-                <Link href={card.link} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#06013E] hover:underline uppercase tracking-wider mt-1">
+                <Link href={card.link} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-[#004f9f] hover:underline uppercase tracking-wider mt-1">
                   {card.linkText} <ArrowRight size={10} />
                 </Link>
               </div>
@@ -142,7 +145,7 @@ export default function SchoolDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Ring Chart */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm flex flex-col items-center justify-center py-6 px-4">
+        <div className="bg-blue-50 rounded-xl border border-blue-100 shadow-sm flex flex-col items-center justify-center py-6 px-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Registration Rate</p>
           <div className="relative">
             <RingChart rate={stats?.registrationRate ?? 0} />
@@ -151,7 +154,7 @@ export default function SchoolDashboardPage() {
                 <div className="h-8 w-12 bg-gray-100 animate-pulse rounded" />
               ) : (
                 <>
-                  <span className="text-2xl font-black text-[#06013E]">{stats?.registrationRate ?? 0}%</span>
+                  <span className="text-2xl font-black text-[#004f9f]">{stats?.registrationRate ?? 0}%</span>
                   <span className="text-[9px] text-gray-400 uppercase font-bold tracking-wider">Complete</span>
                 </>
               )}
@@ -164,10 +167,10 @@ export default function SchoolDashboardPage() {
         </div>
 
         {/* Class-wise Breakdown */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <BookOpen size={14} className="text-[#06013E]" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#06013E]">Class-wise Registration Progress</h2>
+        <div className="lg:col-span-2 bg-green-50 rounded-xl border border-green-100 shadow-sm">
+          <div className="px-5 py-3 border-b border-green-100 flex items-center gap-2">
+            <BookOpen size={14} className="text-[#004f9f]" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">Class-wise Registration Progress</h2>
           </div>
           <div className="p-5 space-y-3">
             {loading ? (
@@ -184,7 +187,7 @@ export default function SchoolDashboardPage() {
                 <div key={cls.classCode}>
                   <div className="flex justify-between items-center mb-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-[#06013E]">{cls.className}</span>
+                      <span className="text-xs font-bold text-[#004f9f]">{cls.className}</span>
                       <span className="text-[10px] text-gray-400">{cls.registered}/{cls.allocated}</span>
                     </div>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
@@ -213,11 +216,11 @@ export default function SchoolDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Recent Registrations */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+        <div className="bg-purple-50 rounded-xl border border-purple-100 shadow-sm">
+          <div className="px-5 py-3 border-b border-purple-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Activity size={14} className="text-[#06013E]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#06013E]">Recent Registrations</h2>
+              <Activity size={14} className="text-[#004f9f]" />
+              <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">Recent Registrations</h2>
             </div>
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           </div>
@@ -243,8 +246,8 @@ export default function SchoolDashboardPage() {
                     {s.studentName.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#06013E] truncate">{s.studentName}</p>
-                    <p className="text-[10px] text-gray-400 font-mono">{s.olympiadCode} · {s.className}</p>
+                    <p className="text-sm font-semibold text-[#004f9f] truncate">{s.studentName}</p>
+                    <p className="text-[10px] text-gray-400 font-mono">{s.olympiadCode} Â· {s.className}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
                     <p className="text-[10px] text-gray-400">
@@ -258,7 +261,7 @@ export default function SchoolDashboardPage() {
           </div>
           {stats?.recentRegistrations?.length ? (
             <div className="px-5 py-2.5 border-t border-gray-100">
-              <Link href="/school/registered-students" className="text-[10px] font-bold text-[#06013E] hover:underline flex items-center gap-1 uppercase tracking-wider">
+              <Link href="/school/registered-students" className="text-[10px] font-bold text-[#004f9f] hover:underline flex items-center gap-1 uppercase tracking-wider">
                 View all students <ChevronRight size={10} />
               </Link>
             </div>
@@ -266,10 +269,10 @@ export default function SchoolDashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <TrendingUp size={14} className="text-[#06013E]" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#06013E]">Quick Actions</h2>
+        <div className="bg-orange-50 rounded-xl border border-orange-100 shadow-sm">
+          <div className="px-5 py-3 border-b border-orange-100 flex items-center gap-2">
+            <TrendingUp size={14} className="text-[#004f9f]" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-[#004f9f]">Quick Actions</h2>
           </div>
           <div className="p-4 grid grid-cols-2 gap-3">
             {[
@@ -286,7 +289,7 @@ export default function SchoolDashboardPage() {
                     <Icon size={16} className={a.color} />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-[#06013E]">{a.label}</p>
+                    <p className="text-xs font-bold text-[#004f9f]">{a.label}</p>
                     <p className="text-[10px] text-gray-400 mt-0.5">{a.sub}</p>
                   </div>
                 </Link>
@@ -298,7 +301,7 @@ export default function SchoolDashboardPage() {
           <div className="mx-4 mb-4 bg-[#06013E] text-white p-4 rounded-lg">
             <p className="text-xs font-bold mb-1">How it works</p>
             <p className="text-[10px] text-white/60 leading-relaxed">
-              Share the Olympiad ID (roll number) with each student. They register on the TalentOlympiad App using that ID — their profile then appears in your "My Students" section.
+              Share the Olympiad ID (roll number) with each student. They register on the TalentOlympiad App using that ID â€” their profile then appears in your "My Students" section.
             </p>
           </div>
         </div>
@@ -306,3 +309,4 @@ export default function SchoolDashboardPage() {
     </div>
   );
 }
+

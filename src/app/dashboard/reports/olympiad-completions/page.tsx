@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -126,7 +126,7 @@ export default function OlympiadCompletionsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-medium text-[#06013E]">Olympiad Completions</h1>
+          <h1 className="text-2xl font-medium text-[#004f9f]">Olympiad Completions</h1>
         </div>
         <button onClick={exportCSV} disabled={filtered.length === 0}
           className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#09025c] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -194,7 +194,7 @@ export default function OlympiadCompletionsPage() {
       <div className="flex items-stretch border border-gray-200 bg-white divide-x divide-gray-200">
         <div className="flex items-center gap-3 px-6 py-3">
           <Trophy size={17} className="text-amber-500" />
-          <span className="text-2xl font-bold text-[#06013E]">{filtered.length}</span>
+          <span className="text-2xl font-bold text-[#004f9f]">{filtered.length}</span>
           <span className="text-sm text-gray-400">Completed</span>
         </div>
         <div className="flex items-center gap-3 px-6 py-3">
@@ -218,7 +218,7 @@ export default function OlympiadCompletionsPage() {
       <div className="bg-white border border-gray-200">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-600">
-            <span className="text-[#06013E]">{filtered.length}</span> students completed participation
+            <span className="text-[#004f9f]">{filtered.length}</span> students completed participation
           </p>
           {loading && <Loader2 size={14} className="animate-spin text-gray-400" />}
         </div>
@@ -241,7 +241,7 @@ export default function OlympiadCompletionsPage() {
             <tbody>
               {loading ? (
                 <tr><td colSpan={10} className="py-16 text-center">
-                  <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#06013E] mb-2" />
+                  <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#004f9f] mb-2" />
                   <p className="text-gray-400 text-sm">Loading...</p>
                 </td></tr>
               ) : filtered.length === 0 ? (
@@ -256,7 +256,7 @@ export default function OlympiadCompletionsPage() {
                   <td className="px-4 py-2.5 text-gray-400 text-xs">{idx + 1}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-amber-500 text-sm">🏅</span>
+                      <span className="text-amber-500 text-sm">ðŸ…</span>
                       <span className={`font-semibold ${r.source === 'app' && r.name === r.username ? 'text-gray-400 italic' : 'text-gray-900'}`}>
                         {r.name}
                       </span>
@@ -271,7 +271,7 @@ export default function OlympiadCompletionsPage() {
                       : <span className="text-gray-300 text-xs">-</span>
                     }
                   </td>
-                  <td className="px-4 py-2.5 font-mono font-bold text-[#06013E] select-all text-sm">{r.olympiadCode}</td>
+                  <td className="px-4 py-2.5 font-mono font-bold text-[#004f9f] select-all text-sm">{r.olympiadCode}</td>
                   <td className="px-4 py-2.5 text-gray-600 text-xs">{r.className || '-'}</td>
                   <td className="px-4 py-2.5 text-center">
                     <span className="inline-flex items-center gap-1 text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5">
@@ -302,10 +302,11 @@ export default function OlympiadCompletionsPage() {
         {!loading && rows.length > 0 && (
           <div className="px-5 py-2.5 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
             <span>Showing <span className="font-semibold text-gray-600">{filtered.length}</span> of <span className="font-semibold text-gray-600">{rows.length}</span> completions</span>
-            <span className="italic">© Mittsure Olympiad Portal</span>
+            <span className="italic">Â© Mittsure Olympiad Portal</span>
           </div>
         )}
       </div>
     </div>
   );
 }
+

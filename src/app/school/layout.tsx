@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -53,7 +53,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   return (
     <div className="flex min-h-screen bg-[#F6F9FF]">
 
-      {/* ── Sidebar ── */}
+      {/* â”€â”€ Sidebar â”€â”€ */}
       <aside className="w-60 flex flex-col fixed h-screen z-50 bg-white border-r border-gray-200 shadow-sm">
 
         {/* Logo */}
@@ -71,7 +71,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
         {/* School identity card */}
         <div className="mx-3 mt-3 mb-2 rounded-xl bg-gradient-to-br from-[#06013E] to-[#1a0f6e] p-3">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-[#FF9000] text-[#06013E] font-black text-sm flex items-center justify-center flex-shrink-0">
+            <div className="w-8 h-8 rounded-full bg-[#FF9000] text-[#004f9f] font-black text-sm flex items-center justify-center flex-shrink-0">
               {initials}
             </div>
             <div className="min-w-0">
@@ -98,15 +98,15 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group relative ${
                   isActive
                     ? 'bg-[#06013E] text-white shadow-sm'
-                    : 'text-gray-500 hover:bg-gray-100 hover:text-[#06013E]'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-[#004f9f]'
                 }`}
               >
                 {/* active accent */}
                 {isActive && (
                   <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#FF9000] rounded-r-full" />
                 )}
-                <Icon size={15} className={isActive ? 'text-[#FF9000]' : 'text-gray-400 group-hover:text-[#06013E]'} />
-                <span className={`text-sm font-semibold flex-1 ${isActive ? 'text-white' : ''}`}>
+                <Icon size={15} className={isActive ? 'text-[#FF9000]' : 'text-gray-400 group-hover:text-[#004f9f]'} />
+                <span className="text-sm font-semibold flex-1">
                   {item.name}
                 </span>
                 {isActive && <ChevronRight size={12} className="text-white/40" />}
@@ -119,21 +119,21 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
         <div className="p-3 border-t border-gray-100 flex-shrink-0">
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all group"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#06013E] hover:bg-red-600 hover:text-white transition-all group"
           >
-            <LogOut size={15} className="group-hover:text-red-500" />
+            <LogOut size={15} className="group-hover:text-white" />
             <span className="text-sm font-semibold">Logout</span>
           </button>
         </div>
       </aside>
 
-      {/* ── Main content ── */}
+      {/* â”€â”€ Main content â”€â”€ */}
       <main className="flex-1 ml-60 min-h-screen flex flex-col">
 
         {/* Top bar */}
         <header className="h-14 bg-white border-b border-gray-200 flex items-center justify-between px-6 flex-shrink-0 sticky top-0 z-40">
           <div className="flex items-center gap-2">
-            <span className="text-base font-medium text-[#06013E]">
+            <span className="text-base font-medium text-[#004f9f]">
               {pathname === '/school' ? 'Dashboard'
                 : pathname.startsWith('/school/olympiad-ids') ? 'Olympiad IDs'
                 : pathname.startsWith('/school/registered-students') ? 'My Students'
@@ -158,3 +158,4 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     </div>
   );
 }
+

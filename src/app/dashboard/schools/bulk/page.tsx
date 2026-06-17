@@ -1,10 +1,10 @@
-'use client';
+﻿'use client';
 
 import { useState, useRef } from 'react';
 import { Upload, FileSpreadsheet, Download, CheckCircle, AlertCircle, X, Copy } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
-// ─── Types ───────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ParsedRow {
   name: string;
@@ -38,14 +38,14 @@ interface UploadResult {
   message: string;
 }
 
-// ─── Constants ───────────────────────────────────────────────────────────────
+// â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const VALID_CLASSES = ['PG', 'Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8'];
 
 const REQUIRED_COLS = ['School Name', 'CRM ID', 'State', 'District'];
 const OPTIONAL_COLS = ['City', 'Address', 'Contact Person', 'Phone', 'Email', 'Pincode', 'Classes'];
 
-// ─── Template download ────────────────────────────────────────────────────────
+// â”€â”€â”€ Template download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function downloadTemplate() {
   const headers = [...REQUIRED_COLS, ...OPTIONAL_COLS];
@@ -71,7 +71,7 @@ function downloadTemplate() {
   XLSX.writeFile(wb, 'bulk_school_template.xlsx');
 }
 
-// ─── Parse Excel ─────────────────────────────────────────────────────────────
+// â”€â”€â”€ Parse Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function parseExcel(file: File): Promise<ParsedRow[]> {
   return new Promise((resolve, reject) => {
@@ -142,7 +142,7 @@ function parseExcel(file: File): Promise<ParsedRow[]> {
   });
 }
 
-// Normalize "Class PG" → "PG", "Class LKG" → "LKG", "Class UKG" → "UKG", "Class Nursery" → "Nursery"
+// Normalize "Class PG" â†’ "PG", "Class LKG" â†’ "LKG", "Class UKG" â†’ "UKG", "Class Nursery" â†’ "Nursery"
 function normalizeClassName(raw: string): string {
   const s = raw.trim();
   // Strip "Class " prefix for non-numeric classes (PG, Nursery, LKG, UKG)
@@ -151,7 +151,7 @@ function normalizeClassName(raw: string): string {
   return s; // keep as-is for "Class 1", "Class 2" etc.
 }
 
-// Parse "Class 1:30,Class 2:25,PG:15" → [{ className, count }]
+// Parse "Class 1:30,Class 2:25,PG:15" â†’ [{ className, count }]
 function parseClasses(raw: string): { className: string; count: number }[] | null {
   if (!raw.trim()) return null;
   const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -167,7 +167,7 @@ function parseClasses(raw: string): { className: string; count: number }[] | nul
   return result.length ? result : null;
 }
 
-// ─── Download results as Excel ────────────────────────────────────────────────
+// â”€â”€â”€ Download results as Excel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function downloadResults(created: CreatedSchool[]) {
   const headers = ['School Name', 'School ID (Username)', 'Password', 'Olympiad IDs Generated', 'First Code', 'Last Code'];
@@ -186,7 +186,7 @@ function downloadResults(created: CreatedSchool[]) {
   XLSX.writeFile(wb, 'created_schools_credentials.xlsx');
 }
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function BulkUploadPage() {
   const [file, setFile] = useState<File | null>(null);
@@ -307,14 +307,14 @@ export default function BulkUploadPage() {
 
   return (
     <div className="space-y-3">
-      <h1 className="text-2xl font-medium text-[#06013E]">Bulk School Registration</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">Bulk School Registration</h1>
       <div className="max-w-5xl bg-[#FFFEFE] border border-gray-300 shadow-sm">
       <div className="p-5 space-y-5">
 
         {/* Step 1: Download Template */}
         <div className="border border-gray-200 bg-gray-50 p-4 flex items-center justify-between">
           <div>
-            <p className="text-xs font-bold uppercase tracking-wide text-black">Step 1 — Download Template</p>
+            <p className="text-xs font-bold uppercase tracking-wide text-black">Step 1 â€” Download Template</p>
             <p className="text-xs text-gray-500 mt-0.5">
               Fill in: <span className="font-semibold text-[#009846]">School Name, CRM ID, State, District</span> (required) +
               City, Address, Contact Person, Phone, Email, Pincode, Classes (optional)
@@ -334,7 +334,7 @@ export default function BulkUploadPage() {
 
         {/* Step 2: Upload */}
         <div>
-          <p className={`${labelCls} mb-2`}>Step 2 — Upload Filled Excel</p>
+          <p className={`${labelCls} mb-2`}>Step 2 â€” Upload Filled Excel</p>
           {!file ? (
             <div
               className={`border-2 border-dashed p-10 text-center cursor-pointer transition-all ${
@@ -386,7 +386,7 @@ export default function BulkUploadPage() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <p className={labelCls}>
-                Step 3 — Preview ({validRows.length} valid
+                Step 3 â€” Preview ({validRows.length} valid
                 {invalidRows.length > 0 && <span className="text-red-600">, {invalidRows.length} with errors</span>})
               </p>
               {validRows.length > 0 && (
@@ -396,7 +396,7 @@ export default function BulkUploadPage() {
                   className="bg-[#009846] text-white px-5 py-2 text-sm font-semibold hover:bg-[#007a38] disabled:opacity-50 transition-colors"
                 >
                   {uploading
-                    ? `Registering… (0/${validRows.length})`
+                    ? `Registeringâ€¦ (0/${validRows.length})`
                     : `Register ${validRows.length} School${validRows.length > 1 ? 's' : ''}`}
                 </button>
               )}
@@ -422,19 +422,19 @@ export default function BulkUploadPage() {
                       className={`border-t border-gray-100 ${row._errors.length ? 'bg-red-50' : 'bg-white hover:bg-gray-50'}`}
                     >
                       <td className="px-3 py-2 text-gray-400 border-r border-gray-100">{row._rowIndex}</td>
-                      <td className="px-3 py-2 font-medium text-[#432818] border-r border-gray-100 max-w-[180px] truncate">{row.name || '—'}</td>
-                      <td className="px-3 py-2 font-mono text-[#009846] border-r border-gray-100">{row.olympiadId || '—'}</td>
-                      <td className="px-3 py-2 border-r border-gray-100">{row.state || '—'}</td>
-                      <td className="px-3 py-2 border-r border-gray-100">{row.district || '—'}</td>
+                      <td className="px-3 py-2 font-medium text-[#432818] border-r border-gray-100 max-w-[180px] truncate">{row.name || 'â€”'}</td>
+                      <td className="px-3 py-2 font-mono text-[#009846] border-r border-gray-100">{row.olympiadId || 'â€”'}</td>
+                      <td className="px-3 py-2 border-r border-gray-100">{row.state || 'â€”'}</td>
+                      <td className="px-3 py-2 border-r border-gray-100">{row.district || 'â€”'}</td>
                       <td className="px-3 py-2 border-r border-gray-100 text-gray-500 max-w-[160px] truncate">
-                        {row.classes || <span className="text-gray-300 italic">—</span>}
+                        {row.classes || <span className="text-gray-300 italic">â€”</span>}
                       </td>
                       <td className="px-3 py-2">
                         {row._errors.length === 0 ? (
-                          <span className="text-green-600 font-semibold">✓ OK</span>
+                          <span className="text-green-600 font-semibold">âœ“ OK</span>
                         ) : (
                           <span className="text-red-600" title={row._errors.join(', ')}>
-                            ✗ {row._errors[0]}{row._errors.length > 1 ? ` +${row._errors.length - 1}` : ''}
+                            âœ— {row._errors[0]}{row._errors.length > 1 ? ` +${row._errors.length - 1}` : ''}
                           </span>
                         )}
                       </td>
@@ -446,7 +446,7 @@ export default function BulkUploadPage() {
 
             {invalidRows.length > 0 && (
               <p className="text-xs text-red-600 mt-2">
-                ⚠ {invalidRows.length} row(s) with errors will be skipped. Fix them in the Excel and re-upload.
+                âš  {invalidRows.length} row(s) with errors will be skipped. Fix them in the Excel and re-upload.
               </p>
             )}
           </div>
@@ -456,7 +456,7 @@ export default function BulkUploadPage() {
         {uploading && (
           <div className="flex items-center gap-3 bg-blue-50 border border-blue-200 px-4 py-3 text-sm text-blue-700">
             <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" />
-            Registering schools and generating Olympiad IDs, please wait…
+            Registering schools and generating Olympiad IDs, please waitâ€¦
           </div>
         )}
 
@@ -528,10 +528,10 @@ export default function BulkUploadPage() {
                             </div>
                           </td>
                           <td className="px-3 py-2 text-center border-r border-gray-100 font-semibold text-[#009846]">
-                            {s.olympiadIdsGenerated ?? '—'}
+                            {s.olympiadIdsGenerated ?? 'â€”'}
                           </td>
-                          <td className="px-3 py-2 font-mono text-gray-500 border-r border-gray-100">{s.firstCode ?? '—'}</td>
-                          <td className="px-3 py-2 font-mono text-gray-500">{s.lastCode ?? '—'}</td>
+                          <td className="px-3 py-2 font-mono text-gray-500 border-r border-gray-100">{s.firstCode ?? 'â€”'}</td>
+                          <td className="px-3 py-2 font-mono text-gray-500">{s.lastCode ?? 'â€”'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -549,7 +549,7 @@ export default function BulkUploadPage() {
                     <div key={i} className="px-4 py-2 flex items-start gap-2 text-xs">
                       <AlertCircle size={13} className="text-red-500 shrink-0 mt-0.5" />
                       <span className="font-semibold text-red-700">{e.name}</span>
-                      <span className="text-red-500">— {e.reason}</span>
+                      <span className="text-red-500">â€” {e.reason}</span>
                     </div>
                   ))}
                 </div>
@@ -570,3 +570,4 @@ export default function BulkUploadPage() {
     </div>
   );
 }
+

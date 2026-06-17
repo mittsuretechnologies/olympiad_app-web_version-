@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -416,20 +416,20 @@ export default function SchoolsPage() {
 
   return (
     <div className="space-y-3">
-      <h1 className="text-2xl font-medium text-[#06013E]">School Directory</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">School Directory</h1>
     <div className="bg-white border border-gray-300 shadow-sm">
 
       {/* Action Bar */}
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-600">Total Registered Schools:</span>
-          <span className="font-bold text-[#06013E]">{schools.length}</span>
+          <span className="font-bold text-[#004f9f]">{schools.length}</span>
         </div>
 
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsBulkModalOpen(true)}
-            className="inline-flex items-center gap-2 bg-white border border-gray-400 text-[#06013E] px-4 py-2 text-sm font-semibold hover:bg-gray-100 transition-colors"
+            className="inline-flex items-center gap-2 bg-white border border-gray-400 text-[#004f9f] px-4 py-2 text-sm font-semibold hover:bg-gray-100 transition-colors"
           >
             <Upload className="w-4 h-4" /> Bulk Register
           </button>
@@ -463,7 +463,7 @@ export default function SchoolsPage() {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#06013E]">
+            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#004f9f]">
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300 w-12">
                 #
               </th>
@@ -497,7 +497,7 @@ export default function SchoolsPage() {
             {loading ? (
               <tr>
                 <td colSpan={9} className="py-16 text-center">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#06013E] mb-2" />
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#004f9f] mb-2" />
                   <p className="text-gray-600 text-sm">Loading records...</p>
                 </td>
               </tr>
@@ -524,7 +524,7 @@ export default function SchoolsPage() {
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
                     <div className="flex items-center gap-2">
-                      <span className="font-mono font-semibold text-[#06013E] tracking-tight tabular-nums">
+                      <span className="font-mono font-semibold text-[#004f9f] tracking-tight tabular-nums">
                         {school.schoolId || '-'}
                       </span>
                       {inactive && (
@@ -564,7 +564,7 @@ export default function SchoolsPage() {
                       <button
                         title="Edit"
                         onClick={() => openEditModal(school)}
-                        className="p-1.5 text-[#06013E] hover:bg-[#06013E]/10 border border-transparent hover:border-[#06013E]/20 transition-all"
+                        className="p-1.5 text-[#004f9f] hover:bg-[#06013E]/10 border border-transparent hover:border-[#06013E]/20 transition-all"
                       >
                         <Edit className="w-3.5 h-3.5" />
                       </button>
@@ -602,7 +602,7 @@ export default function SchoolsPage() {
           Showing <span className="font-bold">{filteredSchools.length}</span> of{' '}
           <span className="font-bold">{schools.length}</span> records
         </span>
-        <span className="italic">© Mittsure Olympiad Portal</span>
+        <span className="italic">Â© Mittsure Olympiad Portal</span>
       </div>
 
       {/* Manual Registration Modal */}
@@ -621,7 +621,7 @@ export default function SchoolsPage() {
             className="p-6 bg-white grid grid-cols-1 md:grid-cols-2 gap-4"
           >
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Official School Name <span className="text-red-600">*</span>
               </label>
               <Input
@@ -633,7 +633,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 CRM ID <span className="text-red-600">*</span>
               </label>
               <Input
@@ -645,7 +645,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Contact Person
               </label>
               <Input
@@ -656,7 +656,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Phone Number
               </label>
               <Input
@@ -667,7 +667,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Email Address
               </label>
               <Input
@@ -679,7 +679,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Full Postal Address
               </label>
               <textarea
@@ -743,7 +743,7 @@ export default function SchoolsPage() {
 
             <Button
               variant="outline"
-              className="w-full rounded-none h-10 border-gray-400 font-semibold text-[#06013E]"
+              className="w-full rounded-none h-10 border-gray-400 font-semibold text-[#004f9f]"
             >
               <Download className="w-4 h-4 mr-2" /> Download Template
             </Button>
@@ -767,7 +767,7 @@ export default function SchoolsPage() {
             className="p-6 bg-white grid grid-cols-1 md:grid-cols-2 gap-4"
           >
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Official School Name <span className="text-red-600">*</span>
               </label>
               <Input
@@ -778,7 +778,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 CRM ID <span className="text-red-600">*</span>
               </label>
               <Input
@@ -789,7 +789,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Contact Person
               </label>
               <Input
@@ -799,7 +799,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Phone Number
               </label>
               <Input
@@ -809,7 +809,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Email Address
               </label>
               <Input
@@ -820,7 +820,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 State <span className="text-red-600">*</span>
               </label>
               <Input
@@ -831,7 +831,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 District <span className="text-red-600">*</span>
               </label>
               <Input
@@ -842,7 +842,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 City
               </label>
               <Input
@@ -852,7 +852,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div>
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Pincode
               </label>
               <Input
@@ -862,7 +862,7 @@ export default function SchoolsPage() {
               />
             </div>
             <div className="col-span-2">
-              <label className="block text-xs font-bold text-[#06013E] mb-1.5 uppercase">
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 Full Postal Address
               </label>
               <textarea
@@ -985,7 +985,7 @@ export default function SchoolsPage() {
               <div className="bg-gray-50 border border-gray-200 p-3 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 font-medium">School ID</span>
-                  <span className="font-bold text-[#06013E] font-mono">{toggleTarget.schoolId || '-'}</span>
+                  <span className="font-bold text-[#004f9f] font-mono">{toggleTarget.schoolId || '-'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500 font-medium">Name</span>
@@ -1059,7 +1059,7 @@ export default function SchoolsPage() {
 
               {/* Allocation header */}
               <div className="flex items-center justify-between border-b-2 border-[#06013E] pb-2 flex-wrap gap-2">
-                <div className="flex items-center gap-3 text-[#06013E]">
+                <div className="flex items-center gap-3 text-[#004f9f]">
                   <Hash className="w-4 h-4" />
                   <h3 className="text-sm font-bold uppercase tracking-wider">
                     Olympiad ID Pool ({allocations.length})
@@ -1067,7 +1067,7 @@ export default function SchoolsPage() {
                   {allocations.length > 0 && (
                     <span className="text-[10px] font-semibold text-gray-600 uppercase">
                       Sent: <span className="text-green-700">{allocations.filter((a) => a.sentAt).length}</span>
-                      {' · '}
+                      {' Â· '}
                       Pending: <span className="text-orange-700">{allocations.filter((a) => !a.sentAt).length}</span>
                     </span>
                   )}
@@ -1086,7 +1086,7 @@ export default function SchoolsPage() {
                   {allocations.length > 0 && (
                     <button
                       onClick={exportAllocationsCSV}
-                      className="inline-flex items-center gap-1.5 bg-white border border-gray-400 text-[#06013E] px-3 py-1.5 text-xs font-semibold hover:bg-gray-100 transition-colors"
+                      className="inline-flex items-center gap-1.5 bg-white border border-gray-400 text-[#004f9f] px-3 py-1.5 text-xs font-semibold hover:bg-gray-100 transition-colors"
                     >
                       <Download className="w-3.5 h-3.5" /> Export CSV
                     </button>
@@ -1120,7 +1120,7 @@ export default function SchoolsPage() {
                 >
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-[#06013E] mb-1 uppercase">
+                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
                         Prefix <span className="text-red-600">*</span>
                       </label>
                       <input
@@ -1133,7 +1133,7 @@ export default function SchoolsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#06013E] mb-1 uppercase">
+                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
                         Count <span className="text-red-600">*</span>
                       </label>
                       <input
@@ -1147,7 +1147,7 @@ export default function SchoolsPage() {
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-bold text-[#06013E] mb-1 uppercase">
+                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
                         Padding (digits)
                       </label>
                       <input
@@ -1160,7 +1160,7 @@ export default function SchoolsPage() {
                       />
                     </div>
                     <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-[#06013E] mb-1 uppercase">
+                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
                         Preview
                       </label>
                       <div className="h-9 bg-white border border-gray-300 px-3 flex items-center text-sm font-mono text-gray-700">
@@ -1203,7 +1203,7 @@ export default function SchoolsPage() {
                 <div className="max-h-72 overflow-y-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-[#E8EAF6] sticky top-0">
-                      <tr className="border-b-2 border-[#06013E] text-[#06013E]">
+                      <tr className="border-b-2 border-[#06013E] text-[#004f9f]">
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300 w-12">
                           #
                         </th>
@@ -1222,7 +1222,7 @@ export default function SchoolsPage() {
                       {allocLoading ? (
                         <tr>
                           <td colSpan={4} className="py-8 text-center">
-                            <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#06013E]" />
+                            <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#004f9f]" />
                           </td>
                         </tr>
                       ) : allocations.length === 0 ? (
@@ -1242,7 +1242,7 @@ export default function SchoolsPage() {
                             <td className="px-3 py-2 border-r border-gray-200 text-gray-700 text-xs">
                               {idx + 1}
                             </td>
-                            <td className="px-3 py-2 border-r border-gray-200 font-mono font-semibold text-[#06013E]">
+                            <td className="px-3 py-2 border-r border-gray-200 font-mono font-semibold text-[#004f9f]">
                               {a.code}
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200">
@@ -1298,3 +1298,4 @@ function InfoRow({
     </div>
   );
 }
+

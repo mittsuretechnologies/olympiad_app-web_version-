@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
@@ -103,7 +103,7 @@ export default function SchoolCredentialsPage() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-medium text-[#06013E]">Manage School Credentials</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">Manage School Credentials</h1>
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#009846] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold animate-in fade-in slide-in-from-bottom-2">
           <CheckCircle size={16} />
@@ -114,7 +114,7 @@ export default function SchoolCredentialsPage() {
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="text-sm">
           <span className="text-gray-600">Total Schools: </span>
-          <span className="font-bold text-[#06013E]">{rows.length}</span>
+          <span className="font-bold text-[#004f9f]">{rows.length}</span>
         </div>
         <div className="relative max-w-md flex-1 min-w-[240px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
@@ -132,7 +132,7 @@ export default function SchoolCredentialsPage() {
       <div className="overflow-x-auto">
         <table className="w-full text-sm border-collapse">
           <thead>
-            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#06013E]">
+            <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#004f9f]">
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300 w-12">#</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">School ID</th>
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">CRM ID</th>
@@ -148,7 +148,7 @@ export default function SchoolCredentialsPage() {
             {loading ? (
               <tr>
                 <td colSpan={9} className="py-16 text-center">
-                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#06013E] mb-2" />
+                  <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#004f9f] mb-2" />
                   <p className="text-gray-600 text-sm">Loading credentials...</p>
                 </td>
               </tr>
@@ -170,10 +170,10 @@ export default function SchoolCredentialsPage() {
                   <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-xs text-gray-400">{r.schoolId}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 font-mono text-xs text-gray-400">{r.olympiadId || '-'}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-sm text-gray-400">{r.name}</td>
-                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-bold text-[#06013E]">{r.username || '-'}</td>
+                  <td className="px-4 py-2.5 border-r border-gray-200 font-mono font-bold text-[#004f9f]">{r.username || '-'}</td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
                     {r.plainPassword ? (
-                      <span className="font-mono text-sm font-bold text-[#06013E] select-all">
+                      <span className="font-mono text-sm font-bold text-[#004f9f] select-all">
                         {r.plainPassword}
                       </span>
                     ) : (
@@ -205,7 +205,7 @@ export default function SchoolCredentialsPage() {
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{rows.length}</span> schools
         </span>
-        <span className="italic">© Mittsure Olympiad Portal</span>
+        <span className="italic">Â© Mittsure Olympiad Portal</span>
       </div>
 
       {/* Reset Dialog */}
@@ -228,7 +228,7 @@ export default function SchoolCredentialsPage() {
 
           <div className="p-5 bg-white">
 
-            {/* Step 1 — Choose action */}
+            {/* Step 1 â€” Choose action */}
             {resetAction === 'choose' && (
               <div className="space-y-3">
                 <p className="text-xs text-gray-400 mb-3">What do you want to change?</p>
@@ -256,7 +256,7 @@ export default function SchoolCredentialsPage() {
               </div>
             )}
 
-            {/* Step 2a — Username */}
+            {/* Step 2a â€” Username */}
             {resetAction === 'username' && (
               <div className="space-y-4">
                 <div>
@@ -281,7 +281,7 @@ export default function SchoolCredentialsPage() {
               </div>
             )}
 
-            {/* Step 2b — Password */}
+            {/* Step 2b â€” Password */}
             {resetAction === 'password' && (
               <div className="space-y-4">
                 <div>
@@ -322,3 +322,4 @@ export default function SchoolCredentialsPage() {
     </div>
   );
 }
+

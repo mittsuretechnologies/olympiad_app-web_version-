@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState } from 'react';
 
@@ -38,13 +38,13 @@ export default function RegisterUploaderPage() {
     }
   };
 
-  const labelCls = 'block text-xs font-bold text-[#06013E] mb-1.5 uppercase tracking-wide';
+  const labelCls = 'block text-xs font-bold text-[#004f9f] mb-1.5 uppercase tracking-wide';
   const inputCls =
     'w-full h-10 border border-gray-300 rounded-none px-3 text-sm text-[#432818] placeholder:text-gray-400 focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E] transition-all bg-white';
 
   return (
     <div className="space-y-3">
-      <h1 className="text-2xl font-medium text-[#06013E]">Register New Uploader</h1>
+      <h1 className="text-2xl font-medium text-[#004f9f]">Register New Uploader</h1>
       <div className="max-w-3xl bg-[#FFFEFE] border border-gray-300 shadow-sm">
       <div className="p-6">
         {message && (
@@ -98,7 +98,7 @@ export default function RegisterUploaderPage() {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-900">
-            Uploaders can scan/search any Olympiad ID across all schools after login. School allocations are not needed — the system resolves school context from the ID itself.
+            Uploaders can scan/search any Olympiad ID across all schools after login. School allocations are not needed â€” the system resolves school context from the ID itself.
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">
@@ -128,3 +128,4 @@ export default function RegisterUploaderPage() {
     </div>
   );
 }
+

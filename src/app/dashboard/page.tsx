@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { School, Users, Trophy, TrendingUp, ArrowUpRight, Activity, Calendar, Bell, Search } from 'lucide-react';
@@ -151,3 +151,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
