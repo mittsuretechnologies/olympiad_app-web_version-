@@ -104,7 +104,7 @@ export default function RegisterSchoolPage() {
       } else {
         setMessage({
           type: 'success',
-          text: `School registered (${data.schoolId}) â€” ${data.olympiadIdsGenerated} Olympiad IDs generated.`,
+          text: `School registered (${data.schoolId}) — ${data.olympiadIdsGenerated} Olympiad IDs generated.`,
         });
         setFormData({
           schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',

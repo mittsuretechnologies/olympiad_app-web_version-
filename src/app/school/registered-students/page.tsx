@@ -101,7 +101,7 @@ export default function SchoolRegisteredStudentsPage() {
 
       {/* Header */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-        <div className="bg-[#06013E] text-white px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
+        <div className="bg-[#E8EAF6] text-[#06013E] px-6 py-3 flex items-center justify-between border-b-4 border-[#FF9000]">
           <div className="flex items-center gap-3">
             <Users size={18} />
             <h1 className="text-base font-medium">My Registered Students</h1>
@@ -109,7 +109,7 @@ export default function SchoolRegisteredStudentsPage() {
           <button
             onClick={exportCSV}
             disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 bg-[#FF9000] text-[#004f9f] px-3 py-1.5 text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 bg-[#FF9000] text-black px-3 py-1.5 text-xs font-bold hover:bg-amber-400 transition-colors disabled:opacity-40"
           >
             <Download size={13} /> Export CSV
           </button>
@@ -126,8 +126,8 @@ export default function SchoolRegisteredStudentsPage() {
             const count = students.filter(s => (s.classCode || 'UNKNOWN') === cls.code).length;
             return (
               <div key={cls.code} className="flex items-center gap-2 px-5 py-3">
-                <BookOpen size={13} className="text-[#004f9f]/50" />
-                <span className="text-lg font-black text-[#004f9f]">{count}</span>
+                <BookOpen size={13} className="text-black/50" />
+                <span className="text-lg font-black text-black">{count}</span>
                 <span className="text-xs text-gray-400">{cls.name}</span>
               </div>
             );
@@ -177,7 +177,7 @@ export default function SchoolRegisteredStudentsPage() {
       {/* Content */}
       {loading ? (
         <div className="bg-white border border-gray-200 py-20 flex flex-col items-center gap-3">
-          <Loader2 className="w-6 h-6 animate-spin text-[#004f9f]" />
+          <Loader2 className="w-6 h-6 animate-spin text-black" />
           <p className="text-sm text-gray-400">Loading student records...</p>
         </div>
       ) : error ? (
@@ -194,7 +194,7 @@ export default function SchoolRegisteredStudentsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#004f9f]">
+                <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-black">
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase w-10">#</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Student</th>
                   <th className="px-4 py-3 text-left text-[10px] font-bold uppercase">Olympiad ID</th>
@@ -215,13 +215,13 @@ export default function SchoolRegisteredStudentsPage() {
                         <div className={`w-7 h-7 rounded-full ${avatarColors[i % avatarColors.length]} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0`}>
                           {getInitials(s.name)}
                         </div>
-                        <span className="font-semibold text-[#004f9f] text-sm">{s.name}</span>
+                        <span className="font-semibold text-black text-sm">{s.name}</span>
                       </div>
                     </td>
                     <td className="px-4 py-3 font-mono text-xs font-bold text-gray-700">{s.olympiadCode}</td>
                     <td className="px-4 py-3">
                       {s.className || s.classCode ? (
-                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-[#E8EAF6] text-[#004f9f] rounded">
+                        <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-[#E8EAF6] text-black rounded">
                           <BookOpen size={8} /> {s.className || s.classCode}
                         </span>
                       ) : <span className="text-gray-300 text-xs">-</span>}
@@ -273,7 +273,7 @@ export default function SchoolRegisteredStudentsPage() {
                   {getInitials(s.name)}
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-[#004f9f] truncate">{s.name}</p>
+                  <p className="font-bold text-black truncate">{s.name}</p>
                   <p className="font-mono text-xs text-gray-400">{s.olympiadCode}</p>
                 </div>
                 <div className="ml-auto flex flex-col items-end gap-1 flex-shrink-0">
@@ -297,16 +297,16 @@ export default function SchoolRegisteredStudentsPage() {
               <div className="flex flex-col gap-1.5 text-xs text-gray-500">
                 {(s.className || s.classCode) && (
                   <div className="flex items-center gap-2">
-                    <BookOpen size={11} className="text-[#004f9f]/40 flex-shrink-0" />
+                    <BookOpen size={11} className="text-black/40 flex-shrink-0" />
                     <span>{s.className || s.classCode}</span>
                   </div>
                 )}
                 <div className="flex items-center gap-2">
-                  <Phone size={11} className="text-[#004f9f]/40 flex-shrink-0" />
+                  <Phone size={11} className="text-black/40 flex-shrink-0" />
                   <span className="font-mono">{s.phone}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Calendar size={11} className="text-[#004f9f]/40 flex-shrink-0" />
+                  <Calendar size={11} className="text-black/40 flex-shrink-0" />
                   <span>{new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
                 </div>
               </div>

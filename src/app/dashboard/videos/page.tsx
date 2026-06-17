@@ -307,7 +307,7 @@ export default function VideoModerationPage() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, school, olympiad code, captionâ€¦"
+            placeholder="Search by name, school, olympiad code, caption…"
             className="w-full pl-9 pr-4 h-9 border border-gray-200 rounded-xl text-xs text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#014584]/20 focus:border-[#014584]/40 bg-white"
           />
           {search && (
@@ -429,7 +429,7 @@ export default function VideoModerationPage() {
       {loading ? (
         <div className="flex items-center justify-center py-24 gap-3">
           <Clock size={26} className="animate-spin text-gray-300" />
-          <span className="text-gray-400 text-sm font-bold">Loadingâ€¦</span>
+          <span className="text-gray-400 text-sm font-bold">Loading…</span>
         </div>
       ) : videos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 bg-white border border-dashed border-gray-200 rounded-2xl">
@@ -562,7 +562,7 @@ export default function VideoModerationPage() {
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-[11px] font-black text-[#004f9f] truncate">
-                            {video.student?.name ?? video.appUser?.userId ?? 'â€”'}
+                            {video.student?.name ?? video.appUser?.userId ?? '—'}
                           </p>
                           <p className="text-[10px] text-gray-400 font-mono truncate">
                             {video.student?.olympiadCode ?? video.appUser?.email ?? video.appUser?.mobile ?? ''}
@@ -581,7 +581,7 @@ export default function VideoModerationPage() {
                           <School size={9} className="text-gray-300 shrink-0" />
                           <p className="text-[10px] text-gray-400 truncate">{school.name}</p>
                           {(school.district || school.state) && (
-                            <span className="text-[9px] text-gray-300 shrink-0">Â· {school.district || school.state}</span>
+                            <span className="text-[9px] text-gray-300 shrink-0">· {school.district || school.state}</span>
                           )}
                         </div>
                       )}
@@ -684,7 +684,7 @@ export default function VideoModerationPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <p className="text-sm font-black text-white truncate">
-                      {previewVideo.student?.name ?? previewVideo.appUser?.userId ?? 'â€”'}
+                      {previewVideo.student?.name ?? previewVideo.appUser?.userId ?? '—'}
                     </p>
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
                       (previewVideo.uploaderType === 'STUDENT' || previewVideo.student)
@@ -713,7 +713,7 @@ export default function VideoModerationPage() {
                     </div>
                   ) : previewVideo.appUser ? (
                     <div className="space-y-0.5">
-                      <p className="text-[11px] text-white/40 truncate">{previewVideo.appUser.email || previewVideo.appUser.mobile || 'â€”'}</p>
+                      <p className="text-[11px] text-white/40 truncate">{previewVideo.appUser.email || previewVideo.appUser.mobile || '—'}</p>
                       {previewVideo.appUser.olympiadId && (
                         <p className="text-[11px] text-amber-400 font-mono">{previewVideo.appUser.olympiadId}</p>
                       )}
@@ -792,7 +792,7 @@ export default function VideoModerationPage() {
 
             <textarea
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 min-h-[70px] mt-2"
-              placeholder="Or type a custom reasonâ€¦"
+              placeholder="Or type a custom reason…"
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
             />
@@ -834,7 +834,7 @@ export default function VideoModerationPage() {
               <button onClick={confirmDelete} disabled={deleting}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-colors disabled:opacity-40">
                 {deleting ? <Clock size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                {deleting ? 'Deletingâ€¦' : 'Delete'}
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>

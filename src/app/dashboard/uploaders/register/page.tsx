@@ -98,7 +98,7 @@ export default function RegisterUploaderPage() {
           </div>
 
           <div className="bg-blue-50 border border-blue-200 px-4 py-3 text-xs text-blue-900">
-            Uploaders can scan/search any Olympiad ID across all schools after login. School allocations are not needed â€” the system resolves school context from the ID itself.
+            Uploaders can scan/search any Olympiad ID across all schools after login. School allocations are not needed — the system resolves school context from the ID itself.
           </div>
 
           <div className="flex justify-end gap-2 pt-3 border-t border-gray-200">

@@ -98,10 +98,10 @@ export default function StudentVideosPage() {
       <div className="grid grid-cols-3 gap-4">
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-[#06013E]/10 flex items-center justify-center flex-shrink-0">
-            <Video className="w-5 h-5 text-[#004f9f]" />
+            <Video className="w-5 h-5 text-black" />
           </div>
           <div>
-            <p className="text-2xl font-black text-[#004f9f]">{videos.length}</p>
+            <p className="text-2xl font-black text-black">{videos.length}</p>
             <p className="text-xs text-gray-400">Total in Feed</p>
           </div>
         </div>
@@ -145,7 +145,7 @@ export default function StudentVideosPage() {
             <button key={t} onClick={() => setTypeFilter(t)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                 typeFilter === t
-                  ? t === 'OLYMPIAD' ? 'bg-amber-500 text-white' : t === 'GENERAL' ? 'bg-blue-500 text-white' : 'bg-white text-[#004f9f] shadow-sm'
+                  ? t === 'OLYMPIAD' ? 'bg-amber-500 text-white' : t === 'GENERAL' ? 'bg-blue-500 text-white' : 'bg-white text-black shadow-sm'
                   : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -237,15 +237,15 @@ function VideoCard({ video: v, isPlaying, onPlay }: { video: VideoItem; isPlayin
           </button>
         )}
 
-        {/* Olympiad badge â€” top left */}
+        {/* Olympiad badge — top left */}
         {v.isEvaluation && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 bg-amber-400 text-[#004f9f] px-2 py-0.5 rounded-full text-[10px] font-black shadow">
+          <div className="absolute top-2 left-2 flex items-center gap-1 bg-amber-400 text-black px-2 py-0.5 rounded-full text-[10px] font-black shadow">
             <Star className="w-2.5 h-2.5 fill-current" />
             OLYMPIAD
           </div>
         )}
 
-        {/* Uploader type â€” top right */}
+        {/* Uploader type — top right */}
         {v.uploaderType === 'SCHOOL' && (
           <div className="absolute top-2 right-2 bg-[#06013E]/80 text-white px-2 py-0.5 rounded-full text-[10px] font-bold">
             By School
@@ -262,11 +262,11 @@ function VideoCard({ video: v, isPlaying, onPlay }: { video: VideoItem; isPlayin
             {getInitials(v.studentName)}
           </div>
           <div className="min-w-0">
-            <p className="font-bold text-[#004f9f] text-sm truncate">{v.studentName}</p>
+            <p className="font-bold text-black text-sm truncate">{v.studentName}</p>
             <p className="text-[10px] text-gray-400 font-mono">{v.olympiadCode}</p>
           </div>
           {v.className && (
-            <span className="ml-auto flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-[#E8EAF6] text-[#004f9f] rounded-full flex-shrink-0">
+            <span className="ml-auto flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 bg-[#E8EAF6] text-black rounded-full flex-shrink-0">
               <BookOpen className="w-2.5 h-2.5" />{v.className}
             </span>
           )}

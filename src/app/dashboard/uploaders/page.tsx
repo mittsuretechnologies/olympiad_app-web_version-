@@ -277,7 +277,7 @@ export default function UploadersPage() {
           <div className="bg-[#009846] text-white px-5 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
             <div>
               <p className="text-sm font-bold uppercase tracking-wider">Edit Uploader</p>
-              {editing && <p className="text-xs text-white/70 mt-0.5">{editing.uploaderId} â€” {editing.name}</p>}
+              {editing && <p className="text-xs text-white/70 mt-0.5">{editing.uploaderId} — {editing.name}</p>}
             </div>
             <button onClick={() => setEditing(null)} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
           </div>

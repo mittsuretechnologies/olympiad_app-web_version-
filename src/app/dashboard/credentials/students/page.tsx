@@ -269,8 +269,8 @@ export default function StudentCredentialsPage() {
                           {r.student
                             ? r.student.username
                               ? r.student.username
-                              : <span className="text-gray-300 italic text-xs">â€”</span>
-                            : <span className="text-gray-300 italic text-xs">â€”</span>}
+                              : <span className="text-gray-300 italic text-xs">—</span>
+                            : <span className="text-gray-300 italic text-xs">—</span>}
                         </td>
                         <td className="px-3 py-2 border-r border-gray-100">
                           {r.student ? (
@@ -298,7 +298,7 @@ export default function StudentCredentialsPage() {
                               <RotateCw size={13} />
                             </button>
                           ) : (
-                            <span className="text-gray-200">â€”</span>
+                            <span className="text-gray-200">—</span>
                           )}
                         </td>
                       </tr>
@@ -330,7 +330,7 @@ export default function StudentCredentialsPage() {
               <p className="text-sm font-bold uppercase tracking-wider">
                 {resetAction === 'choose' ? 'Edit Credentials' : resetAction === 'username' ? 'Change Username' : 'Set Password'}
               </p>
-              {resetTarget?.student && <p className="text-xs text-white/70 mt-0.5">{resetTarget.student.name} â€” {resetTarget.code}</p>}
+              {resetTarget?.student && <p className="text-xs text-white/70 mt-0.5">{resetTarget.student.name} — {resetTarget.code}</p>}
             </div>
             <button onClick={closeDialog} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
           </div>
@@ -345,7 +345,7 @@ export default function StudentCredentialsPage() {
                   <KeyRound size={18} className="text-[#009846] shrink-0" />
                   <div>
                     <p className="text-sm font-semibold text-gray-800">Change Username</p>
-                    <p className="text-xs text-gray-400">Current: <span className="font-mono">{resetTarget?.student?.username || 'â€”'}</span></p>
+                    <p className="text-xs text-gray-400">Current: <span className="font-mono">{resetTarget?.student?.username || '—'}</span></p>
                   </div>
                 </button>
                 <button onClick={() => setResetAction('password')} className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:border-[#009846] hover:bg-green-50 transition-all text-left">
