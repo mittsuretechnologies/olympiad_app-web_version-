@@ -54,10 +54,10 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     <div className="flex min-h-screen bg-[#F6F9FF]">
 
       {/* â”€â”€ Sidebar â”€â”€ */}
-      <aside className="w-60 flex flex-col fixed h-screen z-50 bg-[#F9D216] border-r border-yellow-300 shadow-sm">
+      <aside className="w-60 flex flex-col fixed h-screen z-50 bg-white border-r border-gray-200 shadow-sm">
 
         {/* Logo */}
-        <div className="px-4 border-b border-yellow-300 flex-shrink-0 flex items-center justify-center overflow-hidden">
+        <div className="px-4 border-b border-gray-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
           <Image
             src="/logo-CW-uU9TX.jpg"
             alt="Mittsure Technologies"
@@ -98,14 +98,14 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all group relative ${
                   isActive
                     ? 'bg-[#06013E] text-white shadow-sm'
-                    : 'text-[#06013E] hover:bg-yellow-400 hover:text-[#06013E]'
+                    : 'text-gray-500 hover:bg-gray-100 hover:text-[#004f9f]'
                 }`}
               >
                 {/* active accent */}
                 {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#F9D216] rounded-r-full" />
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-[#FF9000] rounded-r-full" />
                 )}
-                <Icon size={15} className={isActive ? 'text-[#F9D216]' : 'text-[#06013E] group-hover:text-[#06013E]'} />
+                <Icon size={15} className={isActive ? 'text-[#FF9000]' : 'text-gray-400 group-hover:text-[#004f9f]'} />
                 <span className="text-sm font-semibold flex-1">
                   {item.name}
                 </span>
@@ -116,7 +116,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
         </nav>
 
         {/* Logout */}
-        <div className="p-3 border-t border-yellow-400 flex-shrink-0">
+        <div className="p-3 border-t border-gray-100 flex-shrink-0">
           <button
             onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-[#06013E] hover:bg-red-600 hover:text-white transition-all group"
