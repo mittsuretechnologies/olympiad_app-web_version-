@@ -155,7 +155,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   const evaluatorSubItems = [
-    { name: 'Manage Evaluators', href: '/dashboard/evaluator/manage', icon: UserCheck },
+    { name: 'Manage Evaluators', href: '/dashboard/evaluator/manage',           icon: UserCheck },
+    { name: 'Evaluate Content',  href: '/dashboard/evaluator/evaluate-content', icon: Play },
   ];
 
   const reportsSubItems = [
@@ -293,7 +294,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${evaluatorOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
                   <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
-                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage','evaluator.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                 </div>
               </div>
