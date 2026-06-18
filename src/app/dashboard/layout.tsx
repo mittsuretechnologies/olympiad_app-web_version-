@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -167,10 +167,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   const subItemClass = (isActive: boolean) =>
-    `flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive ? 'bg-white text-[#004f9f] font-semibold' : 'text-blue-200 hover:bg-white/10 hover:text-white'}`;
+    `flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive ? 'bg-[#009846] text-white font-semibold' : 'text-black font-semibold hover:bg-gray-100 hover:text-[#052E5C]'}`;
 
   const sectionBtnClass = (active: boolean) =>
-    `w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${active ? 'bg-[#009846] text-white font-semibold' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`;
+    `w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${active ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`;
 
   return (
     <div className="flex min-h-screen bg-[#F0F2F5] text-[#1F2937]">
@@ -199,7 +199,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Dashboard */}
             <Link href="/dashboard"
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname === '/dashboard' ? 'bg-[#009846] text-white font-semibold' : 'text-blue-100 hover:bg-white/10 hover:text-white'}`}>
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname === '/dashboard' ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
               <LayoutDashboard size={20} />
               <span className="text-sm font-semibold">Dashboard</span>
             </Link>
@@ -213,8 +213,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${schoolsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${schoolsOpen ? 'max-h-80 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {schoolSubItems.filter((_, i) => canSeeSubItem(['schools.register','schools.bulk','schools.view'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -229,8 +232,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -245,8 +251,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${uploadersOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${uploadersOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {uploaderSubItems.filter((_, i) => canSeeSubItem(['uploaders.register','uploaders.view'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -261,8 +270,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${credentialsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${credentialsOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {credentialsSubItems.filter((_, i) => canSeeSubItem(['credentials.schools','credentials.uploaders','credentials.students','credentials.reviewers','credentials.evaluators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -277,8 +289,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${reviewerOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${reviewerOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {reviewerSubItems.filter((_, i) => canSeeSubItem(['reviewer.manage','reviewer.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -293,8 +308,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${evaluatorOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${evaluatorOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
-                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage','evaluator.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
+                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -309,8 +327,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${reportsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${reportsOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.schools','reports.appusers'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
                   </div>
                 </div>
               </div>
@@ -325,10 +346,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${settingsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${settingsOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="ml-6 pl-4 border-l border-white/15 space-y-1 my-1">
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     <Link href="/dashboard/settings/permission-control" className={subItemClass(pathname === '/dashboard/settings/permission-control')}>
                       <span>Permission Control</span>
                     </Link>
+                  </div>
                   </div>
                 </div>
               </div>

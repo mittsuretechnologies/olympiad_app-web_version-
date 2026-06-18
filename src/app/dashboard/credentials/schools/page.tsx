@@ -228,7 +228,7 @@ export default function SchoolCredentialsPage() {
 
           <div className="p-5 bg-white">
 
-            {/* Step 1 â€” Choose action */}
+            {/* Step 1 — Choose action */}
             {resetAction === 'choose' && (
               <div className="space-y-3">
                 <p className="text-xs text-gray-400 mb-3">What do you want to change?</p>
@@ -256,7 +256,7 @@ export default function SchoolCredentialsPage() {
               </div>
             )}
 
-            {/* Step 2a â€” Username */}
+            {/* Step 2a — Username */}
             {resetAction === 'username' && (
               <div className="space-y-4">
                 <div>
@@ -281,7 +281,7 @@ export default function SchoolCredentialsPage() {
               </div>
             )}
 
-            {/* Step 2b â€” Password */}
+            {/* Step 2b — Password */}
             {resetAction === 'password' && (
               <div className="space-y-4">
                 <div>

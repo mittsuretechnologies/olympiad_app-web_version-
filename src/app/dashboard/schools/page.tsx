@@ -1067,7 +1067,7 @@ export default function SchoolsPage() {
                   {allocations.length > 0 && (
                     <span className="text-[10px] font-semibold text-gray-600 uppercase">
                       Sent: <span className="text-green-700">{allocations.filter((a) => a.sentAt).length}</span>
-                      {' Â· '}
+                      {' · '}
                       Pending: <span className="text-orange-700">{allocations.filter((a) => !a.sentAt).length}</span>
                     </span>
                   )}
