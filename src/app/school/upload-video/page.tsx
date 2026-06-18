@@ -1,7 +1,7 @@
 ﻿'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw } from 'lucide-react';
+import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw, Globe, EyeOff } from 'lucide-react';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 
 const CATEGORIES = [
@@ -42,6 +42,8 @@ export default function UploadVideoPage() {
   const [category, setCategory]     = useState('');
   const [subCategory, setSubCategory] = useState('');
   const [caption, setCaption]       = useState('');
+
+  const [isPublic, setIsPublic] = useState(true);
 
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [progress, setProgress]     = useState(0);
@@ -128,7 +130,7 @@ export default function UploadVideoPage() {
       const metaRes = await fetch('/api/school/me/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, caption, category, subCategory, isPublic: true }),
+        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, caption, category, subCategory, isPublic }),
       });
       setProgress(100);
       if (!metaRes.ok) throw new Error((await metaRes.json()).error || 'Save failed');
@@ -143,7 +145,7 @@ export default function UploadVideoPage() {
 
   function reset() {
     setSelectedStudent(null); setStudentSearch(''); setVideoFile(null); setVideoPreview(null);
-    setCategory(''); setSubCategory(''); setCaption('');
+    setCategory(''); setSubCategory(''); setCaption(''); setIsPublic(true);
     setUploadState('idle'); setProgress(0); setErrorMsg(''); setLastVideoMeta(null);
     setSlots(null);
   }
@@ -368,6 +370,41 @@ export default function UploadVideoPage() {
 
           {/* â”€â”€ RIGHT column (2/5) â”€â”€ */}
           <div className="xl:col-span-2 space-y-5">
+
+            {/* Visibility */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <p className="text-sm font-bold text-gray-700 mb-3">Visibility</p>
+              <div className="space-y-2">
+                {[
+                  { val: true,  icon: Globe,   label: 'Public',  desc: 'Anyone on TalentOlympiad can see this video', iconColor: 'text-blue-600', iconBg: 'bg-blue-50' },
+                  { val: false, icon: EyeOff,  label: 'Private', desc: 'Only reviewers and school can see this video',  iconColor: 'text-purple-600', iconBg: 'bg-purple-50' },
+                ].map(opt => {
+                  const Icon = opt.icon;
+                  const active = isPublic === opt.val;
+                  return (
+                    <button
+                      key={String(opt.val)}
+                      type="button"
+                      onClick={() => setIsPublic(opt.val)}
+                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
+                        active ? 'border-[#06013E] bg-[#06013E]/5' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                      }`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${opt.iconBg}`}>
+                        <Icon className={`w-4 h-4 ${opt.iconColor}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-sm font-semibold ${active ? 'text-[#004f9f]' : 'text-gray-700'}`}>{opt.label}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                      </div>
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? 'border-[#06013E] bg-[#06013E]' : 'border-gray-300'}`}>
+                        {active && <div className="w-2 h-2 rounded-full bg-white" />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
             {/* General feed notice */}
             {isGeneralOnly && (

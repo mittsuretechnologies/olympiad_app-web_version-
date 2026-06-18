@@ -155,7 +155,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   const evaluatorSubItems = [
-    { name: 'Manage Evaluators', href: '/dashboard/evaluator/manage', icon: UserCheck },
+    { name: 'Manage Evaluators', href: '/dashboard/evaluator/manage',           icon: UserCheck },
+    { name: 'Evaluate Content',  href: '/dashboard/evaluator/evaluate-content', icon: Play },
   ];
 
   const reportsSubItems = [

@@ -69,6 +69,50 @@ export async function POST(request: Request) {
       });
     }
 
+    // 3) Try Reviewer (by reviewerId)
+    const reviewer = await prisma.reviewer.findUnique({
+      where: { reviewerId: identifier.toUpperCase() },
+    });
+    if (reviewer) {
+      const ok = await bcrypt.compare(password, reviewer.password);
+      if (!ok) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+      if (!reviewer.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
+      const token = jwt.sign(
+        { id: reviewer.id, reviewerId: reviewer.reviewerId, role: 'REVIEWER' },
+        process.env.JWT_SECRET || 'fallback_secret',
+        { expiresIn: '7d' }
+      );
+      return NextResponse.json({
+        message: 'Login successful',
+        token,
+        role: 'REVIEWER',
+        redirect: '/dashboard',
+        user: { id: reviewer.id, reviewerId: reviewer.reviewerId, name: reviewer.name, email: reviewer.email },
+      });
+    }
+
+    // 4) Try Evaluator (by evaluatorId)
+    const evaluator = await prisma.talentEvaluator.findUnique({
+      where: { evaluatorId: identifier.toUpperCase() },
+    });
+    if (evaluator) {
+      const ok = await bcrypt.compare(password, evaluator.password);
+      if (!ok) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+      if (!evaluator.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
+      const token = jwt.sign(
+        { id: evaluator.id, evaluatorId: evaluator.evaluatorId, role: 'EVALUATOR' },
+        process.env.JWT_SECRET || 'fallback_secret',
+        { expiresIn: '7d' }
+      );
+      return NextResponse.json({
+        message: 'Login successful',
+        token,
+        role: 'EVALUATOR',
+        redirect: '/dashboard',
+        user: { id: evaluator.id, evaluatorId: evaluator.evaluatorId, name: evaluator.name, email: evaluator.email },
+      });
+    }
+
     return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
   } catch (error) {
     console.error('Login error:', error);
