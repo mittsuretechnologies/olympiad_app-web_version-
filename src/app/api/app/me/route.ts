@@ -27,15 +27,16 @@ export async function GET(request: Request) {
     const user = await prisma.appUser.findUnique({
       where: { id: appUser.id },
       select: {
-        id: true,
-        userId: true,
-        email: true,
-        mobile: true,
-        avatarUrl: true,
-        olympiadId: true,
-        isVerified: true,
+        id:           true,
+        userId:       true,
+        email:        true,
+        mobile:       true,
+        avatarUrl:    true,
+        olympiadId:   true,
+        isVerified:   true,
+        isPrivate:    true,
         termsAccepted: true,
-        createdAt: true,
+        createdAt:    true,
       },
     });
 

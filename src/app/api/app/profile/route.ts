@@ -30,9 +30,12 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { userId, email, mobile, avatarUrl } = body;
+  const { userId, email, mobile, avatarUrl, isPrivate } = body;
 
-  if (userId === undefined && email === undefined && mobile === undefined && avatarUrl === undefined) {
+  if (
+    userId === undefined && email === undefined && mobile === undefined &&
+    avatarUrl === undefined && isPrivate === undefined
+  ) {
     return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
   }
 
@@ -84,22 +87,24 @@ export async function PATCH(request: Request) {
   }
 
   const data: Record<string, any> = {};
-  if (userId !== undefined)   data.userId   = userId.trim();
-  if (email !== undefined)    data.email    = email?.trim()  || null;
-  if (mobile !== undefined)   data.mobile   = mobile?.trim() || null;
-  if (avatarUrl !== undefined) data.avatarUrl = avatarUrl    || null;
+  if (userId !== undefined)    data.userId    = userId.trim();
+  if (email !== undefined)     data.email     = email?.trim()  || null;
+  if (mobile !== undefined)    data.mobile    = mobile?.trim() || null;
+  if (avatarUrl !== undefined) data.avatarUrl = avatarUrl      || null;
+  if (isPrivate !== undefined) data.isPrivate = Boolean(isPrivate);
 
   try {
     const updated = await prisma.appUser.update({
       where: { id: appUser.id },
       data,
       select: {
-        id: true,
-        userId: true,
-        email: true,
-        mobile: true,
+        id:        true,
+        userId:    true,
+        email:     true,
+        mobile:    true,
         avatarUrl: true,
         olympiadId: true,
+        isPrivate:  true,
       },
     });
 

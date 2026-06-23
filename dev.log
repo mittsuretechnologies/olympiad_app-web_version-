@@ -1,0 +1,138 @@
+
+> olympiad-app@0.1.0 dev
+> next dev --turbo
+
+   ▲ Next.js 15.0.3 (Turbopack)
+   - Local:        http://localhost:3000
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 3.7s
+ ○ Compiling /api/credentials/students ...
+ ✓ Compiled /api/credentials/students in 3.1s
+ GET /api/credentials/students 200 in 4630ms
+ ○ Compiling /api/reels ...
+ ✓ Compiled /api/reels in 1121ms
+ GET /api/reels?limit=10&userId=af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 2185ms
+ ✓ Compiled /api/reels/[id]/view in 300ms
+ POST /api/reels/ca8f29de-d520-4ccc-9b9e-520d1f8abe05/view 200 in 2752ms
+ POST /api/reels/5ccb6597-b4f4-4d69-adb4-5d3ec019a5cf/view 200 in 1418ms
+ ✓ Compiled /api/app/me in 208ms
+ GET /api/app/me 200 in 1443ms
+ ✓ Compiled /api/reels/home in 167ms
+ GET /api/reels/home?userId=af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 3268ms
+ GET /api/reels?limit=10&userId=af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 2103ms
+ POST /api/reels/ca8f29de-d520-4ccc-9b9e-520d1f8abe05/view 200 in 1946ms
+ GET /api/app/me 200 in 827ms
+ ✓ Compiled /api/app/olympiad-video-slots in 219ms
+ GET /api/app/olympiad-video-slots 200 in 829ms
+ ✓ Compiled /api/app/users/[userId] in 229ms
+ GET /api/app/videos 200 in 1102ms
+ GET /api/app/users/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 2901ms
+ ✓ Compiled /api/app/follow-requests in 250ms
+ GET /api/app/follow-requests 200 in 666ms
+ POST /api/reels/5ccb6597-b4f4-4d69-adb4-5d3ec019a5cf/view 200 in 1572ms
+ POST /api/reels/fce4d531-00fe-4841-b2f6-8b339dc3114f/view 200 in 1087ms
+ POST /api/reels/7092cb3d-a6f7-4b2e-be87-ce9cfd5f90b2/view 200 in 1491ms
+ POST /api/reels/afe37d2d-fe16-47b7-89b8-d8ceac77007c/view 200 in 1460ms
+ POST /api/reels/fcffc724-a4c7-4726-b81c-00f7d336aa74/view 200 in 1424ms
+ POST /api/reels/99e05dd8-118f-4093-ab3f-7d585b5e4e13/view 200 in 1463ms
+ POST /api/reels/2a55512e-983d-4aeb-b0fc-f57a53954984/view 200 in 1536ms
+ GET /api/credentials/students 200 in 746ms
+ GET /api/credentials/students 200 in 526ms
+ ✓ Compiled /api/app/login in 337ms
+ POST /api/app/login 200 in 1040ms
+ GET /api/reels/home?userId=922bbeb1-0637-4a76-8547-ed1d83bdd84e 200 in 3292ms
+ POST /api/reels/2a55512e-983d-4aeb-b0fc-f57a53954984/view 200 in 1471ms
+ GET /api/reels?limit=10&userId=922bbeb1-0637-4a76-8547-ed1d83bdd84e 200 in 1792ms
+ POST /api/reels/ca8f29de-d520-4ccc-9b9e-520d1f8abe05/view 200 in 2238ms
+ POST /api/reels/5ccb6597-b4f4-4d69-adb4-5d3ec019a5cf/view 200 in 1516ms
+ POST /api/reels/fce4d531-00fe-4841-b2f6-8b339dc3114f/view 200 in 1642ms
+ POST /api/reels/7092cb3d-a6f7-4b2e-be87-ce9cfd5f90b2/view 200 in 1776ms
+ GET /api/app/videos 200 in 888ms
+ GET /api/app/users/922bbeb1-0637-4a76-8547-ed1d83bdd84e 200 in 2245ms
+ ✓ Compiled /api/app/search in 266ms
+ GET /api/app/search?q=suraj 200 in 2306ms
+ GET /api/app/users/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 2165ms
+ GET /api/credentials/students 200 in 746ms
+ GET /api/credentials/students 200 in 1115ms
+ POST /api/app/login 200 in 797ms
+ GET /api/reels/home?userId=af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 1987ms
+ GET /api/app/videos 200 in 1023ms
+ GET /api/app/users/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 2014ms
+ GET /api/app/me 200 in 1041ms
+ GET /api/reels/home?userId=af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 2190ms
+ GET /api/app/videos 200 in 1388ms
+ GET /api/app/users/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 1964ms
+ GET /api/app/follow-requests 200 in 592ms
+ ✓ Compiled /api/app/follow-requests/[requestId] in 238ms
+ PATCH /api/app/follow-requests/780bf559-0420-4cb7-9186-600e04684e14 200 in 2267ms
+ ✓ Compiled /api/app/send-otp in 232ms
+[DEV] OTP for demo@gmail.com: 449192
+ POST /api/app/send-otp 200 in 997ms
+ ✓ Compiled /api/app/verify-otp-register in 259ms
+ POST /api/app/verify-otp-register 200 in 1518ms
+ GET /api/reels/home?userId=8abb69d7-6652-410e-af3e-0b2649898452 200 in 1983ms
+ GET /api/reels?limit=10&userId=8abb69d7-6652-410e-af3e-0b2649898452 200 in 1168ms
+ POST /api/reels/ca8f29de-d520-4ccc-9b9e-520d1f8abe05/view 200 in 1886ms
+ ✓ Compiled /api/reels/[id]/like in 197ms
+ POST /api/reels/ca8f29de-d520-4ccc-9b9e-520d1f8abe05/like 200 in 3522ms
+ POST /api/reels/5ccb6597-b4f4-4d69-adb4-5d3ec019a5cf/view 200 in 1539ms
+ GET /api/app/search?q=About%20Myself 200 in 1383ms
+ GET /api/app/me 200 in 320ms
+ GET /api/app/search?q=s 200 in 2866ms
+ GET /api/app/search?q=suraj 200 in 1910ms
+ GET /api/app/users/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 1865ms
+ ✓ Compiled /api/app/follow/[targetId] in 232ms
+ POST /api/app/follow/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 3019ms
+ GET /api/app/search?q=leno 200 in 1294ms
+ POST /api/reels/fce4d531-00fe-4841-b2f6-8b339dc3114f/view 200 in 1365ms
+ POST /api/reels/afe37d2d-fe16-47b7-89b8-d8ceac77007c/view 200 in 1123ms
+ POST /api/reels/7092cb3d-a6f7-4b2e-be87-ce9cfd5f90b2/view 200 in 1658ms
+ GET /api/app/videos 200 in 1350ms
+ GET /api/app/users/8abb69d7-6652-410e-af3e-0b2649898452 200 in 2183ms
+ GET /api/credentials/students 200 in 2222ms
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+ GET /api/credentials/students 200 in 2243ms
+ GET /api/credentials/students 200 in 3400ms
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+ GET /api/credentials/students 200 in 1405ms
+ GET /api/credentials/students 200 in 622ms
+ GET /api/credentials/students 200 in 562ms
+ GET /api/app/search?q=About%20Myself 200 in 2727ms
+ GET /api/app/search?q=lenovo 200 in 2809ms
+ ✓ Compiled /api/school/videos in 185ms
+ GET /api/school/videos?schoolId=f4f4d51b-7360-496b-b2eb-69efcca90553 200 in 1186ms
+ GET /api/app/search?q=sura 200 in 3128ms
+ GET /api/app/search?q=suraj 200 in 1638ms
+ GET /api/app/users/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 2275ms
+ POST /api/reels/99e05dd8-118f-4093-ab3f-7d585b5e4e13/view 200 in 1061ms
+ POST /api/reels/fcffc724-a4c7-4726-b81c-00f7d336aa74/view 200 in 2269ms
+ GET /api/app/me 200 in 935ms
+ GET /api/reels/home?userId=8abb69d7-6652-410e-af3e-0b2649898452 200 in 2090ms
+ GET /api/reels?limit=10&userId=8abb69d7-6652-410e-af3e-0b2649898452 200 in 1651ms
+ POST /api/reels/ca8f29de-d520-4ccc-9b9e-520d1f8abe05/view 200 in 3201ms
+ POST /api/reels/fce4d531-00fe-4841-b2f6-8b339dc3114f/view 200 in 1031ms
+ POST /api/reels/5ccb6597-b4f4-4d69-adb4-5d3ec019a5cf/view 200 in 2230ms
+ POST /api/reels/7092cb3d-a6f7-4b2e-be87-ce9cfd5f90b2/view 200 in 3022ms
+ POST /api/reels/afe37d2d-fe16-47b7-89b8-d8ceac77007c/view 200 in 1834ms
+ POST /api/reels/fcffc724-a4c7-4726-b81c-00f7d336aa74/view 200 in 1310ms
+ POST /api/reels/99e05dd8-118f-4093-ab3f-7d585b5e4e13/view 200 in 1482ms
+ GET /api/app/me 200 in 321ms
+ GET /api/app/search?q=About%20Myself 200 in 1760ms
+ GET /api/app/search?q=sura 200 in 3833ms
+ GET /api/app/users/af62866e-c4ec-4893-8276-7ffd57f41fbf 200 in 1308ms
+ GET /api/app/videos 200 in 600ms
+ GET /api/app/users/8abb69d7-6652-410e-af3e-0b2649898452 200 in 1011ms
+ GET /api/credentials/students 200 in 556ms
+ ✓ Compiled /api/app/upload-video in 245ms
+ POST /api/app/upload-video 200 in 8159ms
+ POST /api/app/videos 201 in 566ms
+ GET /api/credentials/students 200 in 559ms
+ ○ Compiling /dashboard/videos ...
