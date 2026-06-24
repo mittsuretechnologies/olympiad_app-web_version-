@@ -88,6 +88,9 @@ export async function DELETE(
     if (allocation.schoolId !== payload.id) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     if (allocation.student) return NextResponse.json({ message: 'Cannot unassign — student already registered' }, { status: 409 });
 
+    // If an app account was created via Allot Student, remove it too so the ID becomes available again
+    await prisma.appUser.deleteMany({ where: { olympiadId: code } });
+
     await prisma.olympiadIdAllocation.update({
       where: { code },
       data: { assignedName: null, assignedAt: null },

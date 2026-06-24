@@ -35,13 +35,14 @@ export async function GET(request: Request) {
     const codes = allocations.map(a => a.code);
     const appUsers = await prisma.appUser.findMany({
       where: { olympiadId: { in: codes } },
-      select: { olympiadId: true },
+      select: { olympiadId: true, mobile: true },
     });
-    const appUserCodes = new Set(appUsers.map(u => u.olympiadId!));
+    const appUserByCode = new Map(appUsers.map(u => [u.olympiadId!, u]));
 
     const result = allocations.map(a => ({
       ...a,
-      hasAppUser: appUserCodes.has(a.code),
+      hasAppUser: appUserByCode.has(a.code),
+      appUserPhone: appUserByCode.get(a.code)?.mobile ?? null,
     }));
 
     return NextResponse.json(result);
