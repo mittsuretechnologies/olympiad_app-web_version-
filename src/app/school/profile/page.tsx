@@ -1,11 +1,7 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
-import {
-  School as SchoolIcon, MapPin, Phone, Mail, User,
-  Hash, Building2, Loader2, CheckCircle2, AlertCircle,
-  Calendar, ShieldCheck
-} from 'lucide-react';
+import { School as SchoolIcon, MapPin, Loader2, AlertCircle, ShieldCheck } from 'lucide-react';
 
 interface SchoolProfile {
   id: string;
@@ -24,18 +20,13 @@ interface SchoolProfile {
   createdAt: string;
 }
 
-function InfoRow({ icon: Icon, label, value }: { icon: any; label: string; value: string | null | undefined }) {
+function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
-    <div className="flex items-start gap-3 py-3 border-b border-gray-100 last:border-0">
-      <div className="w-7 h-7 rounded-lg bg-[#E8EAF6] flex items-center justify-center flex-shrink-0 mt-0.5">
-        <Icon size={13} className="text-black" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-0.5">{label}</p>
-        <p className="text-sm font-semibold text-black break-words">
-          {value || <span className="text-gray-300 font-normal italic">Not provided</span>}
-        </p>
-      </div>
+    <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 last:border-0">
+      <span className="text-[11px] text-gray-600 font-medium">{label}</span>
+      <span className="text-sm font-medium text-gray-900 text-right">
+        {value || <span className="text-gray-400 font-normal">— Not provided —</span>}
+      </span>
     </div>
   );
 }
@@ -61,89 +52,95 @@ export default function SchoolProfilePage() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] gap-3">
-        <Loader2 className="w-7 h-7 animate-spin text-black" />
-        <p className="text-sm text-gray-400">Loading profile...</p>
+      <div className="bg-white border border-gray-300 py-20 flex flex-col items-center gap-3">
+        <Loader2 className="w-5 h-5 animate-spin text-[#06013E]" />
+        <p className="text-sm text-gray-500">Loading profile...</p>
       </div>
     );
   }
 
   if (error || !profile) {
     return (
-      <div className="bg-white border border-red-200 p-8 text-center">
-        <AlertCircle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-        <p className="text-red-600 text-sm">{error || 'Profile unavailable'}</p>
+      <div className="bg-white border border-red-300 py-16 text-center text-red-700 text-sm">
+        {error || 'Profile unavailable'}
       </div>
     );
   }
 
   return (
-    <div className="space-y-5 max-w-4xl">
+    <div className="space-y-3">
 
-      {/* Header */}
-      <div className="bg-[#E8EAF6] text-[#06013E] px-6 py-4 border-b-4 border-[#FF9000] flex items-center gap-4">
-        <div className="w-14 h-14 rounded-xl bg-[#06013E]/10 border border-[#06013E]/20 flex items-center justify-center flex-shrink-0">
-          <SchoolIcon size={28} className="text-[#FF9000]" />
+      {/* Title bar */}
+      <div className="bg-white border border-gray-300">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-300 bg-[#F4F5F7]">
+          <div className="flex items-center gap-2">
+            <SchoolIcon size={15} className="text-[#06013E]" />
+            <h1 className="text-[13px] font-bold text-[#06013E] uppercase tracking-wide">School Profile Record</h1>
+          </div>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold border ${
+            profile.isActive ? 'text-green-700 border-green-300 bg-green-50' : 'text-red-700 border-red-300 bg-red-50'
+          }`}>
+            {profile.isActive ? 'ACTIVE' : 'INACTIVE'}
+          </span>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-[#06013E]/40 mb-0.5">School Profile</p>
-          <h1 className="text-lg font-black truncate">{profile.name}</h1>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="text-xs text-[#06013E]/50 font-mono">{profile.schoolId}</span>
-            <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded ${
-              profile.isActive ? 'bg-green-500/20 text-green-700' : 'bg-red-500/20 text-red-700'
-            }`}>
-              {profile.isActive ? <><CheckCircle2 size={9} /> Active</> : <><AlertCircle size={9} /> Inactive</>}
-            </span>
+
+        {/* Identity strip */}
+        <div className="flex flex-wrap divide-x divide-gray-200">
+          <div className="px-4 py-2.5 flex items-center justify-between min-w-[200px]">
+            <span className="text-[11px] text-gray-600 font-medium">School Name</span>
+            <span className="text-sm font-bold text-[#06013E]">{profile.name}</span>
+          </div>
+          <div className="px-4 py-2.5 flex items-center justify-between min-w-[160px]">
+            <span className="text-[11px] text-gray-600 font-medium">School ID</span>
+            <span className="text-sm font-bold text-[#06013E] font-mono">{profile.schoolId}</span>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
 
         {/* Identity */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <ShieldCheck size={13} className="text-black" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-black">School Identity</h2>
+        <div className="bg-white border border-gray-300">
+          <div className="px-4 py-2.5 border-b border-gray-300 bg-[#F4F5F7] flex items-center gap-2">
+            <ShieldCheck size={13} className="text-[#06013E]" />
+            <h2 className="text-[12px] font-bold uppercase tracking-wide text-[#06013E]">School Identity</h2>
           </div>
-          <div className="px-5">
-            <InfoRow icon={Hash} label="School ID (Login)" value={profile.schoolId} />
-            <InfoRow icon={Building2} label="CRM / Olympiad ID" value={profile.olympiadId} />
-            <InfoRow icon={SchoolIcon} label="School Name" value={profile.name} />
-            <InfoRow icon={User} label="Contact Person" value={profile.contactPerson} />
-            <InfoRow icon={Calendar} label="Registered On" value={
+          <div>
+            <InfoRow label="School ID (Login)" value={profile.schoolId} />
+            <InfoRow label="CRM / Olympiad ID" value={profile.olympiadId} />
+            <InfoRow label="School Name" value={profile.name} />
+            <InfoRow label="Contact Person" value={profile.contactPerson} />
+            <InfoRow label="Registered On" value={
               new Date(profile.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' })
             } />
           </div>
         </div>
 
         {/* Contact & Location */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <MapPin size={13} className="text-black" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-black">Contact & Location</h2>
+        <div className="bg-white border border-gray-300">
+          <div className="px-4 py-2.5 border-b border-gray-300 bg-[#F4F5F7] flex items-center gap-2">
+            <MapPin size={13} className="text-[#06013E]" />
+            <h2 className="text-[12px] font-bold uppercase tracking-wide text-[#06013E]">Contact &amp; Location</h2>
           </div>
-          <div className="px-5">
-            <InfoRow icon={Phone} label="Phone" value={profile.phone} />
-            <InfoRow icon={Mail} label="Email" value={profile.email} />
-            <InfoRow icon={MapPin} label="Address" value={profile.address} />
-            <InfoRow icon={Building2} label="City" value={profile.city} />
-            <InfoRow icon={Building2} label="District" value={profile.district} />
-            <InfoRow icon={Building2} label="State" value={profile.state} />
-            <InfoRow icon={Hash} label="Pincode" value={profile.pincode} />
+          <div>
+            <InfoRow label="Phone" value={profile.phone} />
+            <InfoRow label="Email" value={profile.email} />
+            <InfoRow label="Address" value={profile.address} />
+            <InfoRow label="City" value={profile.city} />
+            <InfoRow label="District" value={profile.district} />
+            <InfoRow label="State" value={profile.state} />
+            <InfoRow label="Pincode" value={profile.pincode} />
           </div>
         </div>
       </div>
 
       {/* Notice */}
-      <div className="bg-[#E8EAF6] border border-[#06013E]/10 px-5 py-4 flex items-start gap-3">
-        <AlertCircle size={14} className="text-black/50 flex-shrink-0 mt-0.5" />
-        <p className="text-xs text-black/60 leading-relaxed">
+      <div className="bg-white border border-gray-300 px-4 py-3 flex items-start gap-2.5">
+        <AlertCircle size={14} className="text-gray-500 flex-shrink-0 mt-0.5" />
+        <p className="text-xs text-gray-600 leading-relaxed">
           To update any school details, please contact your Mittsure coordinator. Schools cannot self-edit profile information.
         </p>
       </div>
     </div>
   );
 }
-

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Video as VideoIcon, User, School, CheckCircle, X, Star, Loader2 } from 'lucide-react';
+import { Video as VideoIcon, User, School, CheckCircle, X, Star, Loader2, LayoutGrid } from 'lucide-react';
 
 interface QueueVideo {
   id: string;
@@ -47,6 +47,8 @@ export default function EvaluateContentPage() {
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [columns, setColumns] = useState(3);
+  const [activeColor, setActiveColor] = useState('bg-blue-50');
 
   const fetchQueue = () => {
     setLoading(true);
@@ -58,8 +60,9 @@ export default function EvaluateContentPage() {
 
   useEffect(() => { fetchQueue(); }, []);
 
-  const openVideo = (v: QueueVideo) => {
+  const openVideo = (v: QueueVideo, color: string) => {
     setActive(v);
+    setActiveColor(color);
     setScores(emptyScores);
     setRemarks('');
     setError('');
@@ -88,15 +91,50 @@ export default function EvaluateContentPage() {
     }
   };
 
+  const CARD_COLORS = ['bg-blue-50', 'bg-rose-50', 'bg-amber-50', 'bg-emerald-50', 'bg-violet-50', 'bg-cyan-50'];
+  const HEADER_COLORS: Record<string, string> = {
+    'bg-blue-50': 'bg-blue-100',
+    'bg-rose-50': 'bg-rose-100',
+    'bg-amber-50': 'bg-amber-100',
+    'bg-emerald-50': 'bg-emerald-100',
+    'bg-violet-50': 'bg-violet-100',
+    'bg-cyan-50': 'bg-cyan-100',
+  };
+
+  const GRID_COLS_CLASS: Record<number, string> = {
+    2: 'grid-cols-1 sm:grid-cols-2',
+    3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+    4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+    5: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-5',
+    6: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-6',
+    7: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-7',
+  };
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-medium text-[#004f9f]">Evaluate Content</h1>
-        <p className="text-sm text-gray-400 mt-1">Score olympiad participation videos out of 100 (5 criteria × 20 marks).</p>
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-medium text-[#004f9f]">Evaluate Content</h1>
+          <p className="text-sm text-gray-400 mt-1">Score olympiad participation videos out of 100 (5 criteria × 20 marks).</p>
+        </div>
+        <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1">
+          <LayoutGrid size={14} className="text-gray-400 ml-1.5" />
+          {[2, 3, 4, 5, 6, 7].map(n => (
+            <button
+              key={n}
+              onClick={() => setColumns(n)}
+              className={`w-7 h-7 rounded-lg text-xs font-bold transition-colors ${
+                columns === n ? 'bg-[#004f9f] text-white' : 'text-gray-500 hover:bg-gray-100'
+              }`}
+            >
+              {n}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className={`grid ${GRID_COLS_CLASS[columns]} gap-4`}>
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-56 bg-gray-100 rounded-2xl animate-pulse" />
           ))}
@@ -110,10 +148,10 @@ export default function EvaluateContentPage() {
           <p className="text-sm text-gray-400 max-w-sm">No olympiad videos pending evaluation right now.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {queue.map(v => (
-            <button key={v.id} onClick={() => openVideo(v)}
-              className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden text-left hover:shadow-md hover:border-[#004f9f]/20 transition-all group">
+        <div className={`grid ${GRID_COLS_CLASS[columns]} gap-4`}>
+          {queue.map((v, i) => (
+            <button key={v.id} onClick={() => openVideo(v, CARD_COLORS[i % CARD_COLORS.length])}
+              className="border border-gray-100 rounded-2xl shadow-sm overflow-hidden text-left hover:shadow-md hover:border-[#004f9f]/20 transition-all group">
               <div className="relative aspect-video bg-gray-900 flex items-center justify-center overflow-hidden">
                 {v.thumbnailUrl ? (
                   <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -122,7 +160,7 @@ export default function EvaluateContentPage() {
                 )}
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
               </div>
-              <div className="p-4">
+              <div className={`p-4 ${CARD_COLORS[i % CARD_COLORS.length]}`}>
                 <p className="text-xs font-bold text-[#004f9f] uppercase tracking-wide truncate">{v.category}</p>
                 <p className="text-sm text-gray-700 font-semibold truncate mt-0.5">{v.subCategory}</p>
                 <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
@@ -141,9 +179,9 @@ export default function EvaluateContentPage() {
 
       {/* Evaluation modal */}
       {active && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !submitting && setActive(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 left-72 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !submitting && setActive(null)}>
+          <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto ${activeColor}`} onClick={e => e.stopPropagation()}>
+            <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 z-10 ${HEADER_COLORS[activeColor] || activeColor}`}>
               <div>
                 <h2 className="text-base font-bold text-gray-800">{active.studentName} — {active.olympiadCode}</h2>
                 <p className="text-xs text-gray-400">{active.category} · {active.subCategory}</p>

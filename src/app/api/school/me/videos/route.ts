@@ -25,7 +25,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { studentId, videoUrl, caption, category, subCategory, tags, isPublic } =
+    const { studentId, videoUrl, thumbnailUrl, caption, category, subCategory, tags, isPublic } =
       await request.json();
 
     if (!studentId || !videoUrl || !category || !subCategory) {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       const newVideo = await prisma.video.create({
         data: {
           studentId,
-          videoUrl, caption, category, subCategory,
+          videoUrl, thumbnailUrl, caption, category, subCategory,
           tags: mergedTags,
           isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
           isEvaluation,
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     const newVideo = await prisma.video.create({
       data: {
         appUserId: studentId,
-        videoUrl, caption, category, subCategory,
+        videoUrl, thumbnailUrl, caption, category, subCategory,
         tags: mergedTags,
         isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
         isEvaluation,

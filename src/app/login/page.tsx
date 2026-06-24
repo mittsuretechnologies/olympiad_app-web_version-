@@ -194,6 +194,7 @@ export default function LoginPage() {
         localStorage.setItem('evaluatorData', JSON.stringify(data.user));
       } else {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('adminUser', JSON.stringify(data.user));
       }
 
       router.push(data.redirect || '/dashboard');

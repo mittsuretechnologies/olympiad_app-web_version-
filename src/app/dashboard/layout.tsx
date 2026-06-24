@@ -36,6 +36,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const [role, setRole] = useState<Role>('SUPERADMIN');
   const [allowedModules, setAllowedModules] = useState<string[] | null>(null); // null = superadmin (all)
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -48,10 +49,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     setRole(detectedRole);
 
+    const adminData = localStorage.getItem('adminUser');
+    const reviewerData = localStorage.getItem('reviewerData');
+    const evaluatorData = localStorage.getItem('evaluatorData');
+    try {
+      if (detectedRole === 'SUPERADMIN' && adminData) setCurrentUser(JSON.parse(adminData));
+      else if (detectedRole === 'REVIEWER' && reviewerData) setCurrentUser(JSON.parse(reviewerData));
+      else if (detectedRole === 'EVALUATOR' && evaluatorData) setCurrentUser(JSON.parse(evaluatorData));
+    } catch { /* ignore */ }
+
     if (detectedRole !== 'SUPERADMIN') {
       // get memberId from stored token data
-      const reviewerData = localStorage.getItem('reviewerData');
-      const evaluatorData = localStorage.getItem('evaluatorData');
       let memberId: string | null = null;
       try {
         if (detectedRole === 'REVIEWER' && reviewerData) memberId = JSON.parse(reviewerData).id;
@@ -311,7 +319,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
@@ -360,12 +368,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           </nav>
 
-          {/* Logout */}
-          <div className="mt-auto py-8">
-            <button onClick={handleLogout}
-              className="w-full flex items-center gap-3 px-4 py-3 text-red-300 hover:bg-red-500/20 hover:text-red-200 rounded-xl transition-colors font-medium text-sm">
+          {/* Logged-in user + Logout */}
+          <div className="mt-auto py-3 flex items-center gap-2">
+            <div className="flex-1 min-w-0 rounded-xl bg-white/10 border border-white/10 p-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-[#FF9000] text-black font-black text-sm flex items-center justify-center flex-shrink-0">
+                  {(currentUser?.name || role).split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-white font-bold text-xs leading-tight truncate">{currentUser?.name || role}</p>
+                  <p className="text-white/50 text-[10px] truncate">{role}</p>
+                </div>
+                <div className="ml-auto flex-shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                </div>
+              </div>
+            </div>
+            <button onClick={handleLogout} title="Logout"
+              className="flex-shrink-0 p-3 text-red-300 hover:bg-red-500/20 hover:text-red-200 rounded-xl transition-colors">
               <LogOut size={18} />
-              <span>Logout</span>
             </button>
           </div>
         </div>

@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { spawn } from 'child_process';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const ffmpegPath: string = require('ffmpeg-static');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 const MAX_BYTES  = 150 * 1024 * 1024; // 150 MB
@@ -20,6 +23,25 @@ function getSchoolFromToken(request: Request) {
   } catch {
     return null;
   }
+}
+
+function extractThumbnail(videoPath: string, thumbPath: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ffmpegPath, [
+      '-ss', '00:00:01',
+      '-i', videoPath,
+      '-frames:v', '1',
+      '-vf', 'scale=640:-1',
+      '-q:v', '3',
+      '-y',
+      thumbPath,
+    ]);
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  });
 }
 
 export async function POST(request: Request) {
@@ -44,9 +66,12 @@ export async function POST(request: Request) {
     }
 
     const ext       = (file.name.split('.').pop() || 'mp4').toLowerCase();
-    const fileName  = `${Date.now()}_school_${school.id.slice(0, 8)}.${ext}`;
+    const baseName  = `${Date.now()}_school_${school.id.slice(0, 8)}`;
+    const fileName  = `${baseName}.${ext}`;
+    const thumbName = `${baseName}_thumb.jpg`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'videos', studentId);
     const filePath  = path.join(uploadDir, fileName);
+    const thumbPath = path.join(uploadDir, thumbName);
 
     await mkdir(uploadDir, { recursive: true });
 
@@ -55,8 +80,16 @@ export async function POST(request: Request) {
 
     const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
     const videoUrl  = `${serverUrl}/uploads/videos/${studentId}/${fileName}`;
+    let thumbnailUrl: string | null = null;
 
-    return NextResponse.json({ videoUrl }, { status: 200 });
+    try {
+      await extractThumbnail(filePath, thumbPath);
+      thumbnailUrl = `${serverUrl}/uploads/videos/${studentId}/${thumbName}`;
+    } catch {
+      // thumbnail generation is best-effort; upload still succeeds without it
+    }
+
+    return NextResponse.json({ videoUrl, thumbnailUrl }, { status: 200 });
   } catch (error: any) {
     console.error('School upload route error:', error);
     return NextResponse.json({ error: error.message || 'Upload failed' }, { status: 500 });

@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw, Globe, EyeOff } from 'lucide-react';
@@ -22,8 +22,6 @@ const CATEGORIES = [
 type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
 type Slots = { slotA: boolean; slotB: boolean; rejectedA: boolean; rejectedB: boolean; approvedCount: number };
-
-const AVATAR_COLORS = ['bg-violet-500','bg-blue-500','bg-emerald-500','bg-rose-500','bg-amber-500','bg-cyan-500'];
 
 export default function UploadVideoPage() {
   const [students, setStudents]               = useState<Student[]>([]);
@@ -122,7 +120,7 @@ export default function UploadVideoPage() {
       });
       setProgress(60);
       if (!upRes.ok) throw new Error((await upRes.json()).error || 'Upload failed');
-      const { videoUrl } = await upRes.json();
+      const { videoUrl, thumbnailUrl } = await upRes.json();
 
       setUploadState('saving');
       setProgress(80);
@@ -130,7 +128,7 @@ export default function UploadVideoPage() {
       const metaRes = await fetch('/api/school/me/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, caption, category, subCategory, isPublic }),
+        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory, isPublic }),
       });
       setProgress(100);
       if (!metaRes.ok) throw new Error((await metaRes.json()).error || 'Save failed');
@@ -150,47 +148,41 @@ export default function UploadVideoPage() {
     setSlots(null);
   }
 
-  /* â”€â”€ Done screen â”€â”€ */
+  /* — Done screen — */
   if (uploadState === 'done') {
     const isEval = lastVideoMeta?.isEvaluation ?? true;
     return (
       <div className="min-h-[70vh] flex items-center justify-center p-6">
-        <div className="bg-white rounded-3xl shadow-xl p-10 text-center max-w-md w-full border border-gray-100">
-          <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-5">
-            <CheckCircle className="w-10 h-10 text-green-500" />
+        <div className="bg-white border border-gray-300 shadow-lg p-10 text-center max-w-md w-full">
+          <div className="w-16 h-16 border border-green-300 bg-green-50 flex items-center justify-center mx-auto mb-5">
+            <CheckCircle className="w-8 h-8 text-green-700" />
           </div>
-          <h2 className="text-2xl font-black text-gray-900 mb-1">Video Uploaded!</h2>
-          <p className="text-gray-500 text-sm mb-5">
+          <h2 className="text-xl font-bold text-gray-900 mb-1">Video Uploaded</h2>
+          <p className="text-gray-600 text-sm mb-5">
             For <span className="font-semibold text-gray-800">{selectedStudent?.name}</span>
             {lastVideoMeta?.subCategory ? ` · ${lastVideoMeta.subCategory}` : ''}
           </p>
 
           {isEval ? (
-            <div className="mx-auto mb-5 inline-flex flex-col items-center gap-2 bg-[#06013E]/5 border border-[#06013E]/20 rounded-2xl px-6 py-4">
-              <span className="text-xs font-bold uppercase tracking-widest text-black/50">Video Type</span>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-[#FF9000] animate-pulse flex-shrink-0" />
-                <span className="text-base font-black text-black">Olympiad Evaluation</span>
-              </div>
-              <p className="text-xs text-gray-400 leading-snug max-w-[220px]">
+            <div className="mx-auto mb-5 inline-flex flex-col items-center gap-1.5 bg-[#F4F5F7] border border-gray-300 px-6 py-4">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Video Type</span>
+              <span className="text-base font-bold text-[#06013E]">Olympiad Evaluation</span>
+              <p className="text-xs text-gray-500 leading-snug max-w-[220px]">
                 This video will be reviewed and scored as an olympiad participation entry.
               </p>
             </div>
           ) : (
-            <div className="mx-auto mb-5 inline-flex flex-col items-center gap-2 bg-blue-50 border border-blue-100 rounded-2xl px-6 py-4">
-              <span className="text-xs font-bold uppercase tracking-widest text-blue-400">Video Type</span>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-blue-400 flex-shrink-0" />
-                <span className="text-base font-black text-blue-700">General Feed</span>
-              </div>
-              <p className="text-xs text-gray-400 leading-snug max-w-[240px]">
+            <div className="mx-auto mb-5 inline-flex flex-col items-center gap-1.5 bg-gray-50 border border-gray-300 px-6 py-4">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-gray-500">Video Type</span>
+              <span className="text-base font-bold text-blue-700">General Feed</span>
+              <p className="text-xs text-gray-500 leading-snug max-w-[240px]">
                 This student already has 2 approved olympiad videos. This video will appear in the general public feed only.
               </p>
             </div>
           )}
 
-          <p className="text-xs text-gray-400 mb-7">Status will update after admin review.</p>
-          <button onClick={reset} className="bg-[#06013E] text-white px-8 py-3 rounded-xl font-semibold hover:bg-[#0a0258] transition-colors">
+          <p className="text-xs text-gray-500 mb-7">Status will update after admin review.</p>
+          <button onClick={reset} className="bg-[#06013E] text-white px-6 py-2.5 text-sm font-semibold hover:bg-[#100a52] transition-colors">
             Upload Another
           </button>
         </div>
@@ -198,77 +190,84 @@ export default function UploadVideoPage() {
     );
   }
 
-  /* â”€â”€ Main â”€â”€ */
+  /* — Main — */
   return (
-    <div className="min-h-screen bg-[#F6F9FF]">
-      <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-5">
+    <div className="space-y-3">
+      <div className="bg-white border border-gray-300">
+        <div className="flex items-center px-4 py-2.5 border-b border-gray-300 bg-[#F4F5F7]">
+          <Upload size={15} className="text-[#06013E] mr-2" />
+          <h1 className="text-[13px] font-bold text-[#06013E] uppercase tracking-wide">Upload Student Video</h1>
+        </div>
+      </div>
 
-          {/* â”€â”€ LEFT column (3/5) â”€â”€ */}
-          <div className="xl:col-span-3 space-y-5">
+      <form onSubmit={handleSubmit}>
+        <div className="grid grid-cols-1 xl:grid-cols-5 gap-3">
+
+          {/* — LEFT column (3/5) — */}
+          <div className="xl:col-span-3 space-y-3">
 
             {/* Student selector */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="text-sm font-bold text-gray-700 mb-3">
-                Select Student <span className="text-red-400">*</span>
+            <div className="bg-white border border-gray-300 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600 mb-2.5">
+                Select Student <span className="text-red-600">*</span>
               </p>
 
               {loadingStudents ? (
-                <div className="h-12 bg-gray-100 rounded-xl animate-pulse" />
+                <div className="h-11 bg-gray-50 border border-gray-300 animate-pulse" />
               ) : students.length === 0 ? (
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 border border-dashed border-gray-200 text-gray-400 text-sm">
+                <div className="flex items-center gap-3 px-4 py-3 border border-dashed border-gray-300 text-gray-500 text-sm">
                   <User className="w-4 h-4" /> No registered students found
                 </div>
               ) : (
                 <div className="relative">
                   <div
                     onClick={() => setShowDropdown(v => !v)}
-                    className="flex items-center gap-3 border border-gray-200 rounded-xl px-4 py-3 cursor-pointer hover:border-[#06013E]/30 transition-colors bg-white"
+                    className="flex items-center gap-3 border border-gray-300 px-4 py-2.5 cursor-pointer hover:border-[#06013E] transition-colors bg-white"
                   >
                     {selectedStudent ? (
                       <>
-                        <div className={`w-9 h-9 rounded-full ${AVATAR_COLORS[selectedStudent.name.charCodeAt(0) % AVATAR_COLORS.length]} text-white flex items-center justify-center font-black text-xs flex-shrink-0`}>
+                        <div className="w-8 h-8 border border-gray-300 bg-[#F4F5F7] text-[#06013E] flex items-center justify-center font-bold text-xs flex-shrink-0">
                           {selectedStudent.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 text-sm truncate">{selectedStudent.name}</p>
-                          <p className="text-xs text-gray-400">{selectedStudent.olympiadCode}{selectedStudent.className ? ` · ${selectedStudent.className}` : ''}</p>
+                          <p className="text-xs text-gray-500">{selectedStudent.olympiadCode}{selectedStudent.className ? ` · ${selectedStudent.className}` : ''}</p>
                         </div>
-                        <button type="button" onClick={e => { e.stopPropagation(); setSelectedStudent(null); }} className="text-gray-300 hover:text-gray-500 p-1">
+                        <button type="button" onClick={e => { e.stopPropagation(); setSelectedStudent(null); }} className="text-gray-400 hover:text-gray-600 p-1">
                           <X className="w-4 h-4" />
                         </button>
                       </>
                     ) : (
                       <>
-                        <User className="w-4 h-4 text-gray-300" />
-                        <span className="text-gray-400 text-sm flex-1">Choose a student...</span>
-                        <ChevronDown className="w-4 h-4 text-gray-300" />
+                        <User className="w-4 h-4 text-gray-400" />
+                        <span className="text-gray-500 text-sm flex-1">Choose a student...</span>
+                        <ChevronDown className="w-4 h-4 text-gray-400" />
                       </>
                     )}
                   </div>
 
                   {showDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-30 overflow-hidden">
-                      <div className="p-2 border-b border-gray-50">
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-400 shadow-lg z-30 overflow-hidden">
+                      <div className="p-2 border-b border-gray-200">
                         <input autoFocus type="text" placeholder="Search name or ID..."
                           value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-[#06013E]/40"
+                          className="w-full px-3 py-2 text-sm border border-gray-300 outline-none focus:border-[#06013E]"
                         />
                       </div>
                       <div className="max-h-56 overflow-y-auto">
                         {filtered.length === 0
-                          ? <p className="text-center text-gray-400 text-sm py-5">No students found</p>
+                          ? <p className="text-center text-gray-500 text-sm py-5">No students found</p>
                           : filtered.map(s => (
                             <button key={s.id} type="button"
                               onClick={() => { setSelectedStudent(s); setShowDropdown(false); setStudentSearch(''); }}
-                              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#F6F9FF] text-left transition-colors"
+                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 text-left transition-colors border-b border-gray-100 last:border-0"
                             >
-                              <div className={`w-8 h-8 rounded-full ${AVATAR_COLORS[s.name.charCodeAt(0) % AVATAR_COLORS.length]} text-white flex items-center justify-center font-black text-xs flex-shrink-0`}>
+                              <div className="w-7 h-7 border border-gray-300 bg-[#F4F5F7] text-[#06013E] flex items-center justify-center font-bold text-xs flex-shrink-0">
                                 {s.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
                               </div>
                               <div>
                                 <p className="font-medium text-gray-900 text-sm">{s.name}</p>
-                                <p className="text-xs text-gray-400">{s.olympiadCode}{s.className ? ` · ${s.className}` : ''}</p>
+                                <p className="text-xs text-gray-500">{s.olympiadCode}{s.className ? ` · ${s.className}` : ''}</p>
                               </div>
                             </button>
                           ))
@@ -283,11 +282,11 @@ export default function UploadVideoPage() {
               {selectedStudent && (
                 <div className="mt-3">
                   {slotsLoading ? (
-                    <div className="h-8 bg-gray-100 rounded-lg animate-pulse" />
+                    <div className="h-8 bg-gray-50 border border-gray-300 animate-pulse" />
                   ) : slots && (
                     isGeneralOnly ? (
-                      <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 text-xs text-blue-700 font-semibold">
-                        <CheckCircle className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                      <div className="flex items-center gap-2 bg-blue-50 border border-blue-300 px-3 py-2 text-xs text-blue-700 font-semibold">
+                        <CheckCircle className="w-3.5 h-3.5 text-blue-700 flex-shrink-0" />
                         Both olympiad slots filled — this video will go to General Feed
                       </div>
                     ) : (
@@ -295,14 +294,13 @@ export default function UploadVideoPage() {
                         {(['Cat A', 'Cat B'] as const).map((cat) => {
                           const status = getCatStatus(cat);
                           return (
-                            <div key={cat} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold border ${
-                              status === 'filled'    ? 'bg-green-50 border-green-200 text-green-700' :
-                              status === 'rejected'  ? 'bg-red-50 border-red-200 text-red-600' :
-                              'bg-gray-50 border-gray-200 text-gray-500'
+                            <div key={cat} className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold border ${
+                              status === 'filled'    ? 'bg-green-50 border-green-300 text-green-700' :
+                              status === 'rejected'  ? 'bg-red-50 border-red-300 text-red-700' :
+                              'bg-gray-50 border-gray-300 text-gray-600'
                             }`}>
                               {status === 'filled'   && <CheckCircle className="w-3 h-3" />}
                               {status === 'rejected' && <RefreshCw className="w-3 h-3" />}
-                              {status === 'available' && <span className="w-2 h-2 rounded-full bg-gray-300 inline-block" />}
                               {cat} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
                             </div>
                           );
@@ -315,22 +313,22 @@ export default function UploadVideoPage() {
             </div>
 
             {/* Video drop zone */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="text-sm font-bold text-gray-700 mb-3">
-                Video File <span className="text-red-400">*</span>
+            <div className="bg-white border border-gray-300 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600 mb-2.5">
+                Video File <span className="text-red-600">*</span>
               </p>
 
               {videoPreview ? (
-                <div className="relative rounded-xl overflow-hidden bg-black">
+                <div className="relative border border-gray-300 overflow-hidden bg-black">
                   <video src={videoPreview} controls className="w-full max-h-64 object-contain" />
                   <button type="button" onClick={() => { setVideoFile(null); setVideoPreview(null); }}
-                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-black/80 transition-colors">
+                    className="absolute top-2 right-2 bg-black/60 text-white p-1.5 hover:bg-black/80 transition-colors">
                     <X className="w-4 h-4" />
                   </button>
                   <div className="mt-2 flex items-center gap-2 px-1">
-                    <Video className="w-3.5 h-3.5 text-gray-400 flex-shrink-0" />
-                    <p className="text-xs text-gray-500 truncate">{videoFile?.name}</p>
-                    <span className="text-xs text-gray-400 flex-shrink-0">· {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB</span>
+                    <Video className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                    <p className="text-xs text-gray-600 truncate">{videoFile?.name}</p>
+                    <span className="text-xs text-gray-500 flex-shrink-0">· {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB</span>
                   </div>
                 </div>
               ) : (
@@ -339,17 +337,17 @@ export default function UploadVideoPage() {
                   onDragLeave={() => setDragOver(false)}
                   onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`rounded-xl border-2 border-dashed p-12 text-center cursor-pointer transition-all ${
-                    dragOver ? 'border-[#06013E] bg-[#06013E]/5 scale-[1.01]' : 'border-gray-200 hover:border-[#06013E]/30 hover:bg-[#F6F9FF]'
+                  className={`border-2 border-dashed p-12 text-center cursor-pointer transition-all ${
+                    dragOver ? 'border-[#06013E] bg-[#F4F5F7]' : 'border-gray-300 hover:border-[#06013E] hover:bg-gray-50'
                   }`}
                 >
-                  <div className={`w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center transition-all ${dragOver ? 'bg-[#06013E] text-white' : 'bg-gray-100 text-gray-400'}`}>
-                    <Upload className="w-6 h-6" />
+                  <div className={`w-12 h-12 mx-auto mb-3 flex items-center justify-center border transition-all ${dragOver ? 'bg-[#06013E] text-white border-[#06013E]' : 'bg-gray-50 text-gray-500 border-gray-300'}`}>
+                    <Upload className="w-5 h-5" />
                   </div>
-                  <p className="font-semibold text-gray-600 text-sm mb-1">
-                    {dragOver ? 'Drop it here!' : 'Click to select or drag & drop'}
+                  <p className="font-semibold text-gray-700 text-sm mb-1">
+                    {dragOver ? 'Drop it here' : 'Click to select or drag & drop'}
                   </p>
-                  <p className="text-xs text-gray-400">MP4, MOV, AVI · Max 150 MB</p>
+                  <p className="text-xs text-gray-500">MP4, MOV, AVI · Max 150 MB</p>
                   <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
                 </div>
@@ -357,27 +355,27 @@ export default function UploadVideoPage() {
             </div>
 
             {/* Caption */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="text-sm font-bold text-gray-700 mb-3">Caption</p>
+            <div className="bg-white border border-gray-300 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600 mb-2.5">Caption</p>
               <textarea
                 value={caption} onChange={e => setCaption(e.target.value)}
                 placeholder="Add a description for this video..."
                 rows={3}
-                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 placeholder-gray-300 outline-none focus:border-[#06013E]/40 resize-none transition-colors"
+                className="w-full border border-gray-300 px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-[#06013E] resize-none transition-colors"
               />
             </div>
           </div>
 
-          {/* â”€â”€ RIGHT column (2/5) â”€â”€ */}
-          <div className="xl:col-span-2 space-y-5">
+          {/* — RIGHT column (2/5) — */}
+          <div className="xl:col-span-2 space-y-3">
 
             {/* Visibility */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="text-sm font-bold text-gray-700 mb-3">Visibility</p>
+            <div className="bg-white border border-gray-300 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600 mb-2.5">Visibility</p>
               <div className="space-y-2">
                 {[
-                  { val: true,  icon: Globe,   label: 'Public',  desc: 'Anyone on TalentOlympiad can see this video', iconColor: 'text-blue-600', iconBg: 'bg-blue-50' },
-                  { val: false, icon: EyeOff,  label: 'Private', desc: 'Only reviewers and school can see this video',  iconColor: 'text-purple-600', iconBg: 'bg-purple-50' },
+                  { val: true,  icon: Globe,   label: 'Public',  desc: 'Anyone on TalentOlympiad can see this video' },
+                  { val: false, icon: EyeOff,  label: 'Private', desc: 'Only reviewers and school can see this video' },
                 ].map(opt => {
                   const Icon = opt.icon;
                   const active = isPublic === opt.val;
@@ -386,19 +384,17 @@ export default function UploadVideoPage() {
                       key={String(opt.val)}
                       type="button"
                       onClick={() => setIsPublic(opt.val)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all ${
-                        active ? 'border-[#06013E] bg-[#06013E]/5' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                      className={`w-full flex items-center gap-3 px-3 py-2.5 border text-left transition-all ${
+                        active ? 'border-[#06013E] bg-[#F4F5F7]' : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
                       }`}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${opt.iconBg}`}>
-                        <Icon className={`w-4 h-4 ${opt.iconColor}`} />
-                      </div>
+                      <Icon className="w-4 h-4 text-gray-600 flex-shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold ${active ? 'text-[#004f9f]' : 'text-gray-700'}`}>{opt.label}</p>
-                        <p className="text-xs text-gray-400 mt-0.5">{opt.desc}</p>
+                        <p className={`text-sm font-semibold ${active ? 'text-[#06013E]' : 'text-gray-700'}`}>{opt.label}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
                       </div>
-                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 ${active ? 'border-[#06013E] bg-[#06013E]' : 'border-gray-300'}`}>
-                        {active && <div className="w-2 h-2 rounded-full bg-white" />}
+                      <div className={`w-4 h-4 border flex items-center justify-center flex-shrink-0 ${active ? 'border-[#06013E] bg-[#06013E]' : 'border-gray-300'}`}>
+                        {active && <div className="w-1.5 h-1.5 bg-white" />}
                       </div>
                     </button>
                   );
@@ -408,20 +404,20 @@ export default function UploadVideoPage() {
 
             {/* General feed notice */}
             {isGeneralOnly && (
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 text-sm text-blue-700">
-                <p className="font-bold mb-1">General Feed Upload</p>
-                <p className="text-xs text-blue-500 leading-relaxed">
+              <div className="bg-blue-50 border border-blue-300 p-3.5 text-sm text-blue-700">
+                <p className="font-bold mb-1 text-xs uppercase tracking-wide">General Feed Upload</p>
+                <p className="text-xs text-blue-700 leading-relaxed">
                   This student has 2 approved olympiad videos. Any further uploads will go to the general feed — not olympiad evaluation.
                 </p>
               </div>
             )}
 
             {/* Category */}
-            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-              <p className="text-sm font-bold text-gray-700 mb-3">
-                Category <span className="text-red-400">*</span>
+            <div className="bg-white border border-gray-300 p-4">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600 mb-2.5">
+                Category <span className="text-red-600">*</span>
               </p>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {CATEGORIES.map(cat => {
                   const Icon = cat.icon;
                   const isSelected = category === cat.value;
@@ -439,37 +435,31 @@ export default function UploadVideoPage() {
                         setCategory(isSelected ? '' : cat.value);
                         setSubCategory('');
                       }}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 text-left transition-all ${
+                      className={`w-full flex items-center gap-3 px-3 py-3 border text-left transition-all ${
                         isFilled
-                          ? 'border-green-200 bg-green-50 opacity-60 cursor-not-allowed'
+                          ? 'border-green-300 bg-green-50 opacity-60 cursor-not-allowed'
                           : isSelected
-                            ? 'border-[#06013E] bg-[#06013E]/5'
-                            : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
+                            ? 'border-[#06013E] bg-[#F4F5F7]'
+                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
                       }`}
                     >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                        isFilled ? 'bg-green-100' : cat.value === 'Cat A' ? 'bg-purple-100' : 'bg-orange-100'
-                      }`}>
-                        {isFilled
-                          ? <Lock className="w-4 h-4 text-green-600" />
-                          : <Icon className={`w-4 h-4 ${cat.value === 'Cat A' ? 'text-purple-600' : 'text-orange-500'}`} />
-                        }
-                      </div>
+                      {isFilled
+                        ? <Lock className="w-4 h-4 text-green-700 flex-shrink-0" />
+                        : <Icon className="w-4 h-4 text-gray-600 flex-shrink-0" />
+                      }
                       <div className="flex-1 min-w-0">
                         <span className={`text-sm font-semibold leading-tight block ${
-                          isFilled ? 'text-green-700' : isSelected ? 'text-black' : 'text-gray-600'
+                          isFilled ? 'text-green-700' : isSelected ? 'text-[#06013E]' : 'text-gray-700'
                         }`}>
                           {cat.label}
                         </span>
-                        {isFilled && <span className="text-[11px] text-green-600">Already submitted</span>}
-                        {isRejected && !isFilled && <span className="text-[11px] text-red-500 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5" /> Re-upload available</span>}
+                        {isFilled && <span className="text-[11px] text-green-700">Already submitted</span>}
+                        {isRejected && !isFilled && <span className="text-[11px] text-red-700 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5" /> Re-upload available</span>}
                       </div>
                       {isFilled
-                        ? <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
+                        ? <CheckCircle className="w-4 h-4 text-green-700 flex-shrink-0" />
                         : isSelected
-                          ? <div className="w-5 h-5 rounded-full bg-[#06013E] flex items-center justify-center flex-shrink-0">
-                              <CheckCircle className="w-3 h-3 text-white" />
-                            </div>
+                          ? <CheckCircle className="w-4 h-4 text-[#06013E] flex-shrink-0" />
                           : null
                       }
                     </button>
@@ -480,17 +470,17 @@ export default function UploadVideoPage() {
 
             {/* Subcategory */}
             {selectedCat && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-                <p className="text-sm font-bold text-gray-700 mb-3">
-                  Sub Category <span className="text-red-400">*</span>
+              <div className="bg-white border border-gray-300 p-4">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600 mb-2.5">
+                  Sub Category <span className="text-red-600">*</span>
                 </p>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   {selectedCat.subCategories.map(sub => (
                     <button key={sub} type="button" onClick={() => setSubCategory(sub)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all ${
+                      className={`px-2.5 py-1.5 text-xs font-semibold border transition-all ${
                         subCategory === sub
                           ? 'bg-[#06013E] text-white border-[#06013E]'
-                          : 'border-gray-200 text-gray-500 hover:border-gray-300 hover:bg-gray-50'
+                          : 'border-gray-300 text-gray-600 hover:border-gray-400 hover:bg-gray-50'
                       }`}
                     >
                       {sub}
@@ -502,7 +492,7 @@ export default function UploadVideoPage() {
 
             {/* Error */}
             {errorMsg && (
-              <div className="flex items-start gap-2.5 bg-red-50 border border-red-100 rounded-xl px-4 py-3 text-red-600 text-sm">
+              <div className="flex items-start gap-2.5 bg-red-50 border border-red-300 px-3.5 py-2.5 text-red-700 text-sm">
                 <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
                 {errorMsg}
               </div>
@@ -510,16 +500,16 @@ export default function UploadVideoPage() {
 
             {/* Progress */}
             {(uploadState === 'uploading' || uploadState === 'saving') && (
-              <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+              <div className="bg-white border border-gray-300 p-4">
                 <div className="flex justify-between mb-2">
                   <span className="text-sm font-semibold text-gray-700">
                     {uploadState === 'uploading' ? 'Uploading...' : 'Saving details...'}
                   </span>
-                  <span className="text-sm font-bold text-black">{progress}%</span>
+                  <span className="text-sm font-bold text-[#06013E]">{progress}%</span>
                 </div>
-                <div className="w-full h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="w-full h-2 bg-gray-100 border border-gray-300 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-[#06013E] to-[#FF9000] rounded-full transition-all duration-500"
+                    className="h-full bg-[#06013E] transition-all duration-500"
                     style={{ width: `${progress}%` }}
                   />
                 </div>
@@ -530,7 +520,7 @@ export default function UploadVideoPage() {
             <button
               type="submit"
               disabled={uploadState === 'uploading' || uploadState === 'saving'}
-              className="w-full bg-[#06013E] text-white py-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2.5 hover:bg-[#0a0258] transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-[#06013E]/20"
+              className="w-full bg-[#06013E] text-white py-3 text-sm font-semibold flex items-center justify-center gap-2.5 hover:bg-[#100a52] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Upload className="w-4 h-4" />
               {uploadState === 'uploading' ? 'Uploading...' : uploadState === 'saving' ? 'Saving...' : 'Upload Video'}
@@ -543,4 +533,3 @@ export default function UploadVideoPage() {
     </div>
   );
 }
-
