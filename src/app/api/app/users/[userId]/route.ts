@@ -31,72 +31,102 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     const target = await prisma.appUser.findUnique({
       where: { id: userId },
       select: {
-        id: true,
-        userId: true,
+        id:        true,
+        userId:    true,
         avatarUrl: true,
         olympiadId: true,
-        createdAt: true,
+        isPrivate:  true,
+        createdAt:  true,
       },
     });
 
     if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
-    // Resolve student name: prefer Student.name, fall back to allocation.assignedName
+    const isOwnProfile = appUser.id === target.id;
+
+    // Resolve student name
     let studentName: string | null = null;
     if (target.olympiadId) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
-        where:   { code: target.olympiadId },
-        select:  { assignedName: true, student: { select: { name: true } } },
+        where:  { code: target.olympiadId },
+        select: { assignedName: true, student: { select: { name: true } } },
       });
       studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
     }
 
-    // Use raw counts to avoid any relation-mapping issues
-    const [followersCount, followingCount, videosCount] = await Promise.all([
+    const [followersCount, followingCount] = await Promise.all([
       prisma.follow.count({ where: { followingId: target.id } }),
       prisma.follow.count({ where: { followerId:  target.id } }),
-      prisma.video.count({ where: { appUserId: target.id, status: 'APPROVED', isPublic: true } }),
     ]);
 
-    // Check if current user follows this person
-    const isFollowing = appUser.id !== target.id
-      ? !!(await prisma.follow.findUnique({
+    // Check follow relationship
+    let isFollowing = false;
+    let isPending   = false;
+    if (!isOwnProfile) {
+      const [follow, followReq] = await Promise.all([
+        prisma.follow.findUnique({
           where: { followerId_followingId: { followerId: appUser.id, followingId: target.id } },
-        }))
-      : false;
+        }),
+        prisma.followRequest.findUnique({
+          where: { senderId_receiverId: { senderId: appUser.id, receiverId: target.id } },
+        }),
+      ]);
+      isFollowing = !!follow;
+      isPending   = followReq?.status === 'PENDING' ?? false;
+    }
 
-    // Get their approved public videos
-    const videos = await prisma.video.findMany({
-      where: { appUserId: target.id, status: 'APPROVED', isPublic: true },
-      select: {
-        id: true,
-        videoUrl: true,
-        thumbnailUrl: true,
-        caption: true,
-        tags: true,
-        category: true,
-        subCategory: true,
-        isEvaluation: true,
-        likesCount: true,
-        viewsCount: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+    // Private account: only owner or approved followers can see content
+    const canSeeContent = isOwnProfile || !target.isPrivate || isFollowing;
+
+    let videos: any[] = [];
+    let videosCount = 0;
+
+    if (canSeeContent) {
+      // Show approved public videos (private olympiad videos are always hidden from profile)
+      const videoWhere = {
+        appUserId: target.id,
+        status:    'APPROVED',
+        isPublic:  true,
+      };
+
+      [videos, videosCount] = await Promise.all([
+        prisma.video.findMany({
+          where:   videoWhere,
+          select: {
+            id:          true,
+            videoUrl:    true,
+            thumbnailUrl: true,
+            caption:     true,
+            tags:        true,
+            category:    true,
+            subCategory: true,
+            isEvaluation: true,
+            likesCount:  true,
+            viewsCount:  true,
+            createdAt:   true,
+          },
+          orderBy: { createdAt: 'desc' },
+        }),
+        prisma.video.count({ where: videoWhere }),
+      ]);
+    }
 
     return NextResponse.json({
       user: {
-        id:             target.id,
-        userId:         target.userId,
-        avatarUrl:      target.avatarUrl,
-        olympiadId:     target.olympiadId,
+        id:            target.id,
+        userId:        target.userId,
+        avatarUrl:     target.avatarUrl,
+        olympiadId:    target.olympiadId,
+        isPrivate:     target.isPrivate,
         studentName,
         followersCount,
         followingCount,
         videosCount,
         isFollowing,
-        isOwnProfile:   appUser.id === target.id,
-        joinedAt:       target.createdAt,
+        isPending,
+        isOwnProfile,
+        canSeeContent,
+        joinedAt:      target.createdAt,
       },
       videos: videos.map(v => ({
         ...v,

@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { visibilityWhere } from '@/lib/videoVisibility';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+function getViewerIdFromToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = verify(token, JWT_SECRET) as any;
+    return decoded.role === 'APP_USER' ? decoded.id : null;
+  } catch { return null; }
+}
 
 const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000';
 
@@ -21,7 +35,8 @@ function fixUrl(url: string | null) {
 // Also covers Student.allocation.schoolId → Video.studentId
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const schoolId = searchParams.get('schoolId')?.trim();
+  const schoolId  = searchParams.get('schoolId')?.trim();
+  const viewerId  = getViewerIdFromToken(request);
 
   if (!schoolId) {
     return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -61,11 +76,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ videos: [], school: await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true, city: true, state: true } }) });
     }
 
+    // Apply profile-privacy visibility filter
+    const visWhere = await visibilityWhere(viewerId);
+
     // Fetch approved public videos from both appUsers and students
     const videos = await prisma.video.findMany({
       where: {
         status:   'APPROVED',
         isPublic: true,
+        ...visWhere,
         OR: [
           ...(appUserIds.length > 0 ? [{ appUserId: { in: appUserIds } }] : []),
           ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),

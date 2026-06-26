@@ -119,7 +119,7 @@ model Video {
   student         Student?         @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes           Like[]
   views           VideoView[]
-  evaluation      VideoEvaluation?
+  reelShares      ReelShare[]
 
   @@index([studentId])
   @@index([appUserId])
@@ -239,22 +239,27 @@ model VideoView {
 }
 
 model AppUser {
-  id            String    @id @default(uuid())
-  userId        String    @unique
-  email         String?   @unique
-  mobile        String?   @unique
-  avatarUrl     String?
-  password      String
-  plainPassword String?
-  termsAccepted Boolean   @default(false)
-  otpHash       String?
-  otpExpiresAt  DateTime?
-  isVerified    Boolean   @default(false)
-  olympiadId    String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  followers     Follow[]  @relation("UserFollowers")
-  following     Follow[]  @relation("UserFollowing")
+  id              String          @id @default(uuid())
+  userId          String          @unique
+  email           String?         @unique
+  mobile          String?         @unique
+  avatarUrl       String?
+  password        String
+  plainPassword   String?
+  termsAccepted   Boolean         @default(false)
+  otpHash         String?
+  otpExpiresAt    DateTime?
+  isVerified      Boolean         @default(false)
+  olympiadId      String?
+  isPrivate       Boolean         @default(false)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  followers              Follow[]        @relation("UserFollowers")
+  following              Follow[]        @relation("UserFollowing")
+  followRequestsSent     FollowRequest[] @relation("FollowRequestSender")
+  followRequestsReceived FollowRequest[] @relation("FollowRequestReceiver")
+  reelSharesSent         ReelShare[]     @relation("ReelShareSender")
+  reelSharesReceived     ReelShare[]     @relation("ReelShareRecipient")
 
   @@index([email])
   @@index([mobile])
@@ -282,5 +287,37 @@ model Follow {
   @@unique([followerId, followingId])
   @@index([followerId])
   @@index([followingId])
+  @@schema("public")
+}
+
+model FollowRequest {
+  id          String   @id @default(uuid())
+  senderId    String
+  receiverId  String
+  status      String   @default("PENDING")  // PENDING | APPROVED | REJECTED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  sender      AppUser  @relation("FollowRequestSender",   fields: [senderId],   references: [id], onDelete: Cascade)
+  receiver    AppUser  @relation("FollowRequestReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+
+  @@unique([senderId, receiverId])
+  @@index([senderId])
+  @@index([receiverId])
+  @@schema("public")
+}
+
+model ReelShare {
+  id          String   @id @default(uuid())
+  videoId     String
+  senderId    String
+  recipientId String
+  sentAt      DateTime @default(now())
+  video       Video    @relation(fields: [videoId],     references: [id], onDelete: Cascade)
+  sender      AppUser  @relation("ReelShareSender",    fields: [senderId],    references: [id], onDelete: Cascade)
+  recipient   AppUser  @relation("ReelShareRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([senderId, recipientId])
+  @@index([videoId])
   @@schema("public")
 }

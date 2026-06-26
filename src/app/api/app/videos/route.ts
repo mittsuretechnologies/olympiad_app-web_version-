@@ -170,7 +170,8 @@ export async function GET(request: Request) {
 
     const normalized = videos.map((v) => ({
       ...v,
-      videoUrl: v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.videoUrl,
+      videoUrl:     v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.videoUrl,
+      thumbnailUrl: v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.thumbnailUrl,
     }));
 
     return NextResponse.json(normalized);

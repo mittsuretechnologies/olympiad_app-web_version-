@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { visibilityWhere } from '@/lib/videoVisibility';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+function getViewerIdFromToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = verify(token, JWT_SECRET) as any;
+    return decoded.role === 'APP_USER' ? decoded.id : null;
+  } catch { return null; }
+}
 
 // GET /api/reels?cursor=<lastVideoId>&limit=10&category=dance&userId=<id>
 export async function GET(request: NextRequest) {
@@ -10,10 +24,15 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category') ?? undefined;
     const userId   = searchParams.get('userId')   ?? undefined;
 
+    const viewerId = getViewerIdFromToken(request);
+    const visWhere = await visibilityWhere(viewerId);
+
     const where: any = {
       status:   'APPROVED',
       isPublic: true,
+      ...visWhere,
     };
+
     if (category) where.category = { equals: category, mode: 'insensitive' };
 
     const videos = await prisma.video.findMany({
@@ -51,11 +70,11 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const hasMore = videos.length > limit;
-    const items   = hasMore ? videos.slice(0, limit) : videos;
+    const hasMore   = videos.length > limit;
+    const items     = hasMore ? videos.slice(0, limit) : videos;
     const nextCursor = hasMore ? items[items.length - 1].id : null;
 
-    // If userId provided, check which videos this user has liked
+    // Check which videos the requesting userId has liked
     let likedIds: Set<string> = new Set();
     if (userId && items.length > 0) {
       const videoIds = items.map(v => v.id);
@@ -66,23 +85,21 @@ export async function GET(request: NextRequest) {
       likedIds = new Set(userLikes.map(l => l.videoId));
     }
 
-    // Batch-fetch AppUsers (with olympiadId so we can resolve school)
+    // Batch-fetch AppUsers
     const appUserIds = [...new Set(items.map(v => v.appUserId).filter(Boolean))] as string[];
     const appUsersRaw = appUserIds.length > 0
       ? await prisma.appUser.findMany({
-          where: { id: { in: appUserIds } },
+          where:  { id: { in: appUserIds } },
           select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
         })
       : [];
     const appUserMap = new Map(appUsersRaw.map(u => [u.id, u]));
 
-    // Batch-fetch school info via OlympiadIdAllocation for appUsers who have an olympiadId
-    const olympiadCodes = [...new Set(
-      appUsersRaw.map(u => u.olympiadId).filter(Boolean)
-    )] as string[];
+    // Batch-fetch school info via OlympiadIdAllocation
+    const olympiadCodes = [...new Set(appUsersRaw.map(u => u.olympiadId).filter(Boolean))] as string[];
     const allocationsRaw = olympiadCodes.length > 0
       ? await prisma.olympiadIdAllocation.findMany({
-          where: { code: { in: olympiadCodes } },
+          where:  { code: { in: olympiadCodes } },
           select: {
             code:   true,
             school: { select: { id: true, name: true, state: true, city: true } },
@@ -92,9 +109,6 @@ export async function GET(request: NextRequest) {
     const allocationMap = new Map(allocationsRaw.map(a => [a.code, a.school]));
 
     const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-
-    // Rewrite the host:port of any stored URL to the current SERVER_URL so devices can stream them.
-    // Handles localhost, 0.0.0.0, or any old LAN IP that may have changed.
     const fixUrl = (url: string | null) => {
       if (!url) return null;
       try {
@@ -104,19 +118,13 @@ export async function GET(request: NextRequest) {
         parsed.hostname = target.hostname;
         parsed.port     = target.port;
         return parsed.toString();
-      } catch {
-        return url;
-      }
+      } catch { return url; }
     };
 
     const result = items.map(v => {
-      const appUserRaw = v.appUserId ? appUserMap.get(v.appUserId) : undefined;
-
-      // Resolve school: prefer student's school, fall back to appUser's olympiadId → school
+      const appUserRaw  = v.appUserId ? appUserMap.get(v.appUserId) : undefined;
       const studentSchool = v.student?.allocation?.school ?? null;
-      const appUserSchool = appUserRaw?.olympiadId
-        ? (allocationMap.get(appUserRaw.olympiadId) ?? null)
-        : null;
+      const appUserSchool = appUserRaw?.olympiadId ? (allocationMap.get(appUserRaw.olympiadId) ?? null) : null;
       const school = studentSchool ?? appUserSchool;
 
       return {
@@ -140,7 +148,6 @@ export async function GET(request: NextRequest) {
           state:      school?.state ?? null,
           city:       school?.city  ?? null,
         } : school ? {
-          // No student record but school resolved via appUser's olympiadId
           id:         null,
           name:       appUserRaw?.userId ?? null,
           schoolId:   school.id,

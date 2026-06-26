@@ -1,5 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { visibilityWhere } from '@/lib/videoVisibility';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+function getViewerIdFromToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = verify(token, JWT_SECRET) as any;
+    return decoded.role === 'APP_USER' ? decoded.id : null;
+  } catch { return null; }
+}
 
 const ROW_LIMIT = 15;
 
@@ -134,9 +148,11 @@ async function hydrate(items: RawVideo[], userId?: string) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId') ?? undefined;
+    const userId   = searchParams.get('userId') ?? undefined;
+    const viewerId = getViewerIdFromToken(request);
 
-    const baseWhere = { status: 'APPROVED', isPublic: true } as const;
+    const visWhere = await visibilityWhere(viewerId ?? null);
+    const baseWhere = { status: 'APPROVED', isPublic: true, ...visWhere } as const;
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 

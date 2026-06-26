@@ -27,15 +27,16 @@ export async function GET(request: Request) {
     const user = await prisma.appUser.findUnique({
       where: { id: appUser.id },
       select: {
-        id: true,
-        userId: true,
-        email: true,
-        mobile: true,
-        avatarUrl: true,
-        olympiadId: true,
-        isVerified: true,
+        id:           true,
+        userId:       true,
+        email:        true,
+        mobile:       true,
+        avatarUrl:    true,
+        olympiadId:   true,
+        isVerified:   true,
+        isPrivate:    true,
         termsAccepted: true,
-        createdAt: true,
+        createdAt:    true,
       },
     });
 
@@ -45,14 +46,14 @@ export async function GET(request: Request) {
 
     // If user has an olympiadId, resolve the linked school and student name
     // Prefer Student.name, fall back to allocation.assignedName (set by school admin)
-    let school: { name: string | null; state: string | null; district: string | null; schoolId: string } | null = null;
+    let school: { id: string; name: string | null; state: string | null; district: string | null; schoolId: string } | null = null;
     let studentName: string | null = null;
     if (user.olympiadId) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
         where:  { code: user.olympiadId },
         select: {
           assignedName: true,
-          school:  { select: { name: true, state: true, district: true, schoolId: true } },
+          school:  { select: { id: true, name: true, state: true, district: true, schoolId: true } },
           student: { select: { name: true } },
         },
       });

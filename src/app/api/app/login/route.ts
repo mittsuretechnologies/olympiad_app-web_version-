@@ -53,12 +53,13 @@ export async function POST(request: Request) {
       message: 'Login successful',
       token,
       user: {
-        id: user.id,
-        userId: user.userId,
-        email: user.email,
-        mobile: user.mobile,
-        avatarUrl: user.avatarUrl,
+        id:         user.id,
+        userId:     user.userId,
+        email:      user.email,
+        mobile:     user.mobile,
+        avatarUrl:  user.avatarUrl,
         olympiadId: user.olympiadId,
+        isPrivate:  user.isPrivate,
         studentName,
       },
     });

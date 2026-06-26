@@ -1,0 +1,2 @@
+-- Migration: add_plain_password_to_uploader
+-- Applied manually / via baseline; file restored to unblock migrate dev.
