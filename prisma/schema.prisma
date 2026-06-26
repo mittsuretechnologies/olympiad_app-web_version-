@@ -119,6 +119,7 @@ model Video {
   student         Student?    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes           Like[]
   views           VideoView[]
+  reelShares      ReelShare[]
 
   @@index([studentId])
   @@index([appUserId])
@@ -232,10 +233,12 @@ model AppUser {
   isPrivate       Boolean         @default(false)
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
-  followers       Follow[]        @relation("UserFollowers")
-  following       Follow[]        @relation("UserFollowing")
+  followers              Follow[]        @relation("UserFollowers")
+  following              Follow[]        @relation("UserFollowing")
   followRequestsSent     FollowRequest[] @relation("FollowRequestSender")
   followRequestsReceived FollowRequest[] @relation("FollowRequestReceiver")
+  reelSharesSent         ReelShare[]     @relation("ReelShareSender")
+  reelSharesReceived     ReelShare[]     @relation("ReelShareRecipient")
 
   @@index([email])
   @@index([mobile])
@@ -279,5 +282,21 @@ model FollowRequest {
   @@unique([senderId, receiverId])
   @@index([senderId])
   @@index([receiverId])
+  @@schema("public")
+}
+
+model ReelShare {
+  id          String   @id @default(uuid())
+  videoId     String
+  senderId    String
+  recipientId String
+  sentAt      DateTime @default(now())
+  video       Video    @relation(fields: [videoId],     references: [id], onDelete: Cascade)
+  sender      AppUser  @relation("ReelShareSender",    fields: [senderId],    references: [id], onDelete: Cascade)
+  recipient   AppUser  @relation("ReelShareRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId])
+  @@index([senderId, recipientId])
+  @@index([videoId])
   @@schema("public")
 }
