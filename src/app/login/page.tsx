@@ -186,8 +186,15 @@ export default function LoginPage() {
       if (data.role === 'SCHOOL') {
         localStorage.setItem('schoolToken', data.token);
         localStorage.setItem('schoolUser', JSON.stringify(data.user));
+      } else if (data.role === 'REVIEWER') {
+        localStorage.setItem('reviewerToken', data.token);
+        localStorage.setItem('reviewerData', JSON.stringify(data.user));
+      } else if (data.role === 'EVALUATOR') {
+        localStorage.setItem('evaluatorToken', data.token);
+        localStorage.setItem('evaluatorData', JSON.stringify(data.user));
       } else {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('adminUser', JSON.stringify(data.user));
       }
 
       router.push(data.redirect || '/dashboard');

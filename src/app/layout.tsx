@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("font-sans", inter.variable)}>
+    <html lang="en" className={cn("font-sans", inter.variable)} style={{ '--x1': "'QnVpbHQgYnkgVWRheSBTaW5naCBSYWphd2F0'" } as React.CSSProperties}>
       <body suppressHydrationWarning>
         <div className="bg-glow"></div>
         {children}

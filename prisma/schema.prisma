@@ -98,25 +98,25 @@ model Student {
 }
 
 model Video {
-  id              String      @id @default(uuid())
+  id              String           @id @default(uuid())
   studentId       String?
   appUserId       String?
-  uploaderType    String      @default("STUDENT")
+  uploaderType    String           @default("STUDENT")
   videoUrl        String
   thumbnailUrl    String?
   caption         String?
   category        String?
   subCategory     String?
   tags            String?
-  status          String      @default("PENDING")
+  status          String           @default("PENDING")
   rejectionReason String?
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  isEvaluation    Boolean     @default(false)
-  isPublic        Boolean     @default(true)
-  likesCount      Int         @default(0)
-  viewsCount      Int         @default(0)
-  student         Student?    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  isEvaluation    Boolean          @default(false)
+  isPublic        Boolean          @default(true)
+  likesCount      Int              @default(0)
+  viewsCount      Int              @default(0)
+  student         Student?         @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes           Like[]
   views           VideoView[]
   reelShares      ReelShare[]
@@ -125,6 +125,26 @@ model Video {
   @@index([appUserId])
   @@index([status])
   @@index([status, isPublic])
+  @@schema("public")
+}
+
+model VideoEvaluation {
+  id                String          @id @default(uuid())
+  videoId           String          @unique
+  evaluatorId       String
+  confidenceScore   Int
+  creativityScore   Int
+  techniqueScore    Int
+  presentationScore Int
+  overallScore      Int
+  totalScore        Int
+  remarks           String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  video             Video           @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  evaluator         TalentEvaluator @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+
+  @@index([evaluatorId])
   @@schema("public")
 }
 
@@ -165,6 +185,7 @@ model TalentEvaluator {
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
   individualPermission IndividualPermissions?
+  evaluations          VideoEvaluation[]
 
   @@schema("public")
 }
