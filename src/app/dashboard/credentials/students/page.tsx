@@ -112,9 +112,10 @@ export default function StudentCredentialsPage() {
     setResetBusy(true);
     setUsernameError('');
     try {
+      const source = resetTarget.student.source === 'app' ? 'app' : 'web';
       const body = resetAction === 'username'
-        ? { action: 'username', username: customUsername.trim() }
-        : { action: 'password', password: customPassword || undefined };
+        ? { action: 'username', username: customUsername.trim(), source }
+        : { action: 'password', password: customPassword || undefined, source };
 
       const res = await fetch(`/api/credentials/students/${resetTarget.student.id}/reset`, {
         method: 'POST',
