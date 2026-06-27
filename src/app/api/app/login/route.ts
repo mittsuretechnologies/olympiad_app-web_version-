@@ -39,14 +39,20 @@ export async function POST(request: Request) {
       { expiresIn: '30d' }
     );
 
-    // Resolve student name from olympiadId allocation
+    // Resolve student name and school from olympiadId allocation
     let studentName: string | null = null;
+    let school: { id: string; name: string | null; state: string | null; district: string | null; schoolId: string } | null = null;
     if (user.olympiadId) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
         where:  { code: user.olympiadId },
-        select: { assignedName: true, student: { select: { name: true } } },
+        select: {
+          assignedName: true,
+          school:  { select: { id: true, name: true, state: true, district: true, schoolId: true } },
+          student: { select: { name: true } },
+        },
       });
       studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
+      if (allocation?.school) school = allocation.school;
     }
 
     return NextResponse.json({
@@ -61,6 +67,7 @@ export async function POST(request: Request) {
         olympiadId: user.olympiadId,
         isPrivate:  user.isPrivate,
         studentName,
+        school,
       },
     });
   } catch (error) {
