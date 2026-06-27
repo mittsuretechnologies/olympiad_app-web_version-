@@ -48,20 +48,26 @@ export async function GET(request: Request) {
     // Prefer Student.name, fall back to allocation.assignedName (set by school admin)
     let school: { id: string; name: string | null; state: string | null; district: string | null; schoolId: string } | null = null;
     let studentName: string | null = null;
+    let classCode:   string | null = null;
+    let className:   string | null = null;
     if (user.olympiadId) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
         where:  { code: user.olympiadId },
         select: {
           assignedName: true,
+          classCode:    true,
+          className:    true,
           school:  { select: { id: true, name: true, state: true, district: true, schoolId: true } },
           student: { select: { name: true } },
         },
       });
       if (allocation?.school) school = allocation.school;
       studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
+      classCode   = allocation?.classCode ?? null;
+      className   = allocation?.className ?? null;
     }
 
-    return NextResponse.json({ user, school, studentName });
+    return NextResponse.json({ user, school, studentName, classCode, className });
   } catch (error: any) {
     console.error('app/me error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

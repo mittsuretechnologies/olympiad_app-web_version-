@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import {
   OLYMPIAD_CAT_A_SUBS,
   OLYMPIAD_CAT_B_SUBS,
+  OLYMPIAD_CAT_A_LABEL,
+  OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
@@ -101,20 +103,21 @@ export async function POST(request: Request) {
     let finalIsEvaluation = isEvaluation !== undefined ? Boolean(isEvaluation) : false;
     if (isOlympiadUpload) {
       finalIsEvaluation = true;
-      const isSubCatA = OLYMPIAD_CAT_A_SUBS.includes(subCategory);
-      const isSubCatB = OLYMPIAD_CAT_B_SUBS.includes(subCategory);
+      // Use category label to detect slot — subCategory may be a custom "special talent" label
+      const isCatA = category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(subCategory);
+      const isCatB = category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(subCategory);
 
-      if (isSubCatA || isSubCatB) {
+      if (isCatA || isCatB) {
         const existingOlympiadVideos = await prisma.video.findMany({
           where: { appUserId: appUser.id, isEvaluation: true },
-          select: { subCategory: true, status: true },
+          select: { category: true, subCategory: true, status: true },
         });
-        // Only block if there's an active (non-rejected) video for this category
+        // Only block if there's an active (non-rejected) video for this category slot
         const slotTaken = existingOlympiadVideos.some(v =>
           v.status !== 'REJECTED' &&
-          (isSubCatA
-            ? OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '')
-            : OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? ''))
+          (isCatA
+            ? v.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '')
+            : v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? ''))
         );
         if (slotTaken) {
           return NextResponse.json(

@@ -2,22 +2,34 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw, Globe, EyeOff } from 'lucide-react';
-import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
+import {
+  OLYMPIAD_CAT_A_SUBS,
+  OLYMPIAD_CAT_B_NURSERY_LKG_SUBS,
+  OLYMPIAD_CAT_B_UKG_SUBS,
+  OLYMPIAD_CAT_A_LABEL,
+  OLYMPIAD_CAT_B_LABEL,
+  isNurseryOrLkg,
+} from '@/lib/olympiad-categories';
 
-const CATEGORIES = [
-  {
-    label: 'Cat A – Performing Art, Dance & Music',
-    value: 'Cat A',
-    icon: Music,
-    subCategories: OLYMPIAD_CAT_A_SUBS,
-  },
-  {
-    label: 'Cat B – Creative Art & Communication',
-    value: 'Cat B',
-    icon: Palette,
-    subCategories: OLYMPIAD_CAT_B_SUBS,
-  },
-];
+const CAT_A_DEF = {
+  label: `Cat A – ${OLYMPIAD_CAT_A_LABEL}`,
+  value: OLYMPIAD_CAT_A_LABEL,
+  icon: Music,
+};
+
+const CAT_B_NURSERY_DEF = {
+  label: `Cat B – Rhymes (Nursery / LKG)`,
+  value: OLYMPIAD_CAT_B_LABEL,
+  icon: Palette,
+  subCategories: OLYMPIAD_CAT_B_NURSERY_LKG_SUBS,
+};
+
+const CAT_B_UKG_DEF = {
+  label: `Cat B – Speech / Presentation (UKG)`,
+  value: OLYMPIAD_CAT_B_LABEL,
+  icon: Palette,
+  subCategories: OLYMPIAD_CAT_B_UKG_SUBS,
+};
 
 type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
@@ -77,19 +89,26 @@ export default function UploadVideoPage() {
     s.olympiadCode.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
+  // Build category list based on selected student’s grade
+  const catBDef = selectedStudent && isNurseryOrLkg(selectedStudent.classCode, selectedStudent.olympiadCode) ? CAT_B_NURSERY_DEF : CAT_B_UKG_DEF;
+  const CATEGORIES = [
+    { ...CAT_A_DEF, subCategories: OLYMPIAD_CAT_A_SUBS },
+    catBDef,
+  ];
+
   const selectedCat = CATEGORIES.find(c => c.value === category);
 
-  // Both slots approved â†’ only general feed
+  // Both slots approved -> only general feed
   const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
 
   const getCatStatus = (catValue: string) => {
-    if (!slots) return 'available';
-    const isA = catValue === 'Cat A';
+    if (!slots) return ‘available’;
+    const isA = catValue === OLYMPIAD_CAT_A_LABEL;
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
-    if (filled && !rejected) return 'filled';     // submitted (pending/approved)
-    if (rejected) return 'rejected';               // rejected â†’ re-upload allowed
-    return 'available';
+    if (filled && !rejected) return ‘filled’;     // submitted (pending/approved)
+    if (rejected) return ‘rejected’;               // rejected -> re-upload allowed
+    return ‘available’;
   };
 
   function handleFile(file: File) {
@@ -291,17 +310,18 @@ export default function UploadVideoPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        {(['Cat A', 'Cat B'] as const).map((cat) => {
-                          const status = getCatStatus(cat);
+                        {([OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL] as const).map((catVal, idx) => {
+                          const status = getCatStatus(catVal);
+                          const shortLabel = idx === 0 ? 'Cat A' : 'Cat B';
                           return (
-                            <div key={cat} className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold border ${
+                            <div key={catVal} className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold border ${
                               status === 'filled'    ? 'bg-green-50 border-green-300 text-green-700' :
                               status === 'rejected'  ? 'bg-red-50 border-red-300 text-red-700' :
                               'bg-gray-50 border-gray-300 text-gray-600'
                             }`}>
                               {status === 'filled'   && <CheckCircle className="w-3 h-3" />}
                               {status === 'rejected' && <RefreshCw className="w-3 h-3" />}
-                              {cat} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
+                              {shortLabel} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
                             </div>
                           );
                         })}

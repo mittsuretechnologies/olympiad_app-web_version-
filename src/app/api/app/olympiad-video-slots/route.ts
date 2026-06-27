@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
+import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     const [videos, user] = await Promise.all([
       prisma.video.findMany({
         where: { appUserId: appUser.id, isEvaluation: true },
-        select: { subCategory: true, status: true },
+        select: { category: true, subCategory: true, status: true },
       }),
       prisma.appUser.findUnique({
         where: { id: appUser.id },
@@ -38,27 +38,41 @@ export async function GET(request: Request) {
     ]);
 
     // A slot is "used" only if there's a non-rejected video (PENDING or APPROVED).
+    // Match by category label (for custom "special talent" entries) or known subcategory name.
     const activeVideos = videos.filter(v => v.status !== 'REJECTED');
 
-    const usedA = activeVideos.some(v => OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? ''));
-    const usedB = activeVideos.some(v => OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? ''));
+    const isVideoA = (v: { category: string | null; subCategory: string | null }) =>
+      v.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '');
+    const isVideoB = (v: { category: string | null; subCategory: string | null }) =>
+      v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
 
-    const rejectedA = !usedA && videos.some(v => v.status === 'REJECTED' && OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? ''));
-    const rejectedB = !usedB && videos.some(v => v.status === 'REJECTED' && OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? ''));
+    const usedA = activeVideos.some(isVideoA);
+    const usedB = activeVideos.some(isVideoB);
+
+    const rejectedA = !usedA && videos.some(v => v.status === 'REJECTED' && isVideoA(v));
+    const rejectedB = !usedB && videos.some(v => v.status === 'REJECTED' && isVideoB(v));
 
     // Fetch school via the olympiadId → allocation → school chain
     let schoolName: string | null = null;
     let state:      string | null = null;
     let district:   string | null = null;
+    let classCode:  string | null = null;
+    let className:  string | null = null;
 
     if (user?.olympiadId) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
         where: { code: user.olympiadId },
-        select: { school: { select: { name: true, state: true, district: true } } },
+        select: {
+          classCode: true,
+          className: true,
+          school: { select: { name: true, state: true, district: true } },
+        },
       });
       schoolName = allocation?.school?.name     ?? null;
       state      = allocation?.school?.state    ?? null;
       district   = allocation?.school?.district ?? null;
+      classCode  = allocation?.classCode        ?? null;
+      className  = allocation?.className        ?? null;
     }
 
     return NextResponse.json({
@@ -70,6 +84,8 @@ export async function GET(request: Request) {
       schoolName,
       state,
       district,
+      classCode,
+      className,
     });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
