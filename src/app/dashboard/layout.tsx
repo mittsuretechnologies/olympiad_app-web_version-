@@ -193,8 +193,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="relative w-full aspect-[16/10] overflow-hidden rounded-2xl bg-white shadow-lg shadow-black/20">
             <Image src="/banner.webp" alt="Kids Celebration" fill sizes="280px" className="object-cover object-center" priority />
           </div>
-          <div className="absolute top-[2px] right-[6px] h-16 w-32">
-            <Image src="/logo-color.webp" alt="Mittsure Logo" fill className="object-contain" />
+          <div className="absolute top-6 right-4 flex items-center gap-1.5 bg-white/90 rounded-lg px-2 py-1 shadow-sm">
+            <Image src="/mittmee-icon.jpeg" alt="mittmee" width={24} height={24} className="rounded object-cover" />
+            <span className="text-xs font-bold"><span className="text-[#1559C7]">mitt</span><span className="text-[#3CB043]">mee</span></span>
           </div>
         </div>
 

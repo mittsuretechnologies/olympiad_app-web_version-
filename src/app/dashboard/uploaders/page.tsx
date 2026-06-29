@@ -267,7 +267,7 @@ export default function UploadersPage() {
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{uploaders.length}</span> uploaders
         </span>
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
 
       {/* Edit Dialog */}

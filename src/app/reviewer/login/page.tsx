@@ -39,8 +39,9 @@ export default function ReviewerLoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-4">
-            <Image src="/logo-CW-uU9TX.jpg" alt="Mittsure" width={120} height={40} className="object-contain mix-blend-multiply" />
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 px-6 py-4 flex items-center gap-2.5">
+            <Image src="/mittmee-icon.jpeg" alt="mittmee" width={40} height={40} className="rounded-lg object-cover" />
+            <span className="text-lg font-bold tracking-tight"><span className="text-[#1559C7]">mitt</span><span className="text-[#3CB043]">mee</span></span>
           </div>
         </div>
 
@@ -88,7 +89,7 @@ export default function ReviewerLoginPage() {
             </button>
           </div>
         </div>
-        <p className="text-center text-xs text-gray-400 mt-5">Mittsure Olympiad · Reviewer Portal</p>
+        <p className="text-center text-xs text-gray-400 mt-5">mittmee · Reviewer Portal</p>
       </div>
     </div>
   );

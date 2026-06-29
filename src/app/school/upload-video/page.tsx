@@ -2,22 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw, Globe, EyeOff } from 'lucide-react';
-import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
-
-const CATEGORIES = [
-  {
-    label: 'Cat A – Performing Art, Dance & Music',
-    value: 'Cat A',
-    icon: Music,
-    subCategories: OLYMPIAD_CAT_A_SUBS,
-  },
-  {
-    label: 'Cat B – Creative Art & Communication',
-    value: 'Cat B',
-    icon: Palette,
-    subCategories: OLYMPIAD_CAT_B_SUBS,
-  },
-];
+import { OLYMPIAD_CAT_A_SUBS, getCatBSubs } from '@/lib/olympiad-categories';
 
 type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
@@ -39,6 +24,7 @@ export default function UploadVideoPage() {
 
   const [category, setCategory]     = useState('');
   const [subCategory, setSubCategory] = useState('');
+  const [customTalent, setCustomTalent] = useState('');
   const [caption, setCaption]       = useState('');
 
   const [isPublic, setIsPublic] = useState(true);
@@ -69,7 +55,7 @@ export default function UploadVideoPage() {
       .then(data => { if (data) setSlots(data); })
       .finally(() => setSlotsLoading(false));
     // Reset category when student changes
-    setCategory(''); setSubCategory('');
+    setCategory(''); setSubCategory(''); setCustomTalent('');
   }, [selectedStudent, token]);
 
   const filtered = students.filter(s =>
@@ -77,7 +63,26 @@ export default function UploadVideoPage() {
     s.olympiadCode.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
+  const CATEGORIES = [
+    {
+      label: 'Cat A – Performing Art, Dance & Music',
+      value: 'Cat A',
+      icon: Music,
+      subCategories: OLYMPIAD_CAT_A_SUBS,
+    },
+    {
+      label: selectedStudent?.classCode === 'U' ? 'Cat B – Speech / Talent Presentation' : 'Cat B – Rhymes Submission',
+      value: 'Cat B',
+      icon: Palette,
+      subCategories: getCatBSubs(selectedStudent?.classCode),
+    },
+  ];
+
   const selectedCat = CATEGORIES.find(c => c.value === category);
+
+  // Category depends on the student's class (Cat B list differs by classCode),
+  // so block selection until a student is chosen and their class has loaded.
+  const canPickCategory = !!selectedStudent && !slotsLoading;
 
   // Both slots approved â†’ only general feed
   const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
@@ -100,10 +105,17 @@ export default function UploadVideoPage() {
     setVideoPreview(URL.createObjectURL(file));
   }
 
+  const isCustomTalent = subCategory === 'Any Other Special Talent';
+  const finalSubCategory = isCustomTalent ? customTalent.trim() : subCategory;
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedStudent || !videoFile || !category || !subCategory) {
       setErrorMsg('Please fill all required fields and select a video.');
+      return;
+    }
+    if (isCustomTalent && !customTalent.trim()) {
+      setErrorMsg('Please enter the talent name.');
       return;
     }
     setErrorMsg('');
@@ -128,7 +140,7 @@ export default function UploadVideoPage() {
       const metaRes = await fetch('/api/school/me/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory, isPublic }),
+        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory: finalSubCategory, isPublic }),
       });
       setProgress(100);
       if (!metaRes.ok) throw new Error((await metaRes.json()).error || 'Save failed');
@@ -143,7 +155,7 @@ export default function UploadVideoPage() {
 
   function reset() {
     setSelectedStudent(null); setStudentSearch(''); setVideoFile(null); setVideoPreview(null);
-    setCategory(''); setSubCategory(''); setCaption(''); setIsPublic(true);
+    setCategory(''); setSubCategory(''); setCustomTalent(''); setCaption(''); setIsPublic(true);
     setUploadState('idle'); setProgress(0); setErrorMsg(''); setLastVideoMeta(null);
     setSlots(null);
   }
@@ -413,10 +425,15 @@ export default function UploadVideoPage() {
             )}
 
             {/* Category */}
-            <div className="bg-white border border-gray-300 p-4">
+            <div className={`bg-white border border-gray-300 p-4 ${!canPickCategory ? 'opacity-50' : ''}`}>
               <p className="text-[11px] font-bold uppercase tracking-wide text-gray-600 mb-2.5">
                 Category <span className="text-red-600">*</span>
               </p>
+              {!canPickCategory && (
+                <p className="text-xs text-gray-500 mb-2.5">
+                  {selectedStudent ? 'Loading student details…' : 'Select a student first to choose a category.'}
+                </p>
+              )}
               <div className="space-y-2">
                 {CATEGORIES.map(cat => {
                   const Icon = cat.icon;
@@ -424,23 +441,26 @@ export default function UploadVideoPage() {
                   const status = getCatStatus(cat.value);
                   const isFilled = status === 'filled';
                   const isRejected = status === 'rejected';
+                  const isDisabled = isFilled || !canPickCategory;
 
                   return (
                     <button
                       key={cat.value}
                       type="button"
-                      disabled={isFilled}
+                      disabled={isDisabled}
                       onClick={() => {
-                        if (isFilled) return;
+                        if (isDisabled) return;
                         setCategory(isSelected ? '' : cat.value);
-                        setSubCategory('');
+                        setSubCategory(''); setCustomTalent('');
                       }}
                       className={`w-full flex items-center gap-3 px-3 py-3 border text-left transition-all ${
                         isFilled
                           ? 'border-green-300 bg-green-50 opacity-60 cursor-not-allowed'
-                          : isSelected
-                            ? 'border-[#06013E] bg-[#F4F5F7]'
-                            : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
+                          : !canPickCategory
+                            ? 'border-gray-200 cursor-not-allowed'
+                            : isSelected
+                              ? 'border-[#06013E] bg-[#F4F5F7]'
+                              : 'border-gray-300 hover:border-gray-400 hover:bg-gray-50'
                       }`}
                     >
                       {isFilled
@@ -476,7 +496,7 @@ export default function UploadVideoPage() {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedCat.subCategories.map(sub => (
-                    <button key={sub} type="button" onClick={() => setSubCategory(sub)}
+                    <button key={sub} type="button" onClick={() => { setSubCategory(sub); if (sub !== 'Any Other Special Talent') setCustomTalent(''); }}
                       className={`px-2.5 py-1.5 text-xs font-semibold border transition-all ${
                         subCategory === sub
                           ? 'bg-[#06013E] text-white border-[#06013E]'
@@ -487,6 +507,22 @@ export default function UploadVideoPage() {
                     </button>
                   ))}
                 </div>
+
+                {isCustomTalent && (
+                  <div className="mt-3">
+                    <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">
+                      Talent Name <span className="text-red-600">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={customTalent}
+                      onChange={e => setCustomTalent(e.target.value)}
+                      placeholder="Enter the talent name..."
+                      autoFocus
+                      className="w-full border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-[#06013E] transition-colors"
+                    />
+                  </div>
+                )}
               </div>
             )}
 

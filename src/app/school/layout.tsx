@@ -55,17 +55,17 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
 
         {/* Logo */}
         <div className="px-5 pt-5 pb-4 flex-shrink-0 flex items-center gap-2">
-          <div className="w-9 h-9 rounded-md bg-white flex items-center justify-center flex-shrink-0 overflow-hidden p-1">
+          <div className="w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
             <Image
-              src="/Mittsure_LOGO_updated_page-0001-removebg-preview.png"
-              alt="Mittsure"
-              width={32}
-              height={32}
-              className="object-contain w-full h-full"
+              src="/mittmee-icon.jpeg"
+              alt="mittmee"
+              width={36}
+              height={36}
+              className="object-cover w-full h-full"
               priority
             />
           </div>
-          <span className="text-white font-bold text-sm tracking-tight">Mitmee</span>
+          <span className="text-sm font-bold tracking-tight"><span className="text-[#4FA8FF]">mitt</span><span className="text-[#7ED957]">mee</span></span>
         </div>
 
         {/* Nav items */}

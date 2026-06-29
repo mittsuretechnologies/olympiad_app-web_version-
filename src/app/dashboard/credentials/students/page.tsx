@@ -319,7 +319,7 @@ export default function StudentCredentialsPage() {
 
       {/* Footer */}
       <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-500 flex justify-end items-center">
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
 
       {/* Reset Dialog */}

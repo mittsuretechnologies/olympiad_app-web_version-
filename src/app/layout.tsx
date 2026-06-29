@@ -10,8 +10,11 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Mittsure Olympiad - SuperAdmin",
+  title: "mittmee - SuperAdmin",
   description: "Official Olympiad Management Portal",
+  icons: {
+    icon: "/mittmee-icon.jpeg",
+  },
 };
 
 export default function RootLayout({

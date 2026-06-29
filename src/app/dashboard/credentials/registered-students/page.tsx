@@ -303,7 +303,7 @@ export default function StudentReportPage() {
         {!loading && rows.length > 0 && (
           <div className="px-5 py-2.5 border-t border-gray-100 flex justify-between items-center text-xs text-gray-400">
             <span>Showing <span className="font-semibold text-gray-600">{filtered.length}</span> of <span className="font-semibold text-gray-600">{rows.length}</span> students</span>
-            <span className="italic">Â© Mittsure Olympiad Portal</span>
+            <span className="italic">© mittmee</span>
           </div>
         )}
       </div>

@@ -12,7 +12,6 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  GraduationCap,
   Users,
   School,
   Trophy,
@@ -307,18 +306,19 @@ export default function LoginPage() {
         </svg>
 
         <div className="relative z-10 flex flex-col gap-6 px-5 pb-10 pt-4 xl:px-6 xl:pb-10 xl:pt-4 w-full">
-          {/* Top row: logo (top-left, cropped to remove empty padding) */}
-          <div className="flex items-center">
-            <div className="relative h-12 w-[185px] overflow-hidden">
+          {/* Top row: logo (top-left) */}
+          <div className="flex items-center gap-2.5">
+            <div className="relative h-12 w-12 overflow-hidden rounded-xl">
               <Image
-                src="/logo-tech.webp"
-                alt="Mittsure Technologies"
-                width={440}
+                src="/mittmee-icon.jpeg"
+                alt="mittmee"
+                width={147}
                 height={147}
                 priority
-                className="h-full w-full object-cover object-center scale-[1.35] drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]"
+                className="h-full w-full object-cover object-center drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]"
               />
             </div>
+            <span className="text-xl font-bold tracking-tight"><span className="text-[#4FA8FF]">mitt</span><span className="text-[#7ED957]">mee</span></span>
           </div>
 
           <div className="flex items-center gap-2 self-start rounded-full border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm">
@@ -450,27 +450,28 @@ export default function LoginPage() {
         >
           <div className="rounded-[20px] bg-[#EEF4FC] p-7 sm:p-8 text-slate-900 shadow-sm">
             {/* Mobile logo */}
-            <div className="lg:hidden mb-6 flex justify-center">
+            <div className="lg:hidden mb-6 flex items-center justify-center gap-2">
               <Image
-                src="/logo-color.webp"
-                alt="Mittsure Technologies"
-                width={220}
+                src="/mittmee-icon.jpeg"
+                alt="mittmee"
+                width={73}
                 height={73}
                 priority
-                className="h-11 w-auto object-contain"
+                className="h-11 w-11 rounded-xl object-cover"
               />
+              <span className="text-lg font-bold tracking-tight"><span className="text-[#1559C7]">mitt</span><span className="text-[#3CB043]">mee</span></span>
             </div>
 
             {/* Header */}
             <div className="mb-7 text-center">
               <motion.div
-                className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#0e4f8a] to-[#16a34a] shadow-lg shadow-[#0e4f8a]/30"
+                className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl overflow-hidden shadow-lg shadow-[#0e4f8a]/30"
                 initial={{ scale: 0, rotate: -20 }}
                 animate={{ scale: 1, rotate: 0 }}
                 transition={{ type: 'spring', stiffness: 200, damping: 14, delay: 0.2 }}
                 whileHover={{ y: -3, rotate: 6 }}
               >
-                <GraduationCap className="h-7 w-7 text-white" />
+                <Image src="/mittmee-icon.jpeg" alt="mittmee" width={56} height={56} className="h-full w-full object-cover" />
               </motion.div>
               <h2 className="text-2xl font-semibold tracking-tight text-slate-900">
                 Welcome back!

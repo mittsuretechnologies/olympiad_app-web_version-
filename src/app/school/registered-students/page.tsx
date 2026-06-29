@@ -99,7 +99,7 @@ export default function SchoolRegisteredStudentsPage() {
         <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-300 bg-[#F4F5F7]">
           <div className="flex items-center gap-2">
             <Users size={15} className="text-[#06013E]" />
-            <h1 className="text-[13px] font-bold text-[#06013E] uppercase tracking-wide">Registered Students Record</h1>
+            <h1 className="text-[13px] font-bold text-[#06013E] uppercase tracking-wide">My Students</h1>
           </div>
           <button
             onClick={exportCSV}
@@ -113,7 +113,7 @@ export default function SchoolRegisteredStudentsPage() {
         {/* Stats strip */}
         <div className="flex flex-wrap divide-x divide-gray-200">
           <div className="px-4 py-2.5 flex items-center justify-between min-w-[170px]">
-            <span className="text-[11px] text-gray-600 font-medium">Total Registered</span>
+            <span className="text-[11px] text-gray-600 font-medium">Total Students</span>
             <span className="text-sm font-bold text-green-700 font-mono">{students.length}</span>
           </div>
           {classes.map(cls => {
@@ -179,7 +179,7 @@ export default function SchoolRegisteredStudentsPage() {
         <div className="bg-white border border-gray-300 py-20 text-center">
           <Users size={32} className="mx-auto text-gray-300 mb-3" />
           <p className="text-gray-500 text-sm">
-            {students.length === 0 ? 'No students have registered yet via the app.' : 'No students match your filters.'}
+            {students.length === 0 ? 'No students yet. Allot Olympiad IDs to get started.' : 'No students match your filters.'}
           </p>
         </div>
       ) : view === 'table' ? (
@@ -195,7 +195,6 @@ export default function SchoolRegisteredStudentsPage() {
                   <th className="px-3 py-2 text-left text-[10.5px] font-bold uppercase border-r border-gray-200 w-32">Phone</th>
                   <th className="px-3 py-2 text-left text-[10.5px] font-bold uppercase border-r border-gray-200 w-28">Joined On</th>
                   <th className="px-3 py-2 text-center text-[10.5px] font-bold uppercase border-r border-gray-200 w-20">Videos</th>
-                  <th className="px-3 py-2 text-center text-[10.5px] font-bold uppercase border-r border-gray-200 w-24">Status</th>
                   <th className="px-3 py-2 text-center text-[10.5px] font-bold uppercase w-20">Via</th>
                 </tr>
               </thead>
@@ -229,11 +228,6 @@ export default function SchoolRegisteredStudentsPage() {
                         );
                       })()}
                     </td>
-                    <td className="px-3 py-2 text-center border-r border-gray-100">
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-bold text-green-700 border border-green-300 bg-green-50">
-                        VERIFIED
-                      </span>
-                    </td>
                     <td className="px-3 py-2 text-center">
                       {s.source === 'app'
                         ? <span className="text-[10px] font-bold text-gray-600">APP</span>
@@ -247,7 +241,7 @@ export default function SchoolRegisteredStudentsPage() {
           </div>
           <div className="px-4 py-2 border-t border-gray-300 flex justify-between items-center text-[11px] text-gray-500">
             <span>Showing <span className="font-semibold text-gray-700">{filtered.length}</span> of <span className="font-semibold text-gray-700">{students.length}</span> students</span>
-            <span>Mittsure Technologies — Olympiad Portal</span>
+            <span>mittmee</span>
           </div>
         </div>
       ) : (
@@ -264,9 +258,6 @@ export default function SchoolRegisteredStudentsPage() {
                   <p className="font-mono text-xs text-gray-500">{s.olympiadCode}</p>
                 </div>
                 <div className="ml-auto flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className="inline-flex items-center gap-0.5 text-[9px] font-bold px-1.5 py-0.5 text-green-700 border border-green-300 bg-green-50">
-                    VERIFIED
-                  </span>
                   <span className="text-[10px] font-bold text-gray-500">{s.source === 'app' ? 'APP' : 'WEB'}</span>
                 </div>
               </div>

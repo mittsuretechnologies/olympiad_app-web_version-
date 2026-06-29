@@ -205,7 +205,7 @@ export default function SchoolCredentialsPage() {
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{rows.length}</span> schools
         </span>
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
 
       {/* Reset Dialog */}

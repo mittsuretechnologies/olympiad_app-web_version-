@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Loader2, AlertCircle, Star } from 'lucide-react';
+import Image from 'next/image';
+import { Eye, EyeOff, Loader2, AlertCircle, LogIn } from 'lucide-react';
 
 export default function EvaluatorLoginPage() {
   const router = useRouter();
@@ -37,8 +38,8 @@ export default function EvaluatorLoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-[#004f9f]/5 via-white to-blue-50/30 flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-[#004f9f] mb-4 shadow-lg">
-            <Star className="text-white" size={24} />
+          <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl overflow-hidden mb-4 shadow-lg">
+            <Image src="/mittmee-icon.jpeg" alt="mittmee" width={56} height={56} className="h-full w-full object-cover" />
           </div>
           <h1 className="text-2xl font-black text-[#004f9f]">Evaluator Portal</h1>
           <p className="text-gray-400 text-sm mt-1">Sign in with your Evaluator credentials</p>
@@ -88,7 +89,7 @@ export default function EvaluatorLoginPage() {
             disabled={loading}
             className="w-full py-3 bg-[#004f9f] text-white text-sm font-bold rounded-xl hover:bg-[#003d7a] disabled:opacity-50 flex items-center justify-center gap-2 transition-colors"
           >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Star size={15} />}
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <LogIn size={15} />}
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </div>

@@ -172,7 +172,7 @@ export default function UploaderCredentialsPage() {
 
       <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span>Showing <span className="font-bold">{filtered.length}</span> of <span className="font-bold">{rows.length}</span></span>
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
 
       {/* Dialog */}

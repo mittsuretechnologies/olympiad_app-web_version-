@@ -602,7 +602,7 @@ export default function SchoolsPage() {
           Showing <span className="font-bold">{filteredSchools.length}</span> of{' '}
           <span className="font-bold">{schools.length}</span> records
         </span>
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
 
       {/* Manual Registration Modal */}
