@@ -19,6 +19,45 @@ export async function POST(
     const { id } = await params;
     const body = await request.json().catch(() => ({}));
     const action: 'password' | 'username' = body?.action || 'password';
+    const source: 'web' | 'app' = body?.source === 'app' ? 'app' : 'web';
+
+    if (source === 'app') {
+      const appUser = await prisma.appUser.findUnique({
+        where: { id },
+        select: { id: true, userId: true },
+      });
+      if (!appUser) {
+        return NextResponse.json({ message: 'Student not found' }, { status: 404 });
+      }
+
+      if (action === 'username') {
+        const newUserId: string = (body?.username || '').trim();
+        if (!newUserId) return NextResponse.json({ message: 'Username is required' }, { status: 400 });
+        const existing = await prisma.appUser.findFirst({
+          where: { userId: newUserId, id: { not: id } },
+        });
+        if (existing) return NextResponse.json({ message: 'Username already taken' }, { status: 409 });
+        const updated = await prisma.appUser.update({
+          where: { id },
+          data: { userId: newUserId },
+          select: { id: true, userId: true, updatedAt: true },
+        });
+        return NextResponse.json({ ...updated, action: 'username' });
+      }
+
+      // password
+      const customPassword: string | undefined = body?.password?.trim() || undefined;
+      const plainPassword = customPassword || generatePassword(10);
+      const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+      const updated = await prisma.appUser.update({
+        where: { id },
+        data: { password: hashedPassword, plainPassword },
+        select: { id: true, updatedAt: true },
+      });
+
+      return NextResponse.json({ ...updated, password: plainPassword, action: 'password' });
+    }
 
     const student = await prisma.student.findUnique({
       where: { id },

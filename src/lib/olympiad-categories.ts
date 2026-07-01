@@ -14,9 +14,8 @@ export const OLYMPIAD_CAT_A_SUBS = [
   'Any Other Special Talent',
 ];
 
-// Category B — Video 2 Submission
-// Nursery & LKG students: rhymes
-export const OLYMPIAD_CAT_B_NURSERY_LKG_SUBS = [
+// Cat B is class-dependent: Rhymes for PG/Nursery/LKG, Speech/Talent for UKG.
+export const OLYMPIAD_CAT_B_RHYMES_SUBS = [
   'Twinkle Twinkle Little Star',
   'Wheels on the Bus',
   'Johny Johny Yes Papa',
@@ -25,46 +24,25 @@ export const OLYMPIAD_CAT_B_NURSERY_LKG_SUBS = [
   'Humpty Dumpty Sat on a Wall',
   'Baa Baa Black Sheep',
   'Five Little Ducks',
-  'Any Other Favourite Rhyme',
+  'Any other favourite rhyme',
 ];
 
-// UKG students: speech / talent presentation
-export const OLYMPIAD_CAT_B_UKG_SUBS = [
+export const OLYMPIAD_CAT_B_SPEECH_SUBS = [
   'About Yourself',
   'About Your Family',
   'About Your School',
   'Any Topic',
 ];
 
-// Combined Cat B (all subs) — used for slot detection regardless of grade
-export const OLYMPIAD_CAT_B_SUBS = [
-  ...OLYMPIAD_CAT_B_NURSERY_LKG_SUBS,
-  ...OLYMPIAD_CAT_B_UKG_SUBS,
-];
-
-// Class codes that map to Nursery / LKG — anything not in this set is treated as UKG
-export const NURSERY_LKG_CLASS_CODES = ['nursery', 'lkg', 'pre-nursery', 'prenursery', 'pre_nursery', 'jr.kg', 'jrkg', 'jr kg', 'n', 'k'];
-
-// Prefix letters (last char of the school-prefix portion) that map to Nursery/LKG
-// e.g. "976586N0001" → prefix letter = 'N' → Nursery
-//      "976586K0005" → prefix letter = 'K' → LKG
-export const NURSERY_LKG_PREFIX_LETTERS = ['n', 'k'];
-
-export function isNurseryOrLkg(classCode: string | null | undefined, olympiadId?: string | null): boolean {
-  // 1. Try classCode first (explicit, set by admin)
-  if (classCode) {
-    return NURSERY_LKG_CLASS_CODES.includes(classCode.toLowerCase().trim());
-  }
-  // 2. Fall back to Olympiad ID prefix letter (last alpha char before the digits)
-  if (olympiadId) {
-    const match = olympiadId.match(/([A-Za-z]+)\d+$/);
-    if (match) {
-      const prefixLetter = match[1].slice(-1).toLowerCase(); // last letter of the prefix portion
-      return NURSERY_LKG_PREFIX_LETTERS.includes(prefixLetter);
-    }
-  }
-  return false;
+// classCode values from src/lib/classes.ts — UKG (U) gets the Speech/Talent list,
+// every other class (PG/Nursery/LKG/etc.) gets the Rhymes list.
+export function getCatBSubs(classCode: string | null | undefined): string[] {
+  return classCode === 'U' ? OLYMPIAD_CAT_B_SPEECH_SUBS : OLYMPIAD_CAT_B_RHYMES_SUBS;
 }
 
-export const OLYMPIAD_CAT_A_LABEL = 'Talent Performance';
-export const OLYMPIAD_CAT_B_LABEL = 'Rhymes / Speech';
+// Combined list of every possible Cat B subcategory — used for classification
+// checks (e.g. "is this video's subCategory a Cat B one?") regardless of class.
+export const OLYMPIAD_CAT_B_SUBS = [...OLYMPIAD_CAT_B_RHYMES_SUBS, ...OLYMPIAD_CAT_B_SPEECH_SUBS];
+
+export const OLYMPIAD_CAT_A_LABEL = 'Performing Art, Dance & Music';
+export const OLYMPIAD_CAT_B_LABEL = 'Rhymes / Speech & Talent Presentation';

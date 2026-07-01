@@ -112,9 +112,10 @@ export default function StudentCredentialsPage() {
     setResetBusy(true);
     setUsernameError('');
     try {
+      const source = resetTarget.student.source === 'app' ? 'app' : 'web';
       const body = resetAction === 'username'
-        ? { action: 'username', username: customUsername.trim() }
-        : { action: 'password', password: customPassword || undefined };
+        ? { action: 'username', username: customUsername.trim(), source }
+        : { action: 'password', password: customPassword || undefined, source };
 
       const res = await fetch(`/api/credentials/students/${resetTarget.student.id}/reset`, {
         method: 'POST',
@@ -318,7 +319,7 @@ export default function StudentCredentialsPage() {
 
       {/* Footer */}
       <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-500 flex justify-end items-center">
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
 
       {/* Reset Dialog */}

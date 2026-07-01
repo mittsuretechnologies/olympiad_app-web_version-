@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Lock, User, ChevronRight, AlertCircle, Loader2, School as SchoolIcon } from 'lucide-react';
+import Image from 'next/image';
+import { Lock, User, ChevronRight, AlertCircle, Loader2 } from 'lucide-react';
 
 export default function SchoolLoginPage() {
   const [username, setUsername] = useState('');
@@ -40,10 +41,10 @@ export default function SchoolLoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#DDE2F9] p-4">
       <div className="w-full max-w-md bg-white border border-gray-300 shadow-lg">
         <div className="bg-[#06013E] text-white px-6 py-4 border-b-4 border-[#FF9000] flex items-center gap-3">
-          <SchoolIcon className="w-5 h-5" />
+          <Image src="/mittmee-icon.jpeg" alt="mittmee" width={36} height={36} className="rounded-lg" />
           <div>
             <h1 className="text-base font-bold uppercase tracking-wider">School Portal Login</h1>
-            <p className="text-xs text-gray-300 mt-0.5">Mittsure Olympiad Management</p>
+            <p className="text-xs text-gray-300 mt-0.5">mittmee Olympiad Management</p>
           </div>
         </div>
 
@@ -106,7 +107,7 @@ export default function SchoolLoginPage() {
           </form>
 
           <div className="mt-7 pt-5 border-t border-gray-200 text-center text-xs text-gray-500">
-            Need help? Contact your Mittsure coordinator.
+            Need help? Contact your mittmee coordinator.
           </div>
         </div>
       </div>

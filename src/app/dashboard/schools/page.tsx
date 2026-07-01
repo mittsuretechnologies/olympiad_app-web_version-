@@ -48,6 +48,24 @@ interface School {
   isActive?: boolean;
 }
 
+const CLASS_OPTIONS = [
+  { name: 'Nursery', code: 'N' },
+  { name: 'LKG', code: 'L' },
+  { name: 'UKG', code: 'U' },
+  { name: 'Class 1', code: '1' },
+  { name: 'Class 2', code: '2' },
+  { name: 'Class 3', code: '3' },
+  { name: 'Class 4', code: '4' },
+  { name: 'Class 5', code: '5' },
+  { name: 'Class 6', code: '6' },
+  { name: 'Class 7', code: '7' },
+  { name: 'Class 8', code: '8' },
+  { name: 'Class 9', code: '9' },
+  { name: 'Class 10', code: '10' },
+  { name: 'Class 11', code: '11' },
+  { name: 'Class 12', code: '12' },
+];
+
 export default function SchoolsPage() {
   const router = useRouter();
   const {
@@ -72,8 +90,10 @@ export default function SchoolsPage() {
   const [allocLoading, setAllocLoading] = useState(false);
   const [showAllocateForm, setShowAllocateForm] = useState(false);
   const [allocPrefix, setAllocPrefix] = useState('');
-  const [allocCount, setAllocCount] = useState(50);
   const [allocPadding, setAllocPadding] = useState(4);
+  const [allocClasses, setAllocClasses] = useState<
+    { classCode: string; className: string; count: number }[]
+  >([{ classCode: '', className: '', count: 10 }]);
   const [allocBusy, setAllocBusy] = useState(false);
   const [sendBusy, setSendBusy] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
@@ -169,7 +189,7 @@ export default function SchoolsPage() {
     setViewSchool(school);
     setShowAllocateForm(false);
     setAllocError(null);
-    setAllocCount(50);
+    setAllocClasses([{ classCode: '', className: '', count: 10 }]);
     setAllocLoading(true);
 
     const crm = (school.olympiadId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase();
@@ -232,8 +252,17 @@ export default function SchoolsPage() {
       setAllocError('Prefix is required');
       return;
     }
-    if (!allocCount || allocCount < 1 || allocCount > 1000) {
-      setAllocError('Count must be between 1 and 1000');
+    if (allocClasses.some((c) => !c.className.trim())) {
+      setAllocError('Class is required for every row');
+      return;
+    }
+    const totalCount = allocClasses.reduce((sum, c) => sum + (c.count || 0), 0);
+    if (!totalCount || totalCount < 1 || totalCount > 1000) {
+      setAllocError('Total count across classes must be between 1 and 1000');
+      return;
+    }
+    if (allocClasses.some((c) => !c.count || c.count < 1)) {
+      setAllocError('Each class must have a count of at least 1');
       return;
     }
 
@@ -244,8 +273,12 @@ export default function SchoolsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prefix: allocPrefix.trim(),
-          count: allocCount,
           padding: allocPadding,
+          classes: allocClasses.map((c) => ({
+            classCode: c.classCode.trim(),
+            className: c.className.trim(),
+            count: c.count,
+          })),
         }),
       });
       const data = await res.json();
@@ -296,9 +329,10 @@ export default function SchoolsPage() {
   const exportAllocationsCSV = () => {
     if (!viewSchool || allocations.length === 0) return;
     const rows = [
-      ['Olympiad ID', 'Delivery', 'Allocated On'],
+      ['Olympiad ID', 'Class', 'Delivery', 'Allocated On'],
       ...allocations.map((a) => [
         a.code,
+        a.className || '',
         a.sentAt ? 'Delivered' : 'Pending',
         new Date(a.createdAt).toLocaleDateString(),
       ]),
@@ -602,7 +636,7 @@ export default function SchoolsPage() {
           Showing <span className="font-bold">{filteredSchools.length}</span> of{' '}
           <span className="font-bold">{schools.length}</span> records
         </span>
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
 
       {/* Manual Registration Modal */}
@@ -1118,8 +1152,8 @@ export default function SchoolsPage() {
                   onSubmit={handleAllocate}
                   className="bg-blue-50 border border-blue-200 p-4 space-y-3"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-2">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div>
                       <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
                         Prefix <span className="text-red-600">*</span>
                       </label>
@@ -1129,20 +1163,6 @@ export default function SchoolsPage() {
                         onChange={(e) => setAllocPrefix(e.target.value)}
                         className="w-full h-9 border border-gray-300 px-3 text-sm font-mono focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                         placeholder="e.g. MITT-DPS-26-"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
-                        Count <span className="text-red-600">*</span>
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={1000}
-                        value={allocCount}
-                        onChange={(e) => setAllocCount(parseInt(e.target.value || '0', 10))}
-                        className="w-full h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                         required
                       />
                     </div>
@@ -1159,16 +1179,110 @@ export default function SchoolsPage() {
                         className="w-full h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                       />
                     </div>
-                    <div className="md:col-span-2">
-                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
-                        Preview
-                      </label>
-                      <div className="h-9 bg-white border border-gray-300 px-3 flex items-center text-sm font-mono text-gray-700">
-                        {allocPrefix || '---'}
-                        {String(startSeq).padStart(Math.max(allocPadding, 1), '0')} ...{' '}
-                        {allocPrefix || '---'}
-                        {String(startSeq + (allocCount || 1) - 1).padStart(Math.max(allocPadding, 1), '0')}
-                      </div>
+                  </div>
+
+                  {/* Per-class breakdown */}
+                  <div>
+                    <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
+                      Class-wise Count <span className="text-red-600">*</span>
+                    </label>
+                    <div className="space-y-2">
+                      {allocClasses.map((row, idx) => (
+                        <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                          <select
+                            value={row.className}
+                            onChange={(e) => {
+                              const name = e.target.value;
+                              const match = CLASS_OPTIONS.find((c) => c.name === name);
+                              setAllocClasses((prev) =>
+                                prev.map((r, i) =>
+                                  i === idx
+                                    ? { ...r, className: name, classCode: match?.code ?? r.classCode }
+                                    : r
+                                )
+                              );
+                            }}
+                            className="col-span-5 h-9 border border-gray-300 px-3 text-sm bg-white focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                            required
+                          >
+                            <option value="" disabled>
+                              Select class
+                            </option>
+                            {CLASS_OPTIONS.map((c) => (
+                              <option key={c.name} value={c.name}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                          <input
+                            type="text"
+                            value={row.classCode}
+                            onChange={(e) => {
+                              const v = e.target.value.toUpperCase();
+                              setAllocClasses((prev) =>
+                                prev.map((r, i) => (i === idx ? { ...r, classCode: v } : r))
+                              );
+                            }}
+                            placeholder="Code (e.g. N)"
+                            className="col-span-3 h-9 border border-gray-300 px-3 text-sm font-mono focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                          />
+                          <input
+                            type="number"
+                            min={1}
+                            value={row.count}
+                            onChange={(e) => {
+                              const v = parseInt(e.target.value || '0', 10);
+                              setAllocClasses((prev) =>
+                                prev.map((r, i) => (i === idx ? { ...r, count: v } : r))
+                              );
+                            }}
+                            placeholder="Count"
+                            className="col-span-3 h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setAllocClasses((prev) =>
+                                prev.length > 1 ? prev.filter((_, i) => i !== idx) : prev
+                              )
+                            }
+                            disabled={allocClasses.length === 1}
+                            className="col-span-1 h-9 flex items-center justify-center text-red-600 hover:bg-red-50 disabled:opacity-30 disabled:hover:bg-transparent"
+                            title="Remove class"
+                          >
+                            <Trash className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setAllocClasses((prev) => [
+                          ...prev,
+                          { classCode: '', className: '', count: 10 },
+                        ])
+                      }
+                      className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[#004f9f] hover:underline"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Add another class
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
+                      Preview
+                    </label>
+                    <div className="h-9 bg-white border border-gray-300 px-3 flex items-center text-sm font-mono text-gray-700">
+                      {allocPrefix || '---'}
+                      {allocClasses[0]?.classCode || ''}
+                      {String(startSeq).padStart(Math.max(allocPadding, 1), '0')} ...{' '}
+                      {allocPrefix || '---'}
+                      {allocClasses[allocClasses.length - 1]?.classCode || ''}
+                      {String(
+                        startSeq + allocClasses.reduce((sum, c) => sum + (c.count || 0), 0) - 1
+                      ).padStart(Math.max(allocPadding, 1), '0')}
                     </div>
                   </div>
 
@@ -1192,7 +1306,9 @@ export default function SchoolsPage() {
                       disabled={allocBusy}
                       className="h-9 px-5 bg-[#009846] text-white font-semibold text-xs hover:bg-[#007a38] transition-colors disabled:opacity-50"
                     >
-                      {allocBusy ? 'Allocating...' : `Generate ${allocCount} IDs`}
+                      {allocBusy
+                        ? 'Allocating...'
+                        : `Generate ${allocClasses.reduce((sum, c) => sum + (c.count || 0), 0)} IDs`}
                     </button>
                   </div>
                 </form>
@@ -1211,6 +1327,9 @@ export default function SchoolsPage() {
                           Olympiad ID
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300">
+                          Class
+                        </th>
+                        <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300">
                           Delivery
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase">
@@ -1221,13 +1340,13 @@ export default function SchoolsPage() {
                     <tbody>
                       {allocLoading ? (
                         <tr>
-                          <td colSpan={4} className="py-8 text-center">
+                          <td colSpan={5} className="py-8 text-center">
                             <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#004f9f]" />
                           </td>
                         </tr>
                       ) : allocations.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">
+                          <td colSpan={5} className="py-8 text-center text-gray-500 text-sm">
                             No Olympiad IDs allocated yet. Click "Allocate New IDs" to generate.
                           </td>
                         </tr>
@@ -1244,6 +1363,9 @@ export default function SchoolsPage() {
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200 font-mono font-semibold text-[#004f9f]">
                               {a.code}
+                            </td>
+                            <td className="px-3 py-2 border-r border-gray-200 text-gray-700 text-xs">
+                              {a.className || '—'}
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200">
                               {a.sentAt ? (

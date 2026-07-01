@@ -42,9 +42,9 @@ export default function ReviewerLayout({ children }: { children: React.ReactNode
 
       {/* Sidebar */}
       <aside className="w-60 flex flex-col fixed h-screen z-50 bg-white border-r border-gray-200 shadow-sm">
-        <div className="px-4 border-b border-gray-100 flex-shrink-0 flex items-center justify-center overflow-hidden">
-          <Image src="/logo-CW-uU9TX.jpg" alt="Mittsure" width={160} height={52}
-            className="object-contain w-28 scale-[1.5] mix-blend-multiply -mt-3 -mb-3" priority />
+        <div className="px-4 py-4 border-b border-gray-100 flex-shrink-0 flex items-center justify-center gap-2">
+          <Image src="/mittmee-icon.jpeg" alt="mittmee" width={32} height={32} className="rounded-lg object-cover" priority />
+          <span className="text-base font-bold tracking-tight"><span className="text-[#1559C7]">mitt</span><span className="text-[#3CB043]">mee</span></span>
         </div>
 
         {/* Identity card */}

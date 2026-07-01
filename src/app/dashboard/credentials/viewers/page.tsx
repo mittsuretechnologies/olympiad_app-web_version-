@@ -115,7 +115,7 @@ export default function ViewerCredentialsPage() {
           Showing <span className="font-bold">{filtered.length}</span> of{' '}
           <span className="font-bold">{rows.length}</span>
         </span>
-        <span className="italic">Â© Mittsure Olympiad Portal</span>
+        <span className="italic">© mittmee</span>
       </div>
     </div>
     </div>
