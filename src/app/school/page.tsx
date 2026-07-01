@@ -29,6 +29,20 @@ interface Stats {
   }[];
 }
 
+function Sparkline({ color }: { color: string }) {
+  return (
+    <svg width="72" height="32" viewBox="0 0 72 32" fill="none" className="flex-shrink-0">
+      <path
+        d="M1 24 C8 26, 14 10, 21 14 C28 18, 32 6, 40 9 C48 12, 52 22, 59 16 C64 12, 67 18, 71 8"
+        stroke={color}
+        strokeWidth="2"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </svg>
+  );
+}
+
 function RingChart({ rate }: { rate: number }) {
   const r = 42;
   const circ = 2 * Math.PI * r;
@@ -76,33 +90,33 @@ export default function SchoolDashboardPage() {
     {
       label: 'Total Allocated IDs',
       value: stats?.totalAllocated ?? 0,
+      delta: null as string | null,
       icon: Hash,
-      color: 'bg-blue-200',
-      textColor: 'text-blue-700',
-      bg: 'bg-blue-100',
-      cardBg: 'bg-white',
+      iconBg: 'bg-[#1559C7]/10',
+      iconColor: 'text-[#1559C7]',
+      sparkColor: '#1559C7',
       link: '/school/olympiad-ids',
       linkText: 'View All IDs',
     },
     {
       label: 'Registered Students',
       value: stats?.totalRegistered ?? 0,
+      delta: stats ? `${stats.registrationRate}%` : null,
       icon: CheckCircle2,
-      color: 'bg-green-200',
-      textColor: 'text-green-700',
-      bg: 'bg-green-100',
-      cardBg: 'bg-white',
+      iconBg: 'bg-emerald-500/10',
+      iconColor: 'text-emerald-600',
+      sparkColor: '#10b981',
       link: '/school/registered-students',
       linkText: 'View Students',
     },
     {
       label: 'Pending Registrations',
       value: stats?.totalPending ?? 0,
+      delta: null as string | null,
       icon: AlertCircle,
-      color: 'bg-orange-200',
-      textColor: 'text-orange-600',
-      bg: 'bg-orange-100',
-      cardBg: 'bg-white',
+      iconBg: 'bg-amber-500/10',
+      iconColor: 'text-amber-600',
+      sparkColor: '#f59e0b',
       link: '/school/olympiad-ids',
       linkText: 'View Pending IDs',
     },
@@ -116,25 +130,28 @@ export default function SchoolDashboardPage() {
         {topStatCards.map((card) => {
           const Icon = card.icon;
           return (
-            <div key={card.label} className={`${card.cardBg} rounded-xl border border-gray-100 shadow-md relative overflow-hidden group`}>
-              <div className={`absolute top-0 left-0 w-1 h-full ${card.color}`} />
-              <div className="p-5">
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1">{card.label}</p>
-                    {loading ? (
-                      <div className="h-9 w-16 bg-gray-100 animate-pulse rounded" />
-                    ) : (
-                      <p className={`text-4xl font-black ${card.textColor}`}>{card.value}</p>
-                    )}
-                  </div>
-                  <div className={`p-3 rounded-xl ${card.bg} group-hover:scale-110 transition-transform`}>
-                    <Icon size={22} className={card.textColor} />
-                  </div>
+            <div key={card.label} className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] p-5">
+              <div className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-lg ${card.iconBg} flex items-center justify-center flex-shrink-0`}>
+                  <Icon size={16} className={card.iconColor} />
                 </div>
-                <Link href={card.link} className="inline-flex items-center gap-1.5 text-[10px] font-bold text-black hover:underline uppercase tracking-wider mt-1">
-                  {card.linkText} <ArrowRight size={10} />
-                </Link>
+                <p className="text-xs text-[#67748E] pt-1.5">{card.label}</p>
+              </div>
+              <div className="flex items-end justify-between mt-3">
+                <div className="min-w-0">
+                  {loading ? (
+                    <div className="h-7 w-16 bg-gray-100 animate-pulse rounded" />
+                  ) : (
+                    <p className="text-xl font-bold text-[#0D1A06]">
+                      {card.value}
+                      {card.delta && <span className="text-emerald-500 text-sm font-bold ml-1">+{card.delta}</span>}
+                    </p>
+                  )}
+                  <Link href={card.link} className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#67748E] hover:text-[#0D1A06] mt-1.5 transition-colors">
+                    {card.linkText} <ArrowRight size={9} />
+                  </Link>
+                </div>
+                <Sparkline color={card.sparkColor} />
               </div>
             </div>
           );
@@ -145,7 +162,7 @@ export default function SchoolDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         {/* Ring Chart */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-md flex flex-col items-center justify-center py-6 px-4">
+        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] flex flex-col items-center justify-center py-6 px-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-4">Registration Rate</p>
           <div className="relative">
             <RingChart rate={stats?.registrationRate ?? 0} />
@@ -167,7 +184,7 @@ export default function SchoolDashboardPage() {
         </div>
 
         {/* Class-wise Breakdown */}
-        <div className="lg:col-span-2 bg-white rounded-xl border border-gray-100 shadow-md">
+        <div className="lg:col-span-2 bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)]">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
             <BookOpen size={14} className="text-black" />
             <h2 className="text-xs font-bold uppercase tracking-widest text-black">Class-wise Registration Progress</h2>
@@ -216,7 +233,7 @@ export default function SchoolDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
 
         {/* Recent Registrations */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-md">
+        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)]">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity size={14} className="text-black" />
@@ -269,39 +286,40 @@ export default function SchoolDashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-100 shadow-md">
+        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)]">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
             <TrendingUp size={14} className="text-black" />
             <h2 className="text-xs font-bold uppercase tracking-widest text-black">Quick Actions</h2>
           </div>
           <div className="p-4 grid grid-cols-2 gap-3">
             {[
-              { label: 'View All IDs', sub: 'See allocated roll numbers', icon: Hash, href: '/school/olympiad-ids', color: 'text-blue-600', bg: 'bg-blue-50 hover:bg-blue-100' },
-              { label: 'My Students', sub: 'Registered student list', icon: Users, href: '/school/registered-students', color: 'text-green-600', bg: 'bg-green-50 hover:bg-green-100' },
-              { label: 'School Profile', sub: 'View school details', icon: Award, href: '/school/profile', color: 'text-purple-600', bg: 'bg-purple-50 hover:bg-purple-100' },
-              { label: 'Export Data', sub: 'Download CSV reports', icon: Clock, href: '/school/registered-students', color: 'text-orange-600', bg: 'bg-orange-50 hover:bg-orange-100' },
+              { label: 'View All IDs', sub: 'See allocated roll numbers', icon: Hash, href: '/school/olympiad-ids', color: 'text-[#1559C7]', bg: 'bg-[#1559C7]/[0.06] hover:bg-[#1559C7]/10' },
+              { label: 'My Students', sub: 'Registered student list', icon: Users, href: '/school/registered-students', color: 'text-emerald-600', bg: 'bg-emerald-500/[0.06] hover:bg-emerald-500/10' },
+              { label: 'School Profile', sub: 'Manage school details', icon: Award, href: '/school/profile', color: 'text-purple-600', bg: 'bg-purple-500/[0.06] hover:bg-purple-500/10' },
+              { label: 'Event Data', sub: 'View event statistics', icon: Clock, href: '/school/registered-students', color: 'text-amber-600', bg: 'bg-amber-500/[0.06] hover:bg-amber-500/10' },
             ].map((a) => {
               const Icon = a.icon;
               return (
                 <Link key={a.href + a.label} href={a.href}
-                  className={`${a.bg} border border-gray-200 hover:border-gray-300 shadow-sm hover:shadow-md rounded-lg p-4 transition-all group flex flex-col gap-2`}>
-                  <div className={`w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                    <Icon size={16} className={a.color} />
+                  className={`${a.bg} rounded-xl p-4 transition-all group relative`}>
+                  <div className={`w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center mb-2.5`}>
+                    <Icon size={15} className={a.color} />
                   </div>
-                  <div>
-                    <p className="text-xs font-bold text-black">{a.label}</p>
-                    <p className="text-[10px] text-gray-400 mt-0.5">{a.sub}</p>
-                  </div>
+                  <ArrowRight size={13} className={`absolute top-4 right-4 ${a.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
+                  <p className="text-xs font-bold text-[#0D1A06]">{a.label}</p>
+                  <p className="text-[10px] text-[#67748E] mt-0.5">{a.sub}</p>
                 </Link>
               );
             })}
           </div>
 
           {/* Info Panel */}
-          <div className="mx-4 mb-4 bg-[#06013E] text-white p-4 rounded-lg">
-            <p className="text-xs font-bold mb-1">How it works</p>
-            <p className="text-[10px] text-white/60 leading-relaxed">
-              Share the Olympiad ID (roll number) with each student. They register on the TalentOlympiad App using that ID — their profile then appears in your "My Students" section.
+          <div className="mx-4 mb-4 bg-gradient-to-br from-[#1559C7] to-[#3CB043] text-white p-5 rounded-2xl relative overflow-hidden">
+            <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/10" />
+            <div className="absolute -bottom-8 -left-4 w-16 h-16 rounded-full bg-white/10" />
+            <p className="text-sm font-bold mb-1.5 relative">How it works</p>
+            <p className="text-[11px] text-white/80 leading-relaxed relative">
+              Share the Olympiad ID (roll number) with each student. They register on the TalentOlympiad App using that ID — their profile then appears in your &quot;My Students&quot; section.
             </p>
           </div>
         </div>

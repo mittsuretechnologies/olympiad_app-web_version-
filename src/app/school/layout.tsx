@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -48,28 +48,29 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     .split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
 
   return (
-    <div className="flex min-h-screen bg-[#E7F5D9]">
+    <div className="min-h-screen bg-[#F7F9FC]" style={{ fontFamily: 'Inter, sans-serif' }}>
 
-      {/* â”€â”€ Sidebar â”€â”€ */}
-      <aside className="w-60 flex flex-col fixed h-screen z-50 bg-[#0D1A06]">
+      {/* Sidebar */}
+      <aside className="w-[260px] flex flex-col fixed top-0 h-screen z-40">
+        <div className="flex-1 flex flex-col bg-white border-r border-[#E7EBF2] overflow-hidden">
 
         {/* Logo */}
-        <div className="px-5 pt-5 pb-4 flex-shrink-0 flex items-center gap-2">
-          <div className="w-9 h-9 rounded-md flex items-center justify-center flex-shrink-0 overflow-hidden">
+        <div className="h-16 flex-shrink-0 flex items-center gap-2.5 px-6">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
             <Image
               src="/mittmee-icon.jpeg"
               alt="mittmee"
-              width={36}
-              height={36}
+              width={32}
+              height={32}
               className="object-cover w-full h-full"
               priority
             />
           </div>
-          <span className="text-sm font-bold tracking-tight"><span className="text-[#4FA8FF]">mitt</span><span className="text-[#7ED957]">mee</span></span>
+          <span className="text-lg font-bold tracking-tight"><span className="text-[#2357D8]">mitt</span><span className="text-[#1F2937]">mee</span></span>
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-3 space-y-1 overflow-y-auto pt-2">
+        <nav className="flex-1 px-3 space-y-1 overflow-y-auto pt-6">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.href === '/school'
@@ -79,74 +80,62 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${
+                className={`relative flex items-center gap-3 pl-4 pr-3 h-12 rounded-xl transition-colors duration-150 ${
                   isActive
-                    ? 'bg-white text-[#0D1A06] font-semibold shadow-sm'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
+                    ? 'bg-[#EEF4FF] text-[#2357D8]'
+                    : 'text-[#1F2937] hover:bg-[#F7F9FC]'
                 }`}
               >
-                <Icon size={16} strokeWidth={2.5} className={isActive ? 'text-[#0D1A06]' : 'text-white'} />
-                <span className="text-sm flex-1">{item.name}</span>
+                {isActive && (
+                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-[#2357D8]" />
+                )}
+                <Icon
+                  size={20}
+                  strokeWidth={1.75}
+                  className={isActive ? 'text-[#2357D8]' : 'text-[#64748B]'}
+                />
+                <span className={`text-[15px] leading-none flex-1 ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                  {item.name}
+                </span>
               </Link>
             );
           })}
         </nav>
 
-        {/* School identity card + Logout */}
-        <div className="p-3 flex-shrink-0 space-y-2">
-          <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-full bg-[#FF9000] text-[#0D1A06] font-black text-sm flex items-center justify-center flex-shrink-0">
-                {initials}
+        {/* Account switcher + Logout */}
+        <div className="px-3 pb-4 pt-3 flex-shrink-0">
+          <div className="rounded-xl border border-[#E7EBF2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3">
+            <div className="flex items-center gap-3">
+              <div className="relative flex-shrink-0">
+                <div className="w-9 h-9 rounded-full bg-[#2357D8] text-white font-semibold text-xs flex items-center justify-center">
+                  {initials}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
               </div>
               <div className="min-w-0">
-                <p className="text-white font-semibold text-xs leading-tight truncate">{user?.name || 'School'}</p>
-                <p className="text-white/40 text-[10px] font-mono mt-0.5">{user?.schoolId}</p>
-              </div>
-              <div className="ml-auto flex-shrink-0">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <p className="text-[#1F2937] font-semibold text-[13px] leading-tight truncate">{user?.name || 'School'}</p>
+                <p className="text-[#64748B] text-[11px] mt-0.5 truncate">{user?.schoolId}</p>
               </div>
             </div>
           </div>
+
           <button
             onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-white/60 hover:bg-white/10 hover:text-white transition-all"
+            className="w-full mt-3 flex items-center gap-3 px-3 h-11 rounded-xl text-[#64748B] hover:bg-[#F7F9FC] hover:text-[#1F2937] transition-colors duration-150"
           >
-            <LogOut size={15} />
-            <span className="text-sm font-semibold">Log out</span>
+            <LogOut size={18} strokeWidth={1.75} className="flex-shrink-0" />
+            <span className="text-[14px] font-medium">Log out</span>
           </button>
+        </div>
         </div>
       </aside>
 
-      {/* â”€â”€ Main content â”€â”€ */}
-      <main className="flex-1 ml-60 min-h-screen flex flex-col">
-
-        {/* Top bar */}
-        <header className="h-16 flex items-center justify-between px-8 flex-shrink-0 sticky top-0 z-40 bg-[#E7F5D9]">
-          <div className="flex items-center gap-2">
-            <span className="text-lg font-semibold text-[#0D1A06]">
-              {pathname === '/school' ? `Hello, ${(user?.name || 'School').split(' ')[0]}!`
-                : pathname.startsWith('/school/olympiad-ids') ? 'Olympiad IDs'
-                : pathname.startsWith('/school/registered-students') ? 'My Students'
-                : pathname.startsWith('/school/student-videos') ? 'Student Videos'
-                : pathname.startsWith('/school/upload-video') ? 'Upload Video'
-                : pathname.startsWith('/school/profile') ? 'School Profile'
-                : ''}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 hidden sm:block">{user?.name}</span>
-            <div className="w-8 h-8 rounded-full bg-[#0D1A06] text-[#FF9000] font-black text-[11px] flex items-center justify-center">
-              {initials}
-            </div>
-          </div>
-        </header>
-
-        <div className="flex-1 px-8 pb-8">
+      {/* Main content */}
+      <main className="ml-[260px] min-h-screen flex flex-col">
+        <div className="flex-1 px-8 pb-8 pt-8">
           <div className="max-w-7xl mx-auto">{children}</div>
         </div>
       </main>
     </div>
   );
 }
-
