@@ -5,6 +5,7 @@ import {
   Video, Star, Eye, Heart, BookOpen, Search,
   Filter, Calendar, Tag, Loader2
 } from 'lucide-react';
+import { getCategoryDisplayLabel } from '@/lib/olympiad-categories';
 
 interface VideoItem {
   id: string;
@@ -71,7 +72,7 @@ export default function StudentVideosPage() {
         if (
           !v.studentName.toLowerCase().includes(q) &&
           !v.olympiadCode.toLowerCase().includes(q) &&
-          !v.category.toLowerCase().includes(q) &&
+          !getCategoryDisplayLabel(v.category).toLowerCase().includes(q) &&
           !v.subCategory.toLowerCase().includes(q)
         ) return false;
       }
@@ -251,7 +252,7 @@ function VideoCard({ video: v, isPlaying, onPlay }: { video: VideoItem; isPlayin
 
         {/* Category */}
         <div className="flex flex-wrap gap-1.5">
-          <span className="text-[10px] font-semibold px-1.5 py-0.5 border border-gray-300 text-gray-600">{v.category}</span>
+          <span className="text-[10px] font-semibold px-1.5 py-0.5 border border-gray-300 text-gray-600">{getCategoryDisplayLabel(v.category)}</span>
           {v.subCategory && (
             <span className="text-[10px] font-semibold px-1.5 py-0.5 border border-gray-300 text-gray-600">{v.subCategory}</span>
           )}

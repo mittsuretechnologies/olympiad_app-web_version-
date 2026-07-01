@@ -70,8 +70,8 @@ function formatDate(iso: string) {
 }
 
 function getCategoryLabel(cat: string) {
-  if (OLYMPIAD_CAT_A_SUBS.includes(cat)) return { label: 'Cat A', color: 'bg-violet-50 text-violet-700 border-violet-200' };
-  if (OLYMPIAD_CAT_B_SUBS.includes(cat)) return { label: 'Cat B', color: 'bg-teal-50 text-teal-700 border-teal-200' };
+  if (OLYMPIAD_CAT_A_SUBS.includes(cat)) return { label: 'Talent Performance', color: 'bg-violet-50 text-violet-700 border-violet-200' };
+  if (OLYMPIAD_CAT_B_SUBS.includes(cat)) return { label: 'Rhymes / Speech', color: 'bg-teal-50 text-teal-700 border-teal-200' };
   return null;
 }
 
