@@ -93,7 +93,7 @@ export default function UploadVideoPage() {
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
     if (filled && !rejected) return 'filled';     // submitted (pending/approved)
-    if (rejected) return 'rejected';               // rejected â†’ re-upload allowed
+    if (rejected) return 'rejected';               // rejected → re-upload allowed
     return 'available';
   };
 

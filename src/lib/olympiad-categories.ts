@@ -1,3 +1,4 @@
+// Category A — Video 1 Submission (all grades)
 export const OLYMPIAD_CAT_A_SUBS = [
   'Dance',
   'Singing',
