@@ -88,13 +88,13 @@ export default function UploadVideoPage() {
   const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
 
   const getCatStatus = (catValue: string) => {
-    if (!slots) return 'available';
-    const isA = catValue === 'Cat A';
+    if (!slots) return ‘available’;
+    const isA = catValue === OLYMPIAD_CAT_A_LABEL;
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
-    if (filled && !rejected) return 'filled';     // submitted (pending/approved)
-    if (rejected) return 'rejected';               // rejected â†’ re-upload allowed
-    return 'available';
+    if (filled && !rejected) return ‘filled’;     // submitted (pending/approved)
+    if (rejected) return ‘rejected’;               // rejected -> re-upload allowed
+    return ‘available’;
   };
 
   function handleFile(file: File) {
@@ -303,17 +303,18 @@ export default function UploadVideoPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        {(['Cat A', 'Cat B'] as const).map((cat) => {
-                          const status = getCatStatus(cat);
+                        {([OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL] as const).map((catVal, idx) => {
+                          const status = getCatStatus(catVal);
+                          const shortLabel = idx === 0 ? 'Cat A' : 'Cat B';
                           return (
-                            <div key={cat} className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold border ${
+                            <div key={catVal} className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold border ${
                               status === 'filled'    ? 'bg-green-50 border-green-300 text-green-700' :
                               status === 'rejected'  ? 'bg-red-50 border-red-300 text-red-700' :
                               'bg-gray-50 border-gray-300 text-gray-600'
                             }`}>
                               {status === 'filled'   && <CheckCircle className="w-3 h-3" />}
                               {status === 'rejected' && <RefreshCw className="w-3 h-3" />}
-                              {cat} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
+                              {shortLabel} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
                             </div>
                           );
                         })}
