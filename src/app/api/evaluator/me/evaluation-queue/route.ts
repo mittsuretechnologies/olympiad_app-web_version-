@@ -15,7 +15,9 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    if (payload?.role !== 'EVALUATOR' || !payload?.id) {
+    // Real evaluators use this to work their queue; SuperAdmin/Reviewer get
+    // read-only visibility into the same queue for oversight purposes.
+    if (!['EVALUATOR', 'SUPERADMIN', 'REVIEWER'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 

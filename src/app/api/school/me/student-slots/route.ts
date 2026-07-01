@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
+import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
 
 export async function GET(request: Request) {
   try {
@@ -55,15 +56,13 @@ export async function GET(request: Request) {
       select: { category: true, status: true },
     });
 
-    // Cat A slot
+    // Cat A slot (matches current label, plus legacy 'Cat A' values from older records)
     const catAVideos = evalVideos.filter(v =>
-      v.category?.toLowerCase().includes('performing') ||
-      v.category?.toLowerCase().includes('cat a') ||
+      v.category === OLYMPIAD_CAT_A_LABEL ||
       v.category === 'Cat A'
     );
     const catBVideos = evalVideos.filter(v =>
-      v.category?.toLowerCase().includes('creative') ||
-      v.category?.toLowerCase().includes('cat b') ||
+      v.category === OLYMPIAD_CAT_B_LABEL ||
       v.category === 'Cat B'
     );
 

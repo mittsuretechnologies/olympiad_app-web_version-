@@ -35,8 +35,17 @@ const emptyScores: ScoreState = {
   overallScore: 0,
 };
 
-function getEvaluatorToken() {
-  return typeof window !== 'undefined' ? localStorage.getItem('evaluatorToken') || '' : '';
+// This page is used both by real evaluators and by SuperAdmin/Reviewer
+// (read-only oversight), so send whichever session token is present —
+// same role-detection order as dashboard/layout.tsx.
+function getAuthToken() {
+  if (typeof window === 'undefined') return '';
+  return (
+    localStorage.getItem('token') ||
+    localStorage.getItem('reviewerToken') ||
+    localStorage.getItem('evaluatorToken') ||
+    ''
+  );
 }
 
 export default function EvaluateContentPage() {
@@ -47,14 +56,31 @@ export default function EvaluateContentPage() {
   const [remarks, setRemarks] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const [loadError, setLoadError] = useState('');
   const [columns, setColumns] = useState(3);
   const [activeColor, setActiveColor] = useState('bg-blue-50');
 
+  // Only a real TalentEvaluator account can submit scores (the evaluation
+  // record's evaluatorId is a foreign key to that table) — SuperAdmin/Reviewer
+  // sessions get read-only visibility into the queue.
+  const [canScore, setCanScore] = useState(false);
+  useEffect(() => {
+    setCanScore(!!localStorage.getItem('evaluatorToken') && !localStorage.getItem('token'));
+  }, []);
+
   const fetchQueue = () => {
     setLoading(true);
-    fetch('/api/evaluator/me/evaluation-queue', { headers: { Authorization: `Bearer ${getEvaluatorToken()}` } })
-      .then(r => r.ok ? r.json() : [])
+    setLoadError('');
+    fetch('/api/evaluator/me/evaluation-queue', { headers: { Authorization: `Bearer ${getAuthToken()}` } })
+      .then(async r => {
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          throw new Error(data.message || 'Failed to load evaluation queue');
+        }
+        return r.json();
+      })
       .then(setQueue)
+      .catch(e => setLoadError(e.message || 'Failed to load evaluation queue'))
       .finally(() => setLoading(false));
   };
 
@@ -77,7 +103,7 @@ export default function EvaluateContentPage() {
     try {
       const res = await fetch('/api/evaluator/me/evaluate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getEvaluatorToken()}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
         body: JSON.stringify({ videoId: active.id, ...scores, remarks }),
       });
       const data = await res.json();
@@ -138,6 +164,14 @@ export default function EvaluateContentPage() {
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="h-56 bg-gray-100 rounded-2xl animate-pulse" />
           ))}
+        </div>
+      ) : loadError ? (
+        <div className="bg-red-50 border border-red-100 rounded-2xl shadow-sm p-12 flex flex-col items-center justify-center gap-3 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center">
+            <X size={28} className="text-red-500" />
+          </div>
+          <h2 className="text-lg font-bold text-gray-800">Couldn't load the queue</h2>
+          <p className="text-sm text-gray-400 max-w-sm">{loadError}</p>
         </div>
       ) : queue.length === 0 ? (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-12 flex flex-col items-center justify-center gap-3 text-center">
@@ -202,48 +236,57 @@ export default function EvaluateContentPage() {
 
               {/* Scoring */}
               <div className="space-y-4">
-                {CRITERIA.map(c => (
-                  <div key={c.key}>
-                    <div className="flex items-center justify-between mb-1.5">
-                      <label className="text-sm font-semibold text-gray-700">{c.label}</label>
-                      <span className="text-sm font-bold text-[#004f9f]">{scores[c.key]}/20</span>
+                {!canScore && (
+                  <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-semibold rounded-xl px-3 py-2">
+                    View-only — sign in with an evaluator account to score this submission.
+                  </div>
+                )}
+                <fieldset disabled={!canScore} className="space-y-4 disabled:opacity-60">
+                  {CRITERIA.map(c => (
+                    <div key={c.key}>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-sm font-semibold text-gray-700">{c.label}</label>
+                        <span className="text-sm font-bold text-[#004f9f]">{scores[c.key]}/20</span>
+                      </div>
+                      <input
+                        type="range" min={0} max={20} step={1}
+                        value={scores[c.key]}
+                        onChange={e => setScores(prev => ({ ...prev, [c.key]: Number(e.target.value) }))}
+                        className="w-full accent-[#06013E]"
+                      />
                     </div>
-                    <input
-                      type="range" min={0} max={20} step={1}
-                      value={scores[c.key]}
-                      onChange={e => setScores(prev => ({ ...prev, [c.key]: Number(e.target.value) }))}
-                      className="w-full accent-[#06013E]"
+                  ))}
+
+                  <div className="flex items-center justify-between bg-[#F6F9FF] rounded-xl px-4 py-3">
+                    <span className="text-sm font-bold text-gray-600 flex items-center gap-1.5">
+                      <Star className="w-4 h-4 text-[#FF9000]" /> Total Score
+                    </span>
+                    <span className="text-lg font-black text-[#06013E]">{total}/100</span>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-semibold text-gray-700 mb-1.5 block">Remarks (optional)</label>
+                    <textarea
+                      value={remarks} onChange={e => setRemarks(e.target.value)}
+                      rows={2}
+                      placeholder="Any notes for this submission..."
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 placeholder-gray-300 outline-none focus:border-[#06013E]/40 resize-none"
                     />
                   </div>
-                ))}
-
-                <div className="flex items-center justify-between bg-[#F6F9FF] rounded-xl px-4 py-3">
-                  <span className="text-sm font-bold text-gray-600 flex items-center gap-1.5">
-                    <Star className="w-4 h-4 text-[#FF9000]" /> Total Score
-                  </span>
-                  <span className="text-lg font-black text-[#06013E]">{total}/100</span>
-                </div>
-
-                <div>
-                  <label className="text-sm font-semibold text-gray-700 mb-1.5 block">Remarks (optional)</label>
-                  <textarea
-                    value={remarks} onChange={e => setRemarks(e.target.value)}
-                    rows={2}
-                    placeholder="Any notes for this submission..."
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 placeholder-gray-300 outline-none focus:border-[#06013E]/40 resize-none"
-                  />
-                </div>
+                </fieldset>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
 
-                <button
-                  onClick={handleSubmit}
-                  disabled={submitting}
-                  className="w-full bg-[#06013E] text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#0a0258] transition-colors disabled:opacity-50"
-                >
-                  {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
-                  {submitting ? 'Submitting...' : 'Submit Evaluation'}
-                </button>
+                {canScore && (
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting}
+                    className="w-full bg-[#06013E] text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#0a0258] transition-colors disabled:opacity-50"
+                  >
+                    {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}
+                    {submitting ? 'Submitting...' : 'Submit Evaluation'}
+                  </button>
+                )}
               </div>
             </div>
           </div>

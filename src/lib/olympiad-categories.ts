@@ -11,6 +11,9 @@ export const OLYMPIAD_CAT_A_SUBS = [
   'Cooking',
   'Sports (Any Activity)',
   'Poetry (Recitation)',
+  'Mimic',
+  'Skipping',
+  'Hula Hoop',
   'Any Other Special Talent',
 ];
 
@@ -28,10 +31,12 @@ export const OLYMPIAD_CAT_B_RHYMES_SUBS = [
 ];
 
 export const OLYMPIAD_CAT_B_SPEECH_SUBS = [
-  'About Yourself',
-  'About Your Family',
-  'About Your School',
-  'Any Topic',
+  'About Myself',
+  'About My Family',
+  'About My School',
+  'My Best Friend',
+  'My Favourite Toy',
+  'Any Other',
 ];
 
 // classCode values from src/lib/classes.ts — UKG (U) gets the Speech/Talent list,
@@ -44,5 +49,13 @@ export function getCatBSubs(classCode: string | null | undefined): string[] {
 // checks (e.g. "is this video's subCategory a Cat B one?") regardless of class.
 export const OLYMPIAD_CAT_B_SUBS = [...OLYMPIAD_CAT_B_RHYMES_SUBS, ...OLYMPIAD_CAT_B_SPEECH_SUBS];
 
-export const OLYMPIAD_CAT_A_LABEL = 'Performing Art, Dance & Music';
-export const OLYMPIAD_CAT_B_LABEL = 'Rhymes / Speech & Talent Presentation';
+export const OLYMPIAD_CAT_A_LABEL = 'Talent Performance';
+export const OLYMPIAD_CAT_B_LABEL = 'Rhymes / Speech';
+
+// Maps the internal stored category value ('Cat A' / 'Cat B') — or an
+// already-friendly label from older records — to the current display name.
+export function getCategoryDisplayLabel(category: string): string {
+  if (category === 'Cat A') return OLYMPIAD_CAT_A_LABEL;
+  if (category === 'Cat B') return OLYMPIAD_CAT_B_LABEL;
+  return category;
+}

@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw, Globe, EyeOff } from 'lucide-react';
-import { OLYMPIAD_CAT_A_SUBS, getCatBSubs } from '@/lib/olympiad-categories';
+import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, getCatBSubs } from '@/lib/olympiad-categories';
 
 type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
@@ -65,14 +65,14 @@ export default function UploadVideoPage() {
 
   const CATEGORIES = [
     {
-      label: 'Cat A – Performing Art, Dance & Music',
-      value: 'Cat A',
+      label: OLYMPIAD_CAT_A_LABEL,
+      value: OLYMPIAD_CAT_A_LABEL,
       icon: Music,
       subCategories: OLYMPIAD_CAT_A_SUBS,
     },
     {
-      label: selectedStudent?.classCode === 'U' ? 'Cat B – Speech / Talent Presentation' : 'Cat B – Rhymes Submission',
-      value: 'Cat B',
+      label: selectedStudent?.classCode === 'U' ? 'Speech / Talent' : OLYMPIAD_CAT_B_LABEL,
+      value: OLYMPIAD_CAT_B_LABEL,
       icon: Palette,
       subCategories: getCatBSubs(selectedStudent?.classCode),
     },
@@ -88,13 +88,13 @@ export default function UploadVideoPage() {
   const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
 
   const getCatStatus = (catValue: string) => {
-    if (!slots) return ‘available’;
+    if (!slots) return 'available';
     const isA = catValue === OLYMPIAD_CAT_A_LABEL;
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
-    if (filled && !rejected) return ‘filled’;     // submitted (pending/approved)
-    if (rejected) return ‘rejected’;               // rejected -> re-upload allowed
-    return ‘available’;
+    if (filled && !rejected) return 'filled';     // submitted (pending/approved)
+    if (rejected) return 'rejected';               // rejected → re-upload allowed
+    return 'available';
   };
 
   function handleFile(file: File) {
@@ -105,7 +105,7 @@ export default function UploadVideoPage() {
     setVideoPreview(URL.createObjectURL(file));
   }
 
-  const isCustomTalent = subCategory === 'Any Other Special Talent';
+  const isCustomTalent = subCategory === 'Any Other Special Talent' || subCategory === 'Any Other';
   const finalSubCategory = isCustomTalent ? customTalent.trim() : subCategory;
 
   async function handleSubmit(e: React.FormEvent) {
@@ -115,7 +115,7 @@ export default function UploadVideoPage() {
       return;
     }
     if (isCustomTalent && !customTalent.trim()) {
-      setErrorMsg('Please enter the talent name.');
+      setErrorMsg('Please enter the topic.');
       return;
     }
     setErrorMsg('');
@@ -303,18 +303,17 @@ export default function UploadVideoPage() {
                       </div>
                     ) : (
                       <div className="flex items-center gap-2">
-                        {([OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL] as const).map((catVal, idx) => {
-                          const status = getCatStatus(catVal);
-                          const shortLabel = idx === 0 ? 'Cat A' : 'Cat B';
+                        {CATEGORIES.map((catInfo) => {
+                          const status = getCatStatus(catInfo.value);
                           return (
-                            <div key={catVal} className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold border ${
+                            <div key={catInfo.value} className={`flex items-center gap-1.5 px-2 py-1 text-[11px] font-bold border ${
                               status === 'filled'    ? 'bg-green-50 border-green-300 text-green-700' :
                               status === 'rejected'  ? 'bg-red-50 border-red-300 text-red-700' :
                               'bg-gray-50 border-gray-300 text-gray-600'
                             }`}>
                               {status === 'filled'   && <CheckCircle className="w-3 h-3" />}
                               {status === 'rejected' && <RefreshCw className="w-3 h-3" />}
-                              {shortLabel} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
+                              {catInfo.label} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
                             </div>
                           );
                         })}
@@ -497,7 +496,7 @@ export default function UploadVideoPage() {
                 </p>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedCat.subCategories.map(sub => (
-                    <button key={sub} type="button" onClick={() => { setSubCategory(sub); if (sub !== 'Any Other Special Talent') setCustomTalent(''); }}
+                    <button key={sub} type="button" onClick={() => { setSubCategory(sub); if (sub !== 'Any Other Special Talent' && sub !== 'Any Other') setCustomTalent(''); }}
                       className={`px-2.5 py-1.5 text-xs font-semibold border transition-all ${
                         subCategory === sub
                           ? 'bg-[#06013E] text-white border-[#06013E]'
@@ -512,13 +511,13 @@ export default function UploadVideoPage() {
                 {isCustomTalent && (
                   <div className="mt-3">
                     <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-500 mb-1.5">
-                      Talent Name <span className="text-red-600">*</span>
+                      {subCategory === 'Any Other' ? 'Topic' : 'Talent Name'} <span className="text-red-600">*</span>
                     </label>
                     <input
                       type="text"
                       value={customTalent}
                       onChange={e => setCustomTalent(e.target.value)}
-                      placeholder="Enter the talent name..."
+                      placeholder={subCategory === 'Any Other' ? 'Enter the topic...' : 'Enter the talent name...'}
                       autoFocus
                       className="w-full border border-gray-300 px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-[#06013E] transition-colors"
                     />
