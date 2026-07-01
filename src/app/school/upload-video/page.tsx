@@ -194,7 +194,7 @@ export default function UploadVideoPage() {
           )}
 
           <p className="text-xs text-gray-500 mb-7">Status will update after admin review.</p>
-          <button onClick={reset} className="bg-[#06013E] text-white px-6 py-2.5 text-sm font-semibold hover:bg-[#100a52] transition-colors">
+          <button onClick={reset} className="bg-[#2357D8] text-white px-6 py-2.5 text-sm font-semibold rounded-full hover:bg-[#1D4ED8] transition-colors">
             Upload Another
           </button>
         </div>
@@ -556,7 +556,7 @@ export default function UploadVideoPage() {
             <button
               type="submit"
               disabled={uploadState === 'uploading' || uploadState === 'saving'}
-              className="w-full bg-[#06013E] text-white py-3 text-sm font-semibold flex items-center justify-center gap-2.5 hover:bg-[#100a52] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-[#2357D8] text-white py-3 text-sm font-semibold rounded-full flex items-center justify-center gap-2.5 hover:bg-[#1D4ED8] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Upload className="w-4 h-4" />
               {uploadState === 'uploading' ? 'Uploading...' : uploadState === 'saving' ? 'Saving...' : 'Upload Video'}

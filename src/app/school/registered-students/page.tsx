@@ -104,9 +104,9 @@ export default function SchoolRegisteredStudentsPage() {
           <button
             onClick={exportCSV}
             disabled={filtered.length === 0}
-            className="inline-flex items-center gap-1.5 bg-white text-[#06013E] px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 transition-colors border border-gray-300 disabled:opacity-40"
+            className="inline-flex items-center gap-1.5 bg-white text-[#1F2937] px-4 py-2 text-xs font-semibold rounded-full hover:bg-gray-50 transition-colors border border-[#E7EBF2] disabled:opacity-40"
           >
-            <Download size={13} /> Export CSV
+            <Download size={14} /> Export CSV
           </button>
         </div>
 

@@ -308,13 +308,13 @@ export default function SchoolOlympiadIdsPage() {
             <h1 className="text-[13px] font-bold text-[#06013E] uppercase tracking-wide">Olympiad ID Allotment</h1>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={openAllotModal}
-              className="inline-flex items-center gap-1.5 bg-[#06013E] text-white px-3 py-1.5 text-xs font-semibold hover:bg-[#100a52] transition-colors border border-[#06013E]">
-              <UserPlus size={13} /> Allot Student
-            </button>
             <button onClick={exportCSV} disabled={filtered.length === 0}
-              className="inline-flex items-center gap-1.5 bg-white text-[#06013E] px-3 py-1.5 text-xs font-semibold hover:bg-gray-50 transition-colors border border-gray-300 disabled:opacity-40">
-              <Download size={13} /> Export CSV
+              className="inline-flex items-center gap-1.5 bg-white text-[#1F2937] px-4 py-2 text-xs font-semibold rounded-full hover:bg-gray-50 transition-colors border border-[#E7EBF2] disabled:opacity-40">
+              <Download size={14} /> Export CSV
+            </button>
+            <button onClick={openAllotModal}
+              className="inline-flex items-center gap-1.5 bg-[#2357D8] text-white px-4 py-2 text-xs font-semibold rounded-full hover:bg-[#1D4ED8] transition-colors">
+              <UserPlus size={14} /> Allot Student
             </button>
           </div>
         </div>
@@ -530,11 +530,11 @@ export default function SchoolOlympiadIdsPage() {
               </div>
               <div className="flex gap-2">
                 <button onClick={closeModal}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                  className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-[#1F2937] text-sm font-semibold hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
                 <button onClick={handleAssign} disabled={assigning}
-                  className="flex-1 py-2.5 bg-[#06013E] text-white text-sm font-semibold hover:bg-[#100a52] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  className="flex-1 py-2.5 rounded-full bg-[#2357D8] text-white text-sm font-semibold hover:bg-[#1D4ED8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                   {assigning ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
                   {modal.current ? 'Update' : 'Assign'}
                 </button>
@@ -593,11 +593,11 @@ export default function SchoolOlympiadIdsPage() {
               </div>
               <div className="flex gap-2">
                 <button onClick={closeEditAppModal}
-                  className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                  className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-[#1F2937] text-sm font-semibold hover:bg-gray-50 transition-colors">
                   Cancel
                 </button>
                 <button onClick={handleEditApp} disabled={editingApp}
-                  className="flex-1 py-2.5 bg-[#06013E] text-white text-sm font-semibold hover:bg-[#100a52] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                  className="flex-1 py-2.5 rounded-full bg-[#2357D8] text-white text-sm font-semibold hover:bg-[#1D4ED8] transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                   {editingApp ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
                   Update
                 </button>
@@ -649,7 +649,7 @@ export default function SchoolOlympiadIdsPage() {
                   Student can now log in to the app using their phone number and password.
                 </p>
                 <button onClick={closeRegModal}
-                  className="w-full py-2.5 bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors">
+                  className="w-full py-2.5 rounded-full bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors">
                   Done
                 </button>
               </div>
@@ -698,11 +698,11 @@ export default function SchoolOlympiadIdsPage() {
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button onClick={closeRegModal}
-                    className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                    className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-[#1F2937] text-sm font-semibold hover:bg-gray-50 transition-colors">
                     Cancel
                   </button>
                   <button onClick={handleRegister} disabled={registering}
-                    className="flex-1 py-2.5 bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="flex-1 py-2.5 rounded-full bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                     {registering ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
                     Register
                   </button>
@@ -755,11 +755,11 @@ export default function SchoolOlympiadIdsPage() {
                 </p>
                 <div className="flex gap-2">
                   <button onClick={openAllotModal}
-                    className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                    className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-[#1F2937] text-sm font-semibold hover:bg-gray-50 transition-colors">
                     Allot Another
                   </button>
                   <button onClick={closeAllotModal}
-                    className="flex-1 py-2.5 bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors">
+                    className="flex-1 py-2.5 rounded-full bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors">
                     Done
                   </button>
                 </div>
@@ -804,11 +804,11 @@ export default function SchoolOlympiadIdsPage() {
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button onClick={closeAllotModal}
-                    className="flex-1 py-2.5 border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                    className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-[#1F2937] text-sm font-semibold hover:bg-gray-50 transition-colors">
                     Cancel
                   </button>
                   <button onClick={handleAllot} disabled={allotting}
-                    className="flex-1 py-2.5 bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                    className="flex-1 py-2.5 rounded-full bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
                     {allotting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
                     Allot
                   </button>

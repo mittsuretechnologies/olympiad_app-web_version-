@@ -48,25 +48,25 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     .split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC]" style={{ fontFamily: 'Inter, sans-serif' }}>
+    <div className="min-h-screen bg-[#F1F3F7]" style={{ fontFamily: 'Inter, sans-serif' }}>
 
       {/* Sidebar */}
-      <aside className="w-[260px] flex flex-col fixed top-0 h-screen z-40">
-        <div className="flex-1 flex flex-col bg-white border-r border-[#E7EBF2] overflow-hidden">
+      <aside className="w-[220px] flex flex-col fixed top-0 h-screen z-40">
+        <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Logo */}
         <div className="h-16 flex-shrink-0 flex items-center gap-2.5 px-6">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+          <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
             <Image
               src="/mittmee-icon.jpeg"
               alt="mittmee"
-              width={32}
-              height={32}
+              width={44}
+              height={44}
               className="object-cover w-full h-full"
               priority
             />
           </div>
-          <span className="text-lg font-bold tracking-tight"><span className="text-[#2357D8]">mitt</span><span className="text-[#1F2937]">mee</span></span>
+          <span className="text-xl font-bold tracking-tight"><span className="text-[#2357D8]">mitt</span><span className="text-[#3CB043]">mee</span></span>
         </div>
 
         {/* Nav items */}
@@ -82,8 +82,8 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
                 href={item.href}
                 className={`relative flex items-center gap-3 pl-4 pr-3 h-12 rounded-xl transition-colors duration-150 ${
                   isActive
-                    ? 'bg-[#EEF4FF] text-[#2357D8]'
-                    : 'text-[#1F2937] hover:bg-[#F7F9FC]'
+                    ? 'bg-white text-[#2357D8] shadow-[0_1px_2px_rgba(16,24,40,0.06)]'
+                    : 'text-[#1F2937] hover:bg-white/60'
                 }`}
               >
                 {isActive && (
@@ -121,7 +121,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
 
           <button
             onClick={handleLogout}
-            className="w-full mt-3 flex items-center gap-3 px-3 h-11 rounded-xl text-[#64748B] hover:bg-[#F7F9FC] hover:text-[#1F2937] transition-colors duration-150"
+            className="w-full mt-3 flex items-center gap-3 px-3 h-11 rounded-xl text-[#64748B] hover:bg-white/60 hover:text-[#1F2937] transition-colors duration-150"
           >
             <LogOut size={18} strokeWidth={1.75} className="flex-shrink-0" />
             <span className="text-[14px] font-medium">Log out</span>
@@ -131,9 +131,9 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
       </aside>
 
       {/* Main content */}
-      <main className="ml-[260px] min-h-screen flex flex-col">
-        <div className="flex-1 px-8 pb-8 pt-8">
-          <div className="max-w-7xl mx-auto">{children}</div>
+      <main className="ml-[220px] min-h-screen flex flex-col py-3 pr-3">
+        <div className="flex-1 bg-white border border-[#E7EBF2] rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-8 py-8 max-w-7xl mx-auto">{children}</div>
         </div>
       </main>
     </div>
