@@ -137,7 +137,6 @@ model VideoEvaluation {
   creativityScore   Int
   techniqueScore    Int
   presentationScore Int
-  overallScore      Int
   totalScore        Int
   remarks           String?
   createdAt         DateTime        @default(now())

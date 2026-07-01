@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 
-const MAX_PER_CRITERION = 20;
+const MAX_PER_CRITERION = 5;
 
 export async function POST(request: Request) {
   try {
@@ -21,9 +21,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
-    const { videoId, confidenceScore, creativityScore, techniqueScore, presentationScore, overallScore, remarks } = await request.json();
+    const { videoId, confidenceScore, creativityScore, techniqueScore, presentationScore, remarks } = await request.json();
 
-    const scores = { confidenceScore, creativityScore, techniqueScore, presentationScore, overallScore };
+    const scores = { confidenceScore, creativityScore, techniqueScore, presentationScore };
     for (const [key, val] of Object.entries(scores)) {
       if (typeof val !== 'number' || val < 0 || val > MAX_PER_CRITERION) {
         return NextResponse.json({ message: `${key} must be between 0 and ${MAX_PER_CRITERION}` }, { status: 400 });
@@ -36,7 +36,7 @@ export async function POST(request: Request) {
     if (!video.isEvaluation) return NextResponse.json({ message: 'This video is not an olympiad evaluation submission' }, { status: 400 });
     if (video.evaluation) return NextResponse.json({ message: 'This video has already been evaluated' }, { status: 409 });
 
-    const totalScore = confidenceScore + creativityScore + techniqueScore + presentationScore + overallScore;
+    const totalScore = confidenceScore + creativityScore + techniqueScore + presentationScore;
 
     const evaluation = await prisma.videoEvaluation.create({
       data: {
@@ -46,7 +46,6 @@ export async function POST(request: Request) {
         creativityScore,
         techniqueScore,
         presentationScore,
-        overallScore,
         totalScore,
         remarks: remarks?.trim() || null,
       },

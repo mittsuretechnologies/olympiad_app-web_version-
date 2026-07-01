@@ -17,12 +17,13 @@ interface QueueVideo {
   schoolName: string | null;
 }
 
+const MAX_PER_CRITERION = 5;
+
 const CRITERIA = [
   { key: 'confidenceScore',   label: 'Confidence & Stage Presence' },
   { key: 'creativityScore',   label: 'Creativity & Originality' },
   { key: 'techniqueScore',    label: 'Technique & Skill' },
-  { key: 'presentationScore', label: 'Presentation & Clarity' },
-  { key: 'overallScore',      label: 'Overall Impact' },
+  { key: 'presentationScore', label: 'Presentation & Overall Impact' },
 ] as const;
 
 type ScoreState = Record<typeof CRITERIA[number]['key'], number>;
@@ -32,7 +33,6 @@ const emptyScores: ScoreState = {
   creativityScore: 0,
   techniqueScore: 0,
   presentationScore: 0,
-  overallScore: 0,
 };
 
 // This page is used both by real evaluators and by SuperAdmin/Reviewer
@@ -141,7 +141,7 @@ export default function EvaluateContentPage() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-medium text-[#004f9f]">Evaluate Content</h1>
-          <p className="text-sm text-gray-400 mt-1">Score olympiad participation videos out of 100 (5 criteria × 20 marks).</p>
+          <p className="text-sm text-gray-400 mt-1">Score each video out of 20 (4 criteria × 5 marks).</p>
         </div>
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1">
           <LayoutGrid size={14} className="text-gray-400 ml-1.5" />
@@ -246,10 +246,21 @@ export default function EvaluateContentPage() {
                     <div key={c.key}>
                       <div className="flex items-center justify-between mb-1.5">
                         <label className="text-sm font-semibold text-gray-700">{c.label}</label>
-                        <span className="text-sm font-bold text-[#004f9f]">{scores[c.key]}/20</span>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="number" min={0} max={MAX_PER_CRITERION} step={1}
+                            value={scores[c.key]}
+                            onChange={e => {
+                              const v = Math.min(MAX_PER_CRITERION, Math.max(0, Number(e.target.value) || 0));
+                              setScores(prev => ({ ...prev, [c.key]: v }));
+                            }}
+                            className="w-16 h-9 border border-gray-300 rounded-lg text-base font-bold text-center text-[#004f9f] outline-none focus:border-[#06013E]/40"
+                          />
+                          <span className="text-sm font-bold text-[#004f9f]">/{MAX_PER_CRITERION}</span>
+                        </div>
                       </div>
                       <input
-                        type="range" min={0} max={20} step={1}
+                        type="range" min={0} max={MAX_PER_CRITERION} step={1}
                         value={scores[c.key]}
                         onChange={e => setScores(prev => ({ ...prev, [c.key]: Number(e.target.value) }))}
                         className="w-full accent-[#06013E]"
@@ -261,7 +272,7 @@ export default function EvaluateContentPage() {
                     <span className="text-sm font-bold text-gray-600 flex items-center gap-1.5">
                       <Star className="w-4 h-4 text-[#FF9000]" /> Total Score
                     </span>
-                    <span className="text-lg font-black text-[#06013E]">{total}/100</span>
+                    <span className="text-lg font-black text-[#06013E]">{total}/20</span>
                   </div>
 
                   <div>

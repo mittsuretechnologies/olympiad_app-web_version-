@@ -51,7 +51,6 @@ export async function GET(request: Request) {
       creativityScore: e.creativityScore,
       techniqueScore: e.techniqueScore,
       presentationScore: e.presentationScore,
-      overallScore: e.overallScore,
       totalScore: e.totalScore,
       remarks: e.remarks,
       createdAt: e.createdAt,
