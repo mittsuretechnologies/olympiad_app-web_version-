@@ -22,6 +22,7 @@ interface QueueVideo {
     presentationScore: number;
     remarks: string | null;
   } | null;
+  isPublished?: boolean;
 }
 
 const MAX_PER_CRITERION = 5;
@@ -48,9 +49,9 @@ const emptyScores: ScoreState = {
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
   return (
-    localStorage.getItem('token') ||
-    localStorage.getItem('reviewerToken') ||
-    localStorage.getItem('evaluatorToken') ||
+    sessionStorage.getItem('token') ||
+    sessionStorage.getItem('reviewerToken') ||
+    sessionStorage.getItem('evaluatorToken') ||
     ''
   );
 }
@@ -70,7 +71,7 @@ export default function EvaluateContentPage() {
   // Both TalentEvaluator and SuperAdmin accounts can submit scores.
   const [canScore, setCanScore] = useState(false);
   useEffect(() => {
-    setCanScore(!!localStorage.getItem('evaluatorToken') || !!localStorage.getItem('token'));
+    setCanScore(!!sessionStorage.getItem('evaluatorToken') || !!sessionStorage.getItem('token'));
   }, []);
 
   const fetchQueue = () => {
@@ -270,7 +271,12 @@ export default function EvaluateContentPage() {
                     View-only — sign in with an evaluator account to score this submission.
                   </div>
                 )}
-                <fieldset disabled={!canScore} className="space-y-4 disabled:opacity-60">
+                {active.isPublished && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 text-xs font-semibold rounded-xl px-3 py-2">
+                    This evaluation is published and locked. Unpublish it from Evaluation History to make changes.
+                  </div>
+                )}
+                <fieldset disabled={!canScore || active.isPublished} className="space-y-4 disabled:opacity-60">
                   {CRITERIA.map(c => (
                     <div key={c.key}>
                       <div className="flex items-center justify-between mb-1.5">
@@ -317,7 +323,7 @@ export default function EvaluateContentPage() {
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
 
-                {canScore && (
+                {canScore && !active.isPublished && (
                   <button
                     onClick={handleSubmit}
                     disabled={submitting}

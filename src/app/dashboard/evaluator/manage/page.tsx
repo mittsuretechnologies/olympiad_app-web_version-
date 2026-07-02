@@ -12,6 +12,11 @@ interface Evaluator {
   createdAt: string;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = sessionStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function ManageEvaluatorsPage() {
   const [rows, setRows] = useState<Evaluator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,7 +31,7 @@ export default function ManageEvaluatorsPage() {
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    fetch('/api/credentials/evaluators')
+    fetch('/api/credentials/evaluators', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
@@ -48,7 +53,7 @@ export default function ManageEvaluatorsPage() {
     try {
       const res = await fetch('/api/credentials/evaluators', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ name, email, password }),
       });
       const data = await res.json();
@@ -66,15 +71,20 @@ export default function ManageEvaluatorsPage() {
     setRows(prev => prev.map(x => x.id === r.id ? { ...x, isActive: !r.isActive } : x));
     await fetch(`/api/credentials/evaluators/${r.id}`, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ isActive: !r.isActive }),
     });
   };
 
   const handleDelete = async (r: Evaluator) => {
     if (!confirm(`Delete evaluator ${r.name}? This cannot be undone.`)) return;
+    const res = await fetch(`/api/credentials/evaluators/${r.id}`, { method: 'DELETE', headers: authHeaders() });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.message || 'Failed to delete evaluator');
+      return;
+    }
     setRows(prev => prev.filter(x => x.id !== r.id));
-    await fetch(`/api/credentials/evaluators/${r.id}`, { method: 'DELETE' });
   };
 
   const stats = { total: rows.length, active: rows.filter(r => r.isActive).length };

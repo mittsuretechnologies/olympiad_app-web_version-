@@ -14,7 +14,7 @@ export default function ReviewerLayout({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (pathname === '/reviewer/login') { setReady(true); return; }
-    const token = localStorage.getItem('reviewerToken');
+    const token = sessionStorage.getItem('reviewerToken');
     const raw = localStorage.getItem('reviewerUser');
     if (!token || !raw) { router.replace('/reviewer/login'); return; }
     try { setUser(JSON.parse(raw)); setReady(true); }
@@ -22,7 +22,7 @@ export default function ReviewerLayout({ children }: { children: React.ReactNode
   }, [router, pathname]);
 
   const handleLogout = () => {
-    localStorage.removeItem('reviewerToken');
+    sessionStorage.removeItem('reviewerToken');
     localStorage.removeItem('reviewerUser');
     router.replace('/reviewer/login');
   };

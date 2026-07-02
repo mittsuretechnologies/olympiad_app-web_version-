@@ -129,7 +129,7 @@ export default function EvaluationProgressPage() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   useEffect(() => {
-    setIsSuperAdmin(!!localStorage.getItem('token'));
+    setIsSuperAdmin(!!sessionStorage.getItem('token'));
   }, []);
 
   /* ── Derived Filters ────── */

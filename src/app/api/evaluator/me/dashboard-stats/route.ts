@@ -47,7 +47,12 @@ export async function GET(request: Request) {
         include: {
           video: {
             include: {
-              student: { select: { name: true, olympiadCode: true } },
+              student: {
+                select: {
+                  name: true, olympiadCode: true,
+                  allocation: { select: { assignedName: true } },
+                },
+              },
             },
           },
         },
@@ -86,18 +91,31 @@ export async function GET(request: Request) {
 
     const appUserById = new Map(appUsers.map(u => [u.id, u]));
 
-    const formattedRecent = recentEvaluations.map(e => ({
-      id: e.id,
-      videoId: e.videoId,
-      videoUrl: e.video.videoUrl,
-      thumbnailUrl: e.video.thumbnailUrl,
-      category: e.video.category,
-      subCategory: e.video.subCategory,
-      studentName: e.video.student?.name || appUserById.get(e.video.appUserId || '')?.userId || '-',
-      olympiadCode: e.video.student?.olympiadCode || appUserById.get(e.video.appUserId || '')?.olympiadId || '-',
-      totalScore: e.totalScore,
-      createdAt: e.createdAt,
-    }));
+    const appOlympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
+    const appAllocations = appOlympiadCodes.length > 0
+      ? await prisma.olympiadIdAllocation.findMany({
+          where: { code: { in: appOlympiadCodes } },
+          select: { code: true, assignedName: true },
+        })
+      : [];
+    const allocByCode = new Map(appAllocations.map(a => [a.code, a]));
+
+    const formattedRecent = recentEvaluations.map(e => {
+      const appUser = appUserById.get(e.video.appUserId || '');
+      const appAlloc = appUser?.olympiadId ? allocByCode.get(appUser.olympiadId) : null;
+      return {
+        id: e.id,
+        videoId: e.videoId,
+        videoUrl: e.video.videoUrl,
+        thumbnailUrl: e.video.thumbnailUrl,
+        category: e.video.category,
+        subCategory: e.video.subCategory,
+        studentName: e.video.student?.allocation?.assignedName || e.video.student?.name || appAlloc?.assignedName || appUser?.userId || '-',
+        olympiadCode: e.video.student?.olympiadCode || appUser?.olympiadId || '-',
+        totalScore: e.totalScore,
+        createdAt: e.createdAt,
+      };
+    });
 
     const totalPending = pendingStudentCount + pendingAppUserCount;
 

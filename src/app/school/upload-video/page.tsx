@@ -35,7 +35,7 @@ export default function UploadVideoPage() {
   const [lastVideoMeta, setLastVideoMeta] = useState<{ isEvaluation: boolean; category: string; subCategory: string } | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const token = typeof window !== 'undefined' ? localStorage.getItem('schoolToken') || '' : '';
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') || '' : '';
 
   useEffect(() => {
     fetch('/api/school/me/upload-students', { headers: { Authorization: `Bearer ${token}` } })

@@ -113,6 +113,11 @@ function ModuleList({
   );
 }
 
+function authHeaders(): Record<string, string> {
+  const token = sessionStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function PermissionControlPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('global');
   const [activeRole, setActiveRole] = useState<RoleKey>('REVIEWER');
@@ -131,9 +136,9 @@ export default function PermissionControlPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/settings/role-permissions').then(r => r.json()),
-      fetch('/api/credentials/reviewers').then(r => r.json()),
-      fetch('/api/credentials/evaluators').then(r => r.json()),
+      fetch('/api/settings/role-permissions', { headers: authHeaders() }).then(r => r.json()),
+      fetch('/api/credentials/reviewers', { headers: authHeaders() }).then(r => r.json()),
+      fetch('/api/credentials/evaluators', { headers: authHeaders() }).then(r => r.json()),
     ]).then(([permsData, rvwData, evlData]) => {
       if (permsData.global) {
         const map: Record<RoleKey, string[]> = { REVIEWER: [], EVALUATOR: [] };
@@ -178,7 +183,7 @@ export default function PermissionControlPage() {
     setSaving(true); setError(''); setSuccess(false);
     try {
       const res = await fetch('/api/settings/role-permissions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ role: activeRole, allowedModules: globalPerms[activeRole] }),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -191,7 +196,7 @@ export default function PermissionControlPage() {
     setSaving(true); setError(''); setSuccess(false);
     try {
       const res = await fetch('/api/settings/individual-permissions', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ role: activeRole, memberId: selectedMember.id, allowedModules: individualAllowed }),
       });
       if (!res.ok) throw new Error((await res.json()).message);
@@ -209,7 +214,7 @@ export default function PermissionControlPage() {
     setSaving(true); setError('');
     try {
       await fetch('/api/settings/individual-permissions', {
-        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        method: 'DELETE', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ memberId: selectedMember.id }),
       });
       setHasIndividual(false);

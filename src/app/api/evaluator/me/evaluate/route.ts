@@ -62,22 +62,28 @@ export async function POST(request: Request) {
     const video = await prisma.video.findUnique({ where: { id: videoId }, include: { evaluation: true } });
     if (!video) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
     if (!video.isEvaluation) return NextResponse.json({ message: 'This video is not an olympiad evaluation submission' }, { status: 400 });
-    if (video.evaluation) return NextResponse.json({ message: 'This video has already been evaluated' }, { status: 409 });
+
+    const isOwner = video.evaluation?.evaluatorId === payload.id;
+    if (video.evaluation && payload.role !== 'SUPERADMIN' && !isOwner) {
+      return NextResponse.json({ message: 'This video has already been evaluated' }, { status: 409 });
+    }
+    if (video.evaluation?.isPublished) {
+      return NextResponse.json({ message: 'This evaluation has been published and is locked. Unpublish it first to make changes.' }, { status: 409 });
+    }
 
     const totalScore = confidenceScore + creativityScore + techniqueScore + presentationScore;
+    const data = {
+      confidenceScore,
+      creativityScore,
+      techniqueScore,
+      presentationScore,
+      totalScore,
+      remarks: remarks?.trim() || null,
+    };
 
-    const evaluation = await prisma.videoEvaluation.create({
-      data: {
-        videoId,
-        evaluatorId,
-        confidenceScore,
-        creativityScore,
-        techniqueScore,
-        presentationScore,
-        totalScore,
-        remarks: remarks?.trim() || null,
-      },
-    });
+    const evaluation = video.evaluation
+      ? await prisma.videoEvaluation.update({ where: { videoId }, data: { ...data, lastEditedBy: payload.id, lastEditedAt: new Date() } })
+      : await prisma.videoEvaluation.create({ data: { videoId, evaluatorId, ...data } });
 
     return NextResponse.json(evaluation);
   } catch (error) {

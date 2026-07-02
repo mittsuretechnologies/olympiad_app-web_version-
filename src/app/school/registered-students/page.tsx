@@ -25,7 +25,7 @@ export default function SchoolRegisteredStudentsPage() {
   const [view, setView] = useState<'table' | 'cards'>('table');
 
   useEffect(() => {
-    const token = localStorage.getItem('schoolToken');
+    const token = sessionStorage.getItem('schoolToken');
     if (!token) { setError('Not logged in'); setLoading(false); return; }
 
     fetch('/api/school/me/registered-students', {

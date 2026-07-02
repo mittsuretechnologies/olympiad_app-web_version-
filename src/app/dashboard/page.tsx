@@ -356,7 +356,7 @@ function EvaluatorDashboard() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('evaluatorToken');
+    const token = sessionStorage.getItem('evaluatorToken');
     fetch('/api/evaluator/me/dashboard-stats', {
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -573,9 +573,9 @@ export default function Dashboard() {
   const [role, setRole] = useState<'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const reviewerToken = localStorage.getItem('reviewerToken');
-    const evaluatorToken = localStorage.getItem('evaluatorToken');
+    const token = sessionStorage.getItem('token');
+    const reviewerToken = sessionStorage.getItem('reviewerToken');
+    const evaluatorToken = sessionStorage.getItem('evaluatorToken');
 
     if (reviewerToken && !token) {
       setRole('REVIEWER');

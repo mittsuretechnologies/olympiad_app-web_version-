@@ -30,14 +30,14 @@ export async function GET(request: Request) {
           student: {
             select: {
               id: true, name: true, olympiadCode: true,
-              allocation: { select: { classCode: true, className: true, school: { select: { name: true } } } },
+              allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true } } } },
             },
           },
           evaluation: true,
         }
       });
       if (v) {
-        let studentName = v.student?.name || '-';
+        let studentName = v.student?.allocation?.assignedName || v.student?.name || '-';
         let olympiadCode = v.student?.olympiadCode || '-';
         let className = v.student?.allocation?.className || v.student?.allocation?.classCode || null;
         let schoolName = v.student?.allocation?.school?.name || null;
@@ -82,7 +82,8 @@ export async function GET(request: Request) {
             techniqueScore: v.evaluation.techniqueScore,
             presentationScore: v.evaluation.presentationScore,
             remarks: v.evaluation.remarks,
-          } : null
+          } : null,
+          isPublished: v.evaluation?.isPublished || false,
         };
       }
     }
@@ -100,7 +101,7 @@ export async function GET(request: Request) {
         student: {
           select: {
             id: true, name: true, olympiadCode: true,
-            allocation: { select: { classCode: true, className: true, school: { select: { name: true } } } },
+            allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true } } } },
           },
         },
       },
@@ -129,7 +130,7 @@ export async function GET(request: Request) {
     const olympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
     const allocations = await prisma.olympiadIdAllocation.findMany({
       where: { code: { in: olympiadCodes } },
-      select: { code: true, classCode: true, className: true, school: { select: { name: true } } },
+      select: { code: true, classCode: true, className: true, assignedName: true, school: { select: { name: true } } },
     });
     const allocByCode = new Map(allocations.map(a => [a.code, a]));
 
@@ -142,7 +143,7 @@ export async function GET(request: Request) {
         category: v.category || '',
         subCategory: v.subCategory || '',
         createdAt: v.createdAt,
-        studentName: v.student?.name || '-',
+        studentName: v.student?.allocation?.assignedName || v.student?.name || '-',
         olympiadCode: v.student?.olympiadCode || '-',
         className: v.student?.allocation?.className || v.student?.allocation?.classCode || null,
         schoolName: v.student?.allocation?.school?.name || null,
@@ -158,7 +159,7 @@ export async function GET(request: Request) {
           category: v.category || '',
           subCategory: v.subCategory || '',
           createdAt: v.createdAt,
-          studentName: u?.userId || '-',
+          studentName: alloc?.assignedName || u?.userId || '-',
           olympiadCode: u?.olympiadId || '-',
           className: alloc?.className || alloc?.classCode || null,
           schoolName: alloc?.school?.name || null,

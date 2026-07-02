@@ -27,8 +27,8 @@ export default function SchoolLoginPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Login failed');
 
-      localStorage.setItem('schoolToken', data.token);
-      localStorage.setItem('schoolUser', JSON.stringify(data.user));
+      sessionStorage.setItem('schoolToken', data.token);
+      sessionStorage.setItem('schoolUser', JSON.stringify(data.user));
       router.push('/school');
     } catch (err: any) {
       setError(err.message);

@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN', 'EVALUATOR', 'REVIEWER']);
+  if (error) return error;
   try {
     // 1. Get all approved evaluation videos with their evaluation status
     const allVideos = await prisma.video.findMany({

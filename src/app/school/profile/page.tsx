@@ -37,7 +37,7 @@ export default function SchoolProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('schoolToken');
+    const token = sessionStorage.getItem('schoolToken');
     if (!token) { setError('Not authenticated'); setLoading(false); return; }
 
     fetch('/api/school/me/profile', { headers: { Authorization: `Bearer ${token}` } })

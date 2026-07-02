@@ -1,12 +1,15 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth-guard';
 
 function generateEvaluatorId(): string {
   return `EVL${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const evaluators = await prisma.talentEvaluator.findMany({
       orderBy: { createdAt: 'desc' },
@@ -19,6 +22,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const { name, email, password } = await request.json();
     if (!name?.trim() || !email?.trim() || !password?.trim())
