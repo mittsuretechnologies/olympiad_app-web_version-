@@ -15,12 +15,15 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    if (payload?.role !== 'EVALUATOR' || !payload?.id) {
+    if (!['EVALUATOR', 'SUPERADMIN', 'REVIEWER'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
+    const isEvaluator = payload.role === 'EVALUATOR';
+    const filter = isEvaluator ? { evaluatorId: payload.id } : {};
+
     const evaluations = await prisma.videoEvaluation.findMany({
-      where: { evaluatorId: payload.id },
+      where: filter,
       include: {
         video: {
           include: {

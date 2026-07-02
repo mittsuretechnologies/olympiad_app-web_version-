@@ -72,7 +72,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         }),
       ]);
       isFollowing = !!follow;
-      isPending   = followReq?.status === 'PENDING' ?? false;
+      isPending   = followReq?.status === 'PENDING';
     }
 
     // Private account: only owner or approved followers can see content

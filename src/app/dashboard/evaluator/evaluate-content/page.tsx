@@ -15,6 +15,13 @@ interface QueueVideo {
   olympiadCode: string;
   className: string | null;
   schoolName: string | null;
+  existingScores?: {
+    confidenceScore: number;
+    creativityScore: number;
+    techniqueScore: number;
+    presentationScore: number;
+    remarks: string | null;
+  } | null;
 }
 
 const MAX_PER_CRITERION = 5;
@@ -60,18 +67,17 @@ export default function EvaluateContentPage() {
   const [columns, setColumns] = useState(3);
   const [activeColor, setActiveColor] = useState('bg-blue-50');
 
-  // Only a real TalentEvaluator account can submit scores (the evaluation
-  // record's evaluatorId is a foreign key to that table) — SuperAdmin/Reviewer
-  // sessions get read-only visibility into the queue.
+  // Both TalentEvaluator and SuperAdmin accounts can submit scores.
   const [canScore, setCanScore] = useState(false);
   useEffect(() => {
-    setCanScore(!!localStorage.getItem('evaluatorToken') && !localStorage.getItem('token'));
+    setCanScore(!!localStorage.getItem('evaluatorToken') || !!localStorage.getItem('token'));
   }, []);
 
   const fetchQueue = () => {
     setLoading(true);
     setLoadError('');
-    fetch('/api/evaluator/me/evaluation-queue', { headers: { Authorization: `Bearer ${getAuthToken()}` } })
+    const query = typeof window !== 'undefined' ? window.location.search : '';
+    fetch(`/api/evaluator/me/evaluation-queue${query}`, { headers: { Authorization: `Bearer ${getAuthToken()}` } })
       .then(async r => {
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
@@ -86,11 +92,34 @@ export default function EvaluateContentPage() {
 
   useEffect(() => { fetchQueue(); }, []);
 
+  useEffect(() => {
+    if (queue.length > 0 && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const targetId = params.get('videoId');
+      if (targetId) {
+        const found = queue.find(v => v.id === targetId);
+        if (found) {
+          openVideo(found, 'bg-blue-50');
+        }
+      }
+    }
+  }, [queue]);
+
   const openVideo = (v: QueueVideo, color: string) => {
     setActive(v);
     setActiveColor(color);
-    setScores(emptyScores);
-    setRemarks('');
+    if (v.existingScores) {
+      setScores({
+        confidenceScore: v.existingScores.confidenceScore,
+        creativityScore: v.existingScores.creativityScore,
+        techniqueScore: v.existingScores.techniqueScore,
+        presentationScore: v.existingScores.presentationScore,
+      });
+      setRemarks(v.existingScores.remarks || '');
+    } else {
+      setScores(emptyScores);
+      setRemarks('');
+    }
     setError('');
   };
 

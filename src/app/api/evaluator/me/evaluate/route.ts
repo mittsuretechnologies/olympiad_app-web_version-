@@ -17,8 +17,36 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    if (payload?.role !== 'EVALUATOR' || !payload?.id) {
+    if (!['EVALUATOR', 'SUPERADMIN'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    let evaluatorId = payload.id;
+    if (payload.role === 'SUPERADMIN') {
+      const email = payload.email || 'admin@mittsure.com';
+      const existingEvaluator = await prisma.talentEvaluator.findFirst({
+        where: {
+          OR: [
+            { id: payload.id },
+            { email }
+          ]
+        }
+      });
+      if (existingEvaluator) {
+        evaluatorId = existingEvaluator.id;
+      } else {
+        const shadow = await prisma.talentEvaluator.create({
+          data: {
+            id: payload.id,
+            evaluatorId: `ADMIN_${payload.id.slice(0, 4)}`,
+            name: 'Super Admin',
+            email,
+            password: 'shadow_password_not_used_directly',
+            isActive: true,
+          }
+        });
+        evaluatorId = shadow.id;
+      }
     }
 
     const { videoId, confidenceScore, creativityScore, techniqueScore, presentationScore, remarks } = await request.json();
@@ -41,7 +69,7 @@ export async function POST(request: Request) {
     const evaluation = await prisma.videoEvaluation.create({
       data: {
         videoId,
-        evaluatorId: payload.id,
+        evaluatorId,
         confidenceScore,
         creativityScore,
         techniqueScore,

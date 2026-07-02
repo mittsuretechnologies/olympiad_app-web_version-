@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -25,6 +25,7 @@ import {
   Trophy,
   Star,
   Settings,
+  ClipboardCheck,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR';
@@ -42,6 +43,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const token = localStorage.getItem('token');
     const reviewerToken = localStorage.getItem('reviewerToken');
     const evaluatorToken = localStorage.getItem('evaluatorToken');
+
+    if (!token && !reviewerToken && !evaluatorToken) {
+      router.push('/login');
+      return;
+    }
 
     let detectedRole: Role = 'SUPERADMIN';
     if (reviewerToken && !token) detectedRole = 'REVIEWER';
@@ -165,13 +171,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const evaluatorSubItems = [
     { name: 'Manage Evaluators', href: '/dashboard/evaluator/manage',           icon: UserCheck },
     { name: 'Evaluate Content',  href: '/dashboard/evaluator/evaluate-content', icon: Play },
+    { name: 'Evaluation History', href: '/dashboard/evaluator/history',          icon: Clock },
   ];
 
   const reportsSubItems = [
-    { name: 'Student Report',         href: '/dashboard/credentials/registered-students', icon: UserCheck },
-    { name: 'Olympiad Completions',   href: '/dashboard/reports/olympiad-completions',    icon: Trophy },
-    { name: 'School Report',          href: '/dashboard/reports/schools',                 icon: Building2 },
-    { name: 'App Users',              href: '/dashboard/app-users',                       icon: Smartphone },
+    { name: 'Student Report',         href: '/dashboard/credentials/registered-students',    icon: UserCheck },
+    { name: 'Olympiad Completions',   href: '/dashboard/reports/olympiad-completions',       icon: Trophy },
+    { name: 'Evaluation Progress',    href: '/dashboard/reports/evaluation-progress',        icon: ClipboardCheck },
+    { name: 'School Report',          href: '/dashboard/reports/schools',                    icon: Building2 },
+    { name: 'App Users',              href: '/dashboard/app-users',                          icon: Smartphone },
   ];
 
   const subItemClass = (isActive: boolean) =>
@@ -320,7 +328,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.content', 'evaluator.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
@@ -339,7 +347,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.schools','reports.appusers'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.evaluation-progress','reports.schools','reports.appusers'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>

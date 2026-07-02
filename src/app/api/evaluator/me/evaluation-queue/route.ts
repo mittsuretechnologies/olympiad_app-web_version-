@@ -15,10 +15,76 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    // Real evaluators use this to work their queue; SuperAdmin/Reviewer get
-    // read-only visibility into the same queue for oversight purposes.
     if (!['EVALUATOR', 'SUPERADMIN', 'REVIEWER'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const targetVideoId = searchParams.get('videoId');
+
+    let targetFormatted: any = null;
+    if (targetVideoId) {
+      const v = await prisma.video.findUnique({
+        where: { id: targetVideoId },
+        include: {
+          student: {
+            select: {
+              id: true, name: true, olympiadCode: true,
+              allocation: { select: { classCode: true, className: true, school: { select: { name: true } } } },
+            },
+          },
+          evaluation: true,
+        }
+      });
+      if (v) {
+        let studentName = v.student?.name || '-';
+        let olympiadCode = v.student?.olympiadCode || '-';
+        let className = v.student?.allocation?.className || v.student?.allocation?.classCode || null;
+        let schoolName = v.student?.allocation?.school?.name || null;
+
+        if (!v.studentId && v.appUserId) {
+          const appUser = await prisma.appUser.findUnique({
+            where: { id: v.appUserId },
+            select: { id: true, userId: true, olympiadId: true },
+          });
+          if (appUser) {
+            studentName = appUser.userId;
+            olympiadCode = appUser.olympiadId || '-';
+            if (appUser.olympiadId) {
+              const alloc = await prisma.olympiadIdAllocation.findUnique({
+                where: { code: appUser.olympiadId },
+                include: { school: { select: { name: true } } }
+              });
+              if (alloc) {
+                className = alloc.className || alloc.classCode || null;
+                schoolName = alloc.school?.name || null;
+                if (alloc.assignedName) studentName = alloc.assignedName;
+              }
+            }
+          }
+        }
+
+        targetFormatted = {
+          id: v.id,
+          videoUrl: v.videoUrl,
+          thumbnailUrl: v.thumbnailUrl || null,
+          caption: v.caption || '',
+          category: v.category || '',
+          subCategory: v.subCategory || '',
+          createdAt: v.createdAt,
+          studentName,
+          olympiadCode,
+          className,
+          schoolName,
+          existingScores: v.evaluation ? {
+            confidenceScore: v.evaluation.confidenceScore,
+            creativityScore: v.evaluation.creativityScore,
+            techniqueScore: v.evaluation.techniqueScore,
+            presentationScore: v.evaluation.presentationScore,
+            remarks: v.evaluation.remarks,
+          } : null
+        };
+      }
     }
 
     // 1. Olympiad-evaluation videos uploaded by web-registered Students, approved, not yet scored
@@ -28,6 +94,7 @@ export async function GET(request: Request) {
         status: 'APPROVED',
         evaluation: null,
         studentId: { not: null },
+        id: targetVideoId ? { not: targetVideoId } : undefined,
       },
       include: {
         student: {
@@ -47,9 +114,11 @@ export async function GET(request: Request) {
         status: 'APPROVED',
         evaluation: null,
         appUserId: { not: null },
+        id: targetVideoId ? { not: targetVideoId } : undefined,
       },
       orderBy: { createdAt: 'asc' },
     });
+
     const appUserIds = appVideos.map(v => v.appUserId!).filter(Boolean);
     const appUsers = await prisma.appUser.findMany({
       where: { id: { in: appUserIds } },
@@ -64,7 +133,7 @@ export async function GET(request: Request) {
     });
     const allocByCode = new Map(allocations.map(a => [a.code, a]));
 
-    const queue = [
+    const restQueue = [
       ...studentVideos.map(v => ({
         id: v.id,
         videoUrl: v.videoUrl,
@@ -97,7 +166,9 @@ export async function GET(request: Request) {
       }),
     ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
-    return NextResponse.json(queue);
+    const finalQueue = targetFormatted ? [targetFormatted, ...restQueue] : restQueue;
+
+    return NextResponse.json(finalQueue);
   } catch (error) {
     console.error('GET evaluator/me/evaluation-queue failed:', error);
     return NextResponse.json({ message: 'Failed to fetch queue' }, { status: 500 });

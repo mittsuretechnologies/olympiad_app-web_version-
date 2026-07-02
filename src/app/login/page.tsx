@@ -182,6 +182,15 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
+      localStorage.removeItem('token');
+      localStorage.removeItem('adminUser');
+      localStorage.removeItem('schoolToken');
+      localStorage.removeItem('schoolUser');
+      localStorage.removeItem('reviewerToken');
+      localStorage.removeItem('reviewerData');
+      localStorage.removeItem('evaluatorToken');
+      localStorage.removeItem('evaluatorData');
+
       if (data.role === 'SCHOOL') {
         localStorage.setItem('schoolToken', data.token);
         localStorage.setItem('schoolUser', JSON.stringify(data.user));

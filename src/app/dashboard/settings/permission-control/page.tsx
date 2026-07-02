@@ -15,8 +15,8 @@ const MODULES: Module[] = [
   { key: 'uploaders', label: 'Uploaders', subItems: [{ key: 'uploaders.register', label: 'Register Uploader' }, { key: 'uploaders.view', label: 'View / Manage Uploaders' }] },
   { key: 'credentials', label: 'Credentials', subItems: [{ key: 'credentials.schools', label: 'School Credentials' }, { key: 'credentials.uploaders', label: 'Uploader Credentials' }, { key: 'credentials.students', label: 'Student Credentials' }, { key: 'credentials.reviewers', label: 'Reviewer Credentials' }, { key: 'credentials.evaluators', label: 'Evaluator Credentials' }] },
   { key: 'reviewer', label: 'Reviewer', subItems: [{ key: 'reviewer.manage', label: 'Manage Reviewers' }, { key: 'reviewer.content', label: 'Review Content' }] },
-  { key: 'evaluator', label: 'Evaluator', subItems: [{ key: 'evaluator.manage', label: 'Manage Evaluators' }, { key: 'evaluator.content', label: 'Evaluate Content' }] },
-  { key: 'reports', label: 'Reports', subItems: [{ key: 'reports.students', label: 'Student Report' }, { key: 'reports.olympiad', label: 'Olympiad Completions' }, { key: 'reports.schools', label: 'School Report' }, { key: 'reports.appusers', label: 'App Users' }] },
+  { key: 'evaluator', label: 'Evaluator', subItems: [{ key: 'evaluator.manage', label: 'Manage Evaluators' }, { key: 'evaluator.content', label: 'Evaluate Content' }, { key: 'evaluator.history', label: 'Evaluation History' }] },
+  { key: 'reports', label: 'Reports', subItems: [{ key: 'reports.students', label: 'Student Report' }, { key: 'reports.olympiad', label: 'Olympiad Completions' }, { key: 'reports.evaluation-progress', label: 'Evaluation Progress' }, { key: 'reports.schools', label: 'School Report' }, { key: 'reports.appusers', label: 'App Users' }] },
 ];
 
 const ROLES: { key: RoleKey; label: string }[] = [
