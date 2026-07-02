@@ -197,7 +197,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     `w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${active ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`;
 
   return (
-    <div className="flex min-h-screen bg-[#F0F2F5] text-[#1F2937]">
+    <div className="flex min-h-screen bg-[#052E5C] text-[#1F2937]">
 
       {/* Sidebar */}
       <aside
@@ -429,8 +429,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-72 min-h-screen relative px-8 pt-3 pb-8">
-        {children}
+      <main className="flex-1 ml-72 min-h-screen flex flex-col p-3">
+        <div className="flex-1 bg-white border border-[#E7EBF2] rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-8 py-8">{children}</div>
+        </div>
       </main>
     </div>
   );
