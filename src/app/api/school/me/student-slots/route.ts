@@ -52,7 +52,7 @@ export async function GET(request: Request) {
 
     // Fetch evaluation videos for this student
     const evalVideos = await prisma.video.findMany({
-      where: { ...where, isEvaluation: true },
+      where: { ...where, isEvaluation: true, deletedAt: null },
       select: { category: true, status: true },
     });
 

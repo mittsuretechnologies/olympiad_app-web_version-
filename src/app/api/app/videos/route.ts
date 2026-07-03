@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
       if (isCatA || isCatB) {
         const existingOlympiadVideos = await prisma.video.findMany({
-          where: { appUserId: appUser.id, isEvaluation: true },
+          where: { appUserId: appUser.id, isEvaluation: true, deletedAt: null },
           select: { category: true, subCategory: true, status: true },
         });
         // Only block if there's an active (non-rejected) video for this category slot
@@ -167,7 +167,7 @@ export async function GET(request: Request) {
   try {
     // Return all videos uploaded by this app user (both student and viewer)
     const videos = await prisma.video.findMany({
-      where: { appUserId: appUser.id },
+      where: { appUserId: appUser.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 

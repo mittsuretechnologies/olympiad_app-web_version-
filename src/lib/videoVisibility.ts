@@ -19,6 +19,10 @@ export async function visibilityWhere(viewerId: string | null): Promise<object> 
   // Private olympiad videos are always excluded — callers must keep isPublic: true
   // so this function only needs to handle the private-account gate.
 
+  // Soft-deleted videos are always excluded from every public/user-facing view —
+  // the record is retained (for SuperAdmin) but must never surface here.
+  const base: Record<string, any> = { deletedAt: null };
+
   // Get all private-account user IDs
   const privateUsers = await prisma.appUser.findMany({
     where:  { isPrivate: true },
@@ -26,8 +30,8 @@ export async function visibilityWhere(viewerId: string | null): Promise<object> 
   });
 
   if (privateUsers.length === 0) {
-    // No private accounts exist — nothing to filter
-    return {};
+    // No private accounts exist — nothing else to filter
+    return base;
   }
 
   const allPrivateIds = privateUsers.map(u => u.id);
@@ -47,9 +51,10 @@ export async function visibilityWhere(viewerId: string | null): Promise<object> 
   // IDs of private accounts whose videos must be hidden from this viewer
   const blockedIds = allPrivateIds.filter(id => !allowedPrivateIds.has(id));
 
-  if (blockedIds.length === 0) return {};
+  if (blockedIds.length === 0) return base;
 
   return {
+    ...base,
     NOT: { appUserId: { in: blockedIds } },
   };
 }

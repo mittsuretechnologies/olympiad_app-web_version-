@@ -89,3 +89,27 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Failed to fetch conversation' }, { status: 500 });
   }
 }
+
+// PATCH /api/reels/inbox/conversation?userId=<id>&otherId=<id>
+// Marks all reels otherId sent to userId as read (call when the conversation is opened).
+export async function PATCH(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const userId  = searchParams.get('userId')  ?? '';
+    const otherId = searchParams.get('otherId') ?? '';
+
+    if (!userId || !otherId) {
+      return NextResponse.json({ message: 'userId and otherId are required' }, { status: 400 });
+    }
+
+    await prisma.reelShare.updateMany({
+      where: { senderId: otherId, recipientId: userId, readAt: null },
+      data:  { readAt: new Date() },
+    });
+
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error('PATCH /api/reels/inbox/conversation failed:', error);
+    return NextResponse.json({ message: 'Failed to mark conversation read' }, { status: 500 });
+  }
+}

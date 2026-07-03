@@ -116,6 +116,7 @@ model Video {
   isPublic        Boolean          @default(true)
   likesCount      Int              @default(0)
   viewsCount      Int              @default(0)
+  deletedAt       DateTime?
   student         Student?         @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes           Like[]
   views           VideoView[]
@@ -126,6 +127,7 @@ model Video {
   @@index([appUserId])
   @@index([status])
   @@index([status, isPublic])
+  @@index([deletedAt])
   @@schema("public")
 }
 
@@ -253,6 +255,8 @@ model AppUser {
   isVerified             Boolean         @default(false)
   olympiadId             String?
   isPrivate              Boolean         @default(false)
+  olympiadCatAApproved   Boolean         @default(false)
+  olympiadCatBApproved   Boolean         @default(false)
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   followers              Follow[]        @relation("UserFollowers")
@@ -308,14 +312,15 @@ model FollowRequest {
 }
 
 model ReelShare {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   videoId     String
   senderId    String
   recipientId String
-  sentAt      DateTime @default(now())
-  video       Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  sender      AppUser  @relation("ReelShareSender", fields: [senderId], references: [id], onDelete: Cascade)
-  recipient   AppUser  @relation("ReelShareRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  sentAt      DateTime  @default(now())
+  readAt      DateTime?
+  video       Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  sender      AppUser   @relation("ReelShareSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   AppUser   @relation("ReelShareRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
   @@index([recipientId])
   @@index([senderId, recipientId])

@@ -52,12 +52,12 @@ export async function GET(request: Request) {
     const [webVideoCounts, appVideoCounts] = await Promise.all([
       prisma.video.groupBy({
         by: ['studentId'],
-        where: { studentId: { in: webStudentIds }, isEvaluation: true, status: 'APPROVED' },
+        where: { studentId: { in: webStudentIds }, isEvaluation: true, status: 'APPROVED', deletedAt: null },
         _count: { id: true },
       }),
       prisma.video.groupBy({
         by: ['appUserId'],
-        where: { appUserId: { in: appUserIds }, isEvaluation: true, status: 'APPROVED' },
+        where: { appUserId: { in: appUserIds }, isEvaluation: true, status: 'APPROVED', deletedAt: null },
         _count: { id: true },
       }),
     ]);

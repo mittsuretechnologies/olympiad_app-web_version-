@@ -28,6 +28,7 @@ export async function GET(request: Request) {
         status: 'APPROVED',
         evaluation: null,
         studentId: { not: null },
+        deletedAt: null,
       },
       include: {
         student: {
@@ -47,6 +48,7 @@ export async function GET(request: Request) {
         status: 'APPROVED',
         evaluation: null,
         appUserId: { not: null },
+        deletedAt: null,
       },
       orderBy: { createdAt: 'asc' },
     });

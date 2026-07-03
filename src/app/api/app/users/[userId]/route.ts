@@ -87,6 +87,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         appUserId: target.id,
         status:    'APPROVED',
         isPublic:  true,
+        deletedAt: null,
       };
 
       [videos, videosCount] = await Promise.all([

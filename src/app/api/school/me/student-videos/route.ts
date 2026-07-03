@@ -31,6 +31,7 @@ export async function GET(request: Request) {
     const studentVideos = await prisma.video.findMany({
       where: {
         status: 'APPROVED',
+        deletedAt: null,
         student: { allocation: { schoolId: payload.id } },
       },
       include: {
@@ -53,7 +54,7 @@ export async function GET(request: Request) {
     const appUserIds = appUsers.map((u: any) => u.id);
 
     const appVideos = await prisma.video.findMany({
-      where: { appUserId: { in: appUserIds }, status: 'APPROVED' },
+      where: { appUserId: { in: appUserIds }, status: 'APPROVED', deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 

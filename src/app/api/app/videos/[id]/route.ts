@@ -30,13 +30,15 @@ export async function DELETE(
   try {
     // Verify the video belongs to this app user
     const video = await prisma.video.findFirst({
-      where: { id, appUserId: appUser.id },
+      where: { id, appUserId: appUser.id, deletedAt: null },
     });
     if (!video) {
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
-    await prisma.video.delete({ where: { id } });
+    // Soft delete — the record (and any Olympiad approval it represents) is retained
+    // for SuperAdmin/backend visibility; it's just hidden from all normal views.
+    await prisma.video.update({ where: { id }, data: { deletedAt: new Date() } });
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error('App video delete error:', error);
