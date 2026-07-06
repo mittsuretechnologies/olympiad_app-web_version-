@@ -114,6 +114,7 @@ model Video {
   updatedAt       DateTime         @updatedAt
   isEvaluation    Boolean          @default(false)
   isPublic        Boolean          @default(true)
+  olympiadVisibility String?       // "public" | "private" — only meaningful when isEvaluation = true
   likesCount      Int              @default(0)
   viewsCount      Int              @default(0)
   deletedAt       DateTime?
@@ -122,6 +123,7 @@ model Video {
   views           VideoView[]
   reelShares      ReelShare[]
   evaluation      VideoEvaluation?
+  reports         VideoReport[]
 
   @@index([studentId])
   @@index([appUserId])
@@ -265,6 +267,8 @@ model AppUser {
   followRequestsReceived FollowRequest[] @relation("FollowRequestReceiver")
   reelSharesSent         ReelShare[]     @relation("ReelShareSender")
   reelSharesReceived     ReelShare[]     @relation("ReelShareRecipient")
+  reportsSubmitted       VideoReport[]
+  supportTickets         SupportTicket[]
 
   @@index([email])
   @@index([mobile])
@@ -325,5 +329,48 @@ model ReelShare {
   @@index([recipientId])
   @@index([senderId, recipientId])
   @@index([videoId])
+  @@schema("public")
+}
+
+model VideoReport {
+  id           String   @id @default(uuid())
+  videoId      String
+  reporterId   String
+  ownerId      String?
+  category     String   // ABUSIVE_CONTENT | SPAM | HARASSMENT | HATE_SPEECH | VIOLENCE | SEXUAL_CONTENT | MISINFORMATION | COPYRIGHT | OTHER
+  customReason String?
+  resolved     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  video        Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  reporter     AppUser  @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, reporterId])
+  @@index([videoId])
+  @@index([reporterId])
+  @@schema("public")
+}
+
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+
+  @@schema("public")
+}
+
+model SupportTicket {
+  id             String   @id @default(uuid())
+  userId         String
+  category       String?  // Account Issue | Video Upload | Payment | Bug Report | Other
+  message        String
+  screenshotUrls String?  // comma-separated URLs, up to 3
+  status         String   @default("OPEN") // OPEN | RESOLVED
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
   @@schema("public")
 }

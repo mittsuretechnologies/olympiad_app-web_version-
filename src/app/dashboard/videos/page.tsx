@@ -22,6 +22,7 @@ interface Video {
   tags: string;
   isPublic: boolean;
   isEvaluation: boolean;
+  olympiadVisibility: string | null;
   status: string;
   rejectionReason: string | null;
   createdAt: string;
@@ -530,10 +531,17 @@ export default function VideoModerationPage() {
                           {catBadge.label}
                         </span>
                       )}
-                      <span className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full border ml-auto ${video.isPublic ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-purple-600 bg-purple-50 border-purple-100'}`}>
-                        {video.isPublic ? <Globe size={8} /> : <Lock size={8} />}
-                        {video.isPublic ? 'Public' : 'Private'}
-                      </span>
+                      {(() => {
+                        // Olympiad (jury) videos carry their own public/private flag,
+                        // independent of the general isPublic feed-visibility field.
+                        const isVisPublic = video.isEvaluation ? video.olympiadVisibility !== 'private' : video.isPublic;
+                        return (
+                          <span className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full border ml-auto ${isVisPublic ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-purple-600 bg-purple-50 border-purple-100'}`}>
+                            {isVisPublic ? <Globe size={8} /> : <Lock size={8} />}
+                            {isVisPublic ? 'Public' : 'Private'}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Caption + Tags row */}

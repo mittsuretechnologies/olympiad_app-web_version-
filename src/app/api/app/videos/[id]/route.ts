@@ -45,3 +45,42 @@ export async function DELETE(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
+
+// PATCH /api/app/videos/:id — owner-only Olympiad public/private visibility toggle.
+// Does not touch status/evaluation/marking fields.
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const appUser = getAppUserFromToken(request);
+  if (!appUser) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const { olympiadVisibility } = await request.json();
+    if (olympiadVisibility !== 'public' && olympiadVisibility !== 'private') {
+      return NextResponse.json({ error: 'olympiadVisibility must be "public" or "private"' }, { status: 400 });
+    }
+
+    const video = await prisma.video.findFirst({
+      where: { id, appUserId: appUser.id, deletedAt: null },
+    });
+    if (!video) {
+      return NextResponse.json({ error: 'Video not found' }, { status: 404 });
+    }
+    if (!video.isEvaluation) {
+      return NextResponse.json({ error: 'Visibility toggle is only available for Olympiad videos' }, { status: 400 });
+    }
+
+    const updated = await prisma.video.update({
+      where: { id },
+      data: { olympiadVisibility },
+    });
+    return NextResponse.json(updated);
+  } catch (error: any) {
+    console.error('App video visibility update error:', error);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+}

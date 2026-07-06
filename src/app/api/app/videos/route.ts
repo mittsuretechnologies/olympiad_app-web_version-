@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const {
       videoUrl, thumbnailUrl, caption, category, subCategory,
       tags, isPublic, isEvaluation, olympiadId: bodyOlympiadId,
-      isOlympiadUpload,
+      isOlympiadUpload, olympiadVisibility,
     } = await request.json();
 
     if (!videoUrl || !category || !subCategory) {
@@ -147,6 +147,9 @@ export async function POST(request: Request) {
         tags:         mergedTags,
         isPublic:     isPublic     !== undefined ? Boolean(isPublic)     : true,
         isEvaluation: finalIsEvaluation,
+        olympiadVisibility: finalIsEvaluation
+          ? (olympiadVisibility === 'private' ? 'private' : 'public')
+          : null,
         status: 'PENDING',
       },
     });
