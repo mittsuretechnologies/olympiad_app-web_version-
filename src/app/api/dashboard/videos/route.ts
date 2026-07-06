@@ -1,7 +1,23 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 
 export const dynamic = 'force-dynamic';
+
+// Marks the uploader's permanent Olympiad Category A/B approval flag —
+// this survives the video being deleted later, unlike a live video-status lookup.
+async function markOlympiadSlotApproved(video: { isEvaluation: boolean; appUserId: string | null; category: string | null; subCategory: string | null }) {
+  if (!video.isEvaluation || !video.appUserId) return;
+
+  const isCatA = video.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(video.subCategory ?? '');
+  const isCatB = !isCatA && OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '');
+  if (!isCatA && !isCatB) return;
+
+  await prisma.appUser.update({
+    where: { id: video.appUserId },
+    data: isCatA ? { olympiadCatAApproved: true } : { olympiadCatBApproved: true },
+  });
+}
 
 export async function GET(request: Request) {
   try {
@@ -142,6 +158,15 @@ export async function POST(request: Request) {
           rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
         },
       });
+
+      if (status === 'APPROVED') {
+        const approvedVideos = await prisma.video.findMany({
+          where: { id: { in: videoIds } },
+          select: { isEvaluation: true, appUserId: true, category: true, subCategory: true },
+        });
+        await Promise.all(approvedVideos.map(markOlympiadSlotApproved));
+      }
+
       return NextResponse.json({ message: `${videoIds.length} video(s) ${status.toLowerCase()}` });
     }
 
@@ -155,6 +180,10 @@ export async function POST(request: Request) {
         rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
       },
     });
+
+    if (status === 'APPROVED') {
+      await markOlympiadSlotApproved(video);
+    }
 
     return NextResponse.json({ message: `Video ${status.toLowerCase()} successfully`, video });
   } catch (error) {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
 // ffmpeg-static resolves to the platform binary path at runtime (no Next.js bundler issues)
@@ -9,6 +9,26 @@ const ffmpegPath: string = require('ffmpeg-static');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const MAX_BYTES  = 150 * 1024 * 1024;
+const MAX_DURATION_SECONDS = 120;
+
+// No ffprobe binary is bundled with this project (ffmpeg-static only ships ffmpeg) —
+// read duration straight from ffmpeg's own stderr "Duration: HH:MM:SS.ms" line instead.
+function getVideoDurationSeconds(videoPath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const proc = spawn(ffmpegPath, ['-i', videoPath]);
+    let stderr = '';
+    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+    proc.on('error', reject);
+    proc.on('close', () => {
+      const match = stderr.match(/Duration:\s*(\d+):(\d{2}):(\d{2}(?:\.\d+)?)/);
+      if (!match) return reject(new Error('Could not read video duration'));
+      const [, hh, mm, ss] = match;
+      const seconds = Number(hh) * 3600 + Number(mm) * 60 + Number(ss);
+      if (!isFinite(seconds)) return reject(new Error('Could not read video duration'));
+      resolve(seconds);
+    });
+  });
+}
 
 export const dynamic     = 'force-dynamic';
 export const maxDuration = 60;
@@ -74,6 +94,19 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
+
+    try {
+      const durationSeconds = await getVideoDurationSeconds(filePath);
+      if (durationSeconds > MAX_DURATION_SECONDS) {
+        await unlink(filePath).catch(() => {});
+        return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
+      }
+    } catch (durationError) {
+      // Could not read duration (corrupt file / unsupported codec) — reject rather than upload an unverifiable video.
+      console.error('Video duration check failed:', durationError);
+      await unlink(filePath).catch(() => {});
+      return NextResponse.json({ error: 'Could not verify video duration. Please try a different file.' }, { status: 400 });
+    }
 
     const serverUrl  = process.env.SERVER_URL || 'http://localhost:3000';
     const videoUrl   = `${serverUrl}/uploads/app-videos/${appUser.id}/${fileName}`;

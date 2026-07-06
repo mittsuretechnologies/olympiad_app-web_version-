@@ -28,17 +28,18 @@ export async function GET(request: Request) {
   try {
     const [videos, user] = await Promise.all([
       prisma.video.findMany({
-        where: { appUserId: appUser.id, isEvaluation: true },
+        where: { appUserId: appUser.id, isEvaluation: true, deletedAt: null },
         select: { category: true, subCategory: true, status: true },
       }),
       prisma.appUser.findUnique({
         where: { id: appUser.id },
-        select: { olympiadId: true },
+        select: { olympiadId: true, olympiadCatAApproved: true, olympiadCatBApproved: true },
       }),
     ]);
 
-    // A slot is "used" only if there's a non-rejected video (PENDING or APPROVED).
-    // Match by category label (for custom "special talent" entries) or known subcategory name.
+    // A slot is "used" if there's a non-rejected video (PENDING or APPROVED) still on record,
+    // OR the category was permanently approved before — this second check keeps the slot
+    // closed even if the approved video was later deleted.
     const activeVideos = videos.filter(v => v.status !== 'REJECTED');
 
     const isVideoA = (v: { category: string | null; subCategory: string | null }) =>
@@ -46,8 +47,8 @@ export async function GET(request: Request) {
     const isVideoB = (v: { category: string | null; subCategory: string | null }) =>
       v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
 
-    const usedA = activeVideos.some(isVideoA);
-    const usedB = activeVideos.some(isVideoB);
+    const usedA = !!user?.olympiadCatAApproved || activeVideos.some(isVideoA);
+    const usedB = !!user?.olympiadCatBApproved || activeVideos.some(isVideoB);
 
     const rejectedA = !usedA && videos.some(v => v.status === 'REJECTED' && isVideoA(v));
     const rejectedB = !usedB && videos.some(v => v.status === 'REJECTED' && isVideoB(v));

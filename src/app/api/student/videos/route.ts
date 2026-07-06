@@ -89,7 +89,7 @@ export async function GET(request: Request) {
     }
 
     const videos = await prisma.video.findMany({
-      where: { studentId: student.id },
+      where: { studentId: student.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 

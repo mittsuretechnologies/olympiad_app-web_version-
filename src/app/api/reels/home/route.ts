@@ -47,6 +47,7 @@ type RawVideo = {
   createdAt: Date;
   appUserId: string | null;
   isEvaluation: boolean;
+  olympiadVisibility: string | null;
   student: {
     id: string;
     name: string;
@@ -67,6 +68,7 @@ const VIDEO_SELECT = {
   createdAt: true,
   appUserId: true,
   isEvaluation: true,
+  olympiadVisibility: true,
   student: {
     select: {
       id: true,
@@ -126,6 +128,8 @@ async function hydrate(items: RawVideo[], userId?: string) {
       createdAt: v.createdAt,
       isLiked: likedIds.has(v.id),
       isEvaluation: v.isEvaluation,
+      olympiadVisibility: v.olympiadVisibility,
+      appUserId: v.appUserId,
       student: v.student
         ? {
             id: v.student.id,

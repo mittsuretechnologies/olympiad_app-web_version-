@@ -10,12 +10,12 @@ export async function GET() {
     const [webVidCounts, appVidCounts] = await Promise.all([
       prisma.video.groupBy({
         by: ['studentId'],
-        where: { studentId: { in: allWebStudents.map(s => s.id) } },
+        where: { studentId: { in: allWebStudents.map(s => s.id) }, deletedAt: null },
         _count: { id: true },
       }),
       prisma.video.groupBy({
         by: ['appUserId'],
-        where: { appUserId: { in: allAppUsers.map(u => u.id) } },
+        where: { appUserId: { in: allAppUsers.map(u => u.id) }, deletedAt: null },
         _count: { id: true },
       }),
     ]);
