@@ -284,6 +284,18 @@ model AppOtp {
   @@schema("public")
 }
 
+model PasswordResetOtp {
+  id         String   @id @default(uuid())
+  identifier String   @unique
+  otpHash    String
+  attempts   Int      @default(0)
+  lastSentAt DateTime @default(now())
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@schema("public")
+}
+
 model Follow {
   id          String   @id @default(uuid())
   followerId  String
