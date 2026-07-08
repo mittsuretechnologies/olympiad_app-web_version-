@@ -42,7 +42,7 @@ export default function StudentVideosPage() {
   const [classFilter, setClassFilter] = useState('ALL');
   const [playing, setPlaying]   = useState<string | null>(null);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('schoolToken') || '' : '';
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') || '' : '';
 
   useEffect(() => {
     fetch('/api/school/me/student-videos', {

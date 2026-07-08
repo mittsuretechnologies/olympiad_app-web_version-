@@ -182,18 +182,27 @@ export default function LoginPage() {
         throw new Error(data.message || 'Login failed');
       }
 
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('adminUser');
+      sessionStorage.removeItem('schoolToken');
+      sessionStorage.removeItem('schoolUser');
+      sessionStorage.removeItem('reviewerToken');
+      sessionStorage.removeItem('reviewerData');
+      sessionStorage.removeItem('evaluatorToken');
+      sessionStorage.removeItem('evaluatorData');
+
       if (data.role === 'SCHOOL') {
-        localStorage.setItem('schoolToken', data.token);
-        localStorage.setItem('schoolUser', JSON.stringify(data.user));
+        sessionStorage.setItem('schoolToken', data.token);
+        sessionStorage.setItem('schoolUser', JSON.stringify(data.user));
       } else if (data.role === 'REVIEWER') {
-        localStorage.setItem('reviewerToken', data.token);
-        localStorage.setItem('reviewerData', JSON.stringify(data.user));
+        sessionStorage.setItem('reviewerToken', data.token);
+        sessionStorage.setItem('reviewerData', JSON.stringify(data.user));
       } else if (data.role === 'EVALUATOR') {
-        localStorage.setItem('evaluatorToken', data.token);
-        localStorage.setItem('evaluatorData', JSON.stringify(data.user));
+        sessionStorage.setItem('evaluatorToken', data.token);
+        sessionStorage.setItem('evaluatorData', JSON.stringify(data.user));
       } else {
-        localStorage.setItem('token', data.token);
-        localStorage.setItem('adminUser', JSON.stringify(data.user));
+        sessionStorage.setItem('token', data.token);
+        sessionStorage.setItem('adminUser', JSON.stringify(data.user));
       }
 
       router.push(data.redirect || '/dashboard');

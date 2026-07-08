@@ -34,7 +34,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ targ
 
   return NextResponse.json({
     isFollowing: !!follow,
-    isPending:   request_?.status === 'PENDING' ?? false,
+    isPending:   request_?.status === 'PENDING',
   });
 }
 

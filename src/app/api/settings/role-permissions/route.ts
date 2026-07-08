@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth-guard';
 
 // GET — returns global role perms + individual perms
-export async function GET() {
+export async function GET(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR']);
+  if (error) return error;
   try {
     const [global, individual] = await Promise.all([
       prisma.rolePermissions.findMany(),
@@ -18,6 +21,8 @@ export async function GET() {
 
 // POST — upsert global role permissions
 export async function POST(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const { role, allowedModules } = await request.json();
     if (!role || !Array.isArray(allowedModules))

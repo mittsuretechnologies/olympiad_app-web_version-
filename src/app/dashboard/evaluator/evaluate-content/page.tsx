@@ -15,6 +15,14 @@ interface QueueVideo {
   olympiadCode: string;
   className: string | null;
   schoolName: string | null;
+  existingScores?: {
+    confidenceScore: number;
+    creativityScore: number;
+    techniqueScore: number;
+    presentationScore: number;
+    remarks: string | null;
+  } | null;
+  isPublished?: boolean;
 }
 
 const MAX_PER_CRITERION = 5;
@@ -41,9 +49,9 @@ const emptyScores: ScoreState = {
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
   return (
-    localStorage.getItem('token') ||
-    localStorage.getItem('reviewerToken') ||
-    localStorage.getItem('evaluatorToken') ||
+    sessionStorage.getItem('token') ||
+    sessionStorage.getItem('reviewerToken') ||
+    sessionStorage.getItem('evaluatorToken') ||
     ''
   );
 }
@@ -60,18 +68,17 @@ export default function EvaluateContentPage() {
   const [columns, setColumns] = useState(3);
   const [activeColor, setActiveColor] = useState('bg-blue-50');
 
-  // Only a real TalentEvaluator account can submit scores (the evaluation
-  // record's evaluatorId is a foreign key to that table) — SuperAdmin/Reviewer
-  // sessions get read-only visibility into the queue.
+  // Both TalentEvaluator and SuperAdmin accounts can submit scores.
   const [canScore, setCanScore] = useState(false);
   useEffect(() => {
-    setCanScore(!!localStorage.getItem('evaluatorToken') && !localStorage.getItem('token'));
+    setCanScore(!!sessionStorage.getItem('evaluatorToken') || !!sessionStorage.getItem('token'));
   }, []);
 
   const fetchQueue = () => {
     setLoading(true);
     setLoadError('');
-    fetch('/api/evaluator/me/evaluation-queue', { headers: { Authorization: `Bearer ${getAuthToken()}` } })
+    const query = typeof window !== 'undefined' ? window.location.search : '';
+    fetch(`/api/evaluator/me/evaluation-queue${query}`, { headers: { Authorization: `Bearer ${getAuthToken()}` } })
       .then(async r => {
         if (!r.ok) {
           const data = await r.json().catch(() => ({}));
@@ -86,11 +93,34 @@ export default function EvaluateContentPage() {
 
   useEffect(() => { fetchQueue(); }, []);
 
+  useEffect(() => {
+    if (queue.length > 0 && typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const targetId = params.get('videoId');
+      if (targetId) {
+        const found = queue.find(v => v.id === targetId);
+        if (found) {
+          openVideo(found, 'bg-blue-50');
+        }
+      }
+    }
+  }, [queue]);
+
   const openVideo = (v: QueueVideo, color: string) => {
     setActive(v);
     setActiveColor(color);
-    setScores(emptyScores);
-    setRemarks('');
+    if (v.existingScores) {
+      setScores({
+        confidenceScore: v.existingScores.confidenceScore,
+        creativityScore: v.existingScores.creativityScore,
+        techniqueScore: v.existingScores.techniqueScore,
+        presentationScore: v.existingScores.presentationScore,
+      });
+      setRemarks(v.existingScores.remarks || '');
+    } else {
+      setScores(emptyScores);
+      setRemarks('');
+    }
     setError('');
   };
 
@@ -241,7 +271,12 @@ export default function EvaluateContentPage() {
                     View-only — sign in with an evaluator account to score this submission.
                   </div>
                 )}
-                <fieldset disabled={!canScore} className="space-y-4 disabled:opacity-60">
+                {active.isPublished && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 text-xs font-semibold rounded-xl px-3 py-2">
+                    This evaluation is published and locked. Unpublish it from Evaluation History to make changes.
+                  </div>
+                )}
+                <fieldset disabled={!canScore || active.isPublished} className="space-y-4 disabled:opacity-60">
                   {CRITERIA.map(c => (
                     <div key={c.key}>
                       <div className="flex items-center justify-between mb-1.5">
@@ -288,7 +323,7 @@ export default function EvaluateContentPage() {
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
 
-                {canScore && (
+                {canScore && !active.isPublished && (
                   <button
                     onClick={handleSubmit}
                     disabled={submitting}

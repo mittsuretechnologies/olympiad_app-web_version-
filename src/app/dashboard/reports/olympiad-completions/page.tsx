@@ -256,7 +256,7 @@ export default function OlympiadCompletionsPage() {
                   <td className="px-4 py-2.5 text-gray-400 text-xs">{idx + 1}</td>
                   <td className="px-4 py-2.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-amber-500 text-sm">ðŸ…</span>
+                      <span className="text-amber-500 text-sm">🏅</span>
                       <span className={`font-semibold ${r.source === 'app' && r.name === r.username ? 'text-gray-400 italic' : 'text-gray-900'}`}>
                         {r.name}
                       </span>

@@ -13,8 +13,8 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem('schoolToken');
-    const raw = localStorage.getItem('schoolUser');
+    const token = sessionStorage.getItem('schoolToken');
+    const raw = sessionStorage.getItem('schoolUser');
     if (!token || !raw) {
       router.replace('/login');
       return;
@@ -28,8 +28,8 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   }, [router]);
 
   const handleLogout = () => {
-    localStorage.removeItem('schoolToken');
-    localStorage.removeItem('schoolUser');
+    sessionStorage.removeItem('schoolToken');
+    sessionStorage.removeItem('schoolUser');
     router.replace('/login');
   };
 

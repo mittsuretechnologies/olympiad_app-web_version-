@@ -68,8 +68,8 @@ export default function SchoolDashboardPage() {
   const [schoolName, setSchoolName] = useState('');
 
   useEffect(() => {
-    const token = localStorage.getItem('schoolToken');
-    const raw = localStorage.getItem('schoolUser');
+    const token = sessionStorage.getItem('schoolToken');
+    const raw = sessionStorage.getItem('schoolUser');
     if (raw) {
       try { setSchoolName(JSON.parse(raw)?.name || ''); } catch {}
     }

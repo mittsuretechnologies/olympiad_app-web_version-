@@ -63,7 +63,7 @@ export default function SchoolOlympiadIdsPage() {
   const [allotError, setAllotError] = useState('');
   const [allotSuccess, setAllotSuccess] = useState<{ code: string; userId: string; password: string } | null>(null);
 
-  const token = typeof window !== 'undefined' ? localStorage.getItem('schoolToken') : '';
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') : '';
 
   const fetchAllocations = () => {
     if (!token) { setError('Not logged in'); setLoading(false); return; }
