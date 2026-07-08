@@ -22,9 +22,11 @@ interface Video {
   tags: string;
   isPublic: boolean;
   isEvaluation: boolean;
+  olympiadVisibility: string | null;
   status: string;
   rejectionReason: string | null;
   createdAt: string;
+  deletedAt: string | null;
   uploaderType: string | null;
   appUser: { userId: string; email: string | null; mobile: string | null; olympiadId: string | null; school: { name: string; city: string; district: string; state: string } | null } | null;
   student: {
@@ -496,14 +498,19 @@ export default function VideoModerationPage() {
                         className="w-4 h-4 rounded accent-[#014584] cursor-pointer shadow" />
                     </div>
 
-                    {/* Top-right: jury badge */}
-                    {video.isEvaluation && (
-                      <div className="absolute top-2 right-2">
+                    {/* Top-right: jury / deleted badges */}
+                    <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
+                      {video.deletedAt && (
+                        <span className="flex items-center gap-0.5 text-[10px] font-black text-white bg-red-600 px-2 py-0.5 rounded-full shadow">
+                          <Trash2 size={9} /> Deleted
+                        </span>
+                      )}
+                      {video.isEvaluation && (
                         <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-700 bg-amber-400 px-2 py-0.5 rounded-full shadow">
                           <Award size={9} /> Jury
                         </span>
-                      </div>
-                    )}
+                      )}
+                    </div>
 
                     {/* Bottom gradient + date */}
                     <div className="absolute bottom-0 left-0 right-0 h-10 bg-gradient-to-t from-black/60 to-transparent flex items-end px-2.5 pb-1.5">
@@ -524,10 +531,17 @@ export default function VideoModerationPage() {
                           {catBadge.label}
                         </span>
                       )}
-                      <span className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full border ml-auto ${video.isPublic ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-purple-600 bg-purple-50 border-purple-100'}`}>
-                        {video.isPublic ? <Globe size={8} /> : <Lock size={8} />}
-                        {video.isPublic ? 'Public' : 'Private'}
-                      </span>
+                      {(() => {
+                        // Olympiad (jury) videos carry their own public/private flag,
+                        // independent of the general isPublic feed-visibility field.
+                        const isVisPublic = video.isEvaluation ? video.olympiadVisibility !== 'private' : video.isPublic;
+                        return (
+                          <span className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full border ml-auto ${isVisPublic ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-purple-600 bg-purple-50 border-purple-100'}`}>
+                            {isVisPublic ? <Globe size={8} /> : <Lock size={8} />}
+                            {isVisPublic ? 'Public' : 'Private'}
+                          </span>
+                        );
+                      })()}
                     </div>
 
                     {/* Caption + Tags row */}
@@ -548,6 +562,13 @@ export default function VideoModerationPage() {
                     {video.status === 'REJECTED' && video.rejectionReason && (
                       <p className="text-[10px] text-red-400 bg-red-50 rounded-lg px-2 py-1 truncate">
                         Ã¢Åâ¢ {video.rejectionReason}
+                      </p>
+                    )}
+
+                    {/* Deleted-by-user notice */}
+                    {video.deletedAt && (
+                      <p className="text-[10px] text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1">
+                        Deleted by user on {formatDate(video.deletedAt)} — record retained for admin review
                       </p>
                     )}
 
@@ -651,6 +672,11 @@ export default function VideoModerationPage() {
                   {previewVideo.isEvaluation && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
                       <Award size={10} /> Jury
+                    </span>
+                  )}
+                  {previewVideo.deletedAt && (
+                    <span className="flex items-center gap-1 text-[10px] font-black bg-red-600 text-white px-2 py-1 rounded-full">
+                      <Trash2 size={10} /> Deleted by user
                     </span>
                   )}
                 </div>

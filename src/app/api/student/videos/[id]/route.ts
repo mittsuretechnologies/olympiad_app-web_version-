@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
-import { unlink } from 'fs/promises';
-import path from 'path';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -34,7 +32,7 @@ export async function DELETE(
     // Fetch the video first — verify it belongs to this student
     const video = await prisma.video.findUnique({ where: { id } });
 
-    if (!video) {
+    if (!video || video.deletedAt) {
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
@@ -42,21 +40,9 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Delete the DB record first
-    await prisma.video.delete({ where: { id } });
-
-    // Then try to delete the physical file from /public/uploads — best-effort,
-    // don't fail the request if the file is already gone or was hosted elsewhere
-    try {
-      const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-      if (video.videoUrl.startsWith(serverUrl)) {
-        const relativePath = video.videoUrl.replace(serverUrl, '');
-        const filePath = path.join(process.cwd(), 'public', relativePath);
-        await unlink(filePath);
-      }
-    } catch {
-      // File missing or external URL — silently ignore
-    }
+    // Soft delete — record and file are retained for SuperAdmin/backend visibility
+    // (including any Olympiad approval it represents); only hidden from normal views.
+    await prisma.video.update({ where: { id }, data: { deletedAt: new Date() } });
 
     return NextResponse.json({ message: 'Video deleted successfully' });
   } catch (error: any) {

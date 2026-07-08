@@ -110,6 +110,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (p.startsWith('/dashboard/credentials/registered')) return 'reports';
     if (p.startsWith('/dashboard/credentials')) return 'credentials';
     if (p.startsWith('/dashboard/videos')) return 'moderation';
+    if (p.startsWith('/dashboard/reported-videos')) return 'moderation';
     if (p.startsWith('/dashboard/reports')) return 'reports';
     if (p.startsWith('/dashboard/app-users')) return 'reports';
     if (p.startsWith('/dashboard/reviewer')) return 'reviewer';
@@ -146,6 +147,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const moderationSubItems = [
     { name: 'Pending Approvals', href: '/dashboard/videos', icon: Clock },
+    { name: 'Reported Videos',   href: '/dashboard/reported-videos', icon: Flag },
   ];
 
   const schoolSubItems = [
@@ -252,7 +254,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {canSee('moderation') && (
               <div>
                 <button onClick={() => toggleSection('moderation')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos'))}>
+                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos') || pathname.startsWith('/dashboard/reported-videos'))}>
                   <div className="flex items-center gap-3"><Play size={20} /><span className="text-sm font-semibold">Moderation</span></div>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -260,11 +262,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Support */}
+            {canSee('support') && (
+              <Link href="/dashboard/support-tickets"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support-tickets') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <LifeBuoy size={20} />
+                <span className="text-sm font-semibold">Support</span>
+              </Link>
             )}
 
             {/* Uploaders */}

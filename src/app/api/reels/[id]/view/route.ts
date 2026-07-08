@@ -18,7 +18,7 @@ export async function POST(
 
     // Check video exists
     const video = await prisma.video.findFirst({
-      where:  { id: videoId, status: 'APPROVED', isPublic: true },
+      where:  { id: videoId, status: 'APPROVED', isPublic: true, deletedAt: null },
       select: { id: true },
     });
     if (!video) {

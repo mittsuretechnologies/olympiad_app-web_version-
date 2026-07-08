@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     }
     if (!videoId) return NextResponse.json({ message: 'videoId is required' }, { status: 400 });
 
-    const video = await prisma.video.findUnique({ where: { id: videoId }, include: { evaluation: true } });
+    const video = await prisma.video.findUnique({ where: { id: videoId, deletedAt: null }, include: { evaluation: true } });
     if (!video) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
     if (!video.isEvaluation) return NextResponse.json({ message: 'This video is not an olympiad evaluation submission' }, { status: 400 });
 

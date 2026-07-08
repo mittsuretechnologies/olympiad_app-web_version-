@@ -54,6 +54,7 @@ export async function GET(request: NextRequest) {
         createdAt:    true,
         appUserId:    true,
         isEvaluation: true,
+        olympiadVisibility: true,
         student: {
           select: {
             id:   true,
@@ -140,6 +141,8 @@ export async function GET(request: NextRequest) {
         createdAt:    v.createdAt,
         isLiked:      likedIds.has(v.id),
         isEvaluation: v.isEvaluation,
+        olympiadVisibility: v.olympiadVisibility,
+        appUserId:    v.appUserId,
         student: v.student ? {
           id:         v.student.id,
           name:       v.student.name,

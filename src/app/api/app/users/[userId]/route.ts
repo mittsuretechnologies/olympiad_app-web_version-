@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { canViewOlympiadVideo } from '@/lib/videoVisibility';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -82,33 +83,45 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     let videosCount = 0;
 
     if (canSeeContent) {
-      // Show approved public videos (private olympiad videos are always hidden from profile)
       const videoWhere = {
         appUserId: target.id,
         status:    'APPROVED',
         isPublic:  true,
+        deletedAt: null,
       };
 
-      [videos, videosCount] = await Promise.all([
-        prisma.video.findMany({
-          where:   videoWhere,
-          select: {
-            id:          true,
-            videoUrl:    true,
-            thumbnailUrl: true,
-            caption:     true,
-            tags:        true,
-            category:    true,
-            subCategory: true,
-            isEvaluation: true,
-            likesCount:  true,
-            viewsCount:  true,
-            createdAt:   true,
-          },
-          orderBy: { createdAt: 'desc' },
-        }),
-        prisma.video.count({ where: videoWhere }),
-      ]);
+      const allVideos = await prisma.video.findMany({
+        where:   videoWhere,
+        select: {
+          id:          true,
+          videoUrl:    true,
+          thumbnailUrl: true,
+          caption:     true,
+          tags:        true,
+          category:    true,
+          subCategory: true,
+          isEvaluation: true,
+          olympiadVisibility: true,
+          appUserId:   true,
+          likesCount:  true,
+          viewsCount:  true,
+          createdAt:   true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      // Private Olympiad videos are hidden from this profile view unless viewer is the owner
+      videos = isOwnProfile
+        ? allVideos
+        : allVideos.filter(v =>
+            canViewOlympiadVideo(
+              { id: appUser.id, role: appUser.role },
+              v,
+              target.isPrivate,
+              isFollowing
+            )
+          );
+      videosCount = videos.length;
     }
 
     return NextResponse.json({
@@ -129,9 +142,18 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         joinedAt:      target.createdAt,
       },
       videos: videos.map(v => ({
-        ...v,
+        id:           v.id,
         videoUrl:     normalizeUrl(v.videoUrl),
         thumbnailUrl: normalizeUrl(v.thumbnailUrl),
+        caption:      v.caption,
+        tags:         v.tags,
+        category:     v.category,
+        subCategory:  v.subCategory,
+        isEvaluation: v.isEvaluation,
+        olympiadVisibility: v.olympiadVisibility,
+        likesCount:   v.likesCount,
+        viewsCount:   v.viewsCount,
+        createdAt:    v.createdAt,
       })),
     });
   } catch (error: any) {

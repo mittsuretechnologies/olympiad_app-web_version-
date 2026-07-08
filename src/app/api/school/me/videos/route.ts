@@ -54,7 +54,7 @@ export async function POST(request: Request) {
       }
 
       const approvedCount = await prisma.video.count({
-        where: { studentId, isEvaluation: true, status: 'APPROVED' },
+        where: { studentId, isEvaluation: true, status: 'APPROVED', deletedAt: null },
       });
       const isEvaluation = approvedCount < 2;
 
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
 
     // Count approved evaluation videos for this AppUser
     const approvedCount = await prisma.video.count({
-      where: { appUserId: studentId, isEvaluation: true, status: 'APPROVED' },
+      where: { appUserId: studentId, isEvaluation: true, status: 'APPROVED', deletedAt: null },
     });
     const isEvaluation = approvedCount < 2;
 
@@ -145,7 +145,7 @@ export async function GET(request: Request) {
     }
 
     const videos = await prisma.video.findMany({
-      where: { uploaderType: 'SCHOOL', student: { allocation: { schoolId: school.id } } },
+      where: { uploaderType: 'SCHOOL', student: { allocation: { schoolId: school.id } }, deletedAt: null },
       include: { student: { select: { id: true, name: true, olympiadCode: true } } },
       orderBy: { createdAt: 'desc' },
     });

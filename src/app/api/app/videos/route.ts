@@ -33,7 +33,7 @@ export async function POST(request: Request) {
     const {
       videoUrl, thumbnailUrl, caption, category, subCategory,
       tags, isPublic, isEvaluation, olympiadId: bodyOlympiadId,
-      isOlympiadUpload,
+      isOlympiadUpload, olympiadVisibility,
     } = await request.json();
 
     if (!videoUrl || !category || !subCategory) {
@@ -109,7 +109,7 @@ export async function POST(request: Request) {
 
       if (isCatA || isCatB) {
         const existingOlympiadVideos = await prisma.video.findMany({
-          where: { appUserId: appUser.id, isEvaluation: true },
+          where: { appUserId: appUser.id, isEvaluation: true, deletedAt: null },
           select: { category: true, subCategory: true, status: true },
         });
         // Only block if there's an active (non-rejected) video for this category slot
@@ -147,6 +147,9 @@ export async function POST(request: Request) {
         tags:         mergedTags,
         isPublic:     isPublic     !== undefined ? Boolean(isPublic)     : true,
         isEvaluation: finalIsEvaluation,
+        olympiadVisibility: finalIsEvaluation
+          ? (olympiadVisibility === 'private' ? 'private' : 'public')
+          : null,
         status: 'PENDING',
       },
     });
@@ -167,7 +170,7 @@ export async function GET(request: Request) {
   try {
     // Return all videos uploaded by this app user (both student and viewer)
     const videos = await prisma.video.findMany({
-      where: { appUserId: appUser.id },
+      where: { appUserId: appUser.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 

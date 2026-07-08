@@ -11,7 +11,8 @@ interface Module { key: string; label: string; subItems: SubItem[]; }
 
 const MODULES: Module[] = [
   { key: 'schools', label: 'Schools', subItems: [{ key: 'schools.register', label: 'Register School' }, { key: 'schools.bulk', label: 'Bulk Upload' }, { key: 'schools.view', label: 'View / Edit Schools' }] },
-  { key: 'moderation', label: 'Moderation', subItems: [{ key: 'moderation.pending', label: 'Pending Approvals' }] },
+  { key: 'moderation', label: 'Moderation', subItems: [{ key: 'moderation.pending', label: 'Pending Approvals' }, { key: 'moderation.reported', label: 'Reported Videos' }] },
+  { key: 'support', label: 'Support', subItems: [] },
   { key: 'uploaders', label: 'Uploaders', subItems: [{ key: 'uploaders.register', label: 'Register Uploader' }, { key: 'uploaders.view', label: 'View / Manage Uploaders' }] },
   { key: 'credentials', label: 'Credentials', subItems: [{ key: 'credentials.schools', label: 'School Credentials' }, { key: 'credentials.uploaders', label: 'Uploader Credentials' }, { key: 'credentials.students', label: 'Student Credentials' }, { key: 'credentials.reviewers', label: 'Reviewer Credentials' }, { key: 'credentials.evaluators', label: 'Evaluator Credentials' }] },
   { key: 'reviewer', label: 'Reviewer', subItems: [{ key: 'reviewer.manage', label: 'Manage Reviewers' }, { key: 'reviewer.content', label: 'Review Content' }] },
