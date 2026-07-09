@@ -96,7 +96,20 @@ body {
   inset: 0;
   pointer-events: none;
   z-index: -1;
-  background: 
+  background:
     radial-gradient(circle at 10% 10%, rgba(255, 144, 0, 0.05) 0%, transparent 40%),
     radial-gradient(circle at 90% 90%, rgba(255, 107, 0, 0.05) 0%, transparent 40%);
+}
+
+/* Dashboard mascot: walks in from the date-range filter to the Download
+   Report button once on load, then settles in place above the button. */
+@keyframes mascot-walk-in {
+  0%   { left: 0; transform: translateX(0); }
+  85%  { left: 100%; transform: translateX(-100%); }
+  100% { left: 100%; transform: translateX(-100%); }
+}
+
+.mascot-walk-in {
+  left: 0;
+  animation: mascot-walk-in 6s ease-in-out forwards;
 }

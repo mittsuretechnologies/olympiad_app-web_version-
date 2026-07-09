@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { CLASSES } from '@/lib/classes';
+import { STATES, getDistrictsForState } from '@/lib/locations';
 
 export default function RegisterSchoolPage() {
   const [formData, setFormData] = useState({
@@ -13,7 +14,9 @@ export default function RegisterSchoolPage() {
     address: '',
     city: '',
     district: '',
+    districtCode: '',
     state: '',
+    stateCode: '',
     pincode: '',
   });
 
@@ -47,6 +50,30 @@ export default function RegisterSchoolPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const districtOptions = getDistrictsForState(formData.stateCode);
+
+  const handleStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const stateCode = e.target.value;
+    const state = STATES.find((s) => s.code === stateCode);
+    setFormData({
+      ...formData,
+      stateCode,
+      state: state?.name || '',
+      districtCode: '',
+      district: '',
+    });
+  };
+
+  const handleDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const districtCode = e.target.value;
+    const district = districtOptions.find((d) => d.code === districtCode);
+    setFormData({
+      ...formData,
+      districtCode,
+      district: district?.name || '',
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,7 +118,9 @@ export default function RegisterSchoolPage() {
           address: formData.address,
           city: formData.city,
           district: formData.district,
+          districtCode: formData.districtCode,
           state: formData.state,
+          stateCode: formData.stateCode,
           pincode: formData.pincode,
           classes: classesPayload,
         }),
@@ -108,7 +137,7 @@ export default function RegisterSchoolPage() {
         });
         setFormData({
           schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-          address: '', city: '', district: '', state: '', pincode: '',
+          address: '', city: '', district: '', districtCode: '', state: '', stateCode: '', pincode: '',
         });
         setClassCounts({});
       }
@@ -267,28 +296,57 @@ export default function RegisterSchoolPage() {
               <label className={labelCls}>
                 State <span className="text-red-600">*</span>
               </label>
-              <input
-                type="text"
-                name="state"
-                value={formData.state}
-                onChange={handleChange}
+              <select
+                name="stateCode"
+                value={formData.stateCode}
+                onChange={handleStateChange}
                 required
                 className={inputCls}
-                placeholder="State"
+              >
+                <option value="">Select State</option>
+                {STATES.map((s) => (
+                  <option key={s.code} value={s.code}>{s.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>State Code</label>
+              <input
+                type="text"
+                value={formData.stateCode}
+                readOnly
+                disabled
+                className={`${inputCls} bg-gray-100 text-gray-500`}
+                placeholder="Auto-filled from State"
               />
             </div>
             <div>
               <label className={labelCls}>
                 District <span className="text-red-600">*</span>
               </label>
+              <select
+                name="districtCode"
+                value={formData.districtCode}
+                onChange={handleDistrictChange}
+                required
+                disabled={!formData.stateCode}
+                className={`${inputCls} disabled:bg-gray-100 disabled:text-gray-400`}
+              >
+                <option value="">{formData.stateCode ? 'Select District' : 'Select State first'}</option>
+                {districtOptions.map((d) => (
+                  <option key={d.code} value={d.code}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>District Code</label>
               <input
                 type="text"
-                name="district"
-                value={formData.district}
-                onChange={handleChange}
-                required
-                className={inputCls}
-                placeholder="District"
+                value={formData.districtCode}
+                readOnly
+                disabled
+                className={`${inputCls} bg-gray-100 text-gray-500`}
+                placeholder="Auto-filled from District"
               />
             </div>
             <div>
@@ -332,7 +390,7 @@ export default function RegisterSchoolPage() {
               onClick={() => {
                 setFormData({
                   schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-                  address: '', city: '', district: '', state: '', pincode: '',
+                  address: '', city: '', district: '', districtCode: '', state: '', stateCode: '', pincode: '',
                 });
                 setClassCounts({});
               }}
