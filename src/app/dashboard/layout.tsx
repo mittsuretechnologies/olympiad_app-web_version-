@@ -27,6 +27,8 @@ import {
   Settings,
   ClipboardCheck,
   Award,
+  Flag,
+  LifeBuoy,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR';
