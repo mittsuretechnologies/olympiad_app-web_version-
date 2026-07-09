@@ -24,6 +24,26 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
   const { userId } = await params;
 
   try {
+    const target = await prisma.appUser.findUnique({
+      where: { id: userId },
+      select: { id: true, isPrivate: true },
+    });
+    if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    const isOwnProfile = appUser.id === target.id;
+    let isFollowing = false;
+    if (!isOwnProfile) {
+      const viewerFollow = await prisma.follow.findUnique({
+        where: { followerId_followingId: { followerId: appUser.id, followingId: target.id } },
+      });
+      isFollowing = !!viewerFollow;
+    }
+
+    const canSeeList = isOwnProfile || !target.isPrivate || isFollowing;
+    if (!canSeeList) {
+      return NextResponse.json({ error: 'This account is private' }, { status: 403 });
+    }
+
     // Get Follow records where followingId = userId (people who follow this user)
     const follows = await prisma.follow.findMany({
       where: { followingId: userId },

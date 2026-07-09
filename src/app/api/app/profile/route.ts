@@ -39,14 +39,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
   }
 
-  // Validate userId: 3-20 chars, alphanumeric only, stored uppercase
+  // Validate userId: 3-20 chars, any characters allowed
   if (userId !== undefined) {
     const trimmed = userId.trim();
     if (trimmed.length < 3 || trimmed.length > 20) {
       return NextResponse.json({ message: 'User ID must be between 3 and 20 characters' }, { status: 422 });
-    }
-    if (!/^[a-zA-Z0-9]+$/.test(trimmed)) {
-      return NextResponse.json({ message: 'User ID can only contain letters and numbers' }, { status: 422 });
     }
     // Uniqueness check is case-insensitive — stored as-is but compared case-insensitively
     const existing = await prisma.appUser.findFirst({
