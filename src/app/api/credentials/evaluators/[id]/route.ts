@@ -10,11 +10,16 @@ export async function PATCH(
   if (error) return error;
   try {
     const { id } = await params;
-    const { isActive } = await request.json();
+    const body = await request.json();
+    const data: Record<string, any> = {};
+    if ('isActive' in body) data.isActive = Boolean(body.isActive);
+    if ('assignedStates' in body) data.assignedStates = Array.isArray(body.assignedStates) ? body.assignedStates.filter(Boolean) : [];
+    if ('assignedDistricts' in body) data.assignedDistricts = Array.isArray(body.assignedDistricts) ? body.assignedDistricts.filter(Boolean) : [];
+
     const updated = await prisma.talentEvaluator.update({
       where: { id },
-      data: { isActive: Boolean(isActive) },
-      select: { id: true, isActive: true },
+      data,
+      select: { id: true, isActive: true, assignedStates: true, assignedDistricts: true },
     });
     return NextResponse.json(updated);
   } catch (e: any) {

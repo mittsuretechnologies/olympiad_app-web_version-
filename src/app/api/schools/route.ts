@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { CLASS_CODE_BY_NAME } from '@/lib/classes';
+import { stateNameToCode } from '@/lib/indianStateCodes';
 
 export async function GET() {
   try {
@@ -127,7 +128,7 @@ export async function POST(request: Request) {
             district,
             districtCode,
             state,
-            stateCode,
+            stateCode: stateCode || stateNameToCode(state),
             pincode,
             username: generateUsername(name, schoolId),
             password: hashedPassword,

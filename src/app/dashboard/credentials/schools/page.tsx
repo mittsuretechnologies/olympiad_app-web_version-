@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
-import { KeyRound, Loader2, Search, RotateCw, X, Eye, EyeOff, RefreshCw, CheckCircle } from 'lucide-react';
+import { KeyRound, Loader2, Search, RotateCw, X, Eye, EyeOff, RefreshCw, CheckCircle, Send, MessageSquare, Mail } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,8 @@ export default function SchoolCredentialsPage() {
   const [customUsername, setCustomUsername] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  const [sendTarget, setSendTarget] = useState<SchoolCred | null>(null);
+  const [sendBusy, setSendBusy] = useState<'sms' | 'email' | null>(null);
 
 
   const filtered = useMemo(() => {
@@ -100,6 +102,29 @@ export default function SchoolCredentialsPage() {
     }
   };
 
+  const handleSend = async (method: 'sms' | 'email') => {
+    if (!sendTarget) return;
+    setSendBusy(method);
+    try {
+      const res = await fetch(`/api/credentials/schools/${sendTarget.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || 'Failed to send');
+        return;
+      }
+      setSendTarget(null);
+      setToast(`Credentials sent via ${method === 'sms' ? 'SMS' : 'Email'} to ${sendTarget.name}`);
+      setTimeout(() => setToast(null), 3000);
+    } catch {
+      alert('Network error');
+    } finally {
+      setSendBusy(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -185,13 +210,23 @@ export default function SchoolCredentialsPage() {
                     {new Date(r.updatedAt).toLocaleDateString()}
                   </td>
                   <td className="px-4 py-2.5 text-center">
-                    <button
-                      title="Reset / generate new password"
-                      onClick={() => { setResetTarget(r); setResetAction('choose'); setCustomUsername(r.username || ''); }}
-                      className="inline-flex items-center justify-center w-8 h-8 bg-[#009846] text-white rounded hover:bg-[#007a38] transition-colors"
-                    >
-                      <RotateCw className="w-4 h-4" />
-                    </button>
+                    <div className="inline-flex items-center gap-1.5">
+                      <button
+                        title="Reset / generate new password"
+                        onClick={() => { setResetTarget(r); setResetAction('choose'); setCustomUsername(r.username || ''); }}
+                        className="inline-flex items-center justify-center w-8 h-8 bg-[#009846] text-white rounded hover:bg-[#007a38] transition-colors"
+                      >
+                        <RotateCw className="w-4 h-4" />
+                      </button>
+                      <button
+                        title={r.plainPassword ? 'Send credentials to school' : 'Set a password first to enable sending'}
+                        disabled={!r.plainPassword}
+                        onClick={() => setSendTarget(r)}
+                        className="inline-flex items-center justify-center w-8 h-8 bg-[#1559C7] text-white rounded hover:bg-[#0d47b8] transition-colors disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-[#1559C7]"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -315,6 +350,52 @@ export default function SchoolCredentialsPage() {
               </div>
             )}
 
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Credentials Dialog */}
+      <Dialog open={!!sendTarget} onOpenChange={(open) => { if (!open && !sendBusy) setSendTarget(null); }}>
+        <DialogContent className="max-w-sm p-0 border-0 rounded-2xl shadow-2xl overflow-hidden">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Send Credentials</DialogTitle>
+          </DialogHeader>
+
+          <div className="bg-[#1559C7] text-white px-5 py-3 border-b-4 border-[#FF9000] flex items-center justify-between">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-wider">Send Credentials</p>
+              {sendTarget && <p className="text-xs text-white/70 mt-0.5">{sendTarget.name}</p>}
+            </div>
+            <button onClick={() => !sendBusy && setSendTarget(null)} className="text-white/70 hover:text-white"><X className="w-4 h-4" /></button>
+          </div>
+
+          <div className="p-5 bg-white space-y-3">
+            <p className="text-xs text-gray-400 mb-1">How should we send the username and password?</p>
+            <button
+              onClick={() => handleSend('sms')}
+              disabled={!!sendBusy}
+              className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:border-[#1559C7] hover:bg-blue-50 transition-all text-left disabled:opacity-50"
+            >
+              <MessageSquare size={18} className="text-[#1559C7] shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-800">SMS</p>
+                <p className="text-xs text-gray-400">Send to registered phone number</p>
+              </div>
+              {sendBusy === 'sms' && <Loader2 className="w-4 h-4 animate-spin text-[#1559C7]" />}
+            </button>
+            <button
+              onClick={() => handleSend('email')}
+              disabled={!!sendBusy}
+              className="w-full flex items-center gap-3 px-4 py-3 border border-gray-200 rounded-xl hover:border-[#1559C7] hover:bg-blue-50 transition-all text-left disabled:opacity-50"
+            >
+              <Mail size={18} className="text-[#1559C7] shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-gray-800">Email</p>
+                <p className="text-xs text-gray-400">{sendTarget?.email || 'Send to registered email'}</p>
+              </div>
+              {sendBusy === 'email' && <Loader2 className="w-4 h-4 animate-spin text-[#1559C7]" />}
+            </button>
+            <button onClick={() => setSendTarget(null)} disabled={!!sendBusy} className="w-full h-9 text-sm text-gray-400 hover:text-gray-600 transition-colors disabled:opacity-50">Cancel</button>
           </div>
         </DialogContent>
       </Dialog>

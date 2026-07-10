@@ -57,23 +57,28 @@ export async function GET(request: Request) {
         })
       : [];
 
-    // Resolve school for appUsers via their olympiadId → OlympiadIdAllocation → School
+    // Resolve school + assigned name for appUsers via their olympiadId → OlympiadIdAllocation
     const olympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
     const allocations = olympiadCodes.length > 0
       ? await prisma.olympiadIdAllocation.findMany({
           where: { code: { in: olympiadCodes } },
           select: {
             code: true,
+            assignedName: true,
             school: { select: { name: true, city: true, district: true, state: true } },
           },
         })
       : [];
-    const allocationMap = Object.fromEntries(allocations.map(a => [a.code, a.school]));
+    const allocationMap = Object.fromEntries(allocations.map(a => [a.code, a]));
 
-    const appUserMap = Object.fromEntries(appUsers.map(u => [u.id, {
-      ...u,
-      school: u.olympiadId ? (allocationMap[u.olympiadId] ?? null) : null,
-    }]));
+    const appUserMap = Object.fromEntries(appUsers.map(u => {
+      const allocation = u.olympiadId ? allocationMap[u.olympiadId] : null;
+      return [u.id, {
+        ...u,
+        assignedName: allocation?.assignedName ?? null,
+        school: allocation?.school ?? null,
+      }];
+    }));
 
     // ── Normalise URLs ────────────────────────────────────────────────────────
     let normalized = (videos ?? []).map(v => ({

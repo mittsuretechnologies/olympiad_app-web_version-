@@ -20,6 +20,20 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
+    // Evaluators can be scoped to specific states by code (see TalentEvaluator
+    // .assignedStates, e.g. ["RJ", "GJ"]). Empty array = unrestricted.
+    // SuperAdmin/Reviewer always see everything (oversight roles).
+    let regionFilter: string[] | null = null;
+    if (payload.role === 'EVALUATOR') {
+      const evaluator = await prisma.talentEvaluator.findUnique({
+        where: { id: payload.id },
+        select: { assignedStates: true },
+      });
+      if (evaluator && evaluator.assignedStates.length > 0) {
+        regionFilter = evaluator.assignedStates;
+      }
+    }
+
     const { searchParams } = new URL(request.url);
     const targetVideoId = searchParams.get('videoId');
 
@@ -32,7 +46,7 @@ export async function GET(request: Request) {
         student: {
           select: {
             id: true, name: true, olympiadCode: true,
-            allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true } } } },
+            allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true, stateCode: true } } } },
           },
         },
         evaluations: true,
@@ -56,7 +70,7 @@ export async function GET(request: Request) {
     const allocations = olympiadCodes.length
       ? await prisma.olympiadIdAllocation.findMany({
           where: { code: { in: olympiadCodes } },
-          select: { code: true, classCode: true, className: true, assignedName: true, school: { select: { name: true } } },
+          select: { code: true, classCode: true, className: true, assignedName: true, school: { select: { name: true, stateCode: true } } },
         })
       : [];
     const allocByCode = new Map(allocations.map(a => [a.code, a]));
@@ -86,6 +100,7 @@ export async function GET(request: Request) {
       olympiadCode: string;
       className: string | null;
       schoolName: string | null;
+      schoolStateCode: string | null;
       slot: number;
       koshes: readonly [string, string];
       // A video has one scoring form; its result is stored under both
@@ -120,11 +135,13 @@ export async function GET(request: Request) {
         const isFullyPublished = koshes.every(k => evals.find(e => e.kosh === k)?.isPublished);
 
         let studentName = '-', olympiadCode = '-', className: string | null = null, schoolName: string | null = null;
+        let schoolStateCode: string | null = null;
         if (key.startsWith('s:')) {
           studentName = v.student?.allocation?.assignedName || v.student?.name || '-';
           olympiadCode = v.student?.olympiadCode || '-';
           className = v.student?.allocation?.className || v.student?.allocation?.classCode || null;
           schoolName = v.student?.allocation?.school?.name || null;
+          schoolStateCode = v.student?.allocation?.school?.stateCode || null;
         } else {
           const u = appUserById.get(v.appUserId!);
           const alloc = u?.olympiadId ? allocByCode.get(u.olympiadId) : null;
@@ -132,6 +149,7 @@ export async function GET(request: Request) {
           olympiadCode = u?.olympiadId || '-';
           className = alloc?.className || alloc?.classCode || null;
           schoolName = alloc?.school?.name || null;
+          schoolStateCode = alloc?.school?.stateCode || null;
         }
 
         allFormatted.push({
@@ -146,6 +164,7 @@ export async function GET(request: Request) {
           olympiadCode,
           className,
           schoolName,
+          schoolStateCode,
           slot,
           koshes,
           existingScore,
@@ -155,8 +174,12 @@ export async function GET(request: Request) {
       });
     }
 
-    const targetFormatted = targetVideoId ? allFormatted.find(v => v.id === targetVideoId) || null : null;
-    const restQueue = allFormatted
+    const regionScoped = regionFilter
+      ? allFormatted.filter(v => v.schoolStateCode && regionFilter!.includes(v.schoolStateCode))
+      : allFormatted;
+
+    const targetFormatted = targetVideoId ? regionScoped.find(v => v.id === targetVideoId) || null : null;
+    const restQueue = regionScoped
       .filter(v => v.id !== targetVideoId && !v.isFullyScored)
       .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 

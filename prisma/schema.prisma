@@ -208,6 +208,11 @@ model TalentEvaluator {
   password             String
   plainPassword        String?
   isActive             Boolean                @default(true)
+  // Empty arrays = unrestricted (evaluator sees every region). Non-empty =
+  // evaluator only sees videos whose student's school state/district matches
+  // one of these — checked in evaluation-queue and evaluate routes.
+  assignedStates       String[]               @default([])
+  assignedDistricts    String[]               @default([])
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
   individualPermission IndividualPermissions?

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { koshesForSlot, videoSlot } from '@/lib/kosh';
 import { recordAuditLog } from '@/lib/audit-log';
+import { evaluatorCanAccessVideo } from '@/lib/evaluatorRegion';
 
 const MAX_PER_CRITERION = 5;
 
@@ -64,6 +65,13 @@ export async function POST(request: Request) {
     const video = await prisma.video.findUnique({ where: { id: videoId, deletedAt: null }, include: { evaluations: true } });
     if (!video) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
     if (!video.isEvaluation) return NextResponse.json({ message: 'This video is not an olympiad evaluation submission' }, { status: 400 });
+
+    if (payload.role === 'EVALUATOR') {
+      const canAccess = await evaluatorCanAccessVideo(payload.id, video);
+      if (!canAccess) {
+        return NextResponse.json({ message: 'This video is outside your assigned region' }, { status: 403 });
+      }
+    }
 
     // One scoring form per video, but the same score is recorded twice —
     // once per kosh assigned to this video's slot (1st video: Annamaya +

@@ -28,7 +28,7 @@ interface Video {
   createdAt: string;
   deletedAt: string | null;
   uploaderType: string | null;
-  appUser: { userId: string; email: string | null; mobile: string | null; olympiadId: string | null; school: { name: string; city: string; district: string; state: string } | null } | null;
+  appUser: { userId: string; email: string | null; mobile: string | null; olympiadId: string | null; assignedName: string | null; school: { name: string; city: string; district: string; state: string } | null } | null;
   student: {
     name: string;
     olympiadCode: string;
@@ -591,15 +591,22 @@ export default function VideoModerationPage() {
                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-black shrink-0 ${
                           isStudent ? 'bg-amber-100 text-amber-700' : 'bg-blue-100 text-blue-600'
                         }`}>
-                          {video.student?.name?.[0] ?? video.appUser?.userId?.[0] ?? '?'}
+                          {(video.student?.name || video.appUser?.assignedName || video.appUser?.userId || '?')[0]?.toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
                           <p className="text-[11px] font-black text-[#004f9f] truncate">
-                            {video.student?.name ?? video.appUser?.userId ?? 'â'}
+                            {video.student?.name ?? video.appUser?.assignedName ?? video.appUser?.userId ?? 'Unknown'}
                           </p>
-                          <p className="text-[10px] text-gray-400 font-mono truncate">
-                            {video.student?.olympiadCode ?? video.appUser?.email ?? video.appUser?.mobile ?? ''}
-                          </p>
+                          <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                            {video.appUser?.userId && (
+                              <span className="text-[9px] font-bold text-gray-500 bg-gray-100 border border-gray-200 rounded-full px-1.5 py-0.5 truncate max-w-[110px]">
+                                @{video.appUser.userId}
+                              </span>
+                            )}
+                            {video.student?.olympiadCode && (
+                              <span className="text-[10px] text-gray-400 font-mono truncate">{video.student.olympiadCode}</span>
+                            )}
+                          </div>
                         </div>
                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
                           isStudent ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-600 border border-blue-200'

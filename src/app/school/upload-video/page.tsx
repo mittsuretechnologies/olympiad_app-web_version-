@@ -28,6 +28,8 @@ export default function UploadVideoPage() {
   const [caption, setCaption]       = useState('');
 
   const [isPublic, setIsPublic] = useState(true);
+  const [autoCrop, setAutoCrop] = useState(false);
+  const [aspectMismatch, setAspectMismatch] = useState(false);
 
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [progress, setProgress]     = useState(0);
@@ -89,6 +91,10 @@ export default function UploadVideoPage() {
 
   const getCatStatus = (catValue: string) => {
     if (!slots) return 'available';
+    // Once both olympiad slots are filled, every further upload goes to the
+    // general feed — categories are no longer "locked" by slot status, just
+    // freely selectable so the school can still tag what kind of video it is.
+    if (isGeneralOnly) return 'available';
     const isA = catValue === OLYMPIAD_CAT_A_LABEL;
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
@@ -97,12 +103,37 @@ export default function UploadVideoPage() {
     return 'available';
   };
 
+  const RATIO_TOLERANCE = 0.04;
+
   function handleFile(file: File) {
     if (!file.type.startsWith('video/')) { setErrorMsg('Please select a valid video file.'); return; }
-    if (file.size > 150 * 1024 * 1024) { setErrorMsg('Video must be under 150 MB.'); return; }
     setErrorMsg('');
-    setVideoFile(file);
-    setVideoPreview(URL.createObjectURL(file));
+    setAutoCrop(false);
+    setAspectMismatch(false);
+
+    // Quick client-side pre-check for duration + aspect ratio so schools get
+    // instant feedback instead of waiting for the upload round-trip to fail.
+    const url = URL.createObjectURL(file);
+    const probe = document.createElement('video');
+    probe.preload = 'metadata';
+    probe.onloadedmetadata = () => {
+      if (probe.duration > 120) {
+        setErrorMsg(`Video is ${Math.ceil(probe.duration)}s long — it must be 2 minutes or shorter.`);
+        URL.revokeObjectURL(url);
+        return;
+      }
+      const ratio = probe.videoWidth / probe.videoHeight;
+      const isPortrait916 = Math.abs(ratio - 9 / 16) <= RATIO_TOLERANCE;
+      setAspectMismatch(!isPortrait916);
+      setVideoFile(file);
+      setVideoPreview(url);
+    };
+    probe.onerror = () => {
+      // Let the server-side probe be the source of truth if the browser can't read it.
+      setVideoFile(file);
+      setVideoPreview(url);
+    };
+    probe.src = url;
   }
 
   const isCustomTalent = subCategory === 'Any Other Special Talent' || subCategory === 'Any Other';
@@ -118,6 +149,10 @@ export default function UploadVideoPage() {
       setErrorMsg('Please enter the topic.');
       return;
     }
+    if (aspectMismatch && !autoCrop) {
+      setErrorMsg('This video is not in 9:16 format. Enable auto-crop above, or choose a portrait video.');
+      return;
+    }
     setErrorMsg('');
     setUploadState('uploading');
     setProgress(15);
@@ -126,6 +161,7 @@ export default function UploadVideoPage() {
       const fd = new FormData();
       fd.append('video', videoFile);
       fd.append('studentId', selectedStudent.id);
+      fd.append('autoCrop', String(autoCrop));
 
       const upRes = await fetch('/api/school/me/upload-video', {
         method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
@@ -156,6 +192,7 @@ export default function UploadVideoPage() {
   function reset() {
     setSelectedStudent(null); setStudentSearch(''); setVideoFile(null); setVideoPreview(null);
     setCategory(''); setSubCategory(''); setCustomTalent(''); setCaption(''); setIsPublic(true);
+    setAutoCrop(false); setAspectMismatch(false);
     setUploadState('idle'); setProgress(0); setErrorMsg(''); setLastVideoMeta(null);
     setSlots(null);
   }
@@ -339,17 +376,37 @@ export default function UploadVideoPage() {
               </p>
 
               {videoPreview ? (
-                <div className="relative rounded-xl overflow-hidden bg-black">
-                  <video src={videoPreview} controls className="w-full max-h-64 object-contain" />
-                  <button type="button" onClick={() => { setVideoFile(null); setVideoPreview(null); }}
-                    className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full hover:bg-black/80 transition-colors">
-                    <X className="w-4 h-4" />
-                  </button>
-                  <div className="mt-2 flex items-center gap-2 px-1">
+                <div className="space-y-3">
+                  <div className="relative rounded-xl overflow-hidden bg-black">
+                    <video src={videoPreview} controls className="w-full max-h-64 object-contain" />
+                    <button type="button" onClick={() => { setVideoFile(null); setVideoPreview(null); setAspectMismatch(false); setAutoCrop(false); }}
+                      className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full hover:bg-black/80 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-2 px-1">
                     <Video className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
                     <p className="text-xs text-gray-600 truncate">{videoFile?.name}</p>
                     <span className="text-xs text-gray-500 flex-shrink-0">· {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB</span>
                   </div>
+
+                  {aspectMismatch && (
+                    <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 text-red-600 text-xs">
+                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                      This video is not in 9:16 (portrait) format. Enable auto-crop below, or upload a portrait video.
+                    </div>
+                  )}
+
+                  <label className="flex items-center gap-2 px-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoCrop}
+                      onChange={e => setAutoCrop(e.target.checked)}
+                      className="w-3.5 h-3.5 rounded accent-[#1559C7]"
+                    />
+                    <span className="text-xs text-gray-600">Auto-crop to 9:16 if not already portrait</span>
+                  </label>
                 </div>
               ) : (
                 <div
@@ -367,7 +424,7 @@ export default function UploadVideoPage() {
                   <p className="font-semibold text-gray-700 text-sm mb-1">
                     {dragOver ? 'Drop it here' : 'Click to select or drag & drop'}
                   </p>
-                  <p className="text-xs text-gray-500">MP4, MOV, AVI · Max 150 MB</p>
+                  <p className="text-xs text-gray-500">MP4, MOV, AVI · 9:16 portrait · Max 2 min · Auto-compressed above 150 MB</p>
                   <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
                 </div>

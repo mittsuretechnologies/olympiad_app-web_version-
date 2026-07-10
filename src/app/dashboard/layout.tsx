@@ -149,8 +149,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const moderationSubItems = [
-    { name: 'Pending Approvals', href: '/dashboard/videos', icon: Clock },
-    { name: 'Reported Videos',   href: '/dashboard/reported-videos', icon: Flag },
+    { name: 'Video Moderation', href: '/dashboard/videos', icon: Clock },
+    { name: 'Reported Videos',  href: '/dashboard/reported-videos', icon: Flag },
   ];
 
   const schoolSubItems = [

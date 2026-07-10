@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, Star, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle } from 'lucide-react';
+import { Search, Loader2, Star, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, MapPin } from 'lucide-react';
+import { INDIAN_STATE_CODES } from '@/lib/indianStateCodes';
 
 interface Evaluator {
   id: string;
@@ -10,7 +11,10 @@ interface Evaluator {
   email: string;
   isActive: boolean;
   createdAt: string;
+  assignedStates?: string[];
 }
+
+const VALID_STATE_CODES = new Set(Object.values(INDIAN_STATE_CODES));
 
 function authHeaders(): Record<string, string> {
   const token = sessionStorage.getItem('token');
@@ -30,12 +34,61 @@ export default function ManageEvaluatorsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
+  const [regionTarget, setRegionTarget] = useState<Evaluator | null>(null);
+  const [regionStates, setRegionStates] = useState<string[]>([]);
+  const [regionInput, setRegionInput] = useState('');
+  const [regionInputError, setRegionInputError] = useState('');
+  const [regionSaving, setRegionSaving] = useState(false);
+
   useEffect(() => {
     fetch('/api/credentials/evaluators', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, []);
+
+  const openRegionModal = (r: Evaluator) => {
+    setRegionTarget(r);
+    setRegionStates(r.assignedStates || []);
+    setRegionInput('');
+    setRegionInputError('');
+  };
+
+  const addRegionCode = () => {
+    const code = regionInput.trim().toUpperCase();
+    if (!code) return;
+    if (!VALID_STATE_CODES.has(code)) {
+      setRegionInputError(`"${code}" is not a valid state code`);
+      return;
+    }
+    if (!regionStates.includes(code)) setRegionStates(prev => [...prev, code]);
+    setRegionInput('');
+    setRegionInputError('');
+  };
+
+  const removeRegionCode = (code: string) => {
+    setRegionStates(prev => prev.filter(c => c !== code));
+  };
+
+  const saveRegion = async () => {
+    if (!regionTarget) return;
+    setRegionSaving(true);
+    try {
+      const res = await fetch(`/api/credentials/evaluators/${regionTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ assignedStates: regionStates }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to save');
+      setRows(prev => prev.map(x => x.id === regionTarget.id ? { ...x, assignedStates: data.assignedStates } : x));
+      setRegionTarget(null);
+    } catch (e: any) {
+      alert(e.message || 'Failed to save region assignment');
+    } finally {
+      setRegionSaving(false);
+    }
+  };
 
   const filtered = useMemo(() => {
     if (!search) return rows;
@@ -141,6 +194,7 @@ export default function ManageEvaluatorsPage() {
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Name</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Email</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Status</th>
+                <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Assigned Region</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Added</th>
                 <th className="px-5 py-3 text-center text-[10px] font-bold uppercase">Actions</th>
               </tr>
@@ -157,11 +211,26 @@ export default function ManageEvaluatorsPage() {
                       ? <span className="px-2 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded-full">Active</span>
                       : <span className="px-2 py-0.5 text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 rounded-full">Inactive</span>}
                   </td>
+                  <td className="px-5 py-3">
+                    {r.assignedStates?.length ? (
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                        {r.assignedStates.map(s => (
+                          <span key={s} className="px-1.5 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full">{s}</span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-[11px] text-gray-400 italic">All regions</span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-xs text-gray-400">
                     {new Date(r.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => openRegionModal(r)} title="Assign region"
+                        className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
+                        <MapPin size={14} />
+                      </button>
                       <button onClick={() => toggleActive(r)} title={r.isActive ? 'Deactivate' : 'Activate'}
                         className={`p-1.5 rounded-lg transition-colors ${r.isActive ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
                         {r.isActive ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
@@ -231,6 +300,69 @@ export default function ManageEvaluatorsPage() {
                   Create
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {regionTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden max-h-[85vh] flex flex-col">
+            <div className="bg-[#004f9f] px-5 py-4 flex items-center justify-between shrink-0">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Assign Region</p>
+                <p className="text-white font-bold text-sm mt-0.5">{regionTarget.name}</p>
+              </div>
+              <button onClick={() => setRegionTarget(null)} className="text-white/50 hover:text-white"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4 overflow-y-auto">
+              <p className="text-xs text-gray-500">
+                Leave empty to let this evaluator see videos from every state. Adding a state code restricts them to only that state.
+              </p>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">State Code</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={regionInput}
+                    onChange={e => { setRegionInput(e.target.value); setRegionInputError(''); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addRegionCode(); } }}
+                    placeholder="e.g. RJ"
+                    maxLength={3}
+                    className={`flex-1 border rounded-lg px-3 py-2 text-sm font-mono uppercase focus:outline-none ${regionInputError ? 'border-red-300 focus:border-red-400' : 'border-gray-200 focus:border-[#004f9f]'}`}
+                  />
+                  <button type="button" onClick={addRegionCode}
+                    className="px-4 py-2 bg-gray-100 text-gray-700 text-sm font-semibold rounded-lg hover:bg-gray-200 transition-colors">
+                    Add
+                  </button>
+                </div>
+                {regionInputError && <p className="text-xs text-red-500 mt-1">{regionInputError}</p>}
+
+                {regionStates.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-3">
+                    {regionStates.map(s => (
+                      <span key={s} className="flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-full bg-indigo-600 text-white">
+                        {s}
+                        <button type="button" onClick={() => removeRegionCode(s)} className="hover:text-indigo-200">
+                          <X size={11} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 p-5 pt-0 shrink-0">
+              <button onClick={() => setRegionTarget(null)}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50">
+                Cancel
+              </button>
+              <button onClick={saveRegion} disabled={regionSaving}
+                className="flex-1 py-2.5 bg-[#004f9f] text-white text-sm font-bold rounded-lg hover:bg-[#003d7a] disabled:opacity-50 flex items-center justify-center gap-2">
+                {regionSaving ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
+                Save
+              </button>
             </div>
           </div>
         </div>
