@@ -6,7 +6,7 @@ import { fetcher } from '@/lib/swr';
 import {
   Play, CheckCircle, XCircle, Clock, School,
   Eye, Globe, Lock, Award, RefreshCw, Trash2,
-  Search, Filter, ChevronDown, X,
+  Search, Filter, ChevronDown, X, Copy, Check,
 } from 'lucide-react';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
 
@@ -77,6 +77,11 @@ function getCategoryLabel(cat: string) {
   return null;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') || '' : '';
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 // Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ Component Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
 
 export default function VideoModerationPage() {
@@ -100,6 +105,13 @@ export default function VideoModerationPage() {
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [bulkWorking,  setBulkWorking]  = useState(false);
   const [deleting,     setDeleting]     = useState(false);
+  const [copiedId,     setCopiedId]     = useState<string | null>(null);
+
+  const copyVideoId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(cur => (cur === id ? null : cur)), 1500);
+  };
 
   // Ã¢ââ¬Ã¢ââ¬ SWR Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
   const params = new URLSearchParams();
@@ -147,7 +159,7 @@ export default function VideoModerationPage() {
     try {
       const res = await fetch('/api/dashboard/videos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ videoId: video.id, status: 'APPROVED' }),
       });
       if (res.ok) {
@@ -178,7 +190,7 @@ export default function VideoModerationPage() {
       try {
         const res = await fetch('/api/dashboard/videos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({ videoIds: selectedIds, status: 'REJECTED', rejectionReason: rejectReason.trim() }),
         });
         if (res.ok) {
@@ -195,7 +207,7 @@ export default function VideoModerationPage() {
       try {
         const res = await fetch('/api/dashboard/videos', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({ videoId: video.id, status: 'REJECTED', rejectionReason: rejectReason.trim() }),
         });
         if (res.ok) {
@@ -214,7 +226,7 @@ export default function VideoModerationPage() {
     try {
       const res = await fetch('/api/dashboard/videos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ videoIds: selectedIds, status: 'APPROVED' }),
       });
       if (res.ok) {
@@ -234,7 +246,7 @@ export default function VideoModerationPage() {
     try {
       const res = await fetch('/api/dashboard/videos', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ videoIds: deleteModal.ids }),
       });
       if (res.ok) {
@@ -602,10 +614,26 @@ export default function VideoModerationPage() {
                           <School size={9} className="text-gray-300 shrink-0" />
                           <p className="text-[10px] text-gray-400 truncate">{school.name}</p>
                           {(school.district || school.state) && (
-                            <span className="text-[9px] text-gray-300 shrink-0">Â· {school.district || school.state}</span>
+                            <span className="text-[9px] text-gray-300 shrink-0">· {school.district || school.state}</span>
                           )}
                         </div>
                       )}
+
+                      {/* Video ID + copy (for looking it up in the Activity Log) */}
+                      <button
+                        onClick={() => copyVideoId(video.id)}
+                        title="Copy video ID"
+                        className="w-full flex items-center gap-1 mt-1.5 text-left group/copy"
+                      >
+                        {copiedId === video.id ? (
+                          <Check size={9} className="text-green-500 shrink-0" />
+                        ) : (
+                          <Copy size={9} className="text-gray-300 shrink-0 group-hover/copy:text-gray-500" />
+                        )}
+                        <span className={`text-[9px] font-mono truncate ${copiedId === video.id ? 'text-green-600' : 'text-gray-300 group-hover/copy:text-gray-500'}`}>
+                          {copiedId === video.id ? 'Copied!' : video.id}
+                        </span>
+                      </button>
                     </div>
 
                     {/* Action buttons */}

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export async function POST(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'EVALUATOR']);
@@ -31,6 +32,17 @@ export async function POST(request: Request) {
 
     await prisma.videoEvaluation.updateMany({ where, data });
     const evaluations = await prisma.videoEvaluation.findMany({ where });
+
+    await recordAuditLog({
+      actorId: payload!.id,
+      actorRole: payload!.role,
+      actorName: payload!.email || payload!.name || null,
+      action: publish ? 'EVALUATION_PUBLISHED' : 'EVALUATION_UNPUBLISHED',
+      entityType: 'VideoEvaluation',
+      entityId: videoId,
+      previousValue: { isPublished: existingList[0].isPublished },
+      newValue: { isPublished: !!publish },
+    });
 
     return NextResponse.json(evaluations);
   } catch (e: any) {

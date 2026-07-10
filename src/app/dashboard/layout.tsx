@@ -29,6 +29,7 @@ import {
   Award,
   Flag,
   LifeBuoy,
+  History,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR';
@@ -252,34 +253,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
-            {/* Moderation */}
-            {canSee('moderation') && (
-              <div>
-                <button onClick={() => toggleSection('moderation')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos') || pathname.startsWith('/dashboard/reported-videos'))}>
-                  <div className="flex items-center gap-3"><Play size={20} /><span className="text-sm font-semibold">Moderation</span></div>
-                  <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
-                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
-                  </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Support */}
-            {canSee('support') && (
-              <Link href="/dashboard/support-tickets"
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support-tickets') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
-                <LifeBuoy size={20} />
-                <span className="text-sm font-semibold">Support</span>
-              </Link>
-            )}
-
             {/* Uploaders */}
             {canSee('uploaders') && (
               <div>
@@ -312,6 +285,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {credentialsSubItems.filter((_, i) => canSeeSubItem(['credentials.schools','credentials.uploaders','credentials.students','credentials.reviewers','credentials.evaluators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Moderation */}
+            {canSee('moderation') && (
+              <div>
+                <button onClick={() => toggleSection('moderation')}
+                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos') || pathname.startsWith('/dashboard/reported-videos'))}>
+                  <div className="flex items-center gap-3"><Play size={20} /><span className="text-sm font-semibold">Moderation</span></div>
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
+                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
@@ -356,6 +348,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
+            {/* Result — only superadmin */}
+            {role === 'SUPERADMIN' && (
+              <div>
+                <button onClick={() => toggleSection('result')}
+                  className={sectionBtnClass(pathname.startsWith('/dashboard/result'))}>
+                  <div className="flex items-center gap-3"><Award size={20} /><span className="text-sm font-semibold">Result</span></div>
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${resultOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${resultOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
+                    {resultSubItems.map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Reports */}
             {canSee('reports') && (
               <div>
@@ -375,23 +386,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
-            {/* Result — only superadmin */}
+            {/* Activity Log — only superadmin */}
             {role === 'SUPERADMIN' && (
-              <div>
-                <button onClick={() => toggleSection('result')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/result'))}>
-                  <div className="flex items-center gap-3"><Award size={20} /><span className="text-sm font-semibold">Result</span></div>
-                  <ChevronDown size={16} className={`transition-transform duration-200 ${resultOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${resultOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
-                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {resultSubItems.map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
-                  </div>
-                  </div>
-                </div>
-              </div>
+              <Link href="/dashboard/activity-log"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/activity-log') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <History size={20} />
+                <span className="text-sm font-semibold">Activity Log</span>
+              </Link>
+            )}
+
+            {/* Support */}
+            {canSee('support') && (
+              <Link href="/dashboard/support-tickets"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support-tickets') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <LifeBuoy size={20} />
+                <span className="text-sm font-semibold">Support</span>
+              </Link>
             )}
 
             {/* Settings — only superadmin */}

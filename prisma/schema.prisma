@@ -413,6 +413,29 @@ model SupportTicket {
   @@schema("public")
 }
 
+// Append-only trail of every moderation/evaluation action taken by staff
+// (admins, evaluators, schools), so "who did what, when" is always answerable —
+// unlike the mutable status fields on Video/VideoEvaluation/VideoReport, rows
+// here are never updated or deleted.
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String
+  actorRole    String   // SUPERADMIN | EVALUATOR | SCHOOL | REVIEWER
+  actorName    String?  // denormalised at write time so the log stays readable if the actor is later removed
+  action       String   // e.g. VIDEO_APPROVED, VIDEO_REJECTED, VIDEO_DELETED, VISIBILITY_CHANGED, REPORT_IGNORED, REPORT_VIDEO_REMOVED, EVALUATION_SUBMITTED, EVALUATION_PUBLISHED, EVALUATION_UNPUBLISHED
+  entityType   String   // e.g. Video, VideoEvaluation, VideoReport
+  entityId     String
+  previousValue String? // JSON snapshot of relevant fields before the change
+  newValue     String?  // JSON snapshot of relevant fields after the change
+  reason       String?  // e.g. rejection reason, report resolution note
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@schema("public")
+}
+
 // Generic system-originated alerts for the app's Home-screen notification bell
 // (currently used for admin video removals; separate from SupportTicket responses,
 // which are fetched via /api/app/support/notifications).

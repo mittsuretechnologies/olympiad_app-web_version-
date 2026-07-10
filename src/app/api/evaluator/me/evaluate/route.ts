@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { koshesForSlot, videoSlot } from '@/lib/kosh';
+import { recordAuditLog } from '@/lib/audit-log';
 
 const MAX_PER_CRITERION = 5;
 
@@ -106,6 +107,22 @@ export async function POST(request: Request) {
       return existing
         ? prisma.videoEvaluation.update({ where: { videoId_kosh: { videoId, kosh } }, data: { ...data, lastEditedBy: payload.id, lastEditedAt: new Date() } })
         : prisma.videoEvaluation.create({ data: { videoId, kosh, evaluatorId, ...data } });
+    }));
+
+    await Promise.all(koshes.map(kosh => {
+      const existing = existingByKosh.get(kosh);
+      return recordAuditLog({
+        actorId: payload.id,
+        actorRole: payload.role,
+        actorName: payload.email || payload.name || null,
+        action: existing ? 'EVALUATION_EDITED' : 'EVALUATION_SUBMITTED',
+        entityType: 'VideoEvaluation',
+        entityId: videoId,
+        previousValue: existing
+          ? { confidenceScore: existing.confidenceScore, creativityScore: existing.creativityScore, techniqueScore: existing.techniqueScore, presentationScore: existing.presentationScore, remarks: existing.remarks, kosh }
+          : null,
+        newValue: { ...data, kosh },
+      });
     }));
 
     return NextResponse.json(results[0]);

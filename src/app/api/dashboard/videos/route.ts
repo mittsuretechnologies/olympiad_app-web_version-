@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth-guard';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -107,6 +109,9 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
+
   try {
     const { videoIds } = await request.json();
 
@@ -114,9 +119,25 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ message: 'No video IDs provided' }, { status: 400 });
     }
 
+    const existing = await prisma.video.findMany({
+      where: { id: { in: videoIds } },
+      select: { id: true, status: true, olympiadVisibility: true },
+    });
+
     const { count } = await prisma.video.deleteMany({
       where: { id: { in: videoIds } },
     });
+
+    await Promise.all(existing.map(v => recordAuditLog({
+      actorId: payload!.id,
+      actorRole: payload!.role,
+      actorName: payload!.email || payload!.name || null,
+      action: 'VIDEO_DELETED',
+      entityType: 'Video',
+      entityId: v.id,
+      previousValue: v,
+      newValue: null,
+    })));
 
     return NextResponse.json({ message: `${count} video(s) deleted successfully`, count });
   } catch (error) {
@@ -126,6 +147,9 @@ export async function DELETE(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
+
   try {
     const { videoId, videoIds, status, rejectionReason } = await request.json();
 
@@ -133,8 +157,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
     }
 
+    const actor = {
+      actorId: payload!.id,
+      actorRole: payload!.role,
+      actorName: payload!.email || payload!.name || null,
+    };
+    const action = status === 'APPROVED' ? 'VIDEO_APPROVED' : 'VIDEO_REJECTED';
+
     // ── Bulk action: videoIds array ───────────────────────────────────────────
     if (Array.isArray(videoIds) && videoIds.length > 0) {
+      const existing = await prisma.video.findMany({
+        where: { id: { in: videoIds } },
+        select: { id: true, status: true, rejectionReason: true },
+      });
+
       await prisma.video.updateMany({
         where: { id: { in: videoIds } },
         data: {
@@ -143,11 +179,26 @@ export async function POST(request: Request) {
         },
       });
 
+      await Promise.all(existing.map(v => recordAuditLog({
+        ...actor,
+        action,
+        entityType: 'Video',
+        entityId: v.id,
+        previousValue: { status: v.status, rejectionReason: v.rejectionReason },
+        newValue: { status, rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null },
+        reason: status === 'REJECTED' ? (rejectionReason || null) : null,
+      })));
+
       return NextResponse.json({ message: `${videoIds.length} video(s) ${status.toLowerCase()}` });
     }
 
     // ── Single action: videoId ────────────────────────────────────────────────
     if (!videoId) return NextResponse.json({ message: 'videoId required' }, { status: 400 });
+
+    const before = await prisma.video.findUnique({
+      where: { id: videoId },
+      select: { status: true, rejectionReason: true },
+    });
 
     const video = await prisma.video.update({
       where: { id: videoId },
@@ -155,6 +206,16 @@ export async function POST(request: Request) {
         status,
         rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
       },
+    });
+
+    await recordAuditLog({
+      ...actor,
+      action,
+      entityType: 'Video',
+      entityId: videoId,
+      previousValue: before,
+      newValue: { status: video.status, rejectionReason: video.rejectionReason },
+      reason: status === 'REJECTED' ? (rejectionReason || null) : null,
     });
 
     return NextResponse.json({ message: `Video ${status.toLowerCase()} successfully`, video });

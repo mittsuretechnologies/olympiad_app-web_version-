@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import {
   Video, Star, Eye, Heart, BookOpen, Search,
-  Filter, Calendar, Tag, Loader2
+  Filter, Calendar, Tag, Loader2, Share2, Check, Lock, Globe, ShieldCheck, X
 } from 'lucide-react';
 import { getCategoryDisplayLabel } from '@/lib/olympiad-categories';
 
@@ -16,6 +16,7 @@ interface VideoItem {
   subCategory: string;
   tags: string;
   isEvaluation: boolean;
+  olympiadVisibility: 'public' | 'private' | null;
   uploaderType: string;
   status: string;
   likesCount: number;
@@ -28,6 +29,35 @@ interface VideoItem {
   classCode: string | null;
   className: string | null;
   source: 'web' | 'app';
+}
+
+const STEP_UP_STORAGE_KEY = 'schoolVisibilityStepUp';
+
+function getCachedStepUpToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  const raw = sessionStorage.getItem(STEP_UP_STORAGE_KEY);
+  if (!raw) return null;
+  try {
+    const { token, expiresAt } = JSON.parse(raw);
+    if (Date.now() >= expiresAt) {
+      sessionStorage.removeItem(STEP_UP_STORAGE_KEY);
+      return null;
+    }
+    return token;
+  } catch {
+    return null;
+  }
+}
+
+function cacheStepUpToken(token: string, expiresInSeconds: number) {
+  sessionStorage.setItem(STEP_UP_STORAGE_KEY, JSON.stringify({
+    token,
+    expiresAt: Date.now() + expiresInSeconds * 1000,
+  }));
+}
+
+function clearCachedStepUpToken() {
+  sessionStorage.removeItem(STEP_UP_STORAGE_KEY);
 }
 
 const avatarGradients = [
@@ -50,6 +80,9 @@ export default function StudentVideosPage() {
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'OLYMPIAD' | 'GENERAL'>('ALL');
   const [classFilter, setClassFilter] = useState('ALL');
   const [playing, setPlaying]   = useState<string | null>(null);
+
+  // Pending visibility change awaiting OTP step-up verification, if any
+  const [pendingVisibility, setPendingVisibility] = useState<{ videoId: string; next: 'public' | 'private' } | null>(null);
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') || '' : '';
 
@@ -92,6 +125,56 @@ export default function StudentVideosPage() {
 
   const olympiadCount = videos.filter(v => v.isEvaluation).length;
   const generalCount  = videos.filter(v => !v.isEvaluation).length;
+
+  // Applies a visibility change against the API using a valid step-up token.
+  // Returns true on success, false if the step-up token was rejected (expired/invalid).
+  const applyVisibilityChange = async (videoId: string, next: 'public' | 'private', stepUpToken: string): Promise<boolean> => {
+    const res = await fetch(`/api/school/me/videos/${videoId}/visibility`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+        'x-step-up-token': stepUpToken,
+      },
+      body: JSON.stringify({ olympiadVisibility: next }),
+    });
+    if (res.status === 401) {
+      clearCachedStepUpToken();
+      return false;
+    }
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to update visibility');
+    setVideos(prev => prev.map(v => v.id === videoId ? { ...v, olympiadVisibility: next } : v));
+    return true;
+  };
+
+  const handleToggleVisibility = async (video: VideoItem) => {
+    const next: 'public' | 'private' = video.olympiadVisibility === 'private' ? 'public' : 'private';
+    const cached = getCachedStepUpToken();
+    if (cached) {
+      try {
+        const ok = await applyVisibilityChange(video.id, next, cached);
+        if (ok) return;
+      } catch (e: any) {
+        alert(e.message);
+        return;
+      }
+    }
+    // No valid cached step-up token — prompt for OTP verification first.
+    setPendingVisibility({ videoId: video.id, next });
+  };
+
+  const handleVerified = async (stepUpToken: string, expiresIn: number) => {
+    cacheStepUpToken(stepUpToken, expiresIn);
+    if (!pendingVisibility) return;
+    try {
+      await applyVisibilityChange(pendingVisibility.videoId, pendingVisibility.next, stepUpToken);
+    } catch (e: any) {
+      alert(e.message);
+    } finally {
+      setPendingVisibility(null);
+    }
+  };
 
   return (
     <div className="space-y-4">
@@ -194,15 +277,165 @@ export default function StudentVideosPage() {
               avatarGradient={avatarGradients[i % avatarGradients.length]}
               isPlaying={playing === v.id}
               onPlay={() => setPlaying(playing === v.id ? null : v.id)}
+              onToggleVisibility={() => handleToggleVisibility(v)}
             />
           ))}
         </div>
+      )}
+
+      {pendingVisibility && (
+        <VisibilityOtpModal
+          token={token}
+          onVerified={handleVerified}
+          onClose={() => setPendingVisibility(null)}
+        />
       )}
     </div>
   );
 }
 
-function VideoCard({ video: v, avatarGradient, isPlaying, onPlay }: { video: VideoItem; avatarGradient: string; isPlaying: boolean; onPlay: () => void }) {
+function VisibilityOtpModal({ token, onVerified, onClose }: {
+  token: string;
+  onVerified: (stepUpToken: string, expiresIn: number) => void;
+  onClose: () => void;
+}) {
+  const [stage, setStage] = useState<'request' | 'enter'>('request');
+  const [otp, setOtp] = useState('');
+  const [channelMsg, setChannelMsg] = useState('');
+  const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const requestOtp = async () => {
+    setBusy(true); setError('');
+    try {
+      const res = await fetch('/api/school/me/video-visibility/request-otp', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
+      setChannelMsg(data.message);
+      setStage('enter');
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  useEffect(() => { requestOtp(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
+  const verify = async () => {
+    if (!otp.trim()) { setError('Enter the OTP'); return; }
+    setBusy(true); setError('');
+    try {
+      const res = await fetch('/api/school/me/video-visibility/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ otp: otp.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Verification failed');
+      onVerified(data.stepUpToken, data.expiresIn);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.2)] w-full max-w-sm mx-4 overflow-hidden">
+        <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] px-5 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={16} className="text-white" />
+            <p className="text-white font-bold text-sm">Verify it&apos;s you</p>
+          </div>
+          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="p-5 space-y-3.5">
+          <p className="text-xs text-gray-500">
+            Changing a student&apos;s video visibility requires verifying an OTP sent to your school&apos;s registered contact.
+          </p>
+          {stage === 'request' ? (
+            <div className="py-6 flex flex-col items-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin text-[#1559C7]" />
+              <p className="text-xs text-gray-500">Sending OTP...</p>
+            </div>
+          ) : (
+            <>
+              {channelMsg && <p className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5">{channelMsg}</p>}
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Enter OTP</label>
+                <input
+                  type="text" inputMode="numeric" placeholder="6-digit code" value={otp} autoFocus
+                  onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  onKeyDown={e => e.key === 'Enter' && verify()}
+                  className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm tracking-widest focus:outline-none focus:border-[#1559C7] focus:ring-1 focus:ring-[#1559C7]"
+                />
+              </div>
+            </>
+          )}
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose}
+              className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button onClick={stage === 'request' ? requestOtp : verify} disabled={busy || stage === 'request'}
+              className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(21,89,199,0.35)] transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
+              {busy && <Loader2 size={14} className="animate-spin" />}
+              Verify
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function shareVideo(v: VideoItem, onCopied: () => void) {
+  const shareData = {
+    title: `${v.studentName} — ${getCategoryDisplayLabel(v.category)}`,
+    text: v.caption || `Check out this video by ${v.studentName}`,
+    url: v.videoUrl,
+  };
+  if (typeof navigator !== 'undefined' && navigator.share) {
+    try {
+      await navigator.share(shareData);
+      return;
+    } catch {
+      // user cancelled or share failed — fall through to clipboard copy
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(v.videoUrl);
+    onCopied();
+  } catch {
+    // clipboard unavailable — nothing more we can do
+  }
+}
+
+function VideoCard({ video: v, avatarGradient, isPlaying, onPlay, onToggleVisibility }: {
+  video: VideoItem;
+  avatarGradient: string;
+  isPlaying: boolean;
+  onPlay: () => void;
+  onToggleVisibility: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const isPrivate = v.olympiadVisibility === 'private';
+
+  const handleShare = () => {
+    shareVideo(v, () => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
+
   return (
     <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] overflow-hidden hover:shadow-[0_6px_20px_rgba(0,0,0,0.1)] transition-shadow">
 
@@ -279,10 +512,22 @@ function VideoCard({ video: v, avatarGradient, isPlaying, onPlay }: { video: Vid
         </div>
 
         {/* Category */}
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{getCategoryDisplayLabel(v.category)}</span>
           {v.subCategory && (
             <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{v.subCategory}</span>
+          )}
+          {v.isEvaluation && (
+            <button
+              onClick={onToggleVisibility}
+              title={isPrivate ? 'Private — click to make public' : 'Public — click to make private'}
+              className={`ml-auto flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
+                isPrivate ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-[#0d9f6e]/10 text-[#0d9f6e] hover:bg-[#0d9f6e]/20'
+              }`}
+            >
+              {isPrivate ? <Lock className="w-2.5 h-2.5" /> : <Globe className="w-2.5 h-2.5" />}
+              {isPrivate ? 'Private' : 'Public'}
+            </button>
           )}
         </div>
 
@@ -307,10 +552,22 @@ function VideoCard({ video: v, avatarGradient, isPlaying, onPlay }: { video: Vid
             <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-[#e34948]" />{v.likesCount}</span>
             <span className="flex items-center gap-1"><Eye className="w-3 h-3 text-[#1559C7]" />{v.viewsCount}</span>
           </div>
-          <span className="flex items-center gap-1 text-[10px] text-gray-400">
-            <Calendar className="w-3 h-3" />
-            {new Date(v.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </span>
+          <div className="flex items-center gap-2.5">
+            <span className="flex items-center gap-1 text-[10px] text-gray-400">
+              <Calendar className="w-3 h-3" />
+              {new Date(v.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            </span>
+            <button
+              onClick={handleShare}
+              title={copied ? 'Link copied!' : 'Share'}
+              className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full transition-colors ${
+                copied ? 'bg-[#0d9f6e]/10 text-[#0d9f6e]' : 'bg-gray-100 text-gray-600 hover:bg-[#1559C7]/10 hover:text-[#1559C7]'
+              }`}
+            >
+              {copied ? <Check className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
+              {copied ? 'Copied' : 'Share'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
