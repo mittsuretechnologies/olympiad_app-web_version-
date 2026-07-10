@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sendResetOtp } from '@/lib/resetOtp';
-import { resolveResetAccount, isEmail, isMobile } from '@/lib/resolveResetAccount';
+import { resolveResetAccounts, isEmail, isMobile } from '@/lib/resolveResetAccount';
 
 const GENERIC_MESSAGE = 'If an account exists for this email or mobile number, an OTP has been sent to it.';
 
@@ -21,13 +21,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const account = await resolveResetAccount(id);
-    if (!account) {
+    const accounts = await resolveResetAccounts(id);
+    if (accounts.length === 0) {
       // Don't reveal whether the account exists
       return NextResponse.json({ message: GENERIC_MESSAGE });
     }
 
-    const result = await sendResetOtp(account.otpIdentifier);
+    const result = await sendResetOtp(accounts[0].otpIdentifier);
     if (!result.ok) {
       return NextResponse.json({ message: result.message }, { status: result.status });
     }

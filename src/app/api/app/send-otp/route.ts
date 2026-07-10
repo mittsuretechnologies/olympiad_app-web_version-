@@ -35,19 +35,9 @@ export async function POST(request: Request) {
     const mobile = type === 'mobile' ? id.replace(/\D/g, '') : null;
     const lookupId = mobile ?? id;
 
-    if (type === 'email') {
-      // Email uniquely identifies one account — block if already registered and verified
-      const existing = await prisma.appUser.findFirst({ where: { email: id } });
-      if (existing?.isVerified) {
-        return NextResponse.json(
-          { message: 'This account is already registered. Please use the Login screen.' },
-          { status: 409 }
-        );
-      }
-    }
-    // Mobile numbers can be shared across sibling accounts, so we don't block
-    // OTP delivery based on existing AppUser rows for that mobile — the OTP
-    // only proves phone ownership; account resolution happens after verification.
+    // Email and mobile can both be shared across sibling accounts, so we
+    // don't block OTP delivery based on existing AppUser rows — the OTP only
+    // proves contact ownership; account resolution happens after verification.
 
     const otp = generateOtp();
     const otpHash = await bcrypt.hash(otp, 10);

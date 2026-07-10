@@ -267,7 +267,7 @@ model VideoView {
 model AppUser {
   id                     String          @id @default(uuid())
   userId                 String          @unique
-  email                  String?         @unique
+  email                  String?
   mobile                 String?
   avatarUrl              String?
   password               String

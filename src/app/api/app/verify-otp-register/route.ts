@@ -8,6 +8,21 @@ function isEmail(val: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
 }
 
+async function withStudentNames(accounts: { id: string; userId: string; olympiadId: string | null }[]) {
+  return Promise.all(
+    accounts.map(async (acc) => {
+      let studentName: string | null = null;
+      if (acc.olympiadId) {
+        const allocation = await prisma.olympiadIdAllocation.findUnique({
+          where: { code: acc.olympiadId },
+          select: { assignedName: true, student: { select: { name: true } } },
+        });
+        studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
+      }
+      return { id: acc.id, userId: acc.userId, studentName };
+    })
+  );
+}
 
 export async function POST(request: Request) {
   try {
@@ -37,76 +52,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid OTP. Please check and try again.' }, { status: 400 });
     }
 
-    // Email still uniquely identifies one account — keep upsert semantics.
-    if (!mobile) {
-      const userId = await generateUserId(null);
-      const passwordHash = await bcrypt.hash(password, 10);
-
-      const user = await prisma.appUser.upsert({
-        where: { email: id },
-        update: {
-          password: passwordHash,
-          plainPassword: password,
-          isVerified: true,
-          termsAccepted: true,
-        },
-        create: {
-          userId,
-          email: id,
-          mobile: null,
-          password: passwordHash,
-          plainPassword: password,
-          isVerified: true,
-          termsAccepted: true,
-        },
-      });
-
-      await prisma.appOtp.delete({ where: { identifier: lookupId } }).catch(() => {});
-
-      const token = jwt.sign(
-        { id: user.id, userId: user.userId, role: 'APP_USER' },
-        process.env.JWT_SECRET || 'fallback_secret',
-        { expiresIn: '30d' }
-      );
-
-      return NextResponse.json({
-        message: 'Registration successful',
-        token,
-        user: {
-          id: user.id,
-          userId: user.userId,
-          email: user.email,
-          mobile: user.mobile,
-        },
-      });
-    }
-
-    // Mobile can be shared by sibling accounts. If accounts already exist on
-    // this mobile, don't silently overwrite one — surface them so the client
-    // can offer "log in as one of these" vs. "create a new account".
+    // Email and mobile can both be shared by sibling accounts. If accounts
+    // already exist on this contact, don't silently overwrite one — surface
+    // them so the client can offer "log in as one of these" vs. "create a
+    // new account".
+    const contactWhere = mobile ? { mobile } : { email: id };
     const existingAccounts = await prisma.appUser.findMany({
-      where: { mobile, isVerified: true },
+      where: { ...contactWhere, isVerified: true },
       select: { id: true, userId: true, olympiadId: true },
     });
 
     if (existingAccounts.length > 0 && !request.headers.get('x-create-new-account')) {
-      const accountsWithNames = await Promise.all(
-        existingAccounts.map(async (acc) => {
-          let studentName: string | null = null;
-          if (acc.olympiadId) {
-            const allocation = await prisma.olympiadIdAllocation.findUnique({
-              where: { code: acc.olympiadId },
-              select: { assignedName: true, student: { select: { name: true } } },
-            });
-            studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
-          }
-          return { id: acc.id, userId: acc.userId, studentName };
-        })
-      );
-
       return NextResponse.json({
-        message: 'Accounts already exist for this phone number. Choose one to continue, or create a new account.',
-        accounts: accountsWithNames,
+        message: `Accounts already exist for this ${mobile ? 'phone number' : 'email'}. Choose one to continue, or create a new account.`,
+        accounts: await withStudentNames(existingAccounts),
       }, { status: 409 });
     }
 
@@ -116,7 +75,7 @@ export async function POST(request: Request) {
     const user = await prisma.appUser.create({
       data: {
         userId,
-        email: null,
+        email: mobile ? null : id,
         mobile,
         password: passwordHash,
         plainPassword: password,
