@@ -5,6 +5,23 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LogOut, Hash, LayoutDashboard, Users, UserCircle, UploadCloud, PlaySquare } from 'lucide-react';
 import Image from 'next/image';
+import Lottie from 'lottie-react';
+
+// Mascot animation shown above the account card — fetched at runtime
+// since the source file lives in /public with spaces/capitals in its name.
+function MascotAnimation({ className }: { className?: string }) {
+  const [animationData, setAnimationData] = useState<object | null>(null);
+
+  useEffect(() => {
+    fetch('/Luma%20Left%20hand%20Animation.json')
+      .then(r => r.json())
+      .then(setAnimationData)
+      .catch(() => {});
+  }, []);
+
+  if (!animationData) return null;
+  return <Lottie animationData={animationData} loop autoplay className={className} />;
+}
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -36,12 +53,12 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   if (!ready) return null;
 
   const navItems = [
-    { name: 'Dashboard',      href: '/school',                       icon: LayoutDashboard },
-    { name: 'Olympiad IDs',   href: '/school/olympiad-ids',          icon: Hash },
-    { name: 'My Students',    href: '/school/registered-students',   icon: Users },
-    { name: 'Student Videos', href: '/school/student-videos',        icon: PlaySquare },
-    { name: 'Upload Video',   href: '/school/upload-video',          icon: UploadCloud },
-    { name: 'School Profile', href: '/school/profile',               icon: UserCircle },
+    { name: 'Dashboard',      href: '/school',                       icon: LayoutDashboard, gradient: 'from-[#2a78d6] to-[#1559C7]' },
+    { name: 'Olympiad IDs',   href: '/school/olympiad-ids',          icon: Hash,            gradient: 'from-[#1baf7a] to-[#0d9f6e]' },
+    { name: 'My Students',    href: '/school/registered-students',   icon: Users,           gradient: 'from-[#eda100] to-[#d98600]' },
+    { name: 'Student Videos', href: '/school/student-videos',        icon: PlaySquare,      gradient: 'from-[#7a6ad6] to-[#4a3aa7]' },
+    { name: 'Upload Video',   href: '/school/upload-video',          icon: UploadCloud,     gradient: 'from-[#e34948] to-[#c73a3a]' },
+    { name: 'School Profile', href: '/school/profile',               icon: UserCircle,      gradient: 'from-[#eb6834] to-[#d95926]' },
   ];
 
   const initials = (user?.name || 'S')
@@ -51,12 +68,14 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-[#F1F3F7]" style={{ fontFamily: 'Inter, sans-serif' }}>
 
       {/* Sidebar */}
-      <aside className="w-[220px] flex flex-col fixed top-0 h-screen z-40">
-        <div className="flex-1 flex flex-col overflow-hidden">
+      <aside className="w-[260px] flex flex-col fixed top-0 h-screen z-40 bg-gradient-to-b from-[#0d1a6e] via-[#123a8f] to-[#052E5C]">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
+        <div className="absolute -top-10 -right-16 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
+        <div className="absolute top-1/2 -left-14 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
 
         {/* Logo */}
-        <div className="h-16 flex-shrink-0 flex items-center gap-2.5 px-6">
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden">
+        <div className="h-16 flex-shrink-0 flex items-center gap-2.5 px-6 relative">
+          <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
             <Image
               src="/mittmee-icon.jpeg"
               alt="mittmee"
@@ -66,11 +85,11 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
               priority
             />
           </div>
-          <span className="text-xl font-bold tracking-tight"><span className="text-[#2357D8]">mitt</span><span className="text-[#3CB043]">mee</span></span>
+          <span className="text-xl font-bold tracking-tight"><span className="text-white">mitt</span><span className="text-[#4ADE80]">mee</span></span>
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-3 space-y-1 overflow-y-auto pt-6">
+        <nav className="flex-1 px-3 space-y-1.5 overflow-y-auto pt-6 relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.href === '/school'
@@ -80,21 +99,22 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative flex items-center gap-3 pl-4 pr-3 h-12 rounded-xl transition-colors duration-150 ${
+                className={`relative flex items-center gap-3 pl-4 pr-3 h-12 rounded-xl transition-all duration-150 ${
                   isActive
-                    ? 'bg-white text-[#2357D8] shadow-[0_1px_2px_rgba(16,24,40,0.06)]'
-                    : 'text-[#1F2937] hover:bg-white/60'
+                    ? `bg-gradient-to-r ${item.gradient} text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)]`
+                    : 'text-white hover:bg-white/10'
                 }`}
               >
-                {isActive && (
-                  <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-1 rounded-full bg-[#2357D8]" />
-                )}
-                <Icon
-                  size={20}
-                  strokeWidth={1.75}
-                  className={isActive ? 'text-[#2357D8]' : 'text-[#64748B]'}
-                />
-                <span className={`text-[15px] leading-none flex-1 ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                  isActive ? 'bg-white/20' : 'bg-white/5'
+                }`}>
+                  <Icon
+                    size={17}
+                    strokeWidth={1.75}
+                    className="text-white"
+                  />
+                </div>
+                <span className={`text-[14px] leading-none flex-1 ${isActive ? 'font-bold' : 'font-medium'}`}>
                   {item.name}
                 </span>
               </Link>
@@ -103,25 +123,28 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
         </nav>
 
         {/* Account switcher + Logout */}
-        <div className="px-3 pb-4 pt-3 flex-shrink-0">
-          <div className="rounded-xl border border-[#E7EBF2] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] p-3">
+        <div className="px-3 pb-4 pt-3 flex-shrink-0 relative">
+          <div className="flex justify-center translate-x-[61px]">
+            <MascotAnimation className="w-36 h-36" />
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.1)] p-3">
             <div className="flex items-center gap-3">
               <div className="relative flex-shrink-0">
-                <div className="w-9 h-9 rounded-full bg-[#2357D8] text-white font-semibold text-xs flex items-center justify-center">
+                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#eda100] to-[#eb6834] text-white font-bold text-xs flex items-center justify-center shadow-sm">
                   {initials}
                 </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-white" />
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#123a8f]" />
               </div>
               <div className="min-w-0">
-                <p className="text-[#1F2937] font-semibold text-[13px] leading-tight truncate">{user?.name || 'School'}</p>
-                <p className="text-[#64748B] text-[11px] mt-0.5 truncate">{user?.schoolId}</p>
+                <p className="text-white font-semibold text-[13px] leading-tight truncate">{user?.name || 'School'}</p>
+                <p className="text-white/50 text-[11px] mt-0.5 truncate">{user?.schoolId}</p>
               </div>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="w-full mt-3 flex items-center gap-3 px-3 h-11 rounded-xl text-[#64748B] hover:bg-white/60 hover:text-[#1F2937] transition-colors duration-150"
+            className="w-full mt-3 flex items-center gap-3 px-3 h-11 rounded-xl text-white/60 hover:bg-red-500/15 hover:text-red-200 transition-colors duration-150"
           >
             <LogOut size={18} strokeWidth={1.75} className="flex-shrink-0" />
             <span className="text-[14px] font-medium">Log out</span>
@@ -131,10 +154,8 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
       </aside>
 
       {/* Main content */}
-      <main className="ml-[220px] min-h-screen flex flex-col py-3 pr-3">
-        <div className="flex-1 bg-white border border-[#E7EBF2] rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
-          <div className="px-8 py-8 max-w-7xl mx-auto">{children}</div>
-        </div>
+      <main className="ml-[260px] min-h-screen">
+        <div className="px-2.5 py-2.5 max-w-[1600px] mx-auto">{children}</div>
       </main>
     </div>
   );

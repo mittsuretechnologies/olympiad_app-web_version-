@@ -10,11 +10,14 @@ export async function POST(request: Request) {
     const { videoId, publish } = await request.json();
     if (!videoId) return NextResponse.json({ message: 'videoId is required' }, { status: 400 });
 
-    const existing = await prisma.videoEvaluation.findUnique({ where: { videoId } });
-    if (!existing) return NextResponse.json({ message: 'No evaluation found for this video' }, { status: 404 });
+    // A video has one scoring form whose result is stored under both of its
+    // koshas, so publish/unpublish always applies to both rows together.
+    const where = { videoId };
+    const existingList = await prisma.videoEvaluation.findMany({ where });
+    if (existingList.length === 0) return NextResponse.json({ message: 'No evaluation found for this video' }, { status: 404 });
 
     if (payload!.role === 'EVALUATOR') {
-      if (existing.evaluatorId !== payload!.id) {
+      if (existingList.some(e => e.evaluatorId !== payload!.id)) {
         return NextResponse.json({ message: 'You can only publish your own evaluations' }, { status: 403 });
       }
       if (!publish) {
@@ -22,14 +25,14 @@ export async function POST(request: Request) {
       }
     }
 
-    const evaluation = await prisma.videoEvaluation.update({
-      where: { videoId },
-      data: publish
-        ? { isPublished: true, publishedAt: new Date(), lastEditedBy: payload!.id, lastEditedAt: new Date() }
-        : { isPublished: false, publishedAt: null, lastEditedBy: payload!.id, lastEditedAt: new Date() },
-    });
+    const data = publish
+      ? { isPublished: true, publishedAt: new Date(), lastEditedBy: payload!.id, lastEditedAt: new Date() }
+      : { isPublished: false, publishedAt: null, lastEditedBy: payload!.id, lastEditedAt: new Date() };
 
-    return NextResponse.json(evaluation);
+    await prisma.videoEvaluation.updateMany({ where, data });
+    const evaluations = await prisma.videoEvaluation.findMany({ where });
+
+    return NextResponse.json(evaluations);
   } catch (e: any) {
     return NextResponse.json({ message: e.message }, { status: 500 });
   }

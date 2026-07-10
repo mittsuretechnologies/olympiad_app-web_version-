@@ -12,10 +12,20 @@ interface VideoResultEntry {
   id: string;
   category: string | null;
   subCategory: string | null;
+  koshes: [string, string];
+  koshScores: { kosh: string; totalScore: number; isPublished: boolean; evaluatorName: string | null }[];
   isEvaluated: boolean;
   isPublished: boolean;
-  totalScore: number | null;
+  videoPercent: number | null;
   evaluatorName: string | null;
+}
+
+interface KoshBreakdownEntry {
+  kosh: string;
+  label: string;
+  examPercent: number | null;
+  videoPercent: number | null;
+  combinedPercent: number | null;
 }
 
 interface StudentResult {
@@ -30,12 +40,13 @@ interface StudentResult {
   city: string | null;
   source: 'web' | 'app';
   videos: VideoResultEntry[];
-  examScore: number;
-  examMaxScore: number;
+  examPercentage: number | null;
+  examTotalScore: number | null;
+  examMaxScore: number | null;
   videoScoreTotal: number;
   videoMaxScore: number;
-  totalScore: number;
-  maxScore: number;
+  koshBreakdown: KoshBreakdownEntry[];
+  holisticPercent: number | null;
   status: 'Complete' | 'Incomplete';
 }
 
@@ -48,6 +59,13 @@ function StatusBadge({ status }: { status: string }) {
       {isComplete ? <CheckCircle2 size={13} /> : <AlertCircle size={13} />} {status}
     </span>
   );
+}
+
+function percentBandClass(pct: number) {
+  if (pct >= 80) return 'text-emerald-700';
+  if (pct >= 55) return 'text-[#004f9f]';
+  if (pct >= 30) return 'text-amber-700';
+  return 'text-red-600';
 }
 
 export default function ResultPage() {
@@ -88,16 +106,22 @@ export default function ResultPage() {
   const totalIncomplete = totalStudents - totalComplete;
 
   const downloadCSV = () => {
-    const header = ['Name', 'Olympiad Code', 'Class', 'School', 'Exam Score', 'Video Score', 'Total Score', 'Max Score', 'Status'];
-    const csvRows = filtered.map(r => [
-      r.name, r.olympiadCode, r.className || '-', r.schoolName || '-',
-      r.examScore, r.videoScoreTotal, r.totalScore, r.maxScore, r.status,
-    ]);
+    const koshLabels = Array.from(new Set(filtered.flatMap(r => r.koshBreakdown.map(k => k.label))));
+    const header = ['Name', 'Olympiad Code', 'Class', 'School', 'Exam %', 'Video Score', ...koshLabels.map(l => `${l} %`), 'Holistic %', 'Status'];
+    const csvRows = filtered.map(r => {
+      const koshByLabel = new Map(r.koshBreakdown.map(k => [k.label, k.combinedPercent]));
+      return [
+        r.name, r.olympiadCode, r.className || '-', r.schoolName || '-',
+        r.examPercentage ?? '-', `${r.videoScoreTotal}/${r.videoMaxScore}`,
+        ...koshLabels.map(l => koshByLabel.get(l) ?? '-'),
+        r.holisticPercent ?? '-', r.status,
+      ];
+    });
     const csv = [header, ...csvRows].map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `result-${new Date().toISOString().split('T')[0]}.csv`;
+    a.href = url; a.download = `holistic-progress-passport-${new Date().toISOString().split('T')[0]}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
@@ -120,18 +144,14 @@ export default function ResultPage() {
             <Award className="text-white" size={22} />
           </div>
           <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Result</h1>
-            <p className="text-sm text-gray-400">Exam score (60) + 2 evaluated videos (20 each) = Total /100</p>
+            <h1 className="text-2xl font-extrabold text-gray-900">Holistic Progress Passport</h1>
+            <p className="text-sm text-gray-400">Each kosh's % = average of exam performance and video evaluation, where both exist</p>
           </div>
         </div>
         <button onClick={downloadCSV}
           className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md active:scale-95">
           <Download size={16} /> Export CSV
         </button>
-      </div>
-
-      <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 text-xs font-semibold text-amber-700">
-        Exam score is a placeholder (60/60) until the scanner app's marks are wired in — video scores are live.
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -193,9 +213,9 @@ export default function ResultPage() {
                 <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student</th>
                 <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Olympiad Code</th>
                 <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">School</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Exam /60</th>
+                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Exam %</th>
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Videos /40</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Total /100</th>
+                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Holistic %</th>
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
               </tr>
             </thead>
@@ -224,11 +244,14 @@ export default function ResultPage() {
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-gray-600 font-semibold">{row.olympiadCode}</td>
                       <td className="py-3 px-4 text-gray-600 text-xs max-w-[200px] truncate" title={row.schoolName || '-'}>{row.schoolName || '-'}</td>
-                      <td className="py-3 px-4 text-center font-bold text-gray-700">{row.examScore}</td>
+                      <td className="py-3 px-4 text-center font-bold text-gray-700">{row.examPercentage !== null ? `${row.examPercentage}%` : '-'}</td>
                       <td className="py-3 px-4 text-center font-bold text-gray-700">{row.videoScoreTotal}/{row.videoMaxScore}</td>
                       <td className="py-3 px-4 text-center">
-                        <span className="text-lg font-black text-gray-900">{row.totalScore}</span>
-                        <span className="text-xs text-gray-400 font-bold">/{row.maxScore}</span>
+                        {row.holisticPercent !== null ? (
+                          <span className={`text-lg font-black ${percentBandClass(row.holisticPercent)}`}>{row.holisticPercent}%</span>
+                        ) : (
+                          <span className="text-sm text-gray-400 font-semibold">—</span>
+                        )}
                       </td>
                       <td className="py-3 px-4 text-center"><StatusBadge status={row.status} /></td>
                     </tr>
@@ -236,7 +259,30 @@ export default function ResultPage() {
                     {isExpanded && (
                       <tr>
                         <td colSpan={9} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
-                          <div className="space-y-3">
+                          <div className="space-y-4">
+                            <div>
+                              <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Kosh Breakdown</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {row.koshBreakdown.map(k => (
+                                  <div key={k.kosh} className="bg-white rounded-xl border border-gray-200 p-3">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-xs font-bold text-gray-700">{k.label}</span>
+                                      {k.combinedPercent !== null && (
+                                        <span className={`text-sm font-black ${percentBandClass(k.combinedPercent)}`}>{k.combinedPercent}%</span>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold">
+                                      <span>Exam: {k.examPercent !== null ? `${k.examPercent}%` : '—'}</span>
+                                      <span>Video: {k.videoPercent !== null ? `${k.videoPercent}%` : '—'}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                                {row.koshBreakdown.length === 0 && (
+                                  <p className="text-xs text-gray-400 col-span-full">No kosh data yet — pending exam scan and/or video evaluation.</p>
+                                )}
+                              </div>
+                            </div>
+
                             <div className="grid gap-3">
                               {row.videos.map((vid, vi) => (
                                 <div key={vid.id} className={`bg-white rounded-xl border p-4 flex items-center justify-between gap-4 ${
@@ -262,17 +308,17 @@ export default function ResultPage() {
                                       </span>
                                     )}
                                     <div className="flex flex-col items-center min-w-[50px]">
-                                      <span className="text-xl font-black text-gray-900">{vid.totalScore ?? '-'}</span>
-                                      <span className="text-[10px] text-gray-400 font-bold uppercase">/20</span>
+                                      <span className="text-xl font-black text-gray-900">{vid.videoPercent !== null ? `${vid.videoPercent}%` : '-'}</span>
+                                      <span className="text-[10px] text-gray-400 font-bold uppercase">video score</span>
                                     </div>
                                   </div>
                                 </div>
                               ))}
                             </div>
                             <div className="flex items-center justify-end gap-4 pt-2 border-t border-amber-100 text-xs font-semibold text-gray-600">
-                              <span>Exam: {row.examScore}/{row.examMaxScore}</span>
+                              <span>Exam: {row.examPercentage !== null ? `${row.examPercentage}%` : 'Not scanned'}</span>
                               <span>Videos: {row.videoScoreTotal}/{row.videoMaxScore}</span>
-                              <span className="text-sm font-black text-gray-900">Total: {row.totalScore}/{row.maxScore}</span>
+                              <span className="text-sm font-black text-gray-900">Holistic: {row.holisticPercent !== null ? `${row.holisticPercent}%` : '—'}</span>
                             </div>
                           </div>
                         </td>

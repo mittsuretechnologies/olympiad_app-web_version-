@@ -64,13 +64,13 @@ export async function GET(request: Request) {
       .sort((a, b) => a.className.localeCompare(b.className));
 
     // Recent registrations (last 5) — merge Student + AppUser
-    const recentList: { studentName: string; olympiadCode: string; className: string; registeredAt: Date }[] = [];
+    const recentList: { studentName: string; username: string | null; olympiadCode: string; className: string; registeredAt: Date }[] = [];
     for (const a of allocations) {
       if (a.student) {
-        recentList.push({ studentName: a.student.name, olympiadCode: a.code, className: a.className || a.classCode || '-', registeredAt: a.student.createdAt });
+        recentList.push({ studentName: a.student.name, username: null, olympiadCode: a.code, className: a.className || a.classCode || '-', registeredAt: a.student.createdAt });
       } else if (appUserByCode.has(a.code)) {
         const u = appUserByCode.get(a.code)!;
-        recentList.push({ studentName: u.userId, olympiadCode: a.code, className: a.className || a.classCode || '-', registeredAt: u.createdAt });
+        recentList.push({ studentName: a.assignedName || u.userId, username: u.userId, olympiadCode: a.code, className: a.className || a.classCode || '-', registeredAt: u.createdAt });
       }
     }
     const recentRegistrations = recentList

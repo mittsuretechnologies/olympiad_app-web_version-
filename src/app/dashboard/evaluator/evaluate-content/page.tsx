@@ -2,6 +2,15 @@
 
 import { useEffect, useState } from 'react';
 import { Video as VideoIcon, User, School, CheckCircle, X, Star, Loader2, LayoutGrid } from 'lucide-react';
+import { KOSH_LABELS, type KoshKey } from '@/lib/kosh';
+
+interface ExistingScore {
+  confidenceScore: number;
+  creativityScore: number;
+  techniqueScore: number;
+  presentationScore: number;
+  remarks: string | null;
+}
 
 interface QueueVideo {
   id: string;
@@ -15,14 +24,11 @@ interface QueueVideo {
   olympiadCode: string;
   className: string | null;
   schoolName: string | null;
-  existingScores?: {
-    confidenceScore: number;
-    creativityScore: number;
-    techniqueScore: number;
-    presentationScore: number;
-    remarks: string | null;
-  } | null;
-  isPublished?: boolean;
+  slot: number;
+  koshes: [KoshKey, KoshKey];
+  existingScore: ExistingScore | null;
+  isFullyScored?: boolean;
+  isFullyPublished?: boolean;
 }
 
 const MAX_PER_CRITERION = 5;
@@ -42,6 +48,14 @@ const emptyScores: ScoreState = {
   techniqueScore: 0,
   presentationScore: 0,
 };
+
+function scoreTotal(s: ScoreState) {
+  return Object.values(s).reduce((a, b) => a + b, 0);
+}
+
+function scorePercent(total: number) {
+  return Math.round((total / 20) * 1000) / 10;
+}
 
 // This page is used both by real evaluators and by SuperAdmin/Reviewer
 // (read-only oversight), so send whichever session token is present —
@@ -109,14 +123,14 @@ export default function EvaluateContentPage() {
   const openVideo = (v: QueueVideo, color: string) => {
     setActive(v);
     setActiveColor(color);
-    if (v.existingScores) {
+    if (v.existingScore) {
       setScores({
-        confidenceScore: v.existingScores.confidenceScore,
-        creativityScore: v.existingScores.creativityScore,
-        techniqueScore: v.existingScores.techniqueScore,
-        presentationScore: v.existingScores.presentationScore,
+        confidenceScore: v.existingScore.confidenceScore,
+        creativityScore: v.existingScore.creativityScore,
+        techniqueScore: v.existingScore.techniqueScore,
+        presentationScore: v.existingScore.presentationScore,
       });
-      setRemarks(v.existingScores.remarks || '');
+      setRemarks(v.existingScore.remarks || '');
     } else {
       setScores(emptyScores);
       setRemarks('');
@@ -124,7 +138,8 @@ export default function EvaluateContentPage() {
     setError('');
   };
 
-  const total = Object.values(scores).reduce((a, b) => a + b, 0);
+  const total = scoreTotal(scores);
+  const percent = scorePercent(total);
 
   const handleSubmit = async () => {
     if (!active) return;
@@ -225,7 +240,10 @@ export default function EvaluateContentPage() {
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
               </div>
               <div className={`p-4 ${CARD_COLORS[i % CARD_COLORS.length]}`}>
-                <p className="text-xs font-bold text-[#004f9f] uppercase tracking-wide truncate">{v.category}</p>
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-xs font-bold text-[#004f9f] uppercase tracking-wide truncate">{v.category}</p>
+                  <span className="text-[10px] font-bold bg-white/70 text-gray-600 px-2 py-0.5 rounded-full flex-shrink-0">Video {v.slot + 1}</span>
+                </div>
                 <p className="text-sm text-gray-700 font-semibold truncate mt-0.5">{v.subCategory}</p>
                 <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
                   <User className="w-3 h-3" /> {v.studentName} · {v.olympiadCode}
@@ -248,7 +266,7 @@ export default function EvaluateContentPage() {
             <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 z-10 ${HEADER_COLORS[activeColor] || activeColor}`}>
               <div>
                 <h2 className="text-base font-bold text-gray-800">{active.studentName} — {active.olympiadCode}</h2>
-                <p className="text-xs text-gray-400">{active.category} · {active.subCategory}</p>
+                <p className="text-xs text-gray-400">{active.category} · {active.subCategory} · Video {active.slot + 1}</p>
               </div>
               <button onClick={() => setActive(null)} className="text-gray-300 hover:text-gray-500 p-1">
                 <X className="w-5 h-5" />
@@ -262,6 +280,16 @@ export default function EvaluateContentPage() {
                   <video src={active.videoUrl} controls className="w-full max-h-80 object-contain" />
                 </div>
                 {active.caption && <p className="text-sm text-gray-500 mt-3">{active.caption}</p>}
+
+                {/* This video's % is split evenly across its two koshas */}
+                <div className="mt-3 flex items-center gap-2 flex-wrap">
+                  {active.koshes.map(k => (
+                    <span key={k} className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-[#F6F9FF] text-[#004f9f] pl-2.5 pr-1 py-1 rounded-full border border-blue-100">
+                      {KOSH_LABELS[k]}
+                      <span className="bg-[#004f9f] text-white px-1.5 py-0.5 rounded-full">{Math.round((percent / 2) * 10) / 10}%</span>
+                    </span>
+                  ))}
+                </div>
               </div>
 
               {/* Scoring */}
@@ -271,12 +299,12 @@ export default function EvaluateContentPage() {
                     View-only — sign in with an evaluator account to score this submission.
                   </div>
                 )}
-                {active.isPublished && (
+                {active.isFullyPublished && (
                   <div className="bg-green-50 border border-green-200 text-green-700 text-xs font-semibold rounded-xl px-3 py-2">
                     This evaluation is published and locked. Unpublish it from Evaluation History to make changes.
                   </div>
                 )}
-                <fieldset disabled={!canScore || active.isPublished} className="space-y-4 disabled:opacity-60">
+                <fieldset disabled={!canScore || active.isFullyPublished} className="space-y-4 disabled:opacity-60">
                   {CRITERIA.map(c => (
                     <div key={c.key}>
                       <div className="flex items-center justify-between mb-1.5">
@@ -307,7 +335,7 @@ export default function EvaluateContentPage() {
                     <span className="text-sm font-bold text-gray-600 flex items-center gap-1.5">
                       <Star className="w-4 h-4 text-[#FF9000]" /> Total Score
                     </span>
-                    <span className="text-lg font-black text-[#06013E]">{total}/20</span>
+                    <span className="text-lg font-black text-[#06013E]">{total}/20 <span className="text-sm font-bold text-gray-400">({percent}%)</span></span>
                   </div>
 
                   <div>
@@ -323,7 +351,7 @@ export default function EvaluateContentPage() {
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
 
-                {canScore && !active.isPublished && (
+                {canScore && !active.isFullyPublished && (
                   <button
                     onClick={handleSubmit}
                     disabled={submitting}

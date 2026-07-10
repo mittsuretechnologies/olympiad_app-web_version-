@@ -70,16 +70,11 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Validate mobile: exactly 10 digits
+  // Validate mobile: exactly 10 digits. Mobile numbers may be shared across
+  // sibling accounts, so no uniqueness check here.
   if (mobile !== undefined && mobile !== null && mobile !== '') {
     if (!/^\d{10}$/.test(mobile.trim())) {
       return NextResponse.json({ message: 'Mobile number must be exactly 10 digits' }, { status: 422 });
-    }
-    const existing = await prisma.appUser.findFirst({
-      where: { mobile: mobile.trim(), NOT: { id: appUser.id } },
-    });
-    if (existing) {
-      return NextResponse.json({ message: 'Mobile number is already in use' }, { status: 409 });
     }
   }
 

@@ -23,8 +23,8 @@ export async function GET(request: Request) {
     const filter = isEvaluator ? { evaluatorId: payload.id } : {};
 
     // Get stats from evaluations
-    const [evaluationsCount, scoreAggregates, recentEvaluations, pendingStudentCount, pendingAppUserCount] = await Promise.all([
-      // 1. Total evaluated count
+    const [evaluationsCount, scoreAggregates, recentEvaluations, approvedVideos] = await Promise.all([
+      // 1. Total evaluated count (kosh rows, not videos)
       prisma.videoEvaluation.count({
         where: filter,
       }),
@@ -57,25 +57,13 @@ export async function GET(request: Request) {
           },
         },
       }),
-      // 4. Pending queue count (student videos)
-      prisma.video.count({
-        where: {
-          isEvaluation: true,
-          status: 'APPROVED',
-          evaluation: null,
-          studentId: { not: null },
-        },
-      }),
-      // 5. Pending queue count (app user videos)
-      prisma.video.count({
-        where: {
-          isEvaluation: true,
-          status: 'APPROVED',
-          evaluation: null,
-          appUserId: { not: null },
-        },
+      // 4. All approved evaluation videos with their kosh count, to derive pending (< 2 koshas scored)
+      prisma.video.findMany({
+        where: { isEvaluation: true, status: 'APPROVED', deletedAt: null, OR: [{ studentId: { not: null } }, { appUserId: { not: null } }] },
+        select: { id: true, _count: { select: { evaluations: true } } },
       }),
     ]);
+    const pendingQueue = approvedVideos.filter(v => v._count.evaluations < 2).length;
 
     // Resolve app user details for recent evaluations if they were uploaded by app users
     const appUserIds = recentEvaluations
@@ -117,13 +105,11 @@ export async function GET(request: Request) {
       };
     });
 
-    const totalPending = pendingStudentCount + pendingAppUserCount;
-
     return NextResponse.json({
       stats: {
         totalEvaluated: evaluationsCount,
         averageScore: scoreAggregates._avg.totalScore ? Math.round(scoreAggregates._avg.totalScore * 10) / 10 : 0,
-        pendingQueue: totalPending,
+        pendingQueue: pendingQueue,
       },
       criteriaAvg: {
         confidenceScore: scoreAggregates._avg.confidenceScore ? Math.round(scoreAggregates._avg.confidenceScore * 10) / 10 : 0,
