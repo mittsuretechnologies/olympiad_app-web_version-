@@ -172,12 +172,16 @@ export async function GET(request: Request) {
     const videos = await prisma.video.findMany({
       where: { appUserId: appUser.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
+      include: { evaluation: { select: { id: true } } },
     });
 
-    const normalized = videos.map((v) => ({
+    // Expose only whether marks exist (not the scores themselves — those stay
+    // gated behind VideoEvaluation.isPublished) so the app can block/explain deletion.
+    const normalized = videos.map(({ evaluation, ...v }) => ({
       ...v,
       videoUrl:     v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.videoUrl,
       thumbnailUrl: v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.thumbnailUrl,
+      hasEvaluation: !!evaluation,
     }));
 
     return NextResponse.json(normalized);

@@ -31,13 +31,24 @@ export async function DELETE(
     // Verify the video belongs to this app user
     const video = await prisma.video.findFirst({
       where: { id, appUserId: appUser.id, deletedAt: null },
+      include: { evaluation: true },
     });
     if (!video) {
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
     }
 
-    // Soft delete — the record (and any Olympiad approval it represents) is retained
-    // for SuperAdmin/backend visibility; it's just hidden from all normal views.
+    // Once an evaluator has submitted marks, the video is locked — deleting it would
+    // let a student erase a low score and re-submit for another attempt.
+    if (video.evaluation) {
+      return NextResponse.json(
+        { error: 'Marks have already been given for this video, so it can no longer be deleted.' },
+        { status: 403 }
+      );
+    }
+
+    // Soft delete — the record is retained for SuperAdmin/backend visibility;
+    // it's just hidden from all normal views. Un-evaluated Olympiad slots reopen
+    // automatically since slot-lock checks only look at currently active videos.
     await prisma.video.update({ where: { id }, data: { deletedAt: new Date() } });
     return NextResponse.json({ success: true });
   } catch (error: any) {

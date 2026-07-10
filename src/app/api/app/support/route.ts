@@ -25,8 +25,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { category, message, screenshotUrls } = await request.json();
+    const { type, category, message, screenshotUrls } = await request.json();
 
+    const ticketType = type === 'REMARK' ? 'REMARK' : 'TECHNICAL';
     const trimmedMessage = typeof message === 'string' ? message.trim() : '';
     const urls = Array.isArray(screenshotUrls) ? screenshotUrls.filter(Boolean).slice(0, 3) : [];
 
@@ -37,7 +38,8 @@ export async function POST(request: Request) {
     const ticket = await prisma.supportTicket.create({
       data: {
         userId:         appUser.id,
-        category:       typeof category === 'string' && category.trim() ? category.trim() : null,
+        type:           ticketType,
+        category:       ticketType === 'TECHNICAL' && typeof category === 'string' && category.trim() ? category.trim() : null,
         message:        trimmedMessage || '(No description provided — see attached screenshots)',
         screenshotUrls: urls.length > 0 ? urls.join(',') : null,
       },

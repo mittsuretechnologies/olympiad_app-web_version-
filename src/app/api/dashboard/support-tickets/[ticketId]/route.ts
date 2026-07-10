@@ -16,7 +16,7 @@ function requireSuperAdmin(request: Request) {
   }
 }
 
-// PATCH /api/dashboard/support-tickets/:ticketId — body: { status: 'OPEN' | 'RESOLVED' }
+// PATCH /api/dashboard/support-tickets/:ticketId — body: { status?: 'OPEN' | 'RESOLVED', response?: string }
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ ticketId: string }> }
@@ -27,21 +27,27 @@ export async function PATCH(
   const { ticketId } = await params;
 
   try {
-    const { status } = await request.json();
-    if (status !== 'OPEN' && status !== 'RESOLVED') {
+    const { status, response } = await request.json();
+    if (status !== undefined && status !== 'OPEN' && status !== 'RESOLVED') {
       return NextResponse.json({ message: 'status must be "OPEN" or "RESOLVED"' }, { status: 400 });
     }
 
     const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId } });
     if (!ticket) return NextResponse.json({ message: 'Ticket not found' }, { status: 404 });
 
-    const updated = await prisma.supportTicket.update({
-      where: { id: ticketId },
-      data: {
-        status,
-        resolvedAt: status === 'RESOLVED' ? new Date() : null,
-      },
-    });
+    const trimmedResponse = typeof response === 'string' ? response.trim() : undefined;
+    const data: Record<string, any> = {};
+    if (status !== undefined) {
+      data.status = status;
+      data.resolvedAt = status === 'RESOLVED' ? new Date() : null;
+    }
+    if (trimmedResponse) {
+      data.adminResponse = trimmedResponse;
+      data.respondedAt = new Date();
+      data.isReadByUser = false;
+    }
+
+    const updated = await prisma.supportTicket.update({ where: { id: ticketId }, data });
 
     return NextResponse.json(updated);
   } catch (error: any) {

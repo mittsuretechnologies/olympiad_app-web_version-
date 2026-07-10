@@ -29,17 +29,18 @@ export async function GET(request: Request) {
     const [videos, user] = await Promise.all([
       prisma.video.findMany({
         where: { appUserId: appUser.id, isEvaluation: true, deletedAt: null },
-        select: { category: true, subCategory: true, status: true },
+        select: { category: true, subCategory: true, status: true, evaluation: { select: { id: true } } },
       }),
       prisma.appUser.findUnique({
         where: { id: appUser.id },
-        select: { olympiadId: true, olympiadCatAApproved: true, olympiadCatBApproved: true },
+        select: { olympiadId: true },
       }),
     ]);
 
-    // A slot is "used" if there's a non-rejected video (PENDING or APPROVED) still on record,
-    // OR the category was permanently approved before — this second check keeps the slot
-    // closed even if the approved video was later deleted.
+    // A slot is "used" if there's a non-rejected video (PENDING or APPROVED) still on record.
+    // Deleting an un-evaluated video frees the slot; once an evaluator has submitted marks
+    // the video can no longer be deleted (see DELETE /api/app/videos/:id), so an evaluated
+    // video keeps the slot closed naturally without needing a separate permanent flag.
     const activeVideos = videos.filter(v => v.status !== 'REJECTED');
 
     const isVideoA = (v: { category: string | null; subCategory: string | null }) =>
@@ -47,8 +48,12 @@ export async function GET(request: Request) {
     const isVideoB = (v: { category: string | null; subCategory: string | null }) =>
       v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
 
-    const usedA = !!user?.olympiadCatAApproved || activeVideos.some(isVideoA);
-    const usedB = !!user?.olympiadCatBApproved || activeVideos.some(isVideoB);
+    const usedA = activeVideos.some(isVideoA);
+    const usedB = activeVideos.some(isVideoB);
+
+    // Locked = evaluation marks already assigned — the video (and slot) can never be freed again.
+    const lockedA = activeVideos.some(v => isVideoA(v) && !!v.evaluation);
+    const lockedB = activeVideos.some(v => isVideoB(v) && !!v.evaluation);
 
     const rejectedA = !usedA && videos.some(v => v.status === 'REJECTED' && isVideoA(v));
     const rejectedB = !usedB && videos.some(v => v.status === 'REJECTED' && isVideoB(v));
@@ -79,6 +84,8 @@ export async function GET(request: Request) {
     return NextResponse.json({
       slotA: usedA,
       slotB: usedB,
+      lockedA,
+      lockedB,
       rejectedA,
       rejectedB,
       olympiadId: user?.olympiadId ?? null,
