@@ -2,17 +2,20 @@
 
 import { useState, useMemo } from 'react';
 import useSWR from 'swr';
-import { LifeBuoy, RefreshCw, X, CheckCircle, Clock, Mail, Phone, Search, Image as ImageIcon } from 'lucide-react';
+import { LifeBuoy, RefreshCw, X, CheckCircle, Clock, Mail, Phone, Search, Image as ImageIcon, Send, MessageSquare } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
 interface Ticket {
   id: string;
+  type: 'TECHNICAL' | 'REMARK';
   category: string | null;
   message: string;
   screenshotUrls: string[];
   status: 'OPEN' | 'RESOLVED';
   resolvedAt: string | null;
+  adminResponse: string | null;
+  respondedAt: string | null;
   createdAt: string;
   user: {
     id: string;
@@ -38,7 +41,7 @@ const TAB_CFG: Record<Exclude<StatusFilter, 'ALL'>, { label: string; activeClass
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
-  return localStorage.getItem('token') || '';
+  return sessionStorage.getItem('token') || '';
 }
 
 function authedFetcher(url: string) {
@@ -64,6 +67,8 @@ export default function SupportTicketsPage() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<string | null>(null);
+  const [replyDrafts, setReplyDrafts] = useState<Record<string, string>>({});
+  const [replyingId, setReplyingId] = useState<string | null>(null);
 
   const params = new URLSearchParams();
   if (filter !== 'ALL') params.set('status', filter);
@@ -79,6 +84,7 @@ export default function SupportTicketsPage() {
     return all.filter(t =>
       t.message.toLowerCase().includes(q) ||
       t.category?.toLowerCase().includes(q) ||
+      t.type.toLowerCase().includes(q) ||
       t.user.userId?.toLowerCase().includes(q) ||
       t.user.email?.toLowerCase().includes(q) ||
       t.user.mobile?.toLowerCase().includes(q)
@@ -100,6 +106,27 @@ export default function SupportTicketsPage() {
       }
     } finally {
       setUpdatingId(null);
+    }
+  };
+
+  const sendReply = async (ticketId: string) => {
+    const response = (replyDrafts[ticketId] || '').trim();
+    if (!response) return;
+    setReplyingId(ticketId);
+    try {
+      const res = await fetch(`/api/dashboard/support-tickets/${ticketId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
+        body: JSON.stringify({ response }),
+      });
+      if (res.ok) {
+        setReplyDrafts(prev => ({ ...prev, [ticketId]: '' }));
+        mutate();
+      } else {
+        alert('Failed to send response');
+      }
+    } finally {
+      setReplyingId(null);
     }
   };
 
@@ -175,9 +202,19 @@ export default function SupportTicketsPage() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-black text-[#004f9f] truncate">{t.user.userId}</p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                        t.type === 'REMARK' ? 'text-purple-600 bg-purple-50 border border-purple-100' : 'text-indigo-600 bg-indigo-50 border border-indigo-100'
+                      }`}>
+                        {t.type === 'REMARK' ? 'Remark' : 'Technical'}
+                      </span>
                       {t.category && (
                         <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full shrink-0">
                           {t.category}
+                        </span>
+                      )}
+                      {t.adminResponse && (
+                        <span className="flex items-center gap-1 text-[10px] font-bold text-blue-600 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-full shrink-0">
+                          <MessageSquare size={9} /> Replied
                         </span>
                       )}
                     </div>
@@ -236,6 +273,35 @@ export default function SupportTicketsPage() {
                     {t.status === 'RESOLVED' && t.resolvedAt && (
                       <p className="text-[11px] text-green-600">Resolved on {formatDate(t.resolvedAt)}</p>
                     )}
+
+                    {/* Existing SuperAdmin response */}
+                    {t.adminResponse && (
+                      <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                        <p className="text-[11px] font-bold text-blue-600 mb-1 flex items-center gap-1">
+                          <MessageSquare size={12} /> Your response {t.respondedAt ? `· ${formatDate(t.respondedAt)}` : ''}
+                        </p>
+                        <p className="text-sm text-gray-700 whitespace-pre-wrap">{t.adminResponse}</p>
+                      </div>
+                    )}
+
+                    {/* Reply box */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] font-bold text-gray-500">{t.adminResponse ? 'Send another response' : 'Write a response'}</p>
+                      <textarea
+                        value={replyDrafts[t.id] || ''}
+                        onChange={e => setReplyDrafts(prev => ({ ...prev, [t.id]: e.target.value }))}
+                        placeholder="Type your response to the user…"
+                        rows={3}
+                        className="w-full text-sm border border-gray-200 rounded-xl p-3 focus:outline-none focus:ring-2 focus:ring-[#014584]/20 resize-none"
+                      />
+                      <button
+                        onClick={() => sendReply(t.id)}
+                        disabled={replyingId === t.id || !(replyDrafts[t.id] || '').trim()}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#014584] hover:bg-[#013a6e] text-white text-xs font-black transition-colors disabled:opacity-40"
+                      >
+                        <Send size={13} /> {replyingId === t.id ? 'Sending...' : 'Send Response'}
+                      </button>
+                    </div>
 
                     {/* Status action */}
                     <div className="flex gap-2 pt-1">

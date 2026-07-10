@@ -290,6 +290,7 @@ model AppUser {
   reelSharesReceived     ReelShare[]     @relation("ReelShareRecipient")
   reportsSubmitted       VideoReport[]
   supportTickets         SupportTicket[]
+  notifications          Notification[]
 
   @@index([email])
   @@index([mobile])
@@ -394,16 +395,38 @@ model AppSetting {
 model SupportTicket {
   id             String   @id @default(uuid())
   userId         String
-  category       String?  // Account Issue | Video Upload | Payment | Bug Report | Other
+  type           String   @default("TECHNICAL") // TECHNICAL | REMARK
+  category       String?  // App Crash | Video Upload Issue | Login/Account Access | Video Playback Issue | Other Technical (TECHNICAL only)
   message        String
   screenshotUrls String?  // comma-separated URLs, up to 3
   status         String   @default("OPEN") // OPEN | RESOLVED
   resolvedAt     DateTime?
+  adminResponse  String?   // reply written by SuperAdmin
+  respondedAt    DateTime?
+  isReadByUser   Boolean  @default(true) // flips to false when adminResponse is set, until the user opens the notifications modal
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
+  @@schema("public")
+}
+
+// Generic system-originated alerts for the app's Home-screen notification bell
+// (currently used for admin video removals; separate from SupportTicket responses,
+// which are fetched via /api/app/support/notifications).
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // "VIDEO_REMOVED"
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
   @@schema("public")
 }

@@ -45,11 +45,14 @@ export async function GET(request: Request) {
 
     const result = tickets.map(t => ({
       id:             t.id,
+      type:           t.type,
       category:       t.category,
       message:        t.message,
       screenshotUrls: t.screenshotUrls ? t.screenshotUrls.split(',').map(fixUrl) : [],
       status:         t.status,
       resolvedAt:     t.resolvedAt,
+      adminResponse:  t.adminResponse,
+      respondedAt:    t.respondedAt,
       createdAt:      t.createdAt,
       user: {
         id:         t.user.id,
