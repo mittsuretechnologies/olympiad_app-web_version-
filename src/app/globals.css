@@ -10,6 +10,12 @@
   --color-card: #ffffff;
   --color-border: #f3d5b5;
   --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  --animate-pulse-scale: pulse-scale 1.8s ease-in-out infinite;
+
+  @keyframes pulse-scale {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
+  }
 }
 
 :root {

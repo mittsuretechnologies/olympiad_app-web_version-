@@ -268,7 +268,7 @@ model AppUser {
   id                     String          @id @default(uuid())
   userId                 String          @unique
   email                  String?         @unique
-  mobile                 String?         @unique
+  mobile                 String?
   avatarUrl              String?
   password               String
   plainPassword          String?
