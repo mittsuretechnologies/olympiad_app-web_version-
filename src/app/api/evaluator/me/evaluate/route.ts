@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { koshesForSlot, videoSlot } from '@/lib/kosh';
 
 const MAX_PER_CRITERION = 5;
 
@@ -59,16 +60,35 @@ export async function POST(request: Request) {
     }
     if (!videoId) return NextResponse.json({ message: 'videoId is required' }, { status: 400 });
 
-    const video = await prisma.video.findUnique({ where: { id: videoId, deletedAt: null }, include: { evaluation: true } });
+    const video = await prisma.video.findUnique({ where: { id: videoId, deletedAt: null }, include: { evaluations: true } });
     if (!video) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
     if (!video.isEvaluation) return NextResponse.json({ message: 'This video is not an olympiad evaluation submission' }, { status: 400 });
 
-    const isOwner = video.evaluation?.evaluatorId === payload.id;
-    if (video.evaluation && payload.role !== 'SUPERADMIN' && !isOwner) {
-      return NextResponse.json({ message: 'This video has already been evaluated' }, { status: 409 });
-    }
-    if (video.evaluation?.isPublished) {
-      return NextResponse.json({ message: 'This evaluation has been published and is locked. Unpublish it first to make changes.' }, { status: 409 });
+    // One scoring form per video, but the same score is recorded twice —
+    // once per kosh assigned to this video's slot (1st video: Annamaya +
+    // Pranamaya, 2nd video: Vijnanamaya + Anandamaya) — so each kosh gets
+    // this video's % as its contribution.
+    const siblingVideos = await prisma.video.findMany({
+      where: {
+        isEvaluation: true,
+        deletedAt: null,
+        ...(video.studentId ? { studentId: video.studentId } : { appUserId: video.appUserId }),
+      },
+      select: { id: true, createdAt: true },
+    });
+    const slot = videoSlot(video.createdAt, siblingVideos.map(v => v.createdAt));
+    const koshes = koshesForSlot(Math.max(slot, 0));
+
+    const existingByKosh = new Map(video.evaluations.map(e => [e.kosh, e]));
+    for (const kosh of koshes) {
+      const existing = existingByKosh.get(kosh);
+      const isOwner = existing?.evaluatorId === payload.id;
+      if (existing && payload.role !== 'SUPERADMIN' && !isOwner) {
+        return NextResponse.json({ message: 'This video has already been evaluated by another evaluator' }, { status: 409 });
+      }
+      if (existing?.isPublished) {
+        return NextResponse.json({ message: 'This evaluation has been published and is locked. Unpublish it first to make changes.' }, { status: 409 });
+      }
     }
 
     const totalScore = confidenceScore + creativityScore + techniqueScore + presentationScore;
@@ -81,11 +101,14 @@ export async function POST(request: Request) {
       remarks: remarks?.trim() || null,
     };
 
-    const evaluation = video.evaluation
-      ? await prisma.videoEvaluation.update({ where: { videoId }, data: { ...data, lastEditedBy: payload.id, lastEditedAt: new Date() } })
-      : await prisma.videoEvaluation.create({ data: { videoId, evaluatorId, ...data } });
+    const results = await Promise.all(koshes.map(kosh => {
+      const existing = existingByKosh.get(kosh);
+      return existing
+        ? prisma.videoEvaluation.update({ where: { videoId_kosh: { videoId, kosh } }, data: { ...data, lastEditedBy: payload.id, lastEditedAt: new Date() } })
+        : prisma.videoEvaluation.create({ data: { videoId, kosh, evaluatorId, ...data } });
+    }));
 
-    return NextResponse.json(evaluation);
+    return NextResponse.json(results[0]);
   } catch (error) {
     console.error('POST evaluator/me/evaluate failed:', error);
     return NextResponse.json({ message: 'Failed to submit evaluation' }, { status: 500 });

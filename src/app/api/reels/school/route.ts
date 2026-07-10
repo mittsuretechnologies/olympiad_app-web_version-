@@ -73,28 +73,34 @@ export async function GET(request: NextRequest) {
     });
 
     // Videos uploaded by app users whose olympiadId allocation school matches
-    const appUserVideos = await prisma.video.findMany({
-      take: 30,
-      where: {
-        ...baseWhere,
-        appUser: {
-          olympiadId: {
-            in: (await prisma.olympiadIdAllocation.findMany({
-              where: { school: { id: schoolId } },
-              select: { code: true },
-            })).map(a => a.code),
+    const schoolOlympiadCodes = (await prisma.olympiadIdAllocation.findMany({
+      where: { school: { id: schoolId } },
+      select: { code: true },
+    })).map(a => a.code);
+    const schoolAppUserIds = schoolOlympiadCodes.length > 0
+      ? (await prisma.appUser.findMany({
+          where: { olympiadId: { in: schoolOlympiadCodes } },
+          select: { id: true },
+        })).map(u => u.id)
+      : [];
+
+    const appUserVideos = schoolAppUserIds.length > 0
+      ? await prisma.video.findMany({
+          take: 30,
+          where: {
+            ...baseWhere,
+            appUserId: { in: schoolAppUserIds },
           },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-      select: {
-        id: true, videoUrl: true, thumbnailUrl: true,
-        caption: true, category: true, subCategory: true,
-        likesCount: true, viewsCount: true, createdAt: true,
-        appUserId: true, isEvaluation: true, olympiadVisibility: true,
-        student: { select: { id: true, name: true, allocation: { select: { school: { select: { id: true, name: true } } } } } },
-      },
-    });
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true, videoUrl: true, thumbnailUrl: true,
+            caption: true, category: true, subCategory: true,
+            likesCount: true, viewsCount: true, createdAt: true,
+            appUserId: true, isEvaluation: true, olympiadVisibility: true,
+            student: { select: { id: true, name: true, allocation: { select: { school: { select: { id: true, name: true } } } } } },
+          },
+        })
+      : [];
 
     // Merge, deduplicate, sort by createdAt desc
     const seen = new Set<string>();

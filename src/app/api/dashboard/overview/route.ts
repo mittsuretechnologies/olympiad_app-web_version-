@@ -3,8 +3,19 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
+    const { searchParams } = new URL(request.url);
+    const fromParam = searchParams.get('from');
+    const toParam = searchParams.get('to');
+
+    const createdAtRange = (fromParam || toParam) ? {
+      ...(fromParam ? { gte: new Date(fromParam) } : {}),
+      ...(toParam ? { lte: new Date(`${toParam}T23:59:59.999`) } : {}),
+    } : undefined;
+
+    const dateWhere = createdAtRange ? { createdAt: createdAtRange } : {};
+
     const [
       totalSchools,
       activeSchools,
@@ -16,15 +27,15 @@ export async function GET() {
       approvedVideos,
       rejectedVideos,
     ] = await Promise.all([
-      prisma.school.count(),
-      prisma.school.count({ where: { isActive: true } }),
-      prisma.olympiadIdAllocation.count(),
-      prisma.student.count(),
-      prisma.uploader.count(),
-      prisma.appUser.count(),
-      prisma.video.count({ where: { status: 'PENDING' } }),
-      prisma.video.count({ where: { status: 'APPROVED' } }),
-      prisma.video.count({ where: { status: 'REJECTED' } }),
+      prisma.school.count({ where: dateWhere }),
+      prisma.school.count({ where: { isActive: true, ...dateWhere } }),
+      prisma.olympiadIdAllocation.count({ where: dateWhere }),
+      prisma.student.count({ where: dateWhere }),
+      prisma.uploader.count({ where: dateWhere }),
+      prisma.appUser.count({ where: dateWhere }),
+      prisma.video.count({ where: { status: 'PENDING', ...dateWhere } }),
+      prisma.video.count({ where: { status: 'APPROVED', ...dateWhere } }),
+      prisma.video.count({ where: { status: 'REJECTED', ...dateWhere } }),
     ]);
 
     const totalPendingRegistrations = totalAllocatedIds - totalRegisteredStudents;
@@ -91,6 +102,32 @@ export async function GET() {
       },
     });
 
+    // Monthly trend for the current calendar year — schools, school
+    // students, and app users registered per month, for the overview line chart.
+    const yearStart = new Date(new Date().getFullYear(), 0, 1);
+    const [yearSchools, yearStudents, yearAppUsers] = await Promise.all([
+      prisma.school.findMany({ where: { createdAt: { gte: yearStart } }, select: { createdAt: true } }),
+      prisma.student.findMany({ where: { createdAt: { gte: yearStart } }, select: { createdAt: true } }),
+      prisma.appUser.findMany({ where: { createdAt: { gte: yearStart } }, select: { createdAt: true } }),
+    ]);
+
+    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const countByMonth = (rows: { createdAt: Date }[]) => {
+      const counts = new Array(12).fill(0);
+      for (const r of rows) counts[r.createdAt.getMonth()]++;
+      return counts;
+    };
+    const schoolsByMonth = countByMonth(yearSchools);
+    const studentsByMonth = countByMonth(yearStudents);
+    const appUsersByMonth = countByMonth(yearAppUsers);
+
+    const monthlyTrend = monthNames.map((month, i) => ({
+      month,
+      schools: schoolsByMonth[i],
+      schoolStudents: studentsByMonth[i],
+      appUsers: appUsersByMonth[i],
+    }));
+
     return NextResponse.json({
       stats: {
         totalSchools,
@@ -121,6 +158,7 @@ export async function GET() {
         studentName: v.student?.name ?? null,
         createdAt: v.createdAt.toISOString(),
       })),
+      monthlyTrend,
     });
   } catch (error) {
     console.error('GET dashboard/overview failed:', error);

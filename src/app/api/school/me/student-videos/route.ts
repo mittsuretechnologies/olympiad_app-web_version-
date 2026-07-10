@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     // Get all allocations for this school
     const allocations = await prisma.olympiadIdAllocation.findMany({
       where: { schoolId: payload.id, sentAt: { not: null } },
-      select: { code: true, classCode: true, className: true },
+      select: { code: true, classCode: true, className: true, assignedName: true },
     });
     const codes = allocations.map((a: any) => a.code);
     const allocByCode = new Map(allocations.map((a: any) => [a.code, a]));
@@ -76,6 +76,7 @@ export async function GET(request: Request) {
         viewsCount: v.viewsCount,
         createdAt: v.createdAt,
         studentName: v.student?.name || '-',
+        username: null,
         studentId: v.student?.id || null,
         olympiadCode: v.student?.olympiadCode || '-',
         classCode: v.student?.allocation?.classCode || null,
@@ -100,7 +101,8 @@ export async function GET(request: Request) {
           likesCount: v.likesCount,
           viewsCount: v.viewsCount,
           createdAt: v.createdAt,
-          studentName: u?.userId || '-',
+          studentName: alloc?.assignedName || u?.userId || '-',
+          username: u?.userId || null,
           studentId: u?.id || null,
           olympiadCode: u?.olympiadId || '-',
           classCode: alloc?.classCode || null,

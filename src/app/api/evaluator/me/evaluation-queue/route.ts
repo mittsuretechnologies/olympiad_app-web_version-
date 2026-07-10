@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { koshesForSlot } from '@/lib/kosh';
 
 export async function GET(request: Request) {
   try {
@@ -22,49 +23,118 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const targetVideoId = searchParams.get('videoId');
 
-    let targetFormatted: any = null;
-    if (targetVideoId) {
-      const v = await prisma.video.findUnique({
-        where: { id: targetVideoId },
-        include: {
-          student: {
-            select: {
-              id: true, name: true, olympiadCode: true,
-              allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true } } } },
-            },
+    // Pull every approved evaluation video (student + app-user), grouped by
+    // owner, so we can determine each video's slot (1st/2nd upload) and
+    // therefore which pair of koshas it must be scored against.
+    const studentVideos = await prisma.video.findMany({
+      where: { isEvaluation: true, status: 'APPROVED', studentId: { not: null }, deletedAt: null },
+      include: {
+        student: {
+          select: {
+            id: true, name: true, olympiadCode: true,
+            allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true } } } },
           },
-          evaluation: true,
-        }
-      });
-      if (v) {
-        let studentName = v.student?.allocation?.assignedName || v.student?.name || '-';
-        let olympiadCode = v.student?.olympiadCode || '-';
-        let className = v.student?.allocation?.className || v.student?.allocation?.classCode || null;
-        let schoolName = v.student?.allocation?.school?.name || null;
+        },
+        evaluations: true,
+      },
+      orderBy: { createdAt: 'asc' },
+    });
 
-        if (!v.studentId && v.appUserId) {
-          const appUser = await prisma.appUser.findUnique({
-            where: { id: v.appUserId },
-            select: { id: true, userId: true, olympiadId: true },
-          });
-          if (appUser) {
-            studentName = appUser.userId;
-            olympiadCode = appUser.olympiadId || '-';
-            if (appUser.olympiadId) {
-              const alloc = await prisma.olympiadIdAllocation.findUnique({
-                where: { code: appUser.olympiadId },
-                include: { school: { select: { name: true } } }
-              });
-              if (alloc) {
-                className = alloc.className || alloc.classCode || null;
-                schoolName = alloc.school?.name || null;
-                if (alloc.assignedName) studentName = alloc.assignedName;
-              }
-            }
-          }
+    const appVideos = await prisma.video.findMany({
+      where: { isEvaluation: true, status: 'APPROVED', appUserId: { not: null }, deletedAt: null },
+      include: { evaluations: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    const appUserIds = [...new Set(appVideos.map(v => v.appUserId!).filter(Boolean))];
+    const appUsers = appUserIds.length
+      ? await prisma.appUser.findMany({ where: { id: { in: appUserIds } }, select: { id: true, userId: true, olympiadId: true } })
+      : [];
+    const appUserById = new Map(appUsers.map(u => [u.id, u]));
+
+    const olympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
+    const allocations = olympiadCodes.length
+      ? await prisma.olympiadIdAllocation.findMany({
+          where: { code: { in: olympiadCodes } },
+          select: { code: true, classCode: true, className: true, assignedName: true, school: { select: { name: true } } },
+        })
+      : [];
+    const allocByCode = new Map(allocations.map(a => [a.code, a]));
+
+    // Group each owner's videos so we can assign slot 0 / slot 1 by createdAt order.
+    const bySlotKey = new Map<string, typeof studentVideos | typeof appVideos>();
+    for (const v of studentVideos) {
+      const key = `s:${v.studentId}`;
+      if (!bySlotKey.has(key)) bySlotKey.set(key, []);
+      (bySlotKey.get(key) as any[]).push(v);
+    }
+    for (const v of appVideos) {
+      const key = `a:${v.appUserId}`;
+      if (!bySlotKey.has(key)) bySlotKey.set(key, []);
+      (bySlotKey.get(key) as any[]).push(v);
+    }
+
+    type FormattedVideo = {
+      id: string;
+      videoUrl: string;
+      thumbnailUrl: string | null;
+      caption: string;
+      category: string;
+      subCategory: string;
+      createdAt: Date;
+      studentName: string;
+      olympiadCode: string;
+      className: string | null;
+      schoolName: string | null;
+      slot: number;
+      koshes: readonly [string, string];
+      // A video has one scoring form; its result is stored under both
+      // koshas with identical values, so any one row represents the video.
+      existingScore: {
+        confidenceScore: number;
+        creativityScore: number;
+        techniqueScore: number;
+        presentationScore: number;
+        remarks: string | null;
+      } | null;
+      isFullyScored: boolean;
+      isFullyPublished: boolean;
+    };
+
+    const allFormatted: FormattedVideo[] = [];
+
+    for (const [key, videos] of bySlotKey) {
+      const sorted = [...videos].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      sorted.forEach((v: any, slot: number) => {
+        const koshes = koshesForSlot(slot);
+        const evals = v.evaluations as any[];
+        const anyEval = evals[0] || null;
+        const existingScore = anyEval ? {
+          confidenceScore: anyEval.confidenceScore,
+          creativityScore: anyEval.creativityScore,
+          techniqueScore: anyEval.techniqueScore,
+          presentationScore: anyEval.presentationScore,
+          remarks: anyEval.remarks,
+        } : null;
+        const isFullyScored = koshes.every(k => evals.some(e => e.kosh === k));
+        const isFullyPublished = koshes.every(k => evals.find(e => e.kosh === k)?.isPublished);
+
+        let studentName = '-', olympiadCode = '-', className: string | null = null, schoolName: string | null = null;
+        if (key.startsWith('s:')) {
+          studentName = v.student?.allocation?.assignedName || v.student?.name || '-';
+          olympiadCode = v.student?.olympiadCode || '-';
+          className = v.student?.allocation?.className || v.student?.allocation?.classCode || null;
+          schoolName = v.student?.allocation?.school?.name || null;
+        } else {
+          const u = appUserById.get(v.appUserId!);
+          const alloc = u?.olympiadId ? allocByCode.get(u.olympiadId) : null;
+          studentName = alloc?.assignedName || u?.userId || '-';
+          olympiadCode = u?.olympiadId || '-';
+          className = alloc?.className || alloc?.classCode || null;
+          schoolName = alloc?.school?.name || null;
         }
 
-        targetFormatted = {
+        allFormatted.push({
           id: v.id,
           videoUrl: v.videoUrl,
           thumbnailUrl: v.thumbnailUrl || null,
@@ -76,96 +146,19 @@ export async function GET(request: Request) {
           olympiadCode,
           className,
           schoolName,
-          existingScores: v.evaluation ? {
-            confidenceScore: v.evaluation.confidenceScore,
-            creativityScore: v.evaluation.creativityScore,
-            techniqueScore: v.evaluation.techniqueScore,
-            presentationScore: v.evaluation.presentationScore,
-            remarks: v.evaluation.remarks,
-          } : null,
-          isPublished: v.evaluation?.isPublished || false,
-        };
-      }
+          slot,
+          koshes,
+          existingScore,
+          isFullyScored,
+          isFullyPublished,
+        });
+      });
     }
 
-    // 1. Olympiad-evaluation videos uploaded by web-registered Students, approved, not yet scored
-    const studentVideos = await prisma.video.findMany({
-      where: {
-        isEvaluation: true,
-        status: 'APPROVED',
-        evaluation: null,
-        studentId: { not: null },
-        id: targetVideoId ? { not: targetVideoId } : undefined,
-      },
-      include: {
-        student: {
-          select: {
-            id: true, name: true, olympiadCode: true,
-            allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true } } } },
-          },
-        },
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    // 2. Olympiad-evaluation videos uploaded by app users, approved, not yet scored
-    const appVideos = await prisma.video.findMany({
-      where: {
-        isEvaluation: true,
-        status: 'APPROVED',
-        evaluation: null,
-        appUserId: { not: null },
-        id: targetVideoId ? { not: targetVideoId } : undefined,
-      },
-      orderBy: { createdAt: 'asc' },
-    });
-
-    const appUserIds = appVideos.map(v => v.appUserId!).filter(Boolean);
-    const appUsers = await prisma.appUser.findMany({
-      where: { id: { in: appUserIds } },
-      select: { id: true, userId: true, olympiadId: true },
-    });
-    const appUserById = new Map(appUsers.map(u => [u.id, u]));
-
-    const olympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
-    const allocations = await prisma.olympiadIdAllocation.findMany({
-      where: { code: { in: olympiadCodes } },
-      select: { code: true, classCode: true, className: true, assignedName: true, school: { select: { name: true } } },
-    });
-    const allocByCode = new Map(allocations.map(a => [a.code, a]));
-
-    const restQueue = [
-      ...studentVideos.map(v => ({
-        id: v.id,
-        videoUrl: v.videoUrl,
-        thumbnailUrl: v.thumbnailUrl || null,
-        caption: v.caption || '',
-        category: v.category || '',
-        subCategory: v.subCategory || '',
-        createdAt: v.createdAt,
-        studentName: v.student?.allocation?.assignedName || v.student?.name || '-',
-        olympiadCode: v.student?.olympiadCode || '-',
-        className: v.student?.allocation?.className || v.student?.allocation?.classCode || null,
-        schoolName: v.student?.allocation?.school?.name || null,
-      })),
-      ...appVideos.map(v => {
-        const u = appUserById.get(v.appUserId!);
-        const alloc = u?.olympiadId ? allocByCode.get(u.olympiadId) : null;
-        return {
-          id: v.id,
-          videoUrl: v.videoUrl,
-          thumbnailUrl: v.thumbnailUrl || null,
-          caption: v.caption || '',
-          category: v.category || '',
-          subCategory: v.subCategory || '',
-          createdAt: v.createdAt,
-          studentName: alloc?.assignedName || u?.userId || '-',
-          olympiadCode: u?.olympiadId || '-',
-          className: alloc?.className || alloc?.classCode || null,
-          schoolName: alloc?.school?.name || null,
-        };
-      }),
-    ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const targetFormatted = targetVideoId ? allFormatted.find(v => v.id === targetVideoId) || null : null;
+    const restQueue = allFormatted
+      .filter(v => v.id !== targetVideoId && !v.isFullyScored)
+      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
 
     const finalQueue = targetFormatted ? [targetFormatted, ...restQueue] : restQueue;
 

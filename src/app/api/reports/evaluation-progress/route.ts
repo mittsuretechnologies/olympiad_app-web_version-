@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { koshesForSlot, videoPercentFromKoshes, KoshKey } from '@/lib/kosh';
 
 export const dynamic = 'force-dynamic';
 
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
       where: {
         isEvaluation: true,
         status: 'APPROVED',
+        deletedAt: null,
       },
       include: {
         student: {
@@ -32,9 +34,10 @@ export async function GET(request: Request) {
             },
           },
         },
-        evaluation: {
+        evaluations: {
           select: {
             id: true,
+            kosh: true,
             confidenceScore: true,
             creativityScore: true,
             techniqueScore: true,
@@ -104,8 +107,12 @@ export async function GET(request: Request) {
         category: string | null;
         subCategory: string | null;
         createdAt: Date;
+        koshes: readonly [KoshKey, KoshKey];
         isEvaluated: boolean;
-        evaluation: {
+        isFullyScored: boolean;
+        videoPercent: number | null;
+        koshScores: {
+          kosh: string | null;
           totalScore: number;
           confidenceScore: number;
           creativityScore: number;
@@ -114,7 +121,7 @@ export async function GET(request: Request) {
           remarks: string | null;
           evaluatorName: string;
           evaluatedAt: Date;
-        } | null;
+        }[];
       }[];
     }>();
 
@@ -159,29 +166,6 @@ export async function GET(request: Request) {
         continue;
       }
 
-      const videoEntry = {
-        id: v.id,
-        videoUrl: v.videoUrl,
-        thumbnailUrl: v.thumbnailUrl,
-        caption: v.caption,
-        category: v.category,
-        subCategory: v.subCategory,
-        createdAt: v.createdAt,
-        isEvaluated: v.evaluation !== null,
-        evaluation: v.evaluation
-          ? {
-              totalScore: v.evaluation.totalScore,
-              confidenceScore: v.evaluation.confidenceScore,
-              creativityScore: v.evaluation.creativityScore,
-              techniqueScore: v.evaluation.techniqueScore,
-              presentationScore: v.evaluation.presentationScore,
-              remarks: v.evaluation.remarks,
-              evaluatorName: v.evaluation.evaluator?.name || '-',
-              evaluatedAt: v.evaluation.createdAt,
-            }
-          : null,
-      };
-
       if (!groupMap.has(key)) {
         groupMap.set(key, {
           studentKey: key,
@@ -194,22 +178,50 @@ export async function GET(request: Request) {
           district,
           city,
           source,
-          videos: [videoEntry],
+          videos: [],
         });
-      } else {
-        groupMap.get(key)!.videos.push(videoEntry);
       }
+      const group = groupMap.get(key)!;
+      const slot = group.videos.length;
+      const koshes = koshesForSlot(slot);
+      const koshScores = v.evaluations.map(e => ({
+        kosh: e.kosh,
+        totalScore: e.totalScore,
+        confidenceScore: e.confidenceScore,
+        creativityScore: e.creativityScore,
+        techniqueScore: e.techniqueScore,
+        presentationScore: e.presentationScore,
+        remarks: e.remarks,
+        evaluatorName: e.evaluator?.name || '-',
+        evaluatedAt: e.createdAt,
+      }));
+
+      group.videos.push({
+        id: v.id,
+        videoUrl: v.videoUrl,
+        thumbnailUrl: v.thumbnailUrl,
+        caption: v.caption,
+        category: v.category,
+        subCategory: v.subCategory,
+        createdAt: v.createdAt,
+        koshes,
+        isEvaluated: v.evaluations.length > 0,
+        isFullyScored: koshes.every(k => v.evaluations.some(e => e.kosh === k)),
+        videoPercent: videoPercentFromKoshes(v.evaluations, koshes),
+        koshScores,
+      });
     }
 
     // 4. Build final response
     const result = Array.from(groupMap.values()).map(g => {
       const totalVideos = g.videos.length;
-      const evaluatedVideos = g.videos.filter(v => v.isEvaluated).length;
+      const evaluatedVideos = g.videos.filter(v => v.isFullyScored).length;
       const pendingVideos = totalVideos - evaluatedVideos;
+      const anyProgress = g.videos.some(v => v.isEvaluated);
       let status: 'Completed' | 'In Progress' | 'Not Started';
-      if (evaluatedVideos === 0) status = 'Not Started';
-      else if (evaluatedVideos >= totalVideos) status = 'Completed';
-      else status = 'In Progress';
+      if (evaluatedVideos >= totalVideos && totalVideos > 0) status = 'Completed';
+      else if (anyProgress) status = 'In Progress';
+      else status = 'Not Started';
 
       return {
         ...g,
