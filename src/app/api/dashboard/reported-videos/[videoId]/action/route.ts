@@ -46,6 +46,18 @@ export async function POST(
         where: { videoId, resolved: false },
         data:  { resolved: true },
       });
+
+      if (video.appUserId) {
+        const label = video.caption?.trim() || video.subCategory || video.category || 'your video';
+        await prisma.notification.create({
+          data: {
+            userId:  video.appUserId,
+            type:    'VIDEO_REMOVED',
+            title:   'Video Removed',
+            message: `Your video "${label}" was removed by an admin after being reported for violating our content guidelines.`,
+          },
+        });
+      }
     }
 
     return NextResponse.json({ success: true });
