@@ -22,6 +22,111 @@ function normalizeUrl(url: string | null) {
   return url.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000');
 }
 
+async function searchUsers(q: string, appUserId: string) {
+  const usersRaw = await prisma.appUser.findMany({
+    where: {
+      userId:     { contains: q, mode: 'insensitive' },
+      isVerified: true,
+      NOT:        { id: appUserId },
+    },
+    select: { id: true, userId: true, avatarUrl: true, olympiadId: true, isPrivate: true },
+    take: 10,
+  });
+
+  const userIds = usersRaw.map(u => u.id);
+  if (userIds.length === 0) return [];
+
+  // Batched aggregates instead of firing 2 count() queries per matched user.
+  const [followerGroups, followingGroups, existingFollows, pendingRequests] = await Promise.all([
+    prisma.follow.groupBy({ by: ['followingId'], where: { followingId: { in: userIds } }, _count: { _all: true } }),
+    prisma.follow.groupBy({ by: ['followerId'],  where: { followerId:  { in: userIds } }, _count: { _all: true } }),
+    prisma.follow.findMany({
+      where:  { followerId: appUserId, followingId: { in: userIds } },
+      select: { followingId: true },
+    }),
+    prisma.followRequest.findMany({
+      where:  { senderId: appUserId, receiverId: { in: userIds }, status: 'PENDING' },
+      select: { receiverId: true },
+    }),
+  ]);
+
+  const followerCountMap  = new Map(followerGroups.map(g => [g.followingId, g._count._all]));
+  const followingCountMap = new Map(followingGroups.map(g => [g.followerId, g._count._all]));
+  const followingSet      = new Set(existingFollows.map(f => f.followingId));
+  const pendingSet        = new Set(pendingRequests.map(r => r.receiverId));
+
+  return usersRaw.map(u => ({
+    id:             u.id,
+    userId:         u.userId,
+    avatarUrl:      u.avatarUrl,
+    olympiadId:     u.olympiadId,
+    isPrivate:      u.isPrivate,
+    followersCount: followerCountMap.get(u.id)  ?? 0,
+    followingCount: followingCountMap.get(u.id) ?? 0,
+    isFollowing:    followingSet.has(u.id),
+    isPending:      pendingSet.has(u.id),
+  }));
+}
+
+async function searchSchools(q: string) {
+  const schoolsRaw = await prisma.school.findMany({
+    where:  { name: { contains: q, mode: 'insensitive' } },
+    select: { id: true, schoolId: true, name: true, city: true, state: true },
+    take:   10,
+  });
+
+  const schoolVideosCounts = await Promise.all(
+    schoolsRaw.map(sc =>
+      prisma.video.count({
+        where: { tags: { contains: sc.schoolId, mode: 'insensitive' }, status: 'APPROVED', isPublic: true },
+      })
+    )
+  );
+
+  return schoolsRaw.map((sc, i) => ({ ...sc, videoCount: schoolVideosCounts[i] }));
+}
+
+async function searchVideos(q: string, appUserId: string) {
+  const visWhere = await visibilityWhere(appUserId);
+
+  const videosRaw = await prisma.video.findMany({
+    where: {
+      status:   'APPROVED',
+      isPublic: true,
+      ...visWhere,
+      OR: [
+        { caption:     { contains: q, mode: 'insensitive' } },
+        { category:    { contains: q, mode: 'insensitive' } },
+        { subCategory: { contains: q, mode: 'insensitive' } },
+        { tags:        { contains: q, mode: 'insensitive' } },
+      ],
+    },
+    select: {
+      id: true, appUserId: true, videoUrl: true, thumbnailUrl: true,
+      caption: true, category: true, subCategory: true, tags: true,
+      likesCount: true, viewsCount: true, createdAt: true,
+    },
+    orderBy: { createdAt: 'desc' },
+    take:    30,
+  });
+
+  const appUserIds = [...new Set(videosRaw.map(v => v.appUserId).filter(Boolean))] as string[];
+  const uploaders = appUserIds.length
+    ? await prisma.appUser.findMany({
+        where:  { id: { in: appUserIds } },
+        select: { id: true, userId: true, avatarUrl: true },
+      })
+    : [];
+  const uploaderMap = new Map(uploaders.map(u => [u.id, u]));
+
+  return videosRaw.map(v => ({
+    ...v,
+    videoUrl:     normalizeUrl(v.videoUrl),
+    thumbnailUrl: normalizeUrl(v.thumbnailUrl),
+    uploader:     v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
+  }));
+}
+
 export async function GET(request: Request) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -34,104 +139,13 @@ export async function GET(request: Request) {
   }
 
   try {
-    // ── Users ──────────────────────────────────────────────────────────────────
-    const usersRaw = await prisma.appUser.findMany({
-      where: {
-        userId:     { contains: q, mode: 'insensitive' },
-        isVerified: true,
-        NOT:        { id: appUser.id },
-      },
-      select: { id: true, userId: true, avatarUrl: true, olympiadId: true, isPrivate: true },
-      take: 10,
-    });
-
-    const userIds = usersRaw.map(u => u.id);
-
-    const [followerCounts, followingCounts, existingFollows, pendingRequests] = await Promise.all([
-      Promise.all(userIds.map(id => prisma.follow.count({ where: { followingId: id } }))),
-      Promise.all(userIds.map(id => prisma.follow.count({ where: { followerId:  id } }))),
-      prisma.follow.findMany({
-        where:  { followerId: appUser.id, followingId: { in: userIds } },
-        select: { followingId: true },
-      }),
-      prisma.followRequest.findMany({
-        where:  { senderId: appUser.id, receiverId: { in: userIds }, status: 'PENDING' },
-        select: { receiverId: true },
-      }),
+    // Users / Schools / Videos are independent — run them concurrently
+    // instead of paying for each section's latency one after another.
+    const [users, schools, videos] = await Promise.all([
+      searchUsers(q, appUser.id),
+      searchSchools(q),
+      searchVideos(q, appUser.id),
     ]);
-
-    const followerCountMap  = new Map(userIds.map((id, i) => [id, followerCounts[i]]));
-    const followingCountMap = new Map(userIds.map((id, i) => [id, followingCounts[i]]));
-    const followingSet      = new Set(existingFollows.map(f => f.followingId));
-    const pendingSet        = new Set(pendingRequests.map(r => r.receiverId));
-
-    const users = usersRaw.map(u => ({
-      id:             u.id,
-      userId:         u.userId,
-      avatarUrl:      u.avatarUrl,
-      olympiadId:     u.olympiadId,
-      isPrivate:      u.isPrivate,
-      followersCount: followerCountMap.get(u.id)  ?? 0,
-      followingCount: followingCountMap.get(u.id) ?? 0,
-      isFollowing:    followingSet.has(u.id),
-      isPending:      pendingSet.has(u.id),
-    }));
-
-    // ── Schools ────────────────────────────────────────────────────────────────
-    const schoolsRaw = await prisma.school.findMany({
-      where:  { name: { contains: q, mode: 'insensitive' } },
-      select: { id: true, schoolId: true, name: true, city: true, state: true },
-      take:   10,
-    });
-
-    const schoolVideosCounts = await Promise.all(
-      schoolsRaw.map(sc =>
-        prisma.video.count({
-          where: { tags: { contains: sc.schoolId, mode: 'insensitive' }, status: 'APPROVED', isPublic: true },
-        })
-      )
-    );
-
-    const schools = schoolsRaw.map((sc, i) => ({ ...sc, videoCount: schoolVideosCounts[i] }));
-
-    // ── Videos ─────────────────────────────────────────────────────────────────
-    // Apply profile-privacy visibility filter
-    const visWhere = await visibilityWhere(appUser.id);
-
-    const videosRaw = await prisma.video.findMany({
-      where: {
-        status:   'APPROVED',
-        isPublic: true,
-        ...visWhere,
-        OR: [
-          { caption:     { contains: q, mode: 'insensitive' } },
-          { category:    { contains: q, mode: 'insensitive' } },
-          { subCategory: { contains: q, mode: 'insensitive' } },
-          { tags:        { contains: q, mode: 'insensitive' } },
-        ],
-      },
-      select: {
-        id: true, appUserId: true, videoUrl: true, thumbnailUrl: true,
-        caption: true, category: true, subCategory: true, tags: true,
-        likesCount: true, viewsCount: true, createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' },
-      take:    30,
-    });
-
-    const appUserIds = [...new Set(videosRaw.map(v => v.appUserId).filter(Boolean))] as string[];
-    const uploaders  = await prisma.appUser.findMany({
-      where:  { id: { in: appUserIds } },
-      select: { id: true, userId: true, avatarUrl: true },
-    });
-    const uploaderMap = new Map(uploaders.map(u => [u.id, u]));
-
-    const videos = videosRaw.map(v => ({
-      ...v,
-      videoUrl:     normalizeUrl(v.videoUrl),
-      thumbnailUrl: normalizeUrl(v.thumbnailUrl),
-      uploader:     v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
-    }));
 
     return NextResponse.json({ users, schools, videos });
   } catch (error: any) {

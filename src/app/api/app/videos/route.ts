@@ -113,7 +113,7 @@ export async function POST(request: Request) {
         // comment in GET /api/app/olympiad-video-slots for the full reasoning.
         const existingOlympiadVideos = await prisma.video.findMany({
           where: { appUserId: appUser.id, isEvaluation: true },
-          select: { category: true, subCategory: true, status: true, deletedAt: true, evaluation: { select: { id: true } } },
+          select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
         });
         const matchesSlot = (v: { category: string | null; subCategory: string | null }) =>
           isCatA
@@ -121,7 +121,7 @@ export async function POST(request: Request) {
             : v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
         // Blocked if evaluated (regardless of delete state) or if an active, non-rejected video occupies it.
         const slotTaken = existingOlympiadVideos.some(v =>
-          matchesSlot(v) && (!!v.evaluation || (v.deletedAt === null && v.status !== 'REJECTED'))
+          matchesSlot(v) && (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
         );
         if (slotTaken) {
           return NextResponse.json(
@@ -176,16 +176,16 @@ export async function GET(request: Request) {
     const videos = await prisma.video.findMany({
       where: { appUserId: appUser.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
-      include: { evaluation: { select: { id: true } } },
+      include: { evaluations: { select: { id: true } } },
     });
 
     // Expose only whether marks exist (not the scores themselves — those stay
     // gated behind VideoEvaluation.isPublished) so the app can block/explain deletion.
-    const normalized = videos.map(({ evaluation, ...v }) => ({
+    const normalized = videos.map(({ evaluations, ...v }) => ({
       ...v,
       videoUrl:     v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.videoUrl,
       thumbnailUrl: v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.thumbnailUrl,
-      hasEvaluation: !!evaluation,
+      hasEvaluation: !!evaluations?.length,
     }));
 
     return NextResponse.json(normalized);
