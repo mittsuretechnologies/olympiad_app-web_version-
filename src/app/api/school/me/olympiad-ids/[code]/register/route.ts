@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
+import { sendStudentCredentialsEmail } from '@/lib/mailer';
 
 export async function POST(
   request: Request,
@@ -20,11 +21,16 @@ export async function POST(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
     const { code } = await params;
-    const { name, phone, password } = await request.json();
+    const { name, phone, password, email } = await request.json();
 
     if (!name?.trim()) return NextResponse.json({ message: 'Student name is required' }, { status: 400 });
     if (!phone?.trim() || phone.trim().length < 10) return NextResponse.json({ message: 'Valid phone number is required' }, { status: 400 });
     if (!password?.trim() || password.trim().length < 6) return NextResponse.json({ message: 'Password must be at least 6 characters' }, { status: 400 });
+
+    const emailNormalized = email?.trim().toLowerCase() || null;
+    if (emailNormalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
+      return NextResponse.json({ message: 'Invalid email address' }, { status: 400 });
+    }
 
     const allocation = await prisma.olympiadIdAllocation.findUnique({
       where: { code },
@@ -44,6 +50,11 @@ export async function POST(
     const existingOlympiadLink = await prisma.appUser.findFirst({ where: { olympiadId: code } });
     if (existingOlympiadLink) return NextResponse.json({ message: 'This Olympiad ID is already linked to an app account' }, { status: 409 });
 
+    if (emailNormalized) {
+      const existingEmail = await prisma.appUser.findFirst({ where: { email: emailNormalized } });
+      if (existingEmail) return NextResponse.json({ message: 'This email is already registered on the app' }, { status: 409 });
+    }
+
     // Generate userId from student's name → e.g. "Suraj Joshi" → surajjoshi_4f2a
     const userId = await generateUserId(name.trim());
 
@@ -54,6 +65,7 @@ export async function POST(
       data: {
         userId,
         mobile: mobileNormalized,
+        email: emailNormalized,
         password: passwordHash,
         plainPassword: password.trim(),
         isVerified: true,
@@ -71,10 +83,32 @@ export async function POST(
       },
     });
 
+    // Email the credentials to the student (best-effort — a mail failure
+    // must not roll back a successful registration).
+    let emailSent = false;
+    let emailError: string | null = null;
+    if (emailNormalized) {
+      try {
+        await sendStudentCredentialsEmail({
+          to: emailNormalized,
+          studentName: name.trim(),
+          olympiadCode: code,
+          userId: appUser.userId,
+          password: password.trim(),
+        });
+        emailSent = true;
+      } catch (mailErr: any) {
+        emailError = mailErr?.message || 'Failed to send email';
+        console.error(`Student credential email to ${emailNormalized} failed:`, mailErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       userId: appUser.userId,
       message: 'Student registered successfully',
+      emailSent,
+      emailError,
     }, { status: 201 });
   } catch (error: any) {
     if (error.code === 'P2002') return NextResponse.json({ message: 'Phone number or Olympiad ID already in use' }, { status: 409 });

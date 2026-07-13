@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Hash, Loader2, Search, Download,
-  Clock, BookOpen, ChevronDown, ChevronUp, UserPlus, X, Pencil, Trash2, CheckCircle, Phone, Eye, EyeOff
+  Clock, BookOpen, ChevronDown, ChevronUp, UserPlus, X, Pencil, Trash2, CheckCircle, Phone, Eye, EyeOff, Mail
 } from 'lucide-react';
 
 interface Allocation {
@@ -41,11 +41,12 @@ export default function SchoolOlympiadIdsPage() {
   const [regModal, setRegModal] = useState<{ code: string; assignedName: string } | null>(null);
   const [regName, setRegName] = useState('');
   const [regPhone, setRegPhone] = useState('');
+  const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
   const [registering, setRegistering] = useState(false);
   const [regError, setRegError] = useState('');
-  const [regSuccess, setRegSuccess] = useState<{ userId: string } | null>(null);
+  const [regSuccess, setRegSuccess] = useState<{ userId: string; email: string; emailSent: boolean; emailError: string | null } | null>(null);
 
   // Edit app account modal (for ALLOTTED rows — name + phone)
   const [editAppModal, setEditAppModal] = useState<{ code: string } | null>(null);
@@ -58,10 +59,11 @@ export default function SchoolOlympiadIdsPage() {
   const [allotOpen, setAllotOpen] = useState(false);
   const [allotName, setAllotName] = useState('');
   const [allotPhone, setAllotPhone] = useState('');
+  const [allotEmail, setAllotEmail] = useState('');
   const [allotClass, setAllotClass] = useState('');
   const [allotting, setAllotting] = useState(false);
   const [allotError, setAllotError] = useState('');
-  const [allotSuccess, setAllotSuccess] = useState<{ code: string; userId: string; password: string } | null>(null);
+  const [allotSuccess, setAllotSuccess] = useState<{ code: string; userId: string; password: string; email: string; emailSent: boolean; emailError: string | null } | null>(null);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('schoolToken') : '';
 
@@ -165,25 +167,27 @@ export default function SchoolOlympiadIdsPage() {
     setRegModal({ code, assignedName });
     setRegName(assignedName);
     setRegPhone('');
+    setRegEmail('');
     setRegPassword('');
     setRegError('');
     setRegSuccess(null);
   };
   const closeRegModal = () => {
-    setRegModal(null); setRegName(''); setRegPhone('');
+    setRegModal(null); setRegName(''); setRegPhone(''); setRegEmail('');
     setRegPassword(''); setRegError(''); setRegSuccess(null);
   };
 
   const handleRegister = async () => {
     if (!regName.trim()) { setRegError('Student name is required'); return; }
     if (!regPhone.trim() || regPhone.trim().length < 10) { setRegError('Valid phone number is required'); return; }
+    if (regEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) { setRegError('Enter a valid email address'); return; }
     if (!regPassword.trim() || regPassword.trim().length < 6) { setRegError('Password must be at least 6 characters'); return; }
     setRegistering(true); setRegError('');
     try {
       const res = await fetch(`/api/school/me/olympiad-ids/${regModal!.code}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: regName.trim(), phone: regPhone.trim(), password: regPassword.trim() }),
+        body: JSON.stringify({ name: regName.trim(), phone: regPhone.trim(), email: regEmail.trim() || null, password: regPassword.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
@@ -193,7 +197,7 @@ export default function SchoolOlympiadIdsPage() {
           ? { ...a, assignedName: regName.trim(), hasAppUser: true }
           : a
       ));
-      setRegSuccess({ userId: data.userId });
+      setRegSuccess({ userId: data.userId, email: regEmail.trim(), emailSent: !!data.emailSent, emailError: data.emailError || null });
     } catch (e: any) {
       setRegError(e.message);
     } finally {
@@ -204,28 +208,29 @@ export default function SchoolOlympiadIdsPage() {
   // Allot handlers
   const openAllotModal = () => {
     setAllotOpen(true);
-    setAllotName(''); setAllotPhone(''); setAllotClass(activeClass !== 'ALL' ? activeClass : '');
+    setAllotName(''); setAllotPhone(''); setAllotEmail(''); setAllotClass(activeClass !== 'ALL' ? activeClass : '');
     setAllotError(''); setAllotSuccess(null);
   };
   const closeAllotModal = () => {
-    setAllotOpen(false); setAllotName(''); setAllotPhone(''); setAllotClass('');
+    setAllotOpen(false); setAllotName(''); setAllotPhone(''); setAllotEmail(''); setAllotClass('');
     setAllotError(''); setAllotSuccess(null);
   };
 
   const handleAllot = async () => {
     if (!allotName.trim()) { setAllotError('Student name is required'); return; }
     if (!allotPhone.trim() || allotPhone.trim().length < 10) { setAllotError('Valid phone number is required'); return; }
+    if (allotEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) { setAllotError('Enter a valid email address'); return; }
     if (!allotClass.trim()) { setAllotError('Please select a class'); return; }
     setAllotting(true); setAllotError('');
     try {
       const res = await fetch('/api/school/me/olympiad-ids/allot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: allotName.trim(), phone: allotPhone.trim(), classCode: allotClass.trim() }),
+        body: JSON.stringify({ name: allotName.trim(), phone: allotPhone.trim(), email: allotEmail.trim() || null, classCode: allotClass.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      setAllotSuccess({ code: data.code, userId: data.userId, password: data.password });
+      setAllotSuccess({ code: data.code, userId: data.userId, password: data.password, email: allotEmail.trim(), emailSent: !!data.emailSent, emailError: data.emailError || null });
       fetchAllocations();
     } catch (e: any) {
       setAllotError(e.message);
@@ -645,9 +650,19 @@ export default function SchoolOlympiadIdsPage() {
                     <span className="font-mono text-gray-700">{regPhone}</span>
                   </div>
                 </div>
-                <p className="text-xs text-gray-700 bg-gray-50 border border-gray-300 px-3 py-2">
-                  Student can now log in to the app using their phone number and password.
-                </p>
+                {regSuccess.emailSent ? (
+                  <p className="text-xs text-green-800 bg-green-50 border border-green-300 px-3 py-2">
+                    Credentials emailed to {regSuccess.email}. Student can log in to the app using their phone number and password.
+                  </p>
+                ) : regSuccess.email ? (
+                  <p className="text-xs text-red-800 bg-red-50 border border-red-300 px-3 py-2">
+                    Could not email credentials ({regSuccess.emailError || 'mail error'}) — share the login details with the student manually.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-700 bg-gray-50 border border-gray-300 px-3 py-2">
+                    Student can now log in to the app using their phone number and password.
+                  </p>
+                )}
                 <button onClick={closeRegModal}
                   className="w-full py-2.5 rounded-full bg-green-700 text-white text-sm font-semibold hover:bg-green-800 transition-colors">
                   Done
@@ -671,6 +686,17 @@ export default function SchoolOlympiadIdsPage() {
                     <input
                       type="tel" placeholder="10-digit mobile" value={regPhone}
                       onChange={e => setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      className="w-full pl-8 pr-3 border border-gray-300 py-2 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email" placeholder="student@example.com (credentials will be emailed)" value={regEmail}
+                      onChange={e => setRegEmail(e.target.value)}
                       className="w-full pl-8 pr-3 border border-gray-300 py-2 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
                     />
                   </div>
@@ -750,9 +776,19 @@ export default function SchoolOlympiadIdsPage() {
                     <span className="font-mono font-bold text-black">{allotSuccess.password}</span>
                   </div>
                 </div>
-                <p className="text-xs text-gray-700 bg-gray-50 border border-gray-300 px-3 py-2">
-                  Student can now log in to the app using their phone number and this password.
-                </p>
+                {allotSuccess.emailSent ? (
+                  <p className="text-xs text-green-800 bg-green-50 border border-green-300 px-3 py-2">
+                    Credentials emailed to {allotSuccess.email}. Student can log in to the app using their phone number and this password.
+                  </p>
+                ) : allotSuccess.email ? (
+                  <p className="text-xs text-red-800 bg-red-50 border border-red-300 px-3 py-2">
+                    Could not email credentials ({allotSuccess.emailError || 'mail error'}) — share these details with the student manually.
+                  </p>
+                ) : (
+                  <p className="text-xs text-gray-700 bg-gray-50 border border-gray-300 px-3 py-2">
+                    Student can now log in to the app using their phone number and this password.
+                  </p>
+                )}
                 <div className="flex gap-2">
                   <button onClick={openAllotModal}
                     className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-[#1F2937] text-sm font-semibold hover:bg-gray-50 transition-colors">
@@ -798,9 +834,21 @@ export default function SchoolOlympiadIdsPage() {
                     />
                   </div>
                 </div>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email" placeholder="student@example.com (credentials will be emailed)" value={allotEmail}
+                      onChange={e => setAllotEmail(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleAllot()}
+                      className="w-full pl-8 pr-3 border border-gray-300 py-2 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
+                    />
+                  </div>
+                </div>
                 {allotError && <p className="text-xs text-red-500">{allotError}</p>}
                 <div className="bg-gray-50 border border-gray-300 px-3 py-2 text-xs text-gray-700">
-                  The next available Olympiad ID for this class will be assigned automatically, and a password will be generated for the student.
+                  The next available Olympiad ID for this class will be assigned automatically, and a password will be generated for the student. If an email is entered, the credentials will be sent there automatically.
                 </div>
                 <div className="flex gap-2 pt-1">
                   <button onClick={closeAllotModal}

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
+import { sendStudentCredentialsEmail } from '@/lib/mailer';
 
 function generatePassword(len = 8): string {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -21,15 +22,25 @@ export async function POST(request: Request) {
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
-    const { name, phone, classCode } = await request.json();
+    const { name, phone, classCode, email } = await request.json();
 
     if (!name?.trim()) return NextResponse.json({ message: 'Student name is required' }, { status: 400 });
     if (!phone?.trim() || phone.trim().length < 10) return NextResponse.json({ message: 'Valid phone number is required' }, { status: 400 });
     if (!classCode?.trim()) return NextResponse.json({ message: 'Class is required' }, { status: 400 });
 
+    const emailNormalized = email?.trim().toLowerCase() || null;
+    if (emailNormalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
+      return NextResponse.json({ message: 'Invalid email address' }, { status: 400 });
+    }
+
     const mobileNormalized = phone.trim().replace(/\D/g, '');
     const existingAppUser = await prisma.appUser.findFirst({ where: { mobile: mobileNormalized } });
     if (existingAppUser) return NextResponse.json({ message: 'This phone number is already registered on the app' }, { status: 409 });
+
+    if (emailNormalized) {
+      const existingEmail = await prisma.appUser.findFirst({ where: { email: emailNormalized } });
+      if (existingEmail) return NextResponse.json({ message: 'This email is already registered on the app' }, { status: 409 });
+    }
 
     // Find the next unassigned Olympiad ID for this class
     const available = await prisma.olympiadIdAllocation.findFirst({
@@ -55,6 +66,7 @@ export async function POST(request: Request) {
       data: {
         userId,
         mobile: mobileNormalized,
+        email: emailNormalized,
         password: passwordHash,
         plainPassword,
         isVerified: true,
@@ -68,11 +80,33 @@ export async function POST(request: Request) {
       data: { assignedName: name.trim(), assignedAt: new Date() },
     });
 
+    // Email the credentials to the student (best-effort — a mail failure
+    // must not roll back a successful allotment).
+    let emailSent = false;
+    let emailError: string | null = null;
+    if (emailNormalized) {
+      try {
+        await sendStudentCredentialsEmail({
+          to: emailNormalized,
+          studentName: name.trim(),
+          olympiadCode: available.code,
+          userId: appUser.userId,
+          password: plainPassword,
+        });
+        emailSent = true;
+      } catch (mailErr: any) {
+        emailError = mailErr?.message || 'Failed to send email';
+        console.error(`Student credential email to ${emailNormalized} failed:`, mailErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       code: available.code,
       userId: appUser.userId,
       password: plainPassword,
+      emailSent,
+      emailError,
     }, { status: 201 });
   } catch (error: any) {
     if (error.code === 'P2002') return NextResponse.json({ message: 'Phone number or Olympiad ID already in use' }, { status: 409 });

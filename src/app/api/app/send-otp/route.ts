@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { sendOtpEmail } from '@/lib/mailer';
 
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -56,8 +57,25 @@ export async function POST(request: Request) {
       create: { identifier: lookupId, otpHash, expiresAt },
     });
 
-    // TODO: In production send OTP via SMS / email provider
-    // For now we return it in dev mode
+    if (type === 'email') {
+      try {
+        await sendOtpEmail(id, otp);
+        return NextResponse.json({ message: 'OTP sent to your email', type });
+      } catch (mailErr) {
+        console.error(`OTP email to ${id} failed:`, mailErr);
+        // In dev, fall back to returning the OTP so testing isn't blocked.
+        if (process.env.NODE_ENV !== 'production') {
+          return NextResponse.json({ message: 'OTP sent (dev fallback)', type, devOtp: otp });
+        }
+        return NextResponse.json(
+          { message: 'Could not send the OTP email. Please try again.' },
+          { status: 502 }
+        );
+      }
+    }
+
+    // TODO: mobile OTP needs an SMS provider (e.g. MSG91/Twilio); until then
+    // the OTP is only available in dev mode.
     console.log(`[DEV] OTP for ${lookupId}: ${otp}`);
 
     return NextResponse.json({

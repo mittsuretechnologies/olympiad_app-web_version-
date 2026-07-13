@@ -319,7 +319,7 @@ export default function SchoolDashboardPage() {
             <div className="absolute -bottom-8 -left-4 w-16 h-16 rounded-full bg-white/10" />
             <p className="text-sm font-bold mb-1.5 relative">How it works</p>
             <p className="text-[11px] text-white/80 leading-relaxed relative">
-              Share the Olympiad ID (roll number) with each student. They register on the TalentOlympiad App using that ID — their profile then appears in your &quot;My Students&quot; section.
+              Share the Olympiad ID (roll number) with each student. They register on the Mittmee App using that ID — their profile then appears in your &quot;My Students&quot; section.
             </p>
           </div>
         </div>
