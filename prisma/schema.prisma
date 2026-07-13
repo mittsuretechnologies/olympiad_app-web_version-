@@ -200,6 +200,21 @@ model Reviewer {
   @@schema("public")
 }
 
+model Moderator {
+  id                   String                 @id @default(uuid())
+  moderatorId          String                 @unique
+  name                 String
+  email                String                 @unique
+  password             String
+  plainPassword        String?
+  isActive             Boolean                @default(true)
+  createdAt            DateTime               @default(now())
+  updatedAt            DateTime               @updatedAt
+  individualPermission IndividualPermissions?
+
+  @@schema("public")
+}
+
 model TalentEvaluator {
   id                   String                 @id @default(uuid())
   evaluatorId          String                 @unique
@@ -237,9 +252,11 @@ model IndividualPermissions {
   allowedModules String[]
   reviewerId     String?          @unique
   evaluatorId    String?          @unique
+  moderatorId    String?          @unique
   updatedAt      DateTime         @updatedAt
   reviewer       Reviewer?        @relation(fields: [reviewerId], references: [id], onDelete: Cascade)
   evaluator      TalentEvaluator? @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+  moderator      Moderator?       @relation(fields: [moderatorId], references: [id], onDelete: Cascade)
 
   @@schema("public")
 }

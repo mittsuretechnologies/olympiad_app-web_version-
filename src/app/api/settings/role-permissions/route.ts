@@ -4,13 +4,17 @@ import { requireRole } from '@/lib/auth-guard';
 
 // GET — returns global role perms + individual perms
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR']);
+  const { error } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
   if (error) return error;
   try {
     const [global, individual] = await Promise.all([
       prisma.rolePermissions.findMany(),
       prisma.individualPermissions.findMany({
-        include: { reviewer: { select: { id: true, name: true, reviewerId: true } }, evaluator: { select: { id: true, name: true, evaluatorId: true } } },
+        include: {
+          reviewer: { select: { id: true, name: true, reviewerId: true } },
+          evaluator: { select: { id: true, name: true, evaluatorId: true } },
+          moderator: { select: { id: true, name: true, moderatorId: true } },
+        },
       }),
     ]);
     return NextResponse.json({ global, individual });

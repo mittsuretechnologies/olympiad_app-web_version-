@@ -32,7 +32,7 @@ import {
   History,
 } from 'lucide-react';
 
-type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR';
+type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
 type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | 'reports' | 'reviewer' | 'evaluator' | 'result' | 'settings' | null;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -47,8 +47,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const token = sessionStorage.getItem('token');
     const reviewerToken = sessionStorage.getItem('reviewerToken');
     const evaluatorToken = sessionStorage.getItem('evaluatorToken');
+    const moderatorToken = sessionStorage.getItem('moderatorToken');
 
-    if (!token && !reviewerToken && !evaluatorToken) {
+    if (!token && !reviewerToken && !evaluatorToken && !moderatorToken) {
       router.push('/login');
       return;
     }
@@ -56,16 +57,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     let detectedRole: Role = 'SUPERADMIN';
     if (reviewerToken && !token) detectedRole = 'REVIEWER';
     else if (evaluatorToken && !token) detectedRole = 'EVALUATOR';
+    else if (moderatorToken && !token) detectedRole = 'MODERATOR';
 
     setRole(detectedRole);
 
     const adminData = sessionStorage.getItem('adminUser');
     const reviewerData = sessionStorage.getItem('reviewerData');
     const evaluatorData = sessionStorage.getItem('evaluatorData');
+    const moderatorData = sessionStorage.getItem('moderatorData');
     try {
       if (detectedRole === 'SUPERADMIN' && adminData) setCurrentUser(JSON.parse(adminData));
       else if (detectedRole === 'REVIEWER' && reviewerData) setCurrentUser(JSON.parse(reviewerData));
       else if (detectedRole === 'EVALUATOR' && evaluatorData) setCurrentUser(JSON.parse(evaluatorData));
+      else if (detectedRole === 'MODERATOR' && moderatorData) setCurrentUser(JSON.parse(moderatorData));
     } catch { /* ignore */ }
 
     if (detectedRole !== 'SUPERADMIN') {
@@ -74,9 +78,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       try {
         if (detectedRole === 'REVIEWER' && reviewerData) memberId = JSON.parse(reviewerData).id;
         if (detectedRole === 'EVALUATOR' && evaluatorData) memberId = JSON.parse(evaluatorData).id;
+        if (detectedRole === 'MODERATOR' && moderatorData) memberId = JSON.parse(moderatorData).id;
       } catch { /* ignore */ }
 
-      const permToken = token || reviewerToken || evaluatorToken;
+      const permToken = token || reviewerToken || evaluatorToken || moderatorToken;
       fetch('/api/settings/role-permissions', { headers: permToken ? { Authorization: `Bearer ${permToken}` } : {} })
         .then(r => r.json())
         .then((data: { global: { role: string; allowedModules: string[] }[]; individual: { memberId: string; allowedModules: string[] }[] } | { message: string }) => {
@@ -114,6 +119,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (p.startsWith('/dashboard/credentials')) return 'credentials';
     if (p.startsWith('/dashboard/videos')) return 'moderation';
     if (p.startsWith('/dashboard/reported-videos')) return 'moderation';
+    if (p.startsWith('/dashboard/moderation')) return 'moderation';
     if (p.startsWith('/dashboard/reports')) return 'reports';
     if (p.startsWith('/dashboard/app-users')) return 'reports';
     if (p.startsWith('/dashboard/reviewer')) return 'reviewer';
@@ -145,12 +151,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     sessionStorage.removeItem('reviewerData');
     sessionStorage.removeItem('evaluatorToken');
     sessionStorage.removeItem('evaluatorData');
+    sessionStorage.removeItem('moderatorToken');
+    sessionStorage.removeItem('moderatorData');
     router.push('/login');
   };
 
   const moderationSubItems = [
     { name: 'Video Moderation', href: '/dashboard/videos', icon: Clock },
     { name: 'Reported Videos',  href: '/dashboard/reported-videos', icon: Flag },
+    { name: 'Create Moderator', href: '/dashboard/moderation/moderators', icon: UserPlus },
   ];
 
   const schoolSubItems = [
@@ -295,7 +304,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {canSee('moderation') && (
               <div>
                 <button onClick={() => toggleSection('moderation')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos') || pathname.startsWith('/dashboard/reported-videos'))}>
+                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos') || pathname.startsWith('/dashboard/reported-videos') || pathname.startsWith('/dashboard/moderation'))}>
                   <div className="flex items-center gap-3"><Play size={20} /><span className="text-sm font-semibold">Moderation</span></div>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -303,7 +312,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported', 'moderation.moderators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>

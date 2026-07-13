@@ -16,9 +16,15 @@ export async function POST(request: Request) {
     if (role === 'REVIEWER') {
       data.reviewerId = memberId;
       data.evaluatorId = null;
-    } else {
+      data.moderatorId = null;
+    } else if (role === 'EVALUATOR') {
       data.evaluatorId = memberId;
       data.reviewerId = null;
+      data.moderatorId = null;
+    } else {
+      data.moderatorId = memberId;
+      data.reviewerId = null;
+      data.evaluatorId = null;
     }
 
     const perm = await prisma.individualPermissions.upsert({

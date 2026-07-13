@@ -190,6 +190,8 @@ export default function LoginPage() {
       sessionStorage.removeItem('reviewerData');
       sessionStorage.removeItem('evaluatorToken');
       sessionStorage.removeItem('evaluatorData');
+      sessionStorage.removeItem('moderatorToken');
+      sessionStorage.removeItem('moderatorData');
 
       if (data.role === 'SCHOOL') {
         sessionStorage.setItem('schoolToken', data.token);
@@ -200,6 +202,9 @@ export default function LoginPage() {
       } else if (data.role === 'EVALUATOR') {
         sessionStorage.setItem('evaluatorToken', data.token);
         sessionStorage.setItem('evaluatorData', JSON.stringify(data.user));
+      } else if (data.role === 'MODERATOR') {
+        sessionStorage.setItem('moderatorToken', data.token);
+        sessionStorage.setItem('moderatorData', JSON.stringify(data.user));
       } else {
         sessionStorage.setItem('token', data.token);
         sessionStorage.setItem('adminUser', JSON.stringify(data.user));

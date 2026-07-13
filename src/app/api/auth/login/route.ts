@@ -113,6 +113,28 @@ export async function POST(request: Request) {
       });
     }
 
+    // 5) Try Moderator (by moderatorId)
+    const moderator = await prisma.moderator.findUnique({
+      where: { moderatorId: identifier.toUpperCase() },
+    });
+    if (moderator) {
+      const ok = await bcrypt.compare(password, moderator.password);
+      if (!ok) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+      if (!moderator.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
+      const token = jwt.sign(
+        { id: moderator.id, moderatorId: moderator.moderatorId, role: 'MODERATOR' },
+        process.env.JWT_SECRET || 'fallback_secret',
+        { expiresIn: '7d' }
+      );
+      return NextResponse.json({
+        message: 'Login successful',
+        token,
+        role: 'MODERATOR',
+        redirect: '/dashboard',
+        user: { id: moderator.id, moderatorId: moderator.moderatorId, name: moderator.name, email: moderator.email },
+      });
+    }
+
     return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
   } catch (error) {
     console.error('Login error:', error);

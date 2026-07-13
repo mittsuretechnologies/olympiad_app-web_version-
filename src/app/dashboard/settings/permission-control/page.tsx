@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, Eye, EyeOff, User, Globe, Trash2 } from 'lucide-react';
 
-type RoleKey = 'REVIEWER' | 'EVALUATOR';
+type RoleKey = 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
 type ViewMode = 'global' | 'individual';
 
 interface SubItem { key: string; label: string; }
@@ -11,7 +11,7 @@ interface Module { key: string; label: string; subItems: SubItem[]; }
 
 const MODULES: Module[] = [
   { key: 'schools', label: 'Schools', subItems: [{ key: 'schools.register', label: 'Register School' }, { key: 'schools.bulk', label: 'Bulk Upload' }, { key: 'schools.view', label: 'View / Edit Schools' }] },
-  { key: 'moderation', label: 'Moderation', subItems: [{ key: 'moderation.pending', label: 'Pending Approvals' }, { key: 'moderation.reported', label: 'Reported Videos' }] },
+  { key: 'moderation', label: 'Moderation', subItems: [{ key: 'moderation.pending', label: 'Pending Approvals' }, { key: 'moderation.reported', label: 'Reported Videos' }, { key: 'moderation.moderators', label: 'Create Moderator' }] },
   { key: 'support', label: 'Support', subItems: [] },
   { key: 'uploaders', label: 'Uploaders', subItems: [{ key: 'uploaders.register', label: 'Register Uploader' }, { key: 'uploaders.view', label: 'View / Manage Uploaders' }] },
   { key: 'credentials', label: 'Credentials', subItems: [{ key: 'credentials.schools', label: 'School Credentials' }, { key: 'credentials.uploaders', label: 'Uploader Credentials' }, { key: 'credentials.students', label: 'Student Credentials' }, { key: 'credentials.reviewers', label: 'Reviewer Credentials' }, { key: 'credentials.evaluators', label: 'Evaluator Credentials' }] },
@@ -23,10 +23,13 @@ const MODULES: Module[] = [
 const ROLES: { key: RoleKey; label: string }[] = [
   { key: 'REVIEWER', label: 'Reviewer' },
   { key: 'EVALUATOR', label: 'Evaluator' },
+  { key: 'MODERATOR', label: 'Moderator' },
 ];
 
-interface Member { id: string; name: string; reviewerId?: string; evaluatorId?: string; }
-interface IndividualPerm { memberId: string; allowedModules: string[]; reviewer?: Member; evaluator?: Member; }
+const roleLabel = (role: RoleKey) => ROLES.find(r => r.key === role)?.label || role;
+
+interface Member { id: string; name: string; reviewerId?: string; evaluatorId?: string; moderatorId?: string; }
+interface IndividualPerm { memberId: string; allowedModules: string[]; reviewer?: Member; evaluator?: Member; moderator?: Member; }
 
 function ModuleList({
   allowed, setAllowed, search,
@@ -122,10 +125,11 @@ function authHeaders(): Record<string, string> {
 export default function PermissionControlPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('global');
   const [activeRole, setActiveRole] = useState<RoleKey>('REVIEWER');
-  const [globalPerms, setGlobalPerms] = useState<Record<RoleKey, string[]>>({ REVIEWER: [], EVALUATOR: [] });
+  const [globalPerms, setGlobalPerms] = useState<Record<RoleKey, string[]>>({ REVIEWER: [], EVALUATOR: [], MODERATOR: [] });
   const [individualPerms, setIndividualPerms] = useState<IndividualPerm[]>([]);
   const [reviewers, setReviewers] = useState<Member[]>([]);
   const [evaluators, setEvaluators] = useState<Member[]>([]);
+  const [moderators, setModerators] = useState<Member[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [individualAllowed, setIndividualAllowed] = useState<string[]>([]);
   const [hasIndividual, setHasIndividual] = useState(false);
@@ -140,22 +144,25 @@ export default function PermissionControlPage() {
       fetch('/api/settings/role-permissions', { headers: authHeaders() }).then(r => r.json()),
       fetch('/api/credentials/reviewers', { headers: authHeaders() }).then(r => r.json()),
       fetch('/api/credentials/evaluators', { headers: authHeaders() }).then(r => r.json()),
-    ]).then(([permsData, rvwData, evlData]) => {
+      fetch('/api/credentials/moderators', { headers: authHeaders() }).then(r => r.json()),
+    ]).then(([permsData, rvwData, evlData, modData]) => {
       if (permsData.global) {
-        const map: Record<RoleKey, string[]> = { REVIEWER: [], EVALUATOR: [] };
+        const map: Record<RoleKey, string[]> = { REVIEWER: [], EVALUATOR: [], MODERATOR: [] };
         permsData.global.forEach((p: { role: string; allowedModules: string[] }) => {
           if (p.role === 'REVIEWER') map.REVIEWER = p.allowedModules;
           if (p.role === 'EVALUATOR') map.EVALUATOR = p.allowedModules;
+          if (p.role === 'MODERATOR') map.MODERATOR = p.allowedModules;
         });
         setGlobalPerms(map);
         setIndividualPerms(Array.isArray(permsData.individual) ? permsData.individual : []);
       }
       if (Array.isArray(rvwData)) setReviewers(rvwData.map((r: any) => ({ id: r.id, name: r.name, reviewerId: r.reviewerId })));
       if (Array.isArray(evlData)) setEvaluators(evlData.map((e: any) => ({ id: e.id, name: e.name, evaluatorId: e.evaluatorId })));
+      if (Array.isArray(modData)) setModerators(modData.map((m: any) => ({ id: m.id, name: m.name, moderatorId: m.moderatorId })));
     }).finally(() => setLoading(false));
   }, []);
 
-  const members = activeRole === 'REVIEWER' ? reviewers : evaluators;
+  const members = activeRole === 'REVIEWER' ? reviewers : activeRole === 'EVALUATOR' ? evaluators : moderators;
 
   const selectMember = (m: Member) => {
     setSelectedMember(m);
@@ -265,12 +272,12 @@ export default function PermissionControlPage() {
       {viewMode === 'individual' && (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4">
           <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3">
-            Select {activeRole === 'REVIEWER' ? 'Reviewer' : 'Evaluator'}
+            Select {roleLabel(activeRole)}
           </p>
           {loading ? (
             <div className="flex justify-center py-6"><Loader2 size={16} className="animate-spin text-gray-300" /></div>
           ) : members.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center py-4">No {activeRole === 'REVIEWER' ? 'reviewers' : 'evaluators'} found.</p>
+            <p className="text-xs text-gray-400 text-center py-4">No {roleLabel(activeRole).toLowerCase()}s found.</p>
           ) : (
             <div className="grid grid-cols-2 gap-2">
               {members.map(m => {
@@ -285,7 +292,7 @@ export default function PermissionControlPage() {
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs font-bold truncate ${isSelected ? 'text-white' : 'text-gray-800'}`}>{m.name}</p>
                       <p className={`text-[10px] font-mono ${isSelected ? 'text-white/70' : 'text-gray-400'}`}>
-                        {m.reviewerId || m.evaluatorId}
+                        {m.reviewerId || m.evaluatorId || m.moderatorId}
                       </p>
                     </div>
                     {hasOverride && (
@@ -378,7 +385,7 @@ export default function PermissionControlPage() {
 
       {viewMode === 'individual' && !selectedMember && !loading && (
         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm py-16 text-center text-gray-400 text-sm">
-          Select a {activeRole === 'REVIEWER' ? 'reviewer' : 'evaluator'} above to manage their permissions.
+          Select a {roleLabel(activeRole).toLowerCase()} above to manage their permissions.
         </div>
       )}
     </div>

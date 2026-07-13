@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { CLASS_CODE_BY_NAME } from '@/lib/classes';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
+import { stateNameToCode } from '@/lib/indianStateCodes';
 
 export async function GET() {
   try {
