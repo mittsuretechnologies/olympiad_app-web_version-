@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Users, Loader2, Search, Download, BookOpen, Calendar, Phone, Award } from 'lucide-react';
+import { Users, Loader2, Search, Download, BookOpen, Calendar, Phone, Award, Mail, X, CheckCircle, Send } from 'lucide-react';
 
 interface Student {
   id: string;
@@ -14,6 +14,7 @@ interface Student {
   className: string | null;
   source?: 'web' | 'app';
   olympiadVideos?: number;
+  email?: string | null;
 }
 
 const avatarGradients = [
@@ -32,8 +33,16 @@ export default function SchoolRegisteredStudentsPage() {
   const [classFilter, setClassFilter] = useState('ALL');
   const [view, setView] = useState<'table' | 'cards'>('table');
 
+  // Send credentials modal
+  const [sendModal, setSendModal] = useState<Student | null>(null);
+  const [sendEmail, setSendEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
+
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') : '';
+
   useEffect(() => {
-    const token = sessionStorage.getItem('schoolToken');
     if (!token) { setError('Not logged in'); setLoading(false); return; }
 
     fetch('/api/school/me/registered-students', {
@@ -47,6 +56,40 @@ export default function SchoolRegisteredStudentsPage() {
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const openSendModal = (s: Student) => {
+    setSendModal(s);
+    setSendEmail(s.email || '');
+    setSendError('');
+    setSendSuccess(null);
+  };
+  const closeSendModal = () => {
+    setSendModal(null); setSendEmail(''); setSendError(''); setSendSuccess(null);
+  };
+
+  const handleSendCredentials = async () => {
+    if (!sendModal) return;
+    if (sendEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sendEmail.trim())) {
+      setSendError('Enter a valid email address'); return;
+    }
+    if (!sendEmail.trim()) { setSendError('Email address is required'); return; }
+    setSending(true); setSendError('');
+    try {
+      const res = await fetch(`/api/school/me/olympiad-ids/${sendModal.olympiadCode}/send-credentials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ email: sendEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to send credentials');
+      setSendSuccess(data.email);
+      setStudents(prev => prev.map(s => s.id === sendModal.id ? { ...s, email: data.email } : s));
+    } catch (e: any) {
+      setSendError(e.message);
+    } finally {
+      setSending(false);
+    }
+  };
 
   const classes = useMemo(() => {
     const map = new Map<string, string>();
@@ -211,21 +254,22 @@ export default function SchoolRegisteredStudentsPage() {
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr className="bg-gradient-to-r from-[#1559C7]/5 to-transparent text-gray-500">
-                  <th className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-12">Sr.No.</th>
-                  <th className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide">Student Name</th>
-                  <th className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-36">Olympiad ID</th>
-                  <th className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-24">Class</th>
-                  <th className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-32">Phone</th>
-                  <th className="px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-28">Joined On</th>
-                  <th className="px-4 py-3 text-center text-[10.5px] font-bold uppercase tracking-wide w-20">Videos</th>
-                  <th className="px-4 py-3 text-center text-[10.5px] font-bold uppercase tracking-wide w-20">Via</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-12">Sr.No.</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide">Student Name</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-36">Olympiad ID</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-24">Class</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-32">Phone</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-28">Joined On</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-center text-[10.5px] font-bold uppercase tracking-wide w-20">Videos</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-center text-[10.5px] font-bold uppercase tracking-wide w-20">Via</th>
+                  <th className="border border-[#E7EBF2] px-4 py-3 text-center text-[10.5px] font-bold uppercase tracking-wide w-36">Credentials</th>
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((s, i) => (
-                  <tr key={s.id} className={`border-t border-gray-50 hover:bg-[#1559C7]/[0.03] transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                    <td className="px-4 py-2.5 text-gray-400 text-xs">{i + 1}</td>
-                    <td className="px-4 py-2.5">
+                  <tr key={s.id} className={`hover:bg-[#1559C7]/[0.03] transition-colors ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
+                    <td className="border border-[#E7EBF2] px-4 py-2.5 text-gray-400 text-xs">{i + 1}</td>
+                    <td className="border border-[#E7EBF2] px-4 py-2.5">
                       <div className="flex items-center gap-2.5">
                         <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradients[i % avatarGradients.length]} text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0 shadow-sm`}>
                           {getInitials(s.name)}
@@ -233,17 +277,17 @@ export default function SchoolRegisteredStudentsPage() {
                         <span className="font-semibold text-black text-sm">{s.name}</span>
                       </div>
                     </td>
-                    <td className="px-4 py-2.5 font-mono text-xs font-bold text-[#1559C7]">{s.olympiadCode}</td>
-                    <td className="px-4 py-2.5">
+                    <td className="border border-[#E7EBF2] px-4 py-2.5 font-mono text-xs font-bold text-[#1559C7]">{s.olympiadCode}</td>
+                    <td className="border border-[#E7EBF2] px-4 py-2.5">
                       {s.className || s.classCode ? (
                         <span className="text-xs text-gray-700">{s.className || s.classCode}</span>
                       ) : <span className="text-gray-400 text-xs">-</span>}
                     </td>
-                    <td className="px-4 py-2.5 text-sm text-gray-600 font-mono">{s.phone}</td>
-                    <td className="px-4 py-2.5 text-xs text-gray-500">
+                    <td className="border border-[#E7EBF2] px-4 py-2.5 text-sm text-gray-600 font-mono">{s.phone}</td>
+                    <td className="border border-[#E7EBF2] px-4 py-2.5 text-xs text-gray-500">
                       {new Date(s.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                     </td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="border border-[#E7EBF2] px-4 py-2.5 text-center">
                       {(() => {
                         const count = s.olympiadVideos ?? 0;
                         return (
@@ -251,11 +295,19 @@ export default function SchoolRegisteredStudentsPage() {
                         );
                       })()}
                     </td>
-                    <td className="px-4 py-2.5 text-center">
+                    <td className="border border-[#E7EBF2] px-4 py-2.5 text-center">
                       {s.source === 'app'
                         ? <span className="text-[10px] font-bold text-[#4a3aa7] bg-[#4a3aa7]/10 px-2 py-0.5 rounded-full">APP</span>
                         : <span className="text-[10px] font-bold text-[#1559C7] bg-[#1559C7]/10 px-2 py-0.5 rounded-full">WEB</span>
                       }
+                    </td>
+                    <td className="border border-[#E7EBF2] px-4 py-2.5 text-center">
+                      {s.source === 'app' ? (
+                        <button onClick={() => openSendModal(s)}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white text-[10px] font-bold hover:shadow-sm transition-shadow">
+                          <Send size={10} /> Send Credentials
+                        </button>
+                      ) : <span className="text-[11px] text-gray-300">—</span>}
                     </td>
                   </tr>
                 ))}
@@ -304,8 +356,78 @@ export default function SchoolRegisteredStudentsPage() {
                   <span>{s.olympiadVideos ?? 0}/2 videos uploaded</span>
                 </div>
               </div>
+              {s.source === 'app' && (
+                <button onClick={() => openSendModal(s)}
+                  className="inline-flex items-center justify-center gap-1.5 py-1.5 rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white text-[11px] font-bold hover:shadow-sm transition-shadow">
+                  <Send size={11} /> Send Credentials
+                </button>
+              )}
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Send Credentials Modal */}
+      {sendModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.2)] w-full max-w-sm mx-4 overflow-hidden">
+            <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Send Credentials</p>
+                <p className="text-white font-bold text-sm mt-0.5">{sendModal.name}</p>
+              </div>
+              <button onClick={closeSendModal} className="text-white/60 hover:text-white transition-colors">
+                <X size={18} />
+              </button>
+            </div>
+
+            {sendSuccess ? (
+              <div className="p-6 text-center space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0d9f6e] to-[#1baf7a] flex items-center justify-center mx-auto shadow-[0_4px_14px_rgba(13,159,110,0.3)]">
+                  <CheckCircle className="w-7 h-7 text-white" />
+                </div>
+                <div>
+                  <p className="font-black text-black text-base">Credentials Sent!</p>
+                  <p className="text-xs text-gray-500 mt-1">Emailed the Olympiad ID, User ID and password to <span className="font-semibold">{sendSuccess}</span>.</p>
+                </div>
+                <button onClick={closeSendModal}
+                  className="w-full py-2.5 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(13,159,110,0.35)] transition-shadow">
+                  Done
+                </button>
+              </div>
+            ) : (
+              <div className="p-5 space-y-3.5">
+                <p className="text-xs text-gray-500">
+                  Use this if credentials weren&apos;t sent automatically during allocation (e.g. mail failed). This resends the same login details already on file — no new password is generated.
+                </p>
+                <div>
+                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email Address</label>
+                  <div className="relative">
+                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="email" placeholder="student@example.com" value={sendEmail}
+                      onChange={e => setSendEmail(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSendCredentials()}
+                      autoFocus
+                      className="w-full pl-8 pr-3 rounded-xl border border-[#E7EBF2] py-2 text-sm focus:outline-none focus:border-[#1559C7] focus:ring-1 focus:ring-[#1559C7]"
+                    />
+                  </div>
+                </div>
+                {sendError && <p className="text-xs text-red-500">{sendError}</p>}
+                <div className="flex gap-2 pt-1">
+                  <button onClick={closeSendModal}
+                    className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={handleSendCredentials} disabled={sending}
+                    className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(21,89,199,0.35)] transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
+                    {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    Send
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>

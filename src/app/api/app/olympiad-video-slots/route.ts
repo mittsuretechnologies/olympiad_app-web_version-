@@ -32,7 +32,7 @@ export async function GET(request: Request) {
         // it was later soft-deleted (e.g. an admin removing a reported video), so we need to
         // see soft-deleted rows too. Non-evaluated videos are filtered by deletedAt below.
         where: { appUserId: appUser.id, isEvaluation: true },
-        select: { category: true, subCategory: true, status: true, deletedAt: true, evaluation: { select: { id: true } } },
+        select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
       }),
       prisma.appUser.findUnique({
         where: { id: appUser.id },
@@ -54,8 +54,8 @@ export async function GET(request: Request) {
       v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
 
     // Locked = evaluation marks assigned, regardless of the video's current delete state.
-    const lockedA = videos.some(v => isVideoA(v) && !!v.evaluation);
-    const lockedB = videos.some(v => isVideoB(v) && !!v.evaluation);
+    const lockedA = videos.some(v => isVideoA(v) && v.evaluations.length > 0);
+    const lockedB = videos.some(v => isVideoB(v) && v.evaluations.length > 0);
 
     const usedA = lockedA || activeVideos.some(isVideoA);
     const usedB = lockedB || activeVideos.some(isVideoB);
