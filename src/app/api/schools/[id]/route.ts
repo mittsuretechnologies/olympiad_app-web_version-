@@ -17,7 +17,9 @@ export async function PUT(
       contactPerson,
       city,
       district,
+      districtCode,
       state,
+      stateCode,
       pincode,
     } = body;
 
@@ -39,7 +41,9 @@ export async function PUT(
         contactPerson,
         city,
         district,
+        districtCode,
         state,
+        stateCode,
         pincode,
       },
     });

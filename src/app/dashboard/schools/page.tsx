@@ -23,6 +23,7 @@ import {
   AlertTriangle,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { STATES, STATE_CODE_BY_NAME, getDistrictsForState } from '@/lib/locations';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,7 +41,10 @@ interface School {
   name: string;
   address?: string;
   city?: string;
+  district?: string;
+  districtCode?: string;
   state?: string;
+  stateCode?: string;
   pincode?: string;
   email?: string;
   phone?: string;
@@ -117,9 +121,35 @@ export default function SchoolsPage() {
     contactPerson: '',
     city: '',
     district: '',
+    districtCode: '',
     state: '',
+    stateCode: '',
     pincode: '',
   });
+
+  const editDistrictOptions = getDistrictsForState(editFormData.stateCode);
+
+  const handleEditStateChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const stateCode = e.target.value;
+    const state = STATES.find((s) => s.code === stateCode);
+    setEditFormData({
+      ...editFormData,
+      stateCode,
+      state: state?.name || '',
+      districtCode: '',
+      district: '',
+    });
+  };
+
+  const handleEditDistrictChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const districtCode = e.target.value;
+    const district = editDistrictOptions.find((d) => d.code === districtCode);
+    setEditFormData({
+      ...editFormData,
+      districtCode,
+      district: district?.name || '',
+    });
+  };
 
   // Re-fetch the schools list (used after add / edit / delete).
   const fetchSchools = () => mutateSchools();
@@ -144,6 +174,15 @@ export default function SchoolsPage() {
 
   const openEditModal = (school: any) => {
     setEditingSchool(school);
+
+    // Older records may only have plain state/district names with no code —
+    // resolve the code from the name so the dropdowns pre-select correctly.
+    const stateCode = school.stateCode || STATE_CODE_BY_NAME[school.state] || '';
+    const districtCode =
+      school.districtCode ||
+      getDistrictsForState(stateCode).find((d) => d.name === school.district)?.code ||
+      '';
+
     setEditFormData({
       name: school.name || '',
       olympiadId: school.olympiadId || '',
@@ -153,7 +192,9 @@ export default function SchoolsPage() {
       contactPerson: school.contactPerson || '',
       city: school.city || '',
       district: school.district || '',
+      districtCode,
       state: school.state || '',
+      stateCode,
       pincode: school.pincode || '',
     });
     setIsEditModalOpen(true);
@@ -857,23 +898,34 @@ export default function SchoolsPage() {
               <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 State <span className="text-red-600">*</span>
               </label>
-              <Input
-                className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                value={editFormData.state}
-                onChange={(e) => setEditFormData({ ...editFormData, state: e.target.value })}
+              <select
+                value={editFormData.stateCode}
+                onChange={handleEditStateChange}
                 required
-              />
+                className="w-full h-10 border border-gray-300 rounded-none px-3 text-sm bg-white focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+              >
+                <option value="">Select State</option>
+                {STATES.map((s) => (
+                  <option key={s.code} value={s.code}>{s.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
                 District <span className="text-red-600">*</span>
               </label>
-              <Input
-                className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                value={editFormData.district}
-                onChange={(e) => setEditFormData({ ...editFormData, district: e.target.value })}
+              <select
+                value={editFormData.districtCode}
+                onChange={handleEditDistrictChange}
                 required
-              />
+                disabled={!editFormData.stateCode}
+                className="w-full h-10 border border-gray-300 rounded-none px-3 text-sm bg-white focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E] disabled:bg-gray-100 disabled:text-gray-400"
+              >
+                <option value="">{editFormData.stateCode ? 'Select District' : 'Select State first'}</option>
+                {editDistrictOptions.map((d) => (
+                  <option key={d.code} value={d.code}>{d.name}</option>
+                ))}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
