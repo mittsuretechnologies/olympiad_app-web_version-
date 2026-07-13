@@ -131,9 +131,17 @@ export default function RegisterSchoolPage() {
       if (!res.ok) {
         setMessage({ type: 'error', text: data.message || 'Failed to register school' });
       } else {
+        let emailNote: string;
+        if (data.emailSent) {
+          emailNote = ` Login credentials sent to ${formData.email}.`;
+        } else if (formData.email) {
+          emailNote = ` Could not email credentials (${data.emailError || 'mail error'}) — username: ${data.credentials?.username}, password: ${data.credentials?.password}. Share them manually.`;
+        } else {
+          emailNote = ` No email provided — username: ${data.credentials?.username}, password: ${data.credentials?.password}. Note them down now.`;
+        }
         setMessage({
           type: 'success',
-          text: `School registered (${data.schoolId}) — ${data.olympiadIdsGenerated} Olympiad IDs generated.`,
+          text: `School registered (${data.schoolId}) — ${data.olympiadIdsGenerated} Olympiad IDs generated.${emailNote}`,
         });
         setFormData({
           schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',

@@ -3,53 +3,39 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 
-type ResetTokenPayload = {
-  purpose: string;
-  accounts: { id: string; kind: 'APP_USER' | 'STUDENT' }[];
-};
-
 export async function POST(request: Request) {
   try {
     const { resetToken, accountId, newPassword } = await request.json();
 
     if (!resetToken || !accountId || !newPassword) {
-      return NextResponse.json({ message: 'All fields are required' }, { status: 400 });
+      return NextResponse.json({ message: 'resetToken, accountId and newPassword are required' }, { status: 400 });
     }
-    if (newPassword.length < 6) {
+    if (typeof newPassword !== 'string' || newPassword.length < 6) {
       return NextResponse.json({ message: 'Password must be at least 6 characters' }, { status: 400 });
     }
 
-    let payload: ResetTokenPayload;
+    let payload: any;
     try {
-      payload = jwt.verify(resetToken, process.env.JWT_SECRET || 'fallback_secret') as ResetTokenPayload;
+      payload = jwt.verify(resetToken, process.env.JWT_SECRET || 'fallback_secret');
     } catch {
-      return NextResponse.json({ message: 'Reset session expired. Please request a new OTP.' }, { status: 400 });
+      return NextResponse.json({ message: 'Reset session expired. Please start again.' }, { status: 401 });
     }
-    if (payload.purpose !== 'password-reset') {
-      return NextResponse.json({ message: 'Invalid reset session.' }, { status: 400 });
+    if (payload?.purpose !== 'app-password-reset' || !Array.isArray(payload?.accountIds)) {
+      return NextResponse.json({ message: 'Invalid reset token' }, { status: 401 });
     }
-
-    const account = payload.accounts.find((a) => a.id === accountId);
-    if (!account) {
-      return NextResponse.json({ message: 'Select one of the accounts shown for this contact.' }, { status: 400 });
+    if (!payload.accountIds.includes(accountId)) {
+      return NextResponse.json({ message: 'This account cannot be reset with this token' }, { status: 403 });
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    if (account.kind === 'APP_USER') {
-      await prisma.appUser.update({
-        where: { id: account.id },
-        data: { password: passwordHash, plainPassword: newPassword },
-      });
-    } else {
-      await prisma.student.update({
-        where: { id: account.id },
-        data: { password: passwordHash, plainPassword: newPassword },
-      });
-    }
+    await prisma.appUser.update({
+      where: { id: accountId },
+      data: { password: passwordHash, plainPassword: newPassword },
+    });
 
-    return NextResponse.json({ message: 'Password reset successfully. Please log in with your new password.' });
+    return NextResponse.json({ success: true, message: 'Password has been reset' });
   } catch (error) {
-    console.error('app/forgot-password/reset error:', error);
+    console.error('forgot-password/reset error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }

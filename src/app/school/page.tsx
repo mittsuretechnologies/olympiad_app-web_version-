@@ -400,6 +400,45 @@ export default function SchoolDashboardPage() {
             </div>
           ) : null}
         </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)]">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
+            <TrendingUp size={14} className="text-black" />
+            <h2 className="text-xs font-bold uppercase tracking-widest text-black">Quick Actions</h2>
+          </div>
+          <div className="p-4 grid grid-cols-2 gap-3">
+            {[
+              { label: 'View All IDs', sub: 'See allocated roll numbers', icon: Hash, href: '/school/olympiad-ids', color: 'text-[#1559C7]', bg: 'bg-[#1559C7]/[0.06] hover:bg-[#1559C7]/10' },
+              { label: 'My Students', sub: 'Registered student list', icon: Users, href: '/school/registered-students', color: 'text-emerald-600', bg: 'bg-emerald-500/[0.06] hover:bg-emerald-500/10' },
+              { label: 'School Profile', sub: 'Manage school details', icon: Award, href: '/school/profile', color: 'text-purple-600', bg: 'bg-purple-500/[0.06] hover:bg-purple-500/10' },
+              { label: 'Event Data', sub: 'View event statistics', icon: Clock, href: '/school/registered-students', color: 'text-amber-600', bg: 'bg-amber-500/[0.06] hover:bg-amber-500/10' },
+            ].map((a) => {
+              const Icon = a.icon;
+              return (
+                <Link key={a.href + a.label} href={a.href}
+                  className={`${a.bg} rounded-xl p-4 transition-all group relative`}>
+                  <div className={`w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center mb-2.5`}>
+                    <Icon size={15} className={a.color} />
+                  </div>
+                  <ArrowRight size={13} className={`absolute top-4 right-4 ${a.color} opacity-0 group-hover:opacity-100 transition-opacity`} />
+                  <p className="text-xs font-bold text-[#0D1A06]">{a.label}</p>
+                  <p className="text-[10px] text-[#67748E] mt-0.5">{a.sub}</p>
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* Info Panel */}
+          <div className="mx-4 mb-4 bg-gradient-to-br from-[#1559C7] to-[#3CB043] text-white p-5 rounded-2xl relative overflow-hidden">
+            <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/10" />
+            <div className="absolute -bottom-8 -left-4 w-16 h-16 rounded-full bg-white/10" />
+            <p className="text-sm font-bold mb-1.5 relative">How it works</p>
+            <p className="text-[11px] text-white/80 leading-relaxed relative">
+              Share the Olympiad ID (roll number) with each student. They register on the Mittmee App using that ID — their profile then appears in your &quot;My Students&quot; section.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );

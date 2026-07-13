@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { CLASS_CODE_BY_NAME } from '@/lib/classes';
-import { stateNameToCode } from '@/lib/indianStateCodes';
+import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 
 export async function GET() {
   try {
@@ -172,6 +172,29 @@ export async function POST(request: Request) {
         }
 
         const generatedUsername = generateUsername(name, schoolId);
+
+        // Email the login credentials to the school's email (if provided).
+        // Best-effort: a mail failure must not roll back a successful registration,
+        // so we report emailSent/emailError instead of throwing.
+        let emailSent = false;
+        let emailError: string | null = null;
+        if (email) {
+          try {
+            await sendSchoolCredentialsEmail({
+              to: email,
+              schoolName: name,
+              schoolId,
+              username: generatedUsername,
+              password: plainPassword,
+              contactPerson,
+            });
+            emailSent = true;
+          } catch (mailErr: any) {
+            emailError = mailErr?.message || 'Failed to send email';
+            console.error(`Credential email to ${email} failed:`, mailErr);
+          }
+        }
+
         return NextResponse.json({
           ...school,
           olympiadIdsGenerated: totalCount,
@@ -183,6 +206,8 @@ export async function POST(request: Request) {
             username: generatedUsername,
             password: plainPassword,
           },
+          emailSent,
+          emailError,
         });
       } catch (err: any) {
         if (err?.code === 'P2002' && attempt < 2) continue;

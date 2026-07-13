@@ -451,7 +451,7 @@ export default function UploadVideoPage() {
               <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2.5">Visibility</p>
               <div className="space-y-2">
                 {[
-                  { val: true,  icon: Globe,   label: 'Public',  desc: 'Anyone on TalentOlympiad can see this video' },
+                  { val: true,  icon: Globe,   label: 'Public',  desc: 'Anyone on Mittmee can see this video' },
                   { val: false, icon: EyeOff,  label: 'Private', desc: 'Only reviewers and school can see this video' },
                 ].map(opt => {
                   const Icon = opt.icon;
