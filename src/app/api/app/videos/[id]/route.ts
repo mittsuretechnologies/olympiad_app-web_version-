@@ -31,7 +31,7 @@ export async function DELETE(
     // Verify the video belongs to this app user
     const video = await prisma.video.findFirst({
       where: { id, appUserId: appUser.id, deletedAt: null },
-      include: { evaluation: true },
+      include: { evaluations: true },
     });
     if (!video) {
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
@@ -39,7 +39,7 @@ export async function DELETE(
 
     // Once an evaluator has submitted marks, the video is locked — deleting it would
     // let a student erase a low score and re-submit for another attempt.
-    if (video.evaluation) {
+    if (video.evaluations.length > 0) {
       return NextResponse.json(
         { error: 'Marks have already been given for this video, so it can no longer be deleted.' },
         { status: 403 }
