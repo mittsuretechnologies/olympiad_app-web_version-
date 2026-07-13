@@ -1,23 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
+import { requireRole } from '@/lib/auth-guard';
+import { recordAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
-
-// Marks the uploader's permanent Olympiad Category A/B approval flag —
-// this survives the video being deleted later, unlike a live video-status lookup.
-async function markOlympiadSlotApproved(video: { isEvaluation: boolean; appUserId: string | null; category: string | null; subCategory: string | null }) {
-  if (!video.isEvaluation || !video.appUserId) return;
-
-  const isCatA = video.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(video.subCategory ?? '');
-  const isCatB = !isCatA && OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '');
-  if (!isCatA && !isCatB) return;
-
-  await prisma.appUser.update({
-    where: { id: video.appUserId },
-    data: isCatA ? { olympiadCatAApproved: true } : { olympiadCatBApproved: true },
-  });
-}
 
 export async function GET(request: Request) {
   try {
@@ -71,23 +57,28 @@ export async function GET(request: Request) {
         })
       : [];
 
-    // Resolve school for appUsers via their olympiadId → OlympiadIdAllocation → School
+    // Resolve school + assigned name for appUsers via their olympiadId → OlympiadIdAllocation
     const olympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
     const allocations = olympiadCodes.length > 0
       ? await prisma.olympiadIdAllocation.findMany({
           where: { code: { in: olympiadCodes } },
           select: {
             code: true,
+            assignedName: true,
             school: { select: { name: true, city: true, district: true, state: true } },
           },
         })
       : [];
-    const allocationMap = Object.fromEntries(allocations.map(a => [a.code, a.school]));
+    const allocationMap = Object.fromEntries(allocations.map(a => [a.code, a]));
 
-    const appUserMap = Object.fromEntries(appUsers.map(u => [u.id, {
-      ...u,
-      school: u.olympiadId ? (allocationMap[u.olympiadId] ?? null) : null,
-    }]));
+    const appUserMap = Object.fromEntries(appUsers.map(u => {
+      const allocation = u.olympiadId ? allocationMap[u.olympiadId] : null;
+      return [u.id, {
+        ...u,
+        assignedName: allocation?.assignedName ?? null,
+        school: allocation?.school ?? null,
+      }];
+    }));
 
     // ── Normalise URLs ────────────────────────────────────────────────────────
     let normalized = (videos ?? []).map(v => ({
@@ -123,6 +114,9 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
+
   try {
     const { videoIds } = await request.json();
 
@@ -130,9 +124,25 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ message: 'No video IDs provided' }, { status: 400 });
     }
 
+    const existing = await prisma.video.findMany({
+      where: { id: { in: videoIds } },
+      select: { id: true, status: true, olympiadVisibility: true },
+    });
+
     const { count } = await prisma.video.deleteMany({
       where: { id: { in: videoIds } },
     });
+
+    await Promise.all(existing.map(v => recordAuditLog({
+      actorId: payload!.id,
+      actorRole: payload!.role,
+      actorName: payload!.email || payload!.name || null,
+      action: 'VIDEO_DELETED',
+      entityType: 'Video',
+      entityId: v.id,
+      previousValue: v,
+      newValue: null,
+    })));
 
     return NextResponse.json({ message: `${count} video(s) deleted successfully`, count });
   } catch (error) {
@@ -142,6 +152,9 @@ export async function DELETE(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
+
   try {
     const { videoId, videoIds, status, rejectionReason } = await request.json();
 
@@ -149,8 +162,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
     }
 
+    const actor = {
+      actorId: payload!.id,
+      actorRole: payload!.role,
+      actorName: payload!.email || payload!.name || null,
+    };
+    const action = status === 'APPROVED' ? 'VIDEO_APPROVED' : 'VIDEO_REJECTED';
+
     // ── Bulk action: videoIds array ───────────────────────────────────────────
     if (Array.isArray(videoIds) && videoIds.length > 0) {
+      const existing = await prisma.video.findMany({
+        where: { id: { in: videoIds } },
+        select: { id: true, status: true, rejectionReason: true },
+      });
+
       await prisma.video.updateMany({
         where: { id: { in: videoIds } },
         data: {
@@ -159,19 +184,26 @@ export async function POST(request: Request) {
         },
       });
 
-      if (status === 'APPROVED') {
-        const approvedVideos = await prisma.video.findMany({
-          where: { id: { in: videoIds } },
-          select: { isEvaluation: true, appUserId: true, category: true, subCategory: true },
-        });
-        await Promise.all(approvedVideos.map(markOlympiadSlotApproved));
-      }
+      await Promise.all(existing.map(v => recordAuditLog({
+        ...actor,
+        action,
+        entityType: 'Video',
+        entityId: v.id,
+        previousValue: { status: v.status, rejectionReason: v.rejectionReason },
+        newValue: { status, rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null },
+        reason: status === 'REJECTED' ? (rejectionReason || null) : null,
+      })));
 
       return NextResponse.json({ message: `${videoIds.length} video(s) ${status.toLowerCase()}` });
     }
 
     // ── Single action: videoId ────────────────────────────────────────────────
     if (!videoId) return NextResponse.json({ message: 'videoId required' }, { status: 400 });
+
+    const before = await prisma.video.findUnique({
+      where: { id: videoId },
+      select: { status: true, rejectionReason: true },
+    });
 
     const video = await prisma.video.update({
       where: { id: videoId },
@@ -181,9 +213,15 @@ export async function POST(request: Request) {
       },
     });
 
-    if (status === 'APPROVED') {
-      await markOlympiadSlotApproved(video);
-    }
+    await recordAuditLog({
+      ...actor,
+      action,
+      entityType: 'Video',
+      entityId: videoId,
+      previousValue: before,
+      newValue: { status: video.status, rejectionReason: video.rejectionReason },
+      reason: status === 'REJECTED' ? (rejectionReason || null) : null,
+    });
 
     return NextResponse.json({ message: `Video ${status.toLowerCase()} successfully`, video });
   } catch (error) {

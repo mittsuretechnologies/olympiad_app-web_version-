@@ -66,7 +66,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
-  return localStorage.getItem('token') || '';
+  return sessionStorage.getItem('token') || '';
 }
 
 function authedFetcher(url: string) {

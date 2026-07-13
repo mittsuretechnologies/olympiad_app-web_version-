@@ -8,6 +8,21 @@ function isEmail(val: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
 }
 
+async function withStudentNames(accounts: { id: string; userId: string; olympiadId: string | null }[]) {
+  return Promise.all(
+    accounts.map(async (acc) => {
+      let studentName: string | null = null;
+      if (acc.olympiadId) {
+        const allocation = await prisma.olympiadIdAllocation.findUnique({
+          where: { code: acc.olympiadId },
+          select: { assignedName: true, student: { select: { name: true } } },
+        });
+        studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
+      }
+      return { id: acc.id, userId: acc.userId, studentName };
+    })
+  );
+}
 
 export async function POST(request: Request) {
   try {
@@ -37,23 +52,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid OTP. Please check and try again.' }, { status: 400 });
     }
 
-    // Self-signup: name unknown at this point → mittsure_xxxx prefix
-    const userId = await generateUserId(null);
+    // Email and mobile can both be shared by sibling accounts. If accounts
+    // already exist on this contact, don't silently overwrite one — surface
+    // them so the client can offer "log in as one of these" vs. "create a
+    // new account".
+    const contactWhere = mobile ? { mobile } : { email: id };
+    const existingAccounts = await prisma.appUser.findMany({
+      where: { ...contactWhere, isVerified: true },
+      select: { id: true, userId: true, olympiadId: true },
+    });
 
+    if (existingAccounts.length > 0 && !request.headers.get('x-create-new-account')) {
+      return NextResponse.json({
+        message: `Accounts already exist for this ${mobile ? 'phone number' : 'email'}. Choose one to continue, or create a new account.`,
+        accounts: await withStudentNames(existingAccounts),
+      }, { status: 409 });
+    }
+
+    const userId = await generateUserId(null);
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await prisma.appUser.upsert({
-      where: mobile ? { mobile } : { email: id },
-      update: {
-        password: passwordHash,
-        plainPassword: password,
-        isVerified: true,
-        termsAccepted: true,
-      },
-      create: {
+    const user = await prisma.appUser.create({
+      data: {
         userId,
         email: mobile ? null : id,
-        mobile: mobile ?? null,
+        mobile,
         password: passwordHash,
         plainPassword: password,
         isVerified: true,
@@ -61,7 +84,6 @@ export async function POST(request: Request) {
       },
     });
 
-    // Delete used OTP
     await prisma.appOtp.delete({ where: { identifier: lookupId } }).catch(() => {});
 
     const token = jwt.sign(

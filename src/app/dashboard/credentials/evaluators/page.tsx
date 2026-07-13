@@ -13,6 +13,11 @@ interface Evaluator {
   createdAt: string;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = sessionStorage.getItem('token');
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export default function EvaluatorCredentialsPage() {
   const [rows, setRows] = useState<Evaluator[]>([]);
   const [loading, setLoading] = useState(true);
@@ -27,7 +32,7 @@ export default function EvaluatorCredentialsPage() {
   const [resetSuccess, setResetSuccess] = useState('');
 
   useEffect(() => {
-    fetch('/api/credentials/evaluators')
+    fetch('/api/credentials/evaluators', { headers: authHeaders() })
       .then(r => r.json())
       .then(d => setRows(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
@@ -65,7 +70,7 @@ export default function EvaluatorCredentialsPage() {
     try {
       const res = await fetch(`/api/credentials/evaluators/${resetModal.id}/reset`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ password: newPass.trim() || undefined }),
       });
       const data = await res.json();

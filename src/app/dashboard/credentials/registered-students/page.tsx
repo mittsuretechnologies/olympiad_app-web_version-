@@ -238,7 +238,7 @@ export default function StudentReportPage() {
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Username</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Phone</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Olympiad ID</th>
-                <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider">Videos</th>
+                <th className="px-4 py-2.5 text-center text-[11px] font-bold uppercase tracking-wider">Total Uploaded Videos</th>
 
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">School</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">City</th>

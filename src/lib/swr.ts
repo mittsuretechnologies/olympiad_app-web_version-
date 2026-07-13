@@ -3,7 +3,10 @@
 // revalidates in the background so repeat visits render instantly.
 
 export const fetcher = async (url: string) => {
-  const res = await fetch(url);
+  const token = typeof window !== 'undefined'
+    ? sessionStorage.getItem('token') || sessionStorage.getItem('reviewerToken') || sessionStorage.getItem('evaluatorToken')
+    : null;
+  const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (!res.ok) {
     const err: any = new Error('Request failed');
     err.status = res.status;

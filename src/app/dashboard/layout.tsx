@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
@@ -25,12 +25,15 @@ import {
   Trophy,
   Star,
   Settings,
+  ClipboardCheck,
+  Award,
   Flag,
   LifeBuoy,
+  History,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR';
-type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | 'reports' | 'reviewer' | 'evaluator' | 'settings' | null;
+type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | 'reports' | 'reviewer' | 'evaluator' | 'result' | 'settings' | null;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -41,9 +44,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    const reviewerToken = localStorage.getItem('reviewerToken');
-    const evaluatorToken = localStorage.getItem('evaluatorToken');
+    const token = sessionStorage.getItem('token');
+    const reviewerToken = sessionStorage.getItem('reviewerToken');
+    const evaluatorToken = sessionStorage.getItem('evaluatorToken');
+
+    if (!token && !reviewerToken && !evaluatorToken) {
+      router.push('/login');
+      return;
+    }
 
     let detectedRole: Role = 'SUPERADMIN';
     if (reviewerToken && !token) detectedRole = 'REVIEWER';
@@ -51,9 +59,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
     setRole(detectedRole);
 
-    const adminData = localStorage.getItem('adminUser');
-    const reviewerData = localStorage.getItem('reviewerData');
-    const evaluatorData = localStorage.getItem('evaluatorData');
+    const adminData = sessionStorage.getItem('adminUser');
+    const reviewerData = sessionStorage.getItem('reviewerData');
+    const evaluatorData = sessionStorage.getItem('evaluatorData');
     try {
       if (detectedRole === 'SUPERADMIN' && adminData) setCurrentUser(JSON.parse(adminData));
       else if (detectedRole === 'REVIEWER' && reviewerData) setCurrentUser(JSON.parse(reviewerData));
@@ -68,7 +76,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         if (detectedRole === 'EVALUATOR' && evaluatorData) memberId = JSON.parse(evaluatorData).id;
       } catch { /* ignore */ }
 
-      fetch('/api/settings/role-permissions')
+      const permToken = token || reviewerToken || evaluatorToken;
+      fetch('/api/settings/role-permissions', { headers: permToken ? { Authorization: `Bearer ${permToken}` } : {} })
         .then(r => r.json())
         .then((data: { global: { role: string; allowedModules: string[] }[]; individual: { memberId: string; allowedModules: string[] }[] } | { message: string }) => {
           if ('global' in data) {
@@ -109,6 +118,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (p.startsWith('/dashboard/app-users')) return 'reports';
     if (p.startsWith('/dashboard/reviewer')) return 'reviewer';
     if (p.startsWith('/dashboard/evaluator')) return 'evaluator';
+    if (p.startsWith('/dashboard/result')) return 'result';
     if (p.startsWith('/dashboard/settings')) return 'settings';
     return 'schools';
   };
@@ -126,20 +136,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const reportsOpen = openSection === 'reports';
   const reviewerOpen = openSection === 'reviewer';
   const evaluatorOpen = openSection === 'evaluator';
+  const resultOpen = openSection === 'result';
   const settingsOpen = openSection === 'settings';
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    localStorage.removeItem('reviewerToken');
-    localStorage.removeItem('reviewerData');
-    localStorage.removeItem('evaluatorToken');
-    localStorage.removeItem('evaluatorData');
+    sessionStorage.removeItem('token');
+    sessionStorage.removeItem('reviewerToken');
+    sessionStorage.removeItem('reviewerData');
+    sessionStorage.removeItem('evaluatorToken');
+    sessionStorage.removeItem('evaluatorData');
     router.push('/login');
   };
 
   const moderationSubItems = [
-    { name: 'Pending Approvals', href: '/dashboard/videos', icon: Clock },
-    { name: 'Reported Videos',   href: '/dashboard/reported-videos', icon: Flag },
+    { name: 'Video Moderation', href: '/dashboard/videos', icon: Clock },
+    { name: 'Reported Videos',  href: '/dashboard/reported-videos', icon: Flag },
   ];
 
   const schoolSubItems = [
@@ -169,13 +180,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const evaluatorSubItems = [
     { name: 'Manage Evaluators', href: '/dashboard/evaluator/manage',           icon: UserCheck },
     { name: 'Evaluate Content',  href: '/dashboard/evaluator/evaluate-content', icon: Play },
+    { name: 'Evaluation History', href: '/dashboard/evaluator/history',          icon: Clock },
   ];
 
   const reportsSubItems = [
-    { name: 'Student Report',         href: '/dashboard/credentials/registered-students', icon: UserCheck },
-    { name: 'Olympiad Completions',   href: '/dashboard/reports/olympiad-completions',    icon: Trophy },
-    { name: 'School Report',          href: '/dashboard/reports/schools',                 icon: Building2 },
-    { name: 'App Users',              href: '/dashboard/app-users',                       icon: Smartphone },
+    { name: 'Student Report',         href: '/dashboard/credentials/registered-students',    icon: UserCheck },
+    { name: 'Olympiad Completions',   href: '/dashboard/reports/olympiad-completions',       icon: Trophy },
+    { name: 'Evaluation Progress',    href: '/dashboard/reports/evaluation-progress',        icon: ClipboardCheck },
+    { name: 'School Report',          href: '/dashboard/reports/schools',                    icon: Building2 },
+    { name: 'App Users',              href: '/dashboard/app-users',                          icon: Smartphone },
+  ];
+
+  const resultSubItems = [
+    { name: 'Result List',    href: '/dashboard/result',           icon: Trophy },
   ];
 
   const subItemClass = (isActive: boolean) =>
@@ -185,7 +202,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     `w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${active ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`;
 
   return (
-    <div className="flex min-h-screen bg-[#F0F2F5] text-[#1F2937]">
+    <div className="flex min-h-screen bg-[#052E5C] text-[#1F2937]">
 
       {/* Sidebar */}
       <aside
@@ -236,34 +253,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
-            {/* Moderation */}
-            {canSee('moderation') && (
-              <div>
-                <button onClick={() => toggleSection('moderation')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos') || pathname.startsWith('/dashboard/reported-videos'))}>
-                  <div className="flex items-center gap-3"><Play size={20} /><span className="text-sm font-semibold">Moderation</span></div>
-                  <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
-                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
-                  </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Support */}
-            {canSee('support') && (
-              <Link href="/dashboard/support-tickets"
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support-tickets') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
-                <LifeBuoy size={20} />
-                <span className="text-sm font-semibold">Support</span>
-              </Link>
-            )}
-
             {/* Uploaders */}
             {canSee('uploaders') && (
               <div>
@@ -302,6 +291,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
+            {/* Moderation */}
+            {canSee('moderation') && (
+              <div>
+                <button onClick={() => toggleSection('moderation')}
+                  className={sectionBtnClass(pathname.startsWith('/dashboard/videos') || pathname.startsWith('/dashboard/reported-videos'))}>
+                  <div className="flex items-center gap-3"><Play size={20} /><span className="text-sm font-semibold">Moderation</span></div>
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
+                    {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Reviewer */}
             {canSee('reviewer') && (
               <div>
@@ -333,7 +341,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.content', 'evaluator.history'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                  </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Result — only superadmin */}
+            {role === 'SUPERADMIN' && (
+              <div>
+                <button onClick={() => toggleSection('result')}
+                  className={sectionBtnClass(pathname.startsWith('/dashboard/result'))}>
+                  <div className="flex items-center gap-3"><Award size={20} /><span className="text-sm font-semibold">Result</span></div>
+                  <ChevronDown size={16} className={`transition-transform duration-200 ${resultOpen ? 'rotate-180' : ''}`} />
+                </button>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${resultOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                  <div className="relative ml-6 pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
+                    {resultSubItems.map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
@@ -352,11 +379,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.schools','reports.appusers'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.evaluation-progress','reports.schools','reports.appusers'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
               </div>
+            )}
+
+            {/* Activity Log — only superadmin */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/activity-log"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/activity-log') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <History size={20} />
+                <span className="text-sm font-semibold">Activity Log</span>
+              </Link>
+            )}
+
+            {/* Support */}
+            {canSee('support') && (
+              <Link href="/dashboard/support-tickets"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support-tickets') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <LifeBuoy size={20} />
+                <span className="text-sm font-semibold">Support</span>
+              </Link>
             )}
 
             {/* Settings — only superadmin */}
@@ -407,8 +452,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-72 min-h-screen relative px-8 pt-3 pb-8">
-        {children}
+      <main className="flex-1 ml-72 min-h-screen flex flex-col p-3">
+        <div className="flex-1 bg-white border border-[#E7EBF2] rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
+          <div className="px-8 py-8">{children}</div>
+        </div>
       </main>
     </div>
   );

@@ -44,8 +44,6 @@ export async function POST(
     if (allocation.student) return NextResponse.json({ message: 'Already registered as web student' }, { status: 409 });
 
     const mobileNormalized = phone.trim().replace(/\D/g, '');
-    const existingAppUser = await prisma.appUser.findFirst({ where: { mobile: mobileNormalized } });
-    if (existingAppUser) return NextResponse.json({ message: 'This phone number is already registered on the app' }, { status: 409 });
 
     const existingOlympiadLink = await prisma.appUser.findFirst({ where: { olympiadId: code } });
     if (existingOlympiadLink) return NextResponse.json({ message: 'This Olympiad ID is already linked to an app account' }, { status: 409 });
@@ -111,7 +109,7 @@ export async function POST(
       emailError,
     }, { status: 201 });
   } catch (error: any) {
-    if (error.code === 'P2002') return NextResponse.json({ message: 'Phone number or Olympiad ID already in use' }, { status: 409 });
+    if (error.code === 'P2002') return NextResponse.json({ message: 'Olympiad ID already in use' }, { status: 409 });
     return NextResponse.json({ message: error.message }, { status: 500 });
   }
 }

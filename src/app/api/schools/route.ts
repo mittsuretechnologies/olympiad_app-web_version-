@@ -62,7 +62,9 @@ export async function POST(request: Request) {
       contactPerson,
       city,
       district,
+      districtCode,
       state,
+      stateCode,
       pincode,
       classes, // [{ className: string, count: number }, ...]
     } = body;
@@ -124,7 +126,9 @@ export async function POST(request: Request) {
             contactPerson,
             city,
             district,
+            districtCode,
             state,
+            stateCode: stateCode || stateNameToCode(state),
             pincode,
             username: generateUsername(name, schoolId),
             password: hashedPassword,

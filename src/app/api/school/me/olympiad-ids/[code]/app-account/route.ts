@@ -31,10 +31,6 @@ export async function PATCH(
     if (!appUser) return NextResponse.json({ message: 'No app account linked to this ID' }, { status: 404 });
 
     const mobileNormalized = phone.trim().replace(/\D/g, '');
-    if (mobileNormalized !== appUser.mobile) {
-      const existing = await prisma.appUser.findFirst({ where: { mobile: mobileNormalized } });
-      if (existing) return NextResponse.json({ message: 'This phone number is already registered on the app' }, { status: 409 });
-    }
 
     await prisma.appUser.update({
       where: { id: appUser.id },
@@ -48,7 +44,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    if (error.code === 'P2002') return NextResponse.json({ message: 'Phone number already in use' }, { status: 409 });
+    if (error.code === 'P2002') return NextResponse.json({ message: 'This value is already in use' }, { status: 409 });
     console.error('PATCH app-account failed:', error);
     return NextResponse.json({ message: error.message || 'Failed to update' }, { status: 500 });
   }

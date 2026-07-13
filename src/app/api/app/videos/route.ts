@@ -108,16 +108,20 @@ export async function POST(request: Request) {
       const isCatB = category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(subCategory);
 
       if (isCatA || isCatB) {
+        // No deletedAt filter — an evaluated video must keep blocking this slot even if it
+        // was later soft-deleted (e.g. an admin removing a reported video). See the matching
+        // comment in GET /api/app/olympiad-video-slots for the full reasoning.
         const existingOlympiadVideos = await prisma.video.findMany({
-          where: { appUserId: appUser.id, isEvaluation: true, deletedAt: null },
-          select: { category: true, subCategory: true, status: true },
+          where: { appUserId: appUser.id, isEvaluation: true },
+          select: { category: true, subCategory: true, status: true, deletedAt: true, evaluation: { select: { id: true } } },
         });
-        // Only block if there's an active (non-rejected) video for this category slot
-        const slotTaken = existingOlympiadVideos.some(v =>
-          v.status !== 'REJECTED' &&
-          (isCatA
+        const matchesSlot = (v: { category: string | null; subCategory: string | null }) =>
+          isCatA
             ? v.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '')
-            : v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? ''))
+            : v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
+        // Blocked if evaluated (regardless of delete state) or if an active, non-rejected video occupies it.
+        const slotTaken = existingOlympiadVideos.some(v =>
+          matchesSlot(v) && (!!v.evaluation || (v.deletedAt === null && v.status !== 'REJECTED'))
         );
         if (slotTaken) {
           return NextResponse.json(
@@ -172,12 +176,16 @@ export async function GET(request: Request) {
     const videos = await prisma.video.findMany({
       where: { appUserId: appUser.id, deletedAt: null },
       orderBy: { createdAt: 'desc' },
+      include: { evaluation: { select: { id: true } } },
     });
 
-    const normalized = videos.map((v) => ({
+    // Expose only whether marks exist (not the scores themselves — those stay
+    // gated behind VideoEvaluation.isPublished) so the app can block/explain deletion.
+    const normalized = videos.map(({ evaluation, ...v }) => ({
       ...v,
       videoUrl:     v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.videoUrl,
       thumbnailUrl: v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.thumbnailUrl,
+      hasEvaluation: !!evaluation,
     }));
 
     return NextResponse.json(normalized);

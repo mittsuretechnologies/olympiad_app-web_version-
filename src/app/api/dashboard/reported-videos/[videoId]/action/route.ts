@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { recordAuditLog } from '@/lib/audit-log';
 
 function requireSuperAdmin(request: Request) {
   const auth = request.headers.get('authorization') || '';
@@ -38,6 +39,17 @@ export async function POST(
         where: { videoId, resolved: false },
         data:  { resolved: true },
       });
+
+      await recordAuditLog({
+        actorId: admin.id,
+        actorRole: admin.role,
+        actorName: admin.email || admin.name || null,
+        action: 'REPORT_IGNORED',
+        entityType: 'VideoReport',
+        entityId: videoId,
+        previousValue: { resolved: false },
+        newValue: { resolved: true },
+      });
     } else {
       // Soft delete — same mechanism as the owner-initiated delete, preserves the
       // record and evaluation history for audit purposes.
@@ -46,6 +58,30 @@ export async function POST(
         where: { videoId, resolved: false },
         data:  { resolved: true },
       });
+
+      await recordAuditLog({
+        actorId: admin.id,
+        actorRole: admin.role,
+        actorName: admin.email || admin.name || null,
+        action: 'REPORT_VIDEO_REMOVED',
+        entityType: 'Video',
+        entityId: videoId,
+        previousValue: { deletedAt: video.deletedAt },
+        newValue: { deletedAt: new Date() },
+        reason: 'Removed following user report(s)',
+      });
+
+      if (video.appUserId) {
+        const label = video.caption?.trim() || video.subCategory || video.category || 'your video';
+        await prisma.notification.create({
+          data: {
+            userId:  video.appUserId,
+            type:    'VIDEO_REMOVED',
+            title:   'Video Removed',
+            message: `Your video "${label}" was removed by an admin after being reported for violating our content guidelines.`,
+          },
+        });
+      }
     }
 
     return NextResponse.json({ success: true });

@@ -39,6 +39,8 @@ model School {
   username      String?                @unique
   plainPassword String?
   district      String?
+  districtCode  String?
+  stateCode     String?
   isActive      Boolean                @default(true)
   olympiadIds   OlympiadIdAllocation[]
 
@@ -122,7 +124,7 @@ model Video {
   likes           Like[]
   views           VideoView[]
   reelShares      ReelShare[]
-  evaluation      VideoEvaluation?
+  evaluations     VideoEvaluation[]
   reports         VideoReport[]
 
   @@index([studentId])
@@ -133,9 +135,24 @@ model Video {
   @@schema("public")
 }
 
+// Kosh = one of the five Panchkosh evaluation lenses. Each video is scored
+// against two koshas (see KOSHAS_BY_VIDEO_SLOT in the evaluate route), and
+// the video's final % is the average of its two kosh %s.
+enum Kosh {
+  ANNAMAYA
+  PRANAMAYA
+  VIJNANAMAYA
+  ANANDAMAYA
+
+  @@schema("public")
+}
+
 model VideoEvaluation {
   id                String          @id @default(uuid())
-  videoId           String          @unique
+  videoId           String
+  // Nullable only for rows created before the kosh system existed;
+  // every row created going forward always sets this.
+  kosh              Kosh?
   evaluatorId       String
   confidenceScore   Int
   creativityScore   Int
@@ -143,11 +160,16 @@ model VideoEvaluation {
   presentationScore Int
   totalScore        Int
   remarks           String?
+  isPublished       Boolean         @default(false)
+  publishedAt       DateTime?
+  lastEditedBy      String?
+  lastEditedAt      DateTime?
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   video             Video           @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  evaluator         TalentEvaluator @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+  evaluator         TalentEvaluator @relation(fields: [evaluatorId], references: [id], onDelete: Restrict)
 
+  @@unique([videoId, kosh])
   @@index([evaluatorId])
   @@schema("public")
 }
@@ -186,6 +208,11 @@ model TalentEvaluator {
   password             String
   plainPassword        String?
   isActive             Boolean                @default(true)
+  // Empty arrays = unrestricted (evaluator sees every region). Non-empty =
+  // evaluator only sees videos whose student's school state/district matches
+  // one of these — checked in evaluation-queue and evaluate routes.
+  assignedStates       String[]               @default([])
+  assignedDistricts    String[]               @default([])
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
   individualPermission IndividualPermissions?
@@ -245,8 +272,8 @@ model VideoView {
 model AppUser {
   id                     String          @id @default(uuid())
   userId                 String          @unique
-  email                  String?         @unique
-  mobile                 String?         @unique
+  email                  String?
+  mobile                 String?
   avatarUrl              String?
   password               String
   plainPassword          String?
@@ -268,6 +295,7 @@ model AppUser {
   reelSharesReceived     ReelShare[]     @relation("ReelShareRecipient")
   reportsSubmitted       VideoReport[]
   supportTickets         SupportTicket[]
+  notifications          Notification[]
 
   @@index([email])
   @@index([mobile])
@@ -278,6 +306,18 @@ model AppOtp {
   id         String   @id @default(uuid())
   identifier String   @unique
   otpHash    String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@schema("public")
+}
+
+model PasswordResetOtp {
+  id         String   @id @default(uuid())
+  identifier String   @unique
+  otpHash    String
+  attempts   Int      @default(0)
+  lastSentAt DateTime @default(now())
   expiresAt  DateTime
   createdAt  DateTime @default(now())
 
@@ -360,16 +400,61 @@ model AppSetting {
 model SupportTicket {
   id             String   @id @default(uuid())
   userId         String
-  category       String?  // Account Issue | Video Upload | Payment | Bug Report | Other
+  type           String   @default("TECHNICAL") // TECHNICAL | REMARK
+  category       String?  // App Crash | Video Upload Issue | Login/Account Access | Video Playback Issue | Other Technical (TECHNICAL only)
   message        String
   screenshotUrls String?  // comma-separated URLs, up to 3
   status         String   @default("OPEN") // OPEN | RESOLVED
   resolvedAt     DateTime?
+  adminResponse  String?   // reply written by SuperAdmin
+  respondedAt    DateTime?
+  isReadByUser   Boolean  @default(true) // flips to false when adminResponse is set, until the user opens the notifications modal
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
+  @@schema("public")
+}
+
+// Append-only trail of every moderation/evaluation action taken by staff
+// (admins, evaluators, schools), so "who did what, when" is always answerable —
+// unlike the mutable status fields on Video/VideoEvaluation/VideoReport, rows
+// here are never updated or deleted.
+model AuditLog {
+  id           String   @id @default(uuid())
+  actorId      String
+  actorRole    String   // SUPERADMIN | EVALUATOR | SCHOOL | REVIEWER
+  actorName    String?  // denormalised at write time so the log stays readable if the actor is later removed
+  action       String   // e.g. VIDEO_APPROVED, VIDEO_REJECTED, VIDEO_DELETED, VISIBILITY_CHANGED, REPORT_IGNORED, REPORT_VIDEO_REMOVED, EVALUATION_SUBMITTED, EVALUATION_PUBLISHED, EVALUATION_UNPUBLISHED
+  entityType   String   // e.g. Video, VideoEvaluation, VideoReport
+  entityId     String
+  previousValue String? // JSON snapshot of relevant fields before the change
+  newValue     String?  // JSON snapshot of relevant fields after the change
+  reason       String?  // e.g. rejection reason, report resolution note
+  createdAt    DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId])
+  @@index([createdAt])
+  @@schema("public")
+}
+
+// Generic system-originated alerts for the app's Home-screen notification bell
+// (currently used for admin video removals; separate from SupportTicket responses,
+// which are fetched via /api/app/support/notifications).
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String   // "VIDEO_REMOVED"
+  title     String
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
   @@schema("public")
 }

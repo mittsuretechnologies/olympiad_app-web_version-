@@ -30,7 +30,7 @@ export async function DELETE(
 
   try {
     // Fetch the video first — verify it belongs to this student
-    const video = await prisma.video.findUnique({ where: { id } });
+    const video = await prisma.video.findUnique({ where: { id }, include: { evaluation: true } });
 
     if (!video || video.deletedAt) {
       return NextResponse.json({ error: 'Video not found' }, { status: 404 });
@@ -40,8 +40,17 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Soft delete — record and file are retained for SuperAdmin/backend visibility
-    // (including any Olympiad approval it represents); only hidden from normal views.
+    // Once an evaluator has submitted marks, the video is locked — deleting it would
+    // let a student erase a low score and re-submit for another attempt.
+    if (video.evaluation) {
+      return NextResponse.json(
+        { error: 'Marks have already been given for this video, so it can no longer be deleted.' },
+        { status: 403 }
+      );
+    }
+
+    // Soft delete — record and file are retained for SuperAdmin/backend visibility;
+    // only hidden from normal views.
     await prisma.video.update({ where: { id }, data: { deletedAt: new Date() } });
 
     return NextResponse.json({ message: 'Video deleted successfully' });

@@ -24,8 +24,14 @@ export default function EvaluatorLoginPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      localStorage.setItem('evaluatorToken', data.token);
-      localStorage.setItem('evaluatorData', JSON.stringify(data.evaluator));
+      sessionStorage.removeItem('token');
+      sessionStorage.removeItem('adminUser');
+      sessionStorage.removeItem('schoolToken');
+      sessionStorage.removeItem('schoolUser');
+      sessionStorage.removeItem('reviewerToken');
+      sessionStorage.removeItem('reviewerData');
+      sessionStorage.setItem('evaluatorToken', data.token);
+      sessionStorage.setItem('evaluatorData', JSON.stringify(data.evaluator));
       router.push('/dashboard');
     } catch (e: any) {
       setError(e.message);

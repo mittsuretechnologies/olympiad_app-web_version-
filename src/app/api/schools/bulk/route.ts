@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { stateNameToCode } from '@/lib/indianStateCodes';
 
 async function generateSchoolId(): Promise<string> {
   const last = await prisma.school.findFirst({
@@ -62,6 +63,7 @@ export async function POST(request: Request) {
               city: school.city || null,
               district: school.district || null,
               state: school.state || null,
+              stateCode: stateNameToCode(school.state),
               pincode: school.pincode || null,
               username: generateUsername(school.name, schoolId),
               password: hashedPassword,

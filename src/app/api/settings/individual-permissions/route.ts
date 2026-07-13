@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth-guard';
 
 // POST — upsert individual permissions for a reviewer or evaluator
 export async function POST(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const { role, memberId, allowedModules } = await request.json();
     // memberId = reviewer.id or talentEvaluator.id
@@ -31,6 +34,8 @@ export async function POST(request: Request) {
 
 // DELETE — remove individual override
 export async function DELETE(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const { memberId } = await request.json();
     await prisma.individualPermissions.delete({ where: { memberId } });

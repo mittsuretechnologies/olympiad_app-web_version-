@@ -34,8 +34,6 @@ export async function POST(request: Request) {
     }
 
     const mobileNormalized = phone.trim().replace(/\D/g, '');
-    const existingAppUser = await prisma.appUser.findFirst({ where: { mobile: mobileNormalized } });
-    if (existingAppUser) return NextResponse.json({ message: 'This phone number is already registered on the app' }, { status: 409 });
 
     if (emailNormalized) {
       const existingEmail = await prisma.appUser.findFirst({ where: { email: emailNormalized } });
@@ -109,7 +107,7 @@ export async function POST(request: Request) {
       emailError,
     }, { status: 201 });
   } catch (error: any) {
-    if (error.code === 'P2002') return NextResponse.json({ message: 'Phone number or Olympiad ID already in use' }, { status: 409 });
+    if (error.code === 'P2002') return NextResponse.json({ message: 'Olympiad ID already in use' }, { status: 409 });
     console.error('POST allot failed:', error);
     return NextResponse.json({ message: error.message || 'Failed to allot' }, { status: 500 });
   }
