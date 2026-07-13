@@ -3,25 +3,8 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Hash, LayoutDashboard, Users, UserCircle, UploadCloud, PlaySquare } from 'lucide-react';
+import { LogOut, Hash, LayoutDashboard, Users, UserCircle, UploadCloud, PlaySquare, KeyRound } from 'lucide-react';
 import Image from 'next/image';
-import Lottie from 'lottie-react';
-
-// Mascot animation shown above the account card — fetched at runtime
-// since the source file lives in /public with spaces/capitals in its name.
-function MascotAnimation({ className }: { className?: string }) {
-  const [animationData, setAnimationData] = useState<object | null>(null);
-
-  useEffect(() => {
-    fetch('/Luma%20Left%20hand%20Animation.json')
-      .then(r => r.json())
-      .then(setAnimationData)
-      .catch(() => {});
-  }, []);
-
-  if (!animationData) return null;
-  return <Lottie animationData={animationData} loop autoplay className={className} />;
-}
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -59,6 +42,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     { name: 'Student Videos', href: '/school/student-videos',        icon: PlaySquare,      gradient: 'from-[#7a6ad6] to-[#4a3aa7]' },
     { name: 'Upload Video',   href: '/school/upload-video',          icon: UploadCloud,     gradient: 'from-[#e34948] to-[#c73a3a]' },
     { name: 'School Profile', href: '/school/profile',               icon: UserCircle,      gradient: 'from-[#eb6834] to-[#d95926]' },
+    { name: 'Manage Credentials', href: '/school/credentials',       icon: KeyRound,        gradient: 'from-[#7a6ad6] to-[#4a3aa7]' },
   ];
 
   const initials = (user?.name || 'S')
@@ -124,9 +108,6 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
 
         {/* Account switcher + Logout */}
         <div className="px-3 pb-4 pt-3 flex-shrink-0 relative">
-          <div className="flex justify-center translate-x-[61px]">
-            <MascotAnimation className="w-36 h-36" />
-          </div>
           <div className="rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.1)] p-3">
             <div className="flex items-center gap-3">
               <div className="relative flex-shrink-0">

@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     // App-registered users (AppUser table) — only those not already in Student table
     const appUsers = await prisma.appUser.findMany({
       where: { olympiadId: { in: codes }, isVerified: true },
-      select: { id: true, userId: true, mobile: true, olympiadId: true, isVerified: true, createdAt: true },
+      select: { id: true, userId: true, mobile: true, email: true, olympiadId: true, isVerified: true, createdAt: true },
     });
 
     // Olympiad video counts — web students (studentId) + app users (appUserId)
@@ -77,6 +77,7 @@ export async function GET(request: Request) {
         className: s.allocation?.className || null,
         source: 'web' as const,
         olympiadVideos: webVideoCountById.get(s.id) || 0,
+        email: null as string | null,
       })),
       ...appUsers
         .filter(u => !webCodes.has(u.olympiadId!))
@@ -93,6 +94,7 @@ export async function GET(request: Request) {
             className: alloc?.className || null,
             source: 'app' as const,
             olympiadVideos: appVideoCountById.get(u.id) || 0,
+            email: u.email || null,
           };
         }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

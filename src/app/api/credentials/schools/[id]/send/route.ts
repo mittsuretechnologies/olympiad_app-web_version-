@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 
 // POST /api/credentials/schools/:id/send — body: { method: 'sms' | 'email' }
 // Sends the school's current username + password via SMS or email.
-// TODO: wire up a real SMS gateway (e.g. MSG91/Twilio) and email provider
-// (e.g. SES/Resend) here — this currently just simulates a successful send.
+// Email goes out over real SMTP (see src/lib/mailer.ts). SMS still needs a
+// gateway (e.g. MSG91/Twilio) wired up — no provider is configured yet.
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -19,7 +20,7 @@ export async function POST(
 
     const school = await prisma.school.findUnique({
       where: { id },
-      select: { name: true, username: true, plainPassword: true, phone: true, email: true },
+      select: { schoolId: true, name: true, username: true, plainPassword: true, phone: true, email: true, contactPerson: true },
     });
     if (!school) {
       return NextResponse.json({ message: 'School not found' }, { status: 404 });
@@ -34,8 +35,25 @@ export async function POST(
       return NextResponse.json({ message: 'No email on file for this school' }, { status: 400 });
     }
 
-    // Hardcoded/simulated send — no real gateway call yet.
-    console.log(`[credentials-send:${method}] to ${method === 'sms' ? school.phone : school.email} — username=${school.username}`);
+    if (method === 'email') {
+      try {
+        await sendSchoolCredentialsEmail({
+          to: school.email!,
+          schoolName: school.name,
+          schoolId: school.schoolId,
+          username: school.username,
+          password: school.plainPassword,
+          contactPerson: school.contactPerson,
+        });
+      } catch (mailErr: any) {
+        console.error(`Credentials email to ${school.email} failed:`, mailErr);
+        return NextResponse.json({ message: mailErr?.message || 'Failed to send email' }, { status: 502 });
+      }
+    } else {
+      // SMS gateway not configured — log for now instead of a silent no-op.
+      console.log(`[credentials-send:sms] to ${school.phone} — username=${school.username} (no SMS gateway configured)`);
+      return NextResponse.json({ message: 'SMS sending is not configured yet' }, { status: 501 });
+    }
 
     return NextResponse.json({
       success: true,
