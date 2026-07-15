@@ -1,13 +1,16 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth-guard';
 
 function generateReviewerId(): string {
   const num = Math.floor(1000 + Math.random() * 9000);
   return `RVW${num}`;
 }
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const reviewers = await prisma.reviewer.findMany({
       orderBy: { createdAt: 'desc' },
@@ -20,6 +23,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const { name, email, password } = await request.json();
     if (!name?.trim() || !email?.trim() || !password?.trim())

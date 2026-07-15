@@ -1,16 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 
-// GET /api/reels/inbox/conversation?userId=<id>&otherId=<id>
-// Returns all reels shared between userId and otherId in BOTH directions, newest first.
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+function getAppUserIdFromToken(request: Request): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = verify(token, JWT_SECRET) as any;
+    if (decoded.role !== 'APP_USER') return null;
+    return decoded.id;
+  } catch {
+    return null;
+  }
+}
+
+// GET /api/reels/inbox/conversation?otherId=<id>
+// Returns all reels shared between the authenticated caller and otherId in BOTH directions, newest first.
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId  = searchParams.get('userId')  ?? '';
+    const userId  = getAppUserIdFromToken(request);
     const otherId = searchParams.get('otherId') ?? '';
 
-    if (!userId || !otherId) {
-      return NextResponse.json({ message: 'userId and otherId are required' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    if (!otherId) {
+      return NextResponse.json({ message: 'otherId is required' }, { status: 400 });
     }
 
     // Both directions: user→other and other→user
@@ -90,16 +109,19 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// PATCH /api/reels/inbox/conversation?userId=<id>&otherId=<id>
-// Marks all reels otherId sent to userId as read (call when the conversation is opened).
+// PATCH /api/reels/inbox/conversation?otherId=<id>
+// Marks all reels otherId sent to the authenticated caller as read (call when the conversation is opened).
 export async function PATCH(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId  = searchParams.get('userId')  ?? '';
+    const userId  = getAppUserIdFromToken(request);
     const otherId = searchParams.get('otherId') ?? '';
 
-    if (!userId || !otherId) {
-      return NextResponse.json({ message: 'userId and otherId are required' }, { status: 400 });
+    if (!userId) {
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+    }
+    if (!otherId) {
+      return NextResponse.json({ message: 'otherId is required' }, { status: 400 });
     }
 
     await prisma.reelShare.updateMany({

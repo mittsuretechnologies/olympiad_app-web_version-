@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
     await prisma.appOtp.upsert({
       where: { identifier: lookupId },
-      update: { otpHash, expiresAt },
+      update: { otpHash, expiresAt, attempts: 0 },
       create: { identifier: lookupId, otpHash, expiresAt },
     });
 

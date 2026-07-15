@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
+import { probeVideo } from '@/lib/videoProbe';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const MAX_BYTES  = 150 * 1024 * 1024; // 150 MB
+const MAX_DURATION_S = 120; // 2 minutes
 
 export const dynamic    = 'force-dynamic';
 export const maxDuration = 60;
@@ -40,8 +42,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Video exceeds 150 MB limit' }, { status: 413 });
     }
 
-    const ext       = (file.name.split('.').pop() || 'mp4').toLowerCase();
-    const fileName  = `${Date.now()}_${student.id.slice(0, 8)}.${ext}`;
+    const fileName  = `${Date.now()}_${student.id.slice(0, 8)}.mp4`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'videos', student.id);
     const filePath  = path.join(uploadDir, fileName);
 
@@ -49,6 +50,20 @@ export async function POST(request: Request) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
+
+    // Confirm this is actually a decodable video (not e.g. an HTML/script file
+    // renamed with a video extension) before keeping it under public/uploads.
+    let meta;
+    try {
+      meta = await probeVideo(filePath);
+    } catch {
+      await unlink(filePath).catch(() => {});
+      return NextResponse.json({ error: 'Could not read video file. It may be corrupted or in an unsupported format.' }, { status: 400 });
+    }
+    if (meta.durationSeconds > MAX_DURATION_S) {
+      await unlink(filePath).catch(() => {});
+      return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
+    }
 
     const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
     const videoUrl  = `${serverUrl}/uploads/videos/${student.id}/${fileName}`;

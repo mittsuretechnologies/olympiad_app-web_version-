@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { recordAuditLog } from '@/lib/audit-log';
+import { requireModule } from '@/lib/auth-guard';
 
-function requireSuperAdmin(request: Request) {
+function requireModerationAccess(request: Request) {
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
-    return payload?.role === 'SUPERADMIN' ? payload : null;
+    return ['SUPERADMIN', 'MODERATOR'].includes(payload?.role) ? payload : null;
   } catch {
     return null;
   }
@@ -20,8 +21,11 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ videoId: string }> }
 ) {
-  const admin = requireSuperAdmin(request);
+  const admin = requireModerationAccess(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+
+  const moduleCheck = await requireModule(admin, 'moderation.reported');
+  if (moduleCheck.error) return moduleCheck.error;
 
   const { videoId } = await params;
 

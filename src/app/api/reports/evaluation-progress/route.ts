@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireRole, requireModule } from '@/lib/auth-guard';
 import { koshesForSlot, videoPercentFromKoshes, KoshKey } from '@/lib/kosh';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN', 'EVALUATOR', 'REVIEWER']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'EVALUATOR', 'REVIEWER']);
   if (error) return error;
+  const moduleCheck = await requireModule(payload, 'reports.evaluation-progress');
+  if (moduleCheck.error) return moduleCheck.error;
   try {
     // 1. Get all approved evaluation videos with their evaluation status
     const allVideos = await prisma.video.findMany({

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { koshesForSlot } from '@/lib/kosh';
+import { requireModule } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
   try {
@@ -18,6 +19,13 @@ export async function GET(request: Request) {
 
     if (!['EVALUATOR', 'SUPERADMIN', 'REVIEWER'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    // Reviewer/SuperAdmin are oversight roles with unconditional access here;
+    // only Evaluator is gated by the evaluator.content module permission.
+    if (payload.role === 'EVALUATOR') {
+      const moduleCheck = await requireModule(payload, 'evaluator.content');
+      if (moduleCheck.error) return moduleCheck.error;
     }
 
     // Evaluators can be scoped to specific states by code (see TalentEvaluator

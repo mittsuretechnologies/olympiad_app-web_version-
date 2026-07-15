@@ -1,22 +1,38 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 
-// POST /api/reels/[id]/share
-// Body: { senderUserId: string, recipientUserIds: string[] }
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+function getAppUserIdFromToken(request: Request): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = verify(token, JWT_SECRET) as any;
+    if (decoded.role !== 'APP_USER') return null;
+    return decoded.id;
+  } catch {
+    return null;
+  }
+}
+
+// POST /api/reels/[id]/share — shares from the authenticated caller
+// Body: { recipientUserIds: string[] }
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: videoId } = await params;
+    const senderUserId = getAppUserIdFromToken(request);
     const body = await request.json();
-    const senderUserId: string = (body.senderUserId ?? '').toString().trim();
     const recipientUserIds: string[] = Array.isArray(body.recipientUserIds)
       ? body.recipientUserIds.map((r: unknown) => String(r).trim()).filter(Boolean)
       : [];
 
     if (!senderUserId) {
-      return NextResponse.json({ message: 'senderUserId is required' }, { status: 400 });
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
     if (!recipientUserIds.length) {
       return NextResponse.json({ message: 'recipientUserIds must be a non-empty array' }, { status: 400 });

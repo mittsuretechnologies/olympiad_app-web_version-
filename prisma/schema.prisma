@@ -323,6 +323,7 @@ model AppOtp {
   id         String   @id @default(uuid())
   identifier String   @unique
   otpHash    String
+  attempts   Int      @default(0)
   expiresAt  DateTime
   createdAt  DateTime @default(now())
 

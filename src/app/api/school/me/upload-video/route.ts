@@ -4,10 +4,11 @@ import { writeFile, mkdir, unlink, stat, rename } from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
 import { probeVideo, cropTo9x16, compressVideo } from '@/lib/videoProbe';
+import { prisma } from '@/lib/prisma';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
 
-const JWT_SECRET      = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET      = process.env.JWT_SECRET || 'fallback_secret';
 const MAX_BYTES       = 150 * 1024 * 1024; // 150 MB — above this, auto-compress (no hard upper cap)
 const MAX_DURATION_S  = 120; // 2 minutes
 const TARGET_RATIO    = 9 / 16;
@@ -65,6 +66,35 @@ export async function POST(request: Request) {
     }
     if (!studentId) {
       return NextResponse.json({ error: 'studentId is required' }, { status: 400 });
+    }
+
+    // Verify studentId belongs to this school (web-registered Student or
+    // app-registered AppUser, mirroring the ownership check in POST /videos)
+    // before it's used to build a filesystem path — this blocks both
+    // cross-school disk writes and directory-traversal via a crafted value.
+    const webStudent = await prisma.student.findUnique({
+      where: { id: studentId },
+      select: { allocation: { select: { schoolId: true } } },
+    });
+    const ownsAsStudent = webStudent && webStudent.allocation?.schoolId === school.id;
+
+    let ownsAsAppUser = false;
+    if (!ownsAsStudent) {
+      const appUser = await prisma.appUser.findUnique({
+        where: { id: studentId },
+        select: { olympiadId: true },
+      });
+      if (appUser?.olympiadId) {
+        const allocation = await prisma.olympiadIdAllocation.findUnique({
+          where: { code: appUser.olympiadId },
+          select: { schoolId: true },
+        });
+        ownsAsAppUser = allocation?.schoolId === school.id;
+      }
+    }
+
+    if (!ownsAsStudent && !ownsAsAppUser) {
+      return NextResponse.json({ error: 'Student not found for this school' }, { status: 403 });
     }
 
     const ext        = (file.name.split('.').pop() || 'mp4').toLowerCase();

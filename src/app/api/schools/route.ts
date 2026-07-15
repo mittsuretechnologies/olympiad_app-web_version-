@@ -4,8 +4,11 @@ import { prisma } from '@/lib/prisma';
 import { CLASS_CODE_BY_NAME } from '@/lib/classes';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 import { stateNameToCode } from '@/lib/indianStateCodes';
+import { requireRole } from '@/lib/auth-guard';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const schools = await prisma.school.findMany({
       orderBy: { createdAt: 'desc' },
@@ -52,6 +55,8 @@ function buildCrmPrefix(crmId: string): string {
 }
 
 export async function POST(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const body = await request.json();
     const {

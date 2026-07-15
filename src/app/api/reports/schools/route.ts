@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireRole, requireModule } from '@/lib/auth-guard';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
+  if (error) return error;
+  const moduleCheck = await requireModule(payload, 'reports.schools');
+  if (moduleCheck.error) return moduleCheck.error;
   try {
     const schools = await prisma.school.findMany({
       orderBy: { name: 'asc' },

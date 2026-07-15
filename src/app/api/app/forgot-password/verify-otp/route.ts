@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 
+const MAX_APP_OTP_ATTEMPTS = 5;
+
 function isEmail(val: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
 }
@@ -24,11 +26,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No OTP requested for this contact. Please resend.' }, { status: 400 });
     }
     if (record.expiresAt < new Date()) {
+      await prisma.appOtp.delete({ where: { identifier: `reset:${lookupId}` } }).catch(() => {});
       return NextResponse.json({ message: 'OTP has expired. Please request a new one.' }, { status: 400 });
+    }
+    if (record.attempts >= MAX_APP_OTP_ATTEMPTS) {
+      await prisma.appOtp.delete({ where: { identifier: `reset:${lookupId}` } }).catch(() => {});
+      return NextResponse.json({ message: 'Too many incorrect attempts. Please request a new OTP.' }, { status: 429 });
     }
 
     const ok = await bcrypt.compare(otp.trim(), record.otpHash);
     if (!ok) {
+      await prisma.appOtp.update({
+        where: { identifier: `reset:${lookupId}` },
+        data: { attempts: { increment: 1 } },
+      }).catch(() => {});
       return NextResponse.json({ message: 'Incorrect OTP. Please try again.' }, { status: 400 });
     }
 

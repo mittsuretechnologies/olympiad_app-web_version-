@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { koshesForSlot, videoSlot } from '@/lib/kosh';
 import { recordAuditLog } from '@/lib/audit-log';
 import { evaluatorCanAccessVideo } from '@/lib/evaluatorRegion';
+import { requireModule } from '@/lib/auth-guard';
 
 const MAX_PER_CRITERION = 5;
 
@@ -23,6 +24,9 @@ export async function POST(request: Request) {
     if (!['EVALUATOR', 'SUPERADMIN'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+
+    const moduleCheck = await requireModule(payload, 'evaluator.content');
+    if (moduleCheck.error) return moduleCheck.error;
 
     let evaluatorId = payload.id;
     if (payload.role === 'SUPERADMIN') {

@@ -1,20 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 
-// POST /api/reels/[id]/like
-// Body: { userId: string, userType: "student" | "viewer" | "anonymous" }
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+
+function getAppUserIdFromToken(request: Request): string | null {
+  const authHeader = request.headers.get('Authorization');
+  if (!authHeader?.startsWith('Bearer ')) return null;
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = verify(token, JWT_SECRET) as any;
+    if (decoded.role !== 'APP_USER') return null;
+    return decoded.id;
+  } catch {
+    return null;
+  }
+}
+
+// POST /api/reels/[id]/like — likes/unlikes on behalf of the authenticated caller
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: videoId } = await params;
-    const body = await request.json();
-    const userId   = (body.userId   ?? '').toString().trim();
-    const userType = (body.userType ?? 'anonymous').toString().trim();
+    const userId = getAppUserIdFromToken(request);
+    const userType = 'app_user';
 
     if (!userId) {
-      return NextResponse.json({ message: 'userId is required' }, { status: 400 });
+      return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
     }
 
     // Check video exists and is public + approved
@@ -66,14 +80,14 @@ export async function POST(
   }
 }
 
-// GET /api/reels/[id]/like?userId=<id>  — check if user liked this video
+// GET /api/reels/[id]/like — check if the authenticated caller liked this video
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const { id: videoId } = await params;
-    const userId = new URL(request.url).searchParams.get('userId') ?? '';
+    const userId = getAppUserIdFromToken(request) ?? '';
 
     if (!userId) {
       return NextResponse.json({ liked: false });

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { koshesForSlot, videoPercentFromKoshes } from '@/lib/kosh';
+import { requireModule } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
   try {
@@ -18,6 +19,13 @@ export async function GET(request: Request) {
 
     if (!['EVALUATOR', 'SUPERADMIN', 'REVIEWER'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    }
+
+    // Reviewer/SuperAdmin are oversight roles with unconditional access here;
+    // only Evaluator is gated by the evaluator.history module permission.
+    if (payload.role === 'EVALUATOR') {
+      const moduleCheck = await requireModule(payload, 'evaluator.history');
+      if (moduleCheck.error) return moduleCheck.error;
     }
 
     // Every evaluator/admin sees the full combined history for every student —

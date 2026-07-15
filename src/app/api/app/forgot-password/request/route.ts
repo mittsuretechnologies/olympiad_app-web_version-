@@ -40,11 +40,12 @@ export async function POST(request: Request) {
       where: type === 'email' ? { email: id } : { mobile },
       select: { id: true },
     });
+
+    // Always respond the same way whether or not an account exists, so this
+    // endpoint can't be used to enumerate registered emails/mobiles.
+    const genericResponse = { message: 'If an account exists for this contact, an OTP has been sent.', type };
     if (accounts.length === 0) {
-      return NextResponse.json(
-        { message: 'No account is registered with this email/mobile' },
-        { status: 404 }
-      );
+      return NextResponse.json(genericResponse);
     }
 
     const otp = generateOtp();
@@ -54,18 +55,18 @@ export async function POST(request: Request) {
     // "reset:" prefix keeps password-reset OTPs separate from signup OTPs.
     await prisma.appOtp.upsert({
       where: { identifier: `reset:${lookupId}` },
-      update: { otpHash, expiresAt },
+      update: { otpHash, expiresAt, attempts: 0 },
       create: { identifier: `reset:${lookupId}`, otpHash, expiresAt },
     });
 
     if (type === 'email') {
       try {
         await sendOtpEmail(id, otp, 'reset');
-        return NextResponse.json({ message: `OTP sent to ${id}. It expires in 5 minutes.`, type });
+        return NextResponse.json({ ...genericResponse, devOtp: undefined });
       } catch (mailErr) {
         console.error(`Reset OTP email to ${id} failed:`, mailErr);
         if (process.env.NODE_ENV !== 'production') {
-          return NextResponse.json({ message: 'OTP sent (dev fallback)', type, devOtp: otp });
+          return NextResponse.json({ ...genericResponse, devOtp: otp });
         }
         return NextResponse.json(
           { message: 'Could not send the OTP email. Please try again.' },
@@ -77,8 +78,7 @@ export async function POST(request: Request) {
     // TODO: mobile OTP needs an SMS provider; dev-only for now.
     console.log(`[DEV] Reset OTP for ${lookupId}: ${otp}`);
     return NextResponse.json({
-      message: 'OTP sent successfully',
-      type,
+      ...genericResponse,
       devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
     });
   } catch (error) {

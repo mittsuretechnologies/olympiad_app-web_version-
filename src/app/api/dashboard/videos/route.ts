@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
@@ -152,8 +152,11 @@ export async function DELETE(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
   if (error) return error;
+
+  const moduleCheck = await requireModule(payload, 'moderation.pending');
+  if (moduleCheck.error) return moduleCheck.error;
 
   try {
     const { videoId, videoIds, status, rejectionReason } = await request.json();
