@@ -52,6 +52,11 @@ interface School {
   isActive?: boolean;
 }
 
+function authHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') || '' : '';
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 const CLASS_OPTIONS = [
   { name: 'Nursery', code: 'N' },
   { name: 'LKG', code: 'L' },
@@ -159,7 +164,7 @@ export default function SchoolsPage() {
     try {
       const res = await fetch('/api/schools', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(formData),
       });
       if (res.ok) {
@@ -207,7 +212,7 @@ export default function SchoolsPage() {
     try {
       const res = await fetch(`/api/schools/${editingSchool.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(editFormData),
       });
       if (res.ok) {
@@ -242,7 +247,7 @@ export default function SchoolsPage() {
     setAllocPadding(2);
 
     try {
-      const res = await fetch(`/api/schools/${school.id}/olympiad-ids`);
+      const res = await fetch(`/api/schools/${school.id}/olympiad-ids`, { headers: authHeaders() });
       const data = await res.json();
       const loadedAllocations = Array.isArray(data) ? data : [];
       setAllocations(loadedAllocations);
@@ -266,7 +271,7 @@ export default function SchoolsPage() {
   const refreshAllocations = async (schoolId: string) => {
     setAllocLoading(true);
     try {
-      const res = await fetch(`/api/schools/${schoolId}/olympiad-ids`);
+      const res = await fetch(`/api/schools/${schoolId}/olympiad-ids`, { headers: authHeaders() });
       const data = await res.json();
       const loaded = Array.isArray(data) ? data : [];
       setAllocations(loaded);
@@ -311,7 +316,7 @@ export default function SchoolsPage() {
     try {
       const res = await fetch(`/api/schools/${viewSchool.id}/olympiad-ids`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({
           prefix: allocPrefix.trim(),
           padding: allocPadding,
@@ -351,6 +356,7 @@ export default function SchoolsPage() {
     try {
       const res = await fetch(`/api/schools/${viewSchool.id}/olympiad-ids/send`, {
         method: 'POST',
+        headers: authHeaders(),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -394,6 +400,7 @@ export default function SchoolsPage() {
     try {
       const res = await fetch(`/api/schools/${deleteTarget.id}`, {
         method: 'DELETE',
+        headers: authHeaders(),
       });
       if (res.ok) {
         setDeleteTarget(null);
@@ -416,7 +423,7 @@ export default function SchoolsPage() {
     try {
       const res = await fetch(`/api/schools/${toggleTarget.id}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ isActive: !toggleTarget.isActive }),
       });
       if (res.ok) {
@@ -461,7 +468,7 @@ export default function SchoolsPage() {
       try {
         const res = await fetch('/api/schools/bulk', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify({ schools: formattedData }),
         });
         if (res.ok) {

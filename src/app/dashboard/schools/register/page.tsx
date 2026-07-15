@@ -4,6 +4,11 @@ import { useState } from 'react';
 import { CLASSES } from '@/lib/classes';
 import { STATES, getDistrictsForState } from '@/lib/locations';
 
+function authHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') || '' : '';
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 export default function RegisterSchoolPage() {
   const [formData, setFormData] = useState({
     schoolName: '',
@@ -108,7 +113,7 @@ export default function RegisterSchoolPage() {
     try {
       const res = await fetch('/api/schools', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({
           name: formData.schoolName,
           olympiadId: formData.olympiadId,

@@ -6,6 +6,11 @@ import * as XLSX from 'xlsx';
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
+function authHeaders(): Record<string, string> {
+  const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') || '' : '';
+  return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
+}
+
 interface ParsedRow {
   name: string;
   olympiadId: string;
@@ -267,7 +272,7 @@ export default function BulkUploadPage() {
       try {
         const res = await fetch('/api/schools', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: authHeaders(),
           body: JSON.stringify(school),
         });
         const data = await res.json();

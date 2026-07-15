@@ -295,7 +295,8 @@ function SuperAdminDashboard() {
   const fetchOverview = (range: DateRange) => {
     setLoading(true);
     const qs = range ? `?from=${range.from}&to=${range.to}` : '';
-    fetch(`/api/dashboard/overview${qs}`)
+    const token = sessionStorage.getItem('token') || '';
+    fetch(`/api/dashboard/overview${qs}`, { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(d => setData(d))
       .finally(() => setLoading(false));
@@ -805,7 +806,8 @@ function ReviewerDashboard() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/dashboard/overview')
+    const token = sessionStorage.getItem('reviewerToken') || '';
+    fetch('/api/dashboard/overview', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
       .then(d => setPendingCount(d?.stats?.pendingVideos ?? 0))
       .catch(() => {})
