@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 
 export async function POST(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'EVALUATOR']);
   if (error) return error;
+
+  const moduleCheck = await requireModule(payload, 'evaluator.content');
+  if (moduleCheck.error) return moduleCheck.error;
 
   try {
     const { videoId, publish } = await request.json();

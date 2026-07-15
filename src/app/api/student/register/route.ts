@@ -30,7 +30,7 @@ export async function POST(request: Request) {
     const otp = String(Math.floor(100000 + Math.random() * 900000));
     const expires = Date.now() + 5 * 60 * 1000; // 5 min
 
-    otpStore.set(olympiadCode.trim(), { otp, expires, name: name.trim(), phone: phone.trim() });
+    otpStore.set(olympiadCode.trim(), { otp, expires, name: name.trim(), phone: phone.trim(), attempts: 0 });
 
     // TODO: Send real SMS here (Twilio/MSG91)
     console.log(`[OTP] Code: ${olympiadCode} | Name: ${name} | Phone: ${phone} | OTP: ${otp}`);

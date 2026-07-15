@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { viewerOtpStore } from '@/lib/viewerOtpStore';
+import { viewerOtpStore, MAX_VIEWER_OTP_ATTEMPTS } from '@/lib/viewerOtpStore';
 
 export async function POST(request: Request) {
   try {
@@ -24,7 +24,12 @@ export async function POST(request: Request) {
       viewerOtpStore.delete(normalized);
       return NextResponse.json({ message: 'OTP has expired. Please request a new one.' }, { status: 400 });
     }
+    if (record.attempts >= MAX_VIEWER_OTP_ATTEMPTS) {
+      viewerOtpStore.delete(normalized);
+      return NextResponse.json({ message: 'Too many incorrect attempts. Please request a new OTP.' }, { status: 429 });
+    }
     if (record.otp !== otp.trim()) {
+      record.attempts += 1;
       return NextResponse.json({ message: 'Invalid OTP. Please check and try again.' }, { status: 400 });
     }
 

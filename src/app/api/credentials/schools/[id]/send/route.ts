@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
+import { requireRole } from '@/lib/auth-guard';
 
 // POST /api/credentials/schools/:id/send — body: { method: 'sms' | 'email' }
 // Sends the school's current username + password via SMS or email.
@@ -10,6 +11,8 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const { id } = await params;
     const { method } = await request.json().catch(() => ({}));

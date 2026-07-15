@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { requireModule } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
   try {
@@ -20,6 +21,12 @@ export async function GET(request: Request) {
     }
 
     const isEvaluator = payload.role === 'EVALUATOR';
+    // Reviewer/SuperAdmin are oversight roles with unconditional access here;
+    // only Evaluator is gated by the evaluator.content module permission.
+    if (isEvaluator) {
+      const moduleCheck = await requireModule(payload, 'evaluator.content');
+      if (moduleCheck.error) return moduleCheck.error;
+    }
     const filter = isEvaluator ? { evaluatorId: payload.id } : {};
 
     // Get stats from evaluations

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { otpStore } from '@/lib/otpStore';
+import { otpStore, MAX_OTP_ATTEMPTS } from '@/lib/otpStore';
 
 export async function POST(request: Request) {
   try {
@@ -25,7 +25,12 @@ export async function POST(request: Request) {
       otpStore.delete(code);
       return NextResponse.json({ message: 'OTP expired. Please request again.' }, { status: 400 });
     }
+    if (stored.attempts >= MAX_OTP_ATTEMPTS) {
+      otpStore.delete(code);
+      return NextResponse.json({ message: 'Too many incorrect attempts. Please request a new OTP.' }, { status: 429 });
+    }
     if (stored.otp !== otp.trim()) {
+      stored.attempts += 1;
       return NextResponse.json({ message: 'Invalid OTP' }, { status: 400 });
     }
 

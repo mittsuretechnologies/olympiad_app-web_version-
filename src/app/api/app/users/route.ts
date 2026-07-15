@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireRole } from '@/lib/auth-guard';
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const users = await prisma.appUser.findMany({
       orderBy: { createdAt: 'desc' },

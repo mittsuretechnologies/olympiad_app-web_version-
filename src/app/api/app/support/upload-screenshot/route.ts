@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
+import { detectImageExtension } from '@/lib/fileSignature';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const MAX_BYTES  = 5 * 1024 * 1024; // 5 MB
@@ -39,14 +40,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Image exceeds 5 MB limit' }, { status: 413 });
     }
 
-    const ext       = (file.name.split('.').pop() || 'jpg').toLowerCase();
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const ext = detectImageExtension(buffer);
+    if (!ext) {
+      return NextResponse.json({ error: 'File must be a valid JPG, PNG, GIF, or WebP image' }, { status: 400 });
+    }
+
     const fileName  = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`;
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'support-screenshots', appUser.id);
     const filePath  = path.join(uploadDir, fileName);
 
     await mkdir(uploadDir, { recursive: true });
-
-    const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
 
     const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';

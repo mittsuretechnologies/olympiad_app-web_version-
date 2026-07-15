@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { stateNameToCode } from '@/lib/indianStateCodes';
+import { requireRole } from '@/lib/auth-guard';
 
 async function generateSchoolId(): Promise<string> {
   const last = await prisma.school.findFirst({
@@ -31,6 +32,8 @@ function generateUsername(schoolName: string, schoolId: string): string {
 }
 
 export async function POST(request: Request) {
+  const { error } = requireRole(request, ['SUPERADMIN']);
+  if (error) return error;
   try {
     const { schools } = await request.json();
 

@@ -2,26 +2,30 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getReportThreshold } from '@/lib/reportSettings';
+import { requireModule } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
-function requireSuperAdmin(request: Request) {
+function requireModerationAccess(request: Request) {
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
-    return payload?.role === 'SUPERADMIN' ? payload : null;
+    return ['SUPERADMIN', 'MODERATOR'].includes(payload?.role) ? payload : null;
   } catch {
     return null;
   }
 }
 
 // GET /api/dashboard/reported-videos — videos whose (unresolved) report count has
-// reached the configurable threshold. SuperAdmin only.
+// reached the configurable threshold. SuperAdmin and Moderator.
 export async function GET(request: Request) {
-  const admin = requireSuperAdmin(request);
+  const admin = requireModerationAccess(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+
+  const moduleCheck = await requireModule(admin, 'moderation.reported');
+  if (moduleCheck.error) return moduleCheck.error;
 
   try {
     const threshold = await getReportThreshold();
