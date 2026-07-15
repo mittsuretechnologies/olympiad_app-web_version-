@@ -20,6 +20,14 @@ interface RawState {
   districts: string[];
 }
 
+// Explicit overrides for districts whose auto-generated (position-based) code
+// does not match the code already in use / expected for that district.
+// Key: `${stateCode}:${districtName}`.
+const DISTRICT_CODE_OVERRIDES: Record<string, string> = {
+  'UK:Nainital': 'UK04',
+  'UK:Champawat': 'UK14',
+};
+
 const RAW_STATES: RawState[] = [
   { name: 'Andhra Pradesh', code: 'AP', districts: ['Alluri Sitharama Raju', 'Anakapalli', 'Anantapur', 'Annamayya', 'Bapatla', 'Chittoor', 'East Godavari', 'Eluru', 'Guntur', 'Kakinada', 'Konaseema', 'Krishna', 'Kurnool', 'Nandyal', 'NTR', 'Palnadu', 'Parvathipuram Manyam', 'Prakasam', 'Sri Potti Sriramulu Nellore', 'Sri Sathya Sai', 'Srikakulam', 'Tirupati', 'Visakhapatnam', 'Vizianagaram', 'West Godavari', 'YSR Kadapa'] },
   { name: 'Arunachal Pradesh', code: 'AR', districts: ['Anjaw', 'Changlang', 'Dibang Valley', 'East Kameng', 'East Siang', 'Kamle', 'Kra Daadi', 'Kurung Kumey', 'Lepa Rada', 'Lohit', 'Longding', 'Lower Dibang Valley', 'Lower Siang', 'Lower Subansiri', 'Namsai', 'Pakke Kessang', 'Papum Pare', 'Shi Yomi', 'Siang', 'Tawang', 'Tirap', 'Upper Dibang Valley', 'Upper Siang', 'Upper Subansiri', 'West Kameng', 'West Siang'] },
@@ -64,7 +72,7 @@ export const STATES: StateDef[] = RAW_STATES.map((s) => ({
   code: s.code,
   districts: s.districts.map((d, i) => ({
     name: d,
-    code: `${s.code}${String(i + 1).padStart(2, '0')}`,
+    code: DISTRICT_CODE_OVERRIDES[`${s.code}:${d}`] ?? `${s.code}${String(i + 1).padStart(2, '0')}`,
   })),
 })).sort((a, b) => a.name.localeCompare(b.name));
 
