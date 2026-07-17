@@ -441,7 +441,7 @@ function SuperAdminDashboard() {
               Review Now <ChevronRight size={10} />
             </Link>
           </div>
-          <div className="p-5 grid grid-cols-3 gap-3">
+          <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
             {moderationCards.map(m => {
               const Icon = m.icon;
               return (

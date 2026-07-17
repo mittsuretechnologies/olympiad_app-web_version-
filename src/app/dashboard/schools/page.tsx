@@ -1375,7 +1375,7 @@ export default function SchoolsPage() {
 
               {/* Allocations table */}
               <div className="border border-gray-300 overflow-hidden">
-                <div className="max-h-72 overflow-y-auto">
+                <div className="max-h-72 overflow-y-auto overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead className="bg-[#E8EAF6] sticky top-0">
                       <tr className="border-b-2 border-[#06013E] text-[#004f9f]">

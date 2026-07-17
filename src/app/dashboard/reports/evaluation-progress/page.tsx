@@ -302,7 +302,7 @@ export default function EvaluationProgressPage() {
       {/* ── Table ── */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
                 <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-8"></th>

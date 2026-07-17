@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, Star, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, MapPin } from 'lucide-react';
+import { Search, Loader2, Star, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, MapPin, Mail, CheckCircle } from 'lucide-react';
 import { INDIAN_STATE_CODES } from '@/lib/indianStateCodes';
 
 interface Evaluator {
@@ -34,6 +34,11 @@ export default function ManageEvaluatorsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
+  const [sendTarget, setSendTarget] = useState<Evaluator | null>(null);
+  const [sendBusy, setSendBusy] = useState(false);
+  const [sendError, setSendError] = useState('');
+  const [toast, setToast] = useState<string | null>(null);
+
   const [regionTarget, setRegionTarget] = useState<Evaluator | null>(null);
   const [regionStates, setRegionStates] = useState<string[]>([]);
   const [regionInput, setRegionInput] = useState('');
@@ -46,6 +51,27 @@ export default function ManageEvaluatorsPage() {
       .then(d => setRows(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, []);
+
+  const handleSendCredentials = async () => {
+    if (!sendTarget) return;
+    setSendBusy(true);
+    setSendError('');
+    try {
+      const res = await fetch(`/api/credentials/evaluators/${sendTarget.id}/send`, {
+        method: 'POST',
+        headers: authHeaders(),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to send credentials');
+      setToast(`Credentials emailed to ${data.sentTo || sendTarget.email}`);
+      setTimeout(() => setToast(null), 4000);
+      setSendTarget(null);
+    } catch (e: any) {
+      setSendError(e.message);
+    } finally {
+      setSendBusy(false);
+    }
+  };
 
   const openRegionModal = (r: Evaluator) => {
     setRegionTarget(r);
@@ -186,7 +212,7 @@ export default function ManageEvaluatorsPage() {
             {rows.length === 0 ? 'No evaluators yet. Add one to get started.' : 'No results found.'}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-gray-400">
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">#</th>
@@ -227,6 +253,10 @@ export default function ManageEvaluatorsPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => setSendTarget(r)} title="Email credentials"
+                        className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">
+                        <Mail size={14} />
+                      </button>
                       <button onClick={() => openRegionModal(r)} title="Assign region"
                         className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition-colors">
                         <MapPin size={14} />
@@ -244,7 +274,7 @@ export default function ManageEvaluatorsPage() {
                 </tr>
               ))}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 
@@ -298,6 +328,51 @@ export default function ManageEvaluatorsPage() {
                   className="flex-1 py-2.5 bg-[#004f9f] text-white text-sm font-bold rounded-lg hover:bg-[#003d7a] disabled:opacity-50 flex items-center justify-center gap-2">
                   {submitting ? <Loader2 size={14} className="animate-spin" /> : <Star size={14} />}
                   Create
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {toast && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#009846] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold">
+          <CheckCircle size={16} /> {toast}
+        </div>
+      )}
+
+      {sendTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="bg-amber-600 px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Email Credentials</p>
+                <p className="text-white font-bold text-sm mt-0.5">{sendTarget.name}</p>
+              </div>
+              <button onClick={() => { setSendTarget(null); setSendError(''); }} className="text-white/60 hover:text-white"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Send this evaluator&apos;s login credentials to{' '}
+                <span className="font-semibold text-gray-900">{sendTarget.email}</span>?
+              </p>
+              <p className="text-xs text-gray-500">
+                The email includes the Evaluator ID and current password they log in with. If the password was never set or reset, use the Reset action first.
+              </p>
+              {sendError && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 text-xs rounded-lg px-3 py-2">
+                  <AlertCircle size={13} className="mt-0.5 shrink-0" /> <span>{sendError}</span>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-1">
+                <button onClick={() => { setSendTarget(null); setSendError(''); }} disabled={sendBusy}
+                  className="px-4 py-2 text-xs font-bold text-gray-500 hover:text-gray-700 disabled:opacity-50">
+                  Cancel
+                </button>
+                <button onClick={handleSendCredentials} disabled={sendBusy}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-600 text-white text-xs font-bold rounded-lg hover:bg-amber-700 transition-colors disabled:opacity-50">
+                  {sendBusy ? <Loader2 size={13} className="animate-spin" /> : <Mail size={13} />}
+                  {sendBusy ? 'Sending...' : 'Send Email'}
                 </button>
               </div>
             </div>

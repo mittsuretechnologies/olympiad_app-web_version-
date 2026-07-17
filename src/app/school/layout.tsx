@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Hash, LayoutDashboard, Users, UserCircle, UploadCloud, PlaySquare, KeyRound } from 'lucide-react';
+import { LogOut, Hash, LayoutDashboard, Users, UserCircle, UploadCloud, PlaySquare, KeyRound, Menu, X } from 'lucide-react';
 import Image from 'next/image';
 import { isTokenExpired, clearSchoolSession } from '@/lib/session-token';
 
@@ -12,6 +12,18 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const [user, setUser] = useState<any>(null);
   const [ready, setReady] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // On mobile the sidebar is an overlay drawer: close it once navigation lands
+  // on a new route, otherwise it stays open on top of the page you just opened.
+  useEffect(() => { setSidebarOpen(false); }, [pathname]);
+
+  // The drawer covers the page, so let the drawer scroll rather than the body
+  // underneath it.
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
 
   useEffect(() => {
     const token = sessionStorage.getItem('schoolToken');
@@ -55,8 +67,49 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   return (
     <div className="min-h-screen bg-[#F1F3F7]" style={{ fontFamily: 'Inter, sans-serif' }}>
 
+      {/* Mobile top bar */}
+      <header className="lg:hidden fixed top-0 inset-x-0 h-16 z-30 flex items-center gap-3 px-4 bg-gradient-to-r from-[#0d1a6e] to-[#123a8f] border-b border-white/10 shadow-lg shadow-black/20">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="p-2 -ml-2 rounded-xl text-white hover:bg-white/10 active:bg-white/20 transition-colors"
+        >
+          <Menu size={22} />
+        </button>
+        <div className="flex items-center gap-2.5">
+          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
+            <Image src="/mittmee-icon.jpeg" alt="mittmee" width={36} height={36} className="object-cover w-full h-full" priority />
+          </div>
+          <span className="text-lg font-bold tracking-tight">
+            <span className="text-white">mitt</span><span className="text-[#4ADE80]">mee</span>
+          </span>
+        </div>
+        <div className="ml-auto w-9 h-9 rounded-full bg-gradient-to-br from-[#eda100] to-[#eb6834] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+          {initials}
+        </div>
+      </header>
+
+      {/* Drawer backdrop */}
+      <div
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+        className={`lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+          sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      />
+
       {/* Sidebar */}
-      <aside className="w-[260px] flex flex-col fixed top-0 h-screen z-40 bg-gradient-to-b from-[#0d1a6e] via-[#123a8f] to-[#052E5C]">
+      <aside className={`w-[260px] max-w-[85vw] flex flex-col fixed top-0 h-screen z-50 bg-gradient-to-b from-[#0d1a6e] via-[#123a8f] to-[#052E5C] transition-transform duration-300 ease-in-out lg:transition-none shadow-2xl shadow-black/40 lg:shadow-none ${
+        sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+      }`}>
+        {/* Drawer close */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close menu"
+          className="lg:hidden absolute top-3 right-3 z-10 p-2 rounded-xl bg-black/25 text-white hover:bg-black/45 transition-colors"
+        >
+          <X size={18} />
+        </button>
         <div className="flex-1 flex flex-col overflow-hidden relative">
         <div className="absolute -top-10 -right-16 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute top-1/2 -left-14 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
@@ -139,7 +192,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
       </aside>
 
       {/* Main content */}
-      <main className="ml-[260px] min-h-screen">
+      <main className="lg:ml-[260px] min-h-screen pt-16 lg:pt-0">
         <div className="px-2.5 py-2.5 max-w-[1600px] mx-auto">{children}</div>
       </main>
     </div>

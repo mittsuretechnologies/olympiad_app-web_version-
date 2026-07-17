@@ -251,7 +251,7 @@ export default function SchoolRegisteredStudentsPage() {
       ) : view === 'table' ? (
         <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm border-collapse">
+            <table className="w-full text-sm border-collapse min-w-[640px]">
               <thead>
                 <tr className="bg-gradient-to-r from-[#1559C7]/5 to-transparent text-gray-500">
                   <th className="border border-[#E7EBF2] px-4 py-3 text-left text-[10.5px] font-bold uppercase tracking-wide w-12">Sr.No.</th>

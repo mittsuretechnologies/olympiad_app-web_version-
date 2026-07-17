@@ -105,7 +105,7 @@ export default function ReviewerCredentialsPage() {
             {rows.length === 0 ? 'No reviewers found.' : 'No results match your search.'}
           </div>
         ) : (
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto"><table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-gray-400">
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">#</th>
@@ -158,7 +158,7 @@ export default function ReviewerCredentialsPage() {
                 );
               })}
             </tbody>
-          </table>
+          </table></div>
         )}
       </div>
 

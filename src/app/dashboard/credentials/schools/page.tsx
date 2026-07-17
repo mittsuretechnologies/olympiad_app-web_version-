@@ -155,7 +155,7 @@ export default function SchoolCredentialsPage() {
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-sm border-collapse">
+        <table className="w-full text-sm border-collapse min-w-[640px]">
           <thead>
             <tr className="bg-[#E8EAF6] border-b-2 border-[#06013E] text-[#004f9f]">
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300 w-12">#</th>
