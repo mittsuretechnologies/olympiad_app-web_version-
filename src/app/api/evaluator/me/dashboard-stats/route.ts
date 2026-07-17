@@ -29,6 +29,20 @@ export async function GET(request: Request) {
     }
     const filter = isEvaluator ? { evaluatorId: payload.id } : {};
 
+    // Evaluators can be scoped to specific states by code (see TalentEvaluator
+    // .assignedStates, e.g. ["RJ", "GJ"]). Empty array = unrestricted.
+    // SuperAdmin/Reviewer always see everything (oversight roles).
+    let regionFilter: string[] | null = null;
+    if (isEvaluator) {
+      const evaluator = await prisma.talentEvaluator.findUnique({
+        where: { id: payload.id },
+        select: { assignedStates: true },
+      });
+      if (evaluator && evaluator.assignedStates.length > 0) {
+        regionFilter = evaluator.assignedStates;
+      }
+    }
+
     // Get stats from evaluations
     const [evaluationsCount, scoreAggregates, recentEvaluations, approvedVideos] = await Promise.all([
       // 1. Total evaluated count (kosh rows, not videos)
@@ -67,10 +81,44 @@ export async function GET(request: Request) {
       // 4. All approved evaluation videos with their kosh count, to derive pending (< 2 koshas scored)
       prisma.video.findMany({
         where: { isEvaluation: true, status: 'APPROVED', deletedAt: null, OR: [{ studentId: { not: null } }, { appUserId: { not: null } }] },
-        select: { id: true, _count: { select: { evaluations: true } } },
+        select: {
+          id: true,
+          appUserId: true,
+          _count: { select: { evaluations: true } },
+          student: { select: { allocation: { select: { school: { select: { stateCode: true } } } } } },
+        },
       }),
     ]);
-    const pendingQueue = approvedVideos.filter(v => v._count.evaluations < 2).length;
+
+    let regionScopedApproved = approvedVideos;
+    if (regionFilter) {
+      const appUserIds2 = [...new Set(approvedVideos.filter(v => v.appUserId).map(v => v.appUserId!))];
+      const appUsers2 = appUserIds2.length
+        ? await prisma.appUser.findMany({ where: { id: { in: appUserIds2 } }, select: { id: true, olympiadId: true } })
+        : [];
+      const appUserById2 = new Map(appUsers2.map(u => [u.id, u]));
+      const appOlympiadCodes2 = appUsers2.map(u => u.olympiadId).filter(Boolean) as string[];
+      const appAllocations2 = appOlympiadCodes2.length
+        ? await prisma.olympiadIdAllocation.findMany({
+            where: { code: { in: appOlympiadCodes2 } },
+            select: { code: true, school: { select: { stateCode: true } } },
+          })
+        : [];
+      const allocByCode2 = new Map(appAllocations2.map(a => [a.code, a]));
+
+      regionScopedApproved = approvedVideos.filter(v => {
+        let stateCode: string | null = null;
+        if (v.student) {
+          stateCode = v.student.allocation?.school?.stateCode ?? null;
+        } else if (v.appUserId) {
+          const appUser = appUserById2.get(v.appUserId);
+          const alloc = appUser?.olympiadId ? allocByCode2.get(appUser.olympiadId) : null;
+          stateCode = alloc?.school?.stateCode ?? null;
+        }
+        return stateCode !== null && regionFilter!.includes(stateCode);
+      });
+    }
+    const pendingQueue = regionScopedApproved.filter(v => v._count.evaluations < 2).length;
 
     // Resolve app user details for recent evaluations if they were uploaded by app users
     const appUserIds = recentEvaluations
