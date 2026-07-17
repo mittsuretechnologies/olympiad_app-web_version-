@@ -463,10 +463,6 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            <p className="mt-7 text-center text-xs text-slate-400">
-              &copy; 2026 Mittsure Technologies. All rights reserved.
-            </p>
           </div>
         </motion.div>
       </div>
