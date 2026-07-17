@@ -80,13 +80,18 @@ export default function ResultPage() {
 
   const states = useMemo(() => ['All', ...Array.from(new Set(rows.map(r => r.state).filter(Boolean) as string[])).sort()], [rows]);
   const schools = useMemo(() => {
-    const unique = Array.from(new Map(rows.map(r => [r.schoolId, r.schoolName])).entries()).filter(([id]) => id)
+    const scoped = filterState === 'All' ? rows : rows.filter(r => r.state === filterState);
+    const unique = Array.from(new Map(scoped.map(r => [r.schoolId, r.schoolName])).entries()).filter(([id]) => id)
       .sort((a, b) => (a[1] || '').localeCompare(b[1] || ''));
     return [['All', 'All Schools'], ...unique] as [string, string][];
-  }, [rows]);
+  }, [rows, filterState]);
 
   const activeFilterCount = [filterState, filterSchool, filterStatus].filter(v => v !== 'All').length;
   const clearFilters = () => { setFilterState('All'); setFilterSchool('All'); setFilterStatus('All'); setSearch(''); };
+  const handleStateChange = (value: string) => {
+    setFilterState(value);
+    setFilterSchool('All');
+  };
 
   const filtered = useMemo(() => {
     return rows.filter(r => {
@@ -186,7 +191,7 @@ export default function ResultPage() {
             <input type="text" placeholder="Search name/code…" value={search} onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none" />
           </div>
-          <select value={filterState} onChange={e => setFilterState(e.target.value)}
+          <select value={filterState} onChange={e => handleStateChange(e.target.value)}
             className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-amber-300 outline-none">
             {states.map(s => <option key={s} value={s}>{s === 'All' ? 'All States' : s}</option>)}
           </select>
