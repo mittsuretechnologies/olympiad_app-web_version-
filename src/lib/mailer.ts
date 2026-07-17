@@ -134,6 +134,63 @@ export async function sendOtpEmail(
   });
 }
 
+export interface EvaluatorCredentialsMail {
+  to: string;
+  evaluatorName: string;
+  evaluatorId: string;
+  password: string;
+}
+
+export async function sendEvaluatorCredentialsEmail(data: EvaluatorCredentialsMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(
+      `[MAILER not configured] Credentials for ${data.evaluatorName} (${data.to}): ` +
+        `evaluatorId=${data.evaluatorId} password=${data.password}`
+    );
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const html = `
+  <div style="font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;border:1px solid #e5e7eb">
+    <div style="background:#004f9f;color:#ffffff;padding:18px 24px">
+      <h2 style="margin:0;font-size:20px">Mittmee — Evaluator Account</h2>
+    </div>
+    <div style="padding:24px;color:#1f2937;font-size:14px;line-height:1.6">
+      <p>Dear ${data.evaluatorName},</p>
+      <p>An evaluator account has been created for you on the Mittmee platform.
+      Use the credentials below to log in and start evaluating submissions:</p>
+      <table style="border-collapse:collapse;margin:16px 0;font-size:14px">
+        <tr>
+          <td style="border:1px solid #d1d5db;padding:8px 14px;background:#f9fafb"><b>Evaluator ID</b></td>
+          <td style="border:1px solid #d1d5db;padding:8px 14px;font-family:Consolas,monospace">${data.evaluatorId}</td>
+        </tr>
+        <tr>
+          <td style="border:1px solid #d1d5db;padding:8px 14px;background:#f9fafb"><b>Password</b></td>
+          <td style="border:1px solid #d1d5db;padding:8px 14px;font-family:Consolas,monospace">${data.password}</td>
+        </tr>
+      </table>
+      <p>Log in with your <b>Evaluator ID</b> and the password above — not your email address.</p>
+      <p style="color:#b91c1c"><b>Please keep these credentials safe</b> and do not share them with anyone.</p>
+      <p>Regards,<br/>Team Mittmee</p>
+    </div>
+    <div style="background:#f3f4f6;color:#6b7280;padding:12px 24px;font-size:11px">
+      This is an automated email — please do not reply.
+    </div>
+  </div>`;
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'Your Mittmee Evaluator Login Credentials',
+    html,
+    text:
+      `Dear ${data.evaluatorName},\n\nAn evaluator account has been created for you on Mittmee.\n\n` +
+      `Evaluator ID: ${data.evaluatorId}\nPassword: ${data.password}\n\n` +
+      `Log in with your Evaluator ID and the password above — not your email address.\n\n` +
+      `Please keep these credentials safe.\n\nRegards,\nTeam Mittmee`,
+  });
+}
+
 export interface StudentCredentialsMail {
   to: string;
   studentName: string;

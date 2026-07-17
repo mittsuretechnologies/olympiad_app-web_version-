@@ -12,42 +12,8 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  Users,
-  School,
-  Trophy,
-  Sparkles,
-  TrendingUp,
-  CalendarClock,
-  Activity,
   ShieldCheck,
 } from 'lucide-react';
-
-const STATS = [
-  { icon: Users, value: '50,000+', label: 'Students Empowered', tint: 'from-emerald-500/30 to-green-500/20', ring: 'ring-emerald-400/20', ic: 'text-emerald-300' },
-  { icon: School, value: '1,200+', label: 'Schools Onboarded', tint: 'from-blue-500/30 to-indigo-500/20', ring: 'ring-blue-400/20', ic: 'text-blue-300' },
-  { icon: Trophy, value: '25+', label: 'Olympiads Conducted', tint: 'from-amber-500/30 to-yellow-500/20', ring: 'ring-amber-400/20', ic: 'text-amber-300' },
-];
-
-const TOPPERS = [
-  { rank: 1, name: 'Arjun Malhotra', subject: 'Mathematics Olympiad 2026', school: 'Delhi Public School', medal: 'from-amber-400 to-yellow-500', av: 'from-rose-400 to-pink-500' },
-  { rank: 2, name: 'Myra Sharma', subject: 'Science Olympiad 2026', school: 'Ryan Int. School', medal: 'from-slate-300 to-slate-400', av: 'from-violet-400 to-indigo-500' },
-  { rank: 3, name: 'Vihaan Kapoor', subject: 'English Olympiad 2026', school: "St. Xavier's School", medal: 'from-orange-400 to-amber-600', av: 'from-cyan-400 to-teal-500' },
-];
-
-const MINI = [
-  { icon: Activity, value: '12,438', label: 'Active Today', ic: 'text-emerald-300' },
-  { icon: CalendarClock, value: '3 Days', label: 'To Next Olympiad', ic: 'text-blue-300' },
-  { icon: TrendingUp, value: '98.7%', label: 'Participation Growth', ic: 'text-rose-300' },
-];
-
-function initials(name: string) {
-  return name
-    .split(' ')
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
 
 /* ---------- Typewriter headline ---------- */
 // "Empowering Future " (white) then "Champions" (teal). The split index marks
@@ -342,114 +308,13 @@ export default function LoginPage() {
             </span>
           </div>
 
-          {/* Headline + stat cards (side by side like reference) */}
-          <div className="flex items-start justify-between gap-8">
-            <div className="max-w-xl">
-              <h1 className="min-h-[2.4em] text-4xl xl:text-5xl font-extrabold leading-[1.08] tracking-tight">
-                <Typewriter />
-              </h1>
-            </div>
-
-            {/* Vertical stat cards */}
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.6, delay: 0.24 }}
-              className="hidden xl:flex w-[230px] shrink-0 flex-col gap-3"
-            >
-              {STATS.map(({ icon: Icon, value, label, tint, ring, ic }, i) => (
-                <motion.div
-                  key={label}
-                  initial={{ opacity: 0, x: 24 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.5, delay: 0.4 + i * 0.12 }}
-                  whileHover={{ y: -4, scale: 1.03 }}
-                  className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.05] p-3.5 backdrop-blur-md shadow-lg shadow-black/20 transition-colors hover:border-cyan-400/30"
-                >
-                  <div className={`inline-flex rounded-xl bg-gradient-to-br ${tint} p-2.5 ring-1 ${ring}`}>
-                    <Icon className={`w-5 h-5 ${ic}`} />
-                  </div>
-                  <div>
-                    <div className="text-lg font-bold leading-tight text-white">{value}</div>
-                    <div className="text-[11px] leading-tight text-slate-400">{label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
+          {/* Headline */}
+          <div className="max-w-xl">
+            <h1 className="min-h-[2.4em] text-4xl xl:text-5xl font-extrabold leading-[1.08] tracking-tight">
+              <Typewriter />
+            </h1>
           </div>
 
-          {/* Celebrating Excellence — toppers */}
-          <div className="mt-auto">
-            <div className="mb-3 flex items-center gap-2">
-              <Sparkles className="w-4 h-4 text-cyan-300" />
-              <span className="text-sm font-semibold text-slate-200">
-                Celebrating Excellence
-              </span>
-            </div>
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6, delay: 0.34 }}
-              className="grid grid-cols-3 gap-3 max-w-3xl"
-            >
-              {TOPPERS.map((t, i) => (
-                <motion.div
-                  key={t.rank}
-                  initial={{ opacity: 0, y: 24 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.5 + i * 0.12 }}
-                  whileHover={{ y: -4, scale: 1.03 }}
-                  className="flex items-center gap-3 rounded-xl border border-white/10 bg-gradient-to-br from-white/[0.08] to-white/[0.02] p-3 backdrop-blur-md shadow-lg shadow-black/20 transition-colors hover:border-amber-300/30"
-                >
-                  {/* Avatar with medal badge */}
-                  <div className="relative shrink-0">
-                    <motion.div
-                      className={`flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br ${t.av} text-sm font-extrabold text-white shadow-md`}
-                      whileHover={{ rotate: -6, scale: 1.08 }}
-                    >
-                      {initials(t.name)}
-                    </motion.div>
-                    <div
-                      className={`absolute -bottom-1.5 -left-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br ${t.medal} text-[10px] font-extrabold text-slate-900 ring-2 ring-[#0a1228]`}
-                    >
-                      {t.rank}
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold uppercase tracking-wide text-amber-300">
-                      AIR {t.rank}
-                    </div>
-                    <div className="truncate text-sm font-semibold text-white">
-                      {t.name}
-                    </div>
-                    <div className="truncate text-[10px] text-slate-400">
-                      {t.subject}
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </motion.div>
-
-            {/* Mini stats row */}
-            <div className="mt-4 grid grid-cols-3 gap-3 max-w-3xl">
-              {MINI.map(({ icon: Icon, value, label, ic }, i) => (
-                <motion.div
-                  key={label}
-                  initial={{ opacity: 0, y: 16 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.5, delay: 0.85 + i * 0.1 }}
-                  whileHover={{ y: -3 }}
-                  className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 backdrop-blur-md transition-colors hover:border-white/20"
-                >
-                  <Icon className={`w-5 h-5 shrink-0 ${ic}`} />
-                  <div>
-                    <div className="text-sm font-bold leading-tight text-white">{value}</div>
-                    <div className="text-[11px] leading-tight text-slate-400">{label}</div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </div>
         </div>
       </div>
 
@@ -598,10 +463,6 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            <p className="mt-7 text-center text-xs text-slate-400">
-              &copy; 2026 Mittsure Technologies. All rights reserved.
-            </p>
           </div>
         </motion.div>
       </div>

@@ -279,7 +279,7 @@ export default function PermissionControlPage() {
           ) : members.length === 0 ? (
             <p className="text-xs text-gray-400 text-center py-4">No {roleLabel(activeRole).toLowerCase()}s found.</p>
           ) : (
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {members.map(m => {
                 const hasOverride = individualPerms.some(p => p.memberId === m.id);
                 const isSelected = selectedMember?.id === m.id;

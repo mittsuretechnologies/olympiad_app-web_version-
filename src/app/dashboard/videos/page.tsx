@@ -471,7 +471,7 @@ export default function VideoModerationPage() {
           </div>
 
           {/* Card grid */}
-          <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {videos.map((video) => {
               const school    = video.student?.allocation?.school;
               const busy      = processingId === video.id;

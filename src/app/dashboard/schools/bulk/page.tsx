@@ -461,7 +461,7 @@ export default function BulkUploadPage() {
             </div>
 
             <div className="overflow-x-auto border border-gray-200">
-              <table className="w-full text-xs">
+              <table className="w-full text-xs min-w-[560px]">
                 <thead>
                   <tr className="bg-gray-100 text-black uppercase tracking-wide">
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">#</th>
@@ -551,7 +551,7 @@ export default function BulkUploadPage() {
               <div>
                 <p className={`${labelCls} mb-2`}>Created Schools & Credentials</p>
                 <div className="overflow-x-auto border border-gray-200">
-                  <table className="w-full text-xs">
+                  <table className="w-full text-xs min-w-[560px]">
                     <thead>
                       <tr className="bg-[#009846] text-white uppercase tracking-wide">
                         <th className="text-left px-3 py-2 font-bold border-r border-green-700">#</th>

@@ -106,7 +106,7 @@ export default function AppUsersPage() {
             </button>
           )}
         </div>
-        <div className="p-5 grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role</label>
             <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className={sel}>
@@ -163,7 +163,7 @@ export default function AppUsersPage() {
           {loading && <Loader2 size={14} className="animate-spin text-gray-400" />}
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm border-collapse">
+          <table className="w-full text-sm border-collapse min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50 text-gray-500">
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider w-10">S.No</th>

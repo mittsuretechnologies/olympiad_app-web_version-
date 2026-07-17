@@ -32,6 +32,8 @@ import {
   Flag,
   LifeBuoy,
   History,
+  Menu,
+  X,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -140,6 +142,18 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const [openSection, setOpenSection] = useState<Section>(sectionForPath(pathname));
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // On mobile the sidebar is an overlay drawer: close it once navigation lands
+  // on a new route, otherwise it stays open on top of the page you just opened.
+  useEffect(() => { setSidebarOpen(false); }, [pathname]);
+
+  // The drawer covers the page, so let the drawer scroll rather than the body
+  // underneath it.
+  useEffect(() => {
+    document.body.style.overflow = sidebarOpen ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [sidebarOpen]);
 
   const toggleSection = (s: Exclude<Section, null>) => {
     setOpenSection((cur) => (cur === s ? null : s));
@@ -217,11 +231,51 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex min-h-screen bg-[#052E5C] text-[#1F2937]">
 
+      {/* Mobile top bar */}
+      <header className="lg:hidden fixed top-0 inset-x-0 h-16 z-40 flex items-center gap-3 px-4 bg-[#052E5C]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/20">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="p-2 -ml-2 rounded-xl text-white hover:bg-white/10 active:bg-white/20 transition-colors"
+        >
+          <Menu size={22} />
+        </button>
+        <div className="flex items-center gap-2">
+          <Image src="/mittmee-icon.jpeg" alt="mittmee" width={28} height={28} className="rounded-lg object-cover" />
+          <span className="text-base font-bold tracking-tight">
+            <span className="text-white">mitt</span><span className="text-[#4ADE80]">mee</span>
+          </span>
+        </div>
+        <div className="ml-auto w-9 h-9 rounded-full bg-[#FF9000] text-black font-black text-xs flex items-center justify-center">
+          {(currentUser?.name || role).split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase()}
+        </div>
+      </header>
+
+      {/* Drawer backdrop */}
+      <div
+        onClick={() => setSidebarOpen(false)}
+        aria-hidden="true"
+        className={`lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+          sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+        }`}
+      />
+
       {/* Sidebar */}
       <aside
         style={{ scrollbarGutter: 'stable' }}
-        className="w-72 bg-[#052E5C] flex flex-col fixed h-screen z-50 border-r border-[#04203f] overflow-x-hidden overflow-y-hidden hover:overflow-y-auto custom-scrollbar"
+        className={`w-72 max-w-[85vw] bg-[#052E5C] flex flex-col fixed h-screen z-50 border-r border-[#04203f] overflow-x-hidden overflow-y-auto lg:overflow-y-hidden lg:hover:overflow-y-auto custom-scrollbar transition-transform duration-300 ease-in-out lg:transition-none shadow-2xl shadow-black/40 lg:shadow-none ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
       >
+        {/* Drawer close */}
+        <button
+          onClick={() => setSidebarOpen(false)}
+          aria-label="Close menu"
+          className="lg:hidden absolute top-3 right-3 z-10 p-2 rounded-xl bg-black/30 text-white hover:bg-black/50 transition-colors"
+        >
+          <X size={18} />
+        </button>
+
         {/* Banner */}
         <div className="relative px-4 pt-5 pb-2">
           <div className="relative w-full aspect-[16/10] overflow-hidden rounded-2xl bg-white shadow-lg shadow-black/20">
@@ -465,9 +519,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 ml-72 min-h-screen flex flex-col p-3">
+      <main className="flex-1 min-w-0 lg:ml-72 min-h-screen flex flex-col p-2 sm:p-3 pt-[72px] lg:pt-3">
         <div className="flex-1 bg-white border border-[#E7EBF2] rounded-2xl shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden">
-          <div className="px-8 py-8">{children}</div>
+          <div className="px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">{children}</div>
         </div>
       </main>
     </div>

@@ -298,7 +298,7 @@ export default function SchoolDashboardPage() {
             <TrendingUp size={14} className="text-purple-600" />
             <h2 className="text-xs font-bold uppercase tracking-widest text-black">Quick Actions</h2>
           </div>
-          <div className="p-4 grid grid-cols-2 gap-3">
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { label: 'View All IDs', sub: 'See allocated roll numbers', icon: Hash, href: '/school/olympiad-ids', gradient: 'from-[#1559C7] to-[#2a78d6]' },
               { label: 'My Students', sub: 'Registered student list', icon: Users, href: '/school/registered-students', gradient: 'from-[#0d9f6e] to-[#1baf7a]' },
@@ -407,7 +407,7 @@ export default function SchoolDashboardPage() {
             <TrendingUp size={14} className="text-black" />
             <h2 className="text-xs font-bold uppercase tracking-widest text-black">Quick Actions</h2>
           </div>
-          <div className="p-4 grid grid-cols-2 gap-3">
+          <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
               { label: 'View All IDs', sub: 'See allocated roll numbers', icon: Hash, href: '/school/olympiad-ids', color: 'text-[#1559C7]', bg: 'bg-[#1559C7]/[0.06] hover:bg-[#1559C7]/10' },
               { label: 'My Students', sub: 'Registered student list', icon: Users, href: '/school/registered-students', color: 'text-emerald-600', bg: 'bg-emerald-500/[0.06] hover:bg-emerald-500/10' },
