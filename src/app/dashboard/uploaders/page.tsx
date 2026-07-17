@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { fetcher, authFetch } from '@/lib/swr';
 import { UploadCloud, Loader2, Search, Edit, Trash, X, AlertTriangle, ToggleLeft, ToggleRight } from 'lucide-react';
 import {
   Dialog,
@@ -64,7 +64,7 @@ export default function UploadersPage() {
     if (!editing) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/uploaders/${editing.id}`, {
+      const res = await authFetch(`/api/uploaders/${editing.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -93,7 +93,7 @@ export default function UploadersPage() {
     setBusy(true);
     const newStatus = toggling.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
     try {
-      const res = await fetch(`/api/uploaders/${toggling.id}`, {
+      const res = await authFetch(`/api/uploaders/${toggling.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -121,7 +121,7 @@ export default function UploadersPage() {
     if (!deleting) return;
     setBusy(true);
     try {
-      const res = await fetch(`/api/uploaders/${deleting.id}`, { method: 'DELETE' });
+      const res = await authFetch(`/api/uploaders/${deleting.id}`, { method: 'DELETE' });
       if (res.ok) {
         setDeleting(null);
         load();

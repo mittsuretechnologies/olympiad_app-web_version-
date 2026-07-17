@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Loader2, Eye, EyeOff, RefreshCw, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { authFetch } from '@/lib/swr';
 
 interface Evaluator {
   id: string;
@@ -68,7 +69,7 @@ export default function EvaluatorCredentialsPage() {
     if (!resetModal) return;
     setResetting(true); setResetError(''); setResetSuccess('');
     try {
-      const res = await fetch(`/api/credentials/evaluators/${resetModal.id}/reset`, {
+      const res = await authFetch(`/api/credentials/evaluators/${resetModal.id}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ password: newPass.trim() || undefined }),
