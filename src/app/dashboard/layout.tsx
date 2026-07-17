@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
+import { isTokenExpired } from '@/lib/session-token';
+import { DASHBOARD_TOKEN_KEYS, clearDashboardSession } from '@/lib/swr';
 import {
   School,
   LogOut,
@@ -44,6 +46,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
+    // Drop any expired token before reading it: a stale-but-present token used
+    // to admit you to the dashboard, where every API call then 401'd with no
+    // way back to /login.
+    for (const key of DASHBOARD_TOKEN_KEYS) {
+      const value = sessionStorage.getItem(key);
+      if (value && isTokenExpired(value)) clearDashboardSession();
+    }
+
     const token = sessionStorage.getItem('token');
     const reviewerToken = sessionStorage.getItem('reviewerToken');
     const evaluatorToken = sessionStorage.getItem('evaluatorToken');
@@ -146,13 +156,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const settingsOpen = openSection === 'settings';
 
   const handleLogout = () => {
-    sessionStorage.removeItem('token');
-    sessionStorage.removeItem('reviewerToken');
-    sessionStorage.removeItem('reviewerData');
-    sessionStorage.removeItem('evaluatorToken');
-    sessionStorage.removeItem('evaluatorData');
-    sessionStorage.removeItem('moderatorToken');
-    sessionStorage.removeItem('moderatorData');
+    clearDashboardSession();
     router.push('/login');
   };
 

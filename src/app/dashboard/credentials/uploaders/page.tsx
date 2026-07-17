@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { fetcher, authFetch } from '@/lib/swr';
 import { KeyRound, Loader2, Search, RotateCw, X, Eye, EyeOff, RefreshCw, CheckCircle } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -65,7 +65,7 @@ export default function UploaderCredentialsPage() {
         ? { action: 'username', username: customUsername.trim() }
         : { action: 'password', password: customPassword || undefined };
 
-      const res = await fetch(`/api/uploaders/${resetTarget.id}/reset`, {
+      const res = await authFetch(`/api/uploaders/${resetTarget.id}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

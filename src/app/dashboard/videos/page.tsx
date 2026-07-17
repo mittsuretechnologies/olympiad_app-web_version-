@@ -573,7 +573,7 @@ export default function VideoModerationPage() {
                     {/* Rejection reason */}
                     {video.status === 'REJECTED' && video.rejectionReason && (
                       <p className="text-[10px] text-red-400 bg-red-50 rounded-lg px-2 py-1 truncate">
-                        Ã¢Åâ¢ {video.rejectionReason}
+                        • {video.rejectionReason}
                       </p>
                     )}
 

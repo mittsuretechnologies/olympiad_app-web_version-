@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { fetcher, authFetch } from '@/lib/swr';
 import {
   KeyRound, Loader2, Search, RotateCw, X,
   ChevronDown, ChevronRight, Eye, EyeOff, RefreshCw, CheckCircle, Building2
@@ -117,7 +117,7 @@ export default function StudentCredentialsPage() {
         ? { action: 'username', username: customUsername.trim(), source }
         : { action: 'password', password: customPassword || undefined, source };
 
-      const res = await fetch(`/api/credentials/students/${resetTarget.student.id}/reset`, {
+      const res = await authFetch(`/api/credentials/students/${resetTarget.student.id}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw, Globe, EyeOff } from 'lucide-react';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, getCatBSubs } from '@/lib/olympiad-categories';
+import { clearSchoolSession } from '@/lib/session-token';
 
 type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
@@ -36,6 +38,7 @@ export default function UploadVideoPage() {
   const [errorMsg, setErrorMsg]     = useState('');
   const [lastVideoMeta, setLastVideoMeta] = useState<{ isEvaluation: boolean; category: string; subCategory: string } | null>(null);
 
+  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') || '' : '';
 
@@ -139,6 +142,20 @@ export default function UploadVideoPage() {
   const isCustomTalent = subCategory === 'Any Other Special Talent' || subCategory === 'Any Other';
   const finalSubCategory = isCustomTalent ? customTalent.trim() : subCategory;
 
+  // Reads the body exactly once — calling res.json() in both the error and the
+  // success path throws "body stream already read" and hides the real error.
+  // A 401 here means the session died mid-upload, so bounce to /login.
+  async function readJson(res: Response, fallbackMsg: string) {
+    const body = await res.json().catch(() => null);
+    if (res.status === 401) {
+      clearSchoolSession();
+      router.replace('/login');
+      throw new Error('Your session expired. Please sign in again.');
+    }
+    if (!res.ok) throw new Error(body?.error || body?.message || fallbackMsg);
+    return body;
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!selectedStudent || !videoFile || !category || !subCategory) {
@@ -167,8 +184,7 @@ export default function UploadVideoPage() {
         method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
       });
       setProgress(60);
-      if (!upRes.ok) throw new Error((await upRes.json()).error || 'Upload failed');
-      const { videoUrl, thumbnailUrl } = await upRes.json();
+      const { videoUrl, thumbnailUrl } = await readJson(upRes, 'Upload failed');
 
       setUploadState('saving');
       setProgress(80);
@@ -179,8 +195,7 @@ export default function UploadVideoPage() {
         body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory: finalSubCategory, isPublic }),
       });
       setProgress(100);
-      if (!metaRes.ok) throw new Error((await metaRes.json()).error || 'Save failed');
-      const saved = await metaRes.json();
+      const saved = await readJson(metaRes, 'Save failed');
       setLastVideoMeta({ isEvaluation: saved.isEvaluation, category: saved.category, subCategory: saved.subCategory });
       setUploadState('done');
     } catch (err: any) {

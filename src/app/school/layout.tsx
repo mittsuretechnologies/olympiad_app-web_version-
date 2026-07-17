@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { LogOut, Hash, LayoutDashboard, Users, UserCircle, UploadCloud, PlaySquare, KeyRound } from 'lucide-react';
 import Image from 'next/image';
+import { isTokenExpired, clearSchoolSession } from '@/lib/session-token';
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -15,7 +16,10 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   useEffect(() => {
     const token = sessionStorage.getItem('schoolToken');
     const raw = sessionStorage.getItem('schoolUser');
-    if (!token || !raw) {
+    // An expired token is treated the same as a missing one: without this the
+    // page mounts fine and every API call 401s with no way back to /login.
+    if (!token || !raw || isTokenExpired(token)) {
+      clearSchoolSession();
       router.replace('/login');
       return;
     }
@@ -23,13 +27,13 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
       setUser(JSON.parse(raw));
       setReady(true);
     } catch {
+      clearSchoolSession();
       router.replace('/login');
     }
   }, [router]);
 
   const handleLogout = () => {
-    sessionStorage.removeItem('schoolToken');
-    sessionStorage.removeItem('schoolUser');
+    clearSchoolSession();
     router.replace('/login');
   };
 

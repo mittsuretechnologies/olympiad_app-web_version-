@@ -28,6 +28,8 @@ export async function POST(request: Request) {
     const { studentId, videoUrl, thumbnailUrl, caption, category, subCategory, tags, isPublic } =
       await request.json();
 
+    const wantsPublic = isPublic !== undefined ? Boolean(isPublic) : true;
+
     if (!studentId || !videoUrl || !category || !subCategory) {
       return NextResponse.json(
         { error: 'Missing required fields: studentId, videoUrl, category, subCategory' },
@@ -66,9 +68,9 @@ export async function POST(request: Request) {
           studentId,
           videoUrl, thumbnailUrl, caption, category, subCategory,
           tags: mergedTags,
-          isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
+          isPublic: wantsPublic,
           isEvaluation,
-          olympiadVisibility: isEvaluation ? 'public' : null,
+          olympiadVisibility: isEvaluation ? (wantsPublic ? 'public' : 'private') : null,
           uploaderType: 'SCHOOL',
           status: 'PENDING',
         },
@@ -113,9 +115,9 @@ export async function POST(request: Request) {
         appUserId: studentId,
         videoUrl, thumbnailUrl, caption, category, subCategory,
         tags: mergedTags,
-        isPublic: isPublic !== undefined ? Boolean(isPublic) : true,
+        isPublic: wantsPublic,
         isEvaluation,
-        olympiadVisibility: isEvaluation ? 'public' : null,
+        olympiadVisibility: isEvaluation ? (wantsPublic ? 'public' : 'private') : null,
         uploaderType: 'SCHOOL',
         status: 'PENDING',
       },

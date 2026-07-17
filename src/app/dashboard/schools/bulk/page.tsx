@@ -47,8 +47,45 @@ interface UploadResult {
 
 const VALID_CLASSES = ['PG', 'Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8'];
 
+// Spellings schools actually type for the pre-primary classes, mapped to the
+// canonical name stored in VALID_CLASSES. Keys are compared upper-cased.
+const PRE_PRIMARY_ALIASES: Record<string, string> = {
+  PG: 'PG',
+  PREP: 'PG',
+  PLAYGROUP: 'PG',
+  'PLAY GROUP': 'PG',
+  NUR: 'Nursery',
+  NURSERY: 'Nursery',
+  LKG: 'LKG',
+  UKG: 'UKG',
+};
+
 const REQUIRED_COLS = ['School Name', 'CRM ID', 'State', 'District'];
 const OPTIONAL_COLS = ['City', 'Address', 'Contact Person', 'Phone', 'Email', 'Pincode', 'Classes'];
+
+// Deliberately permissive: one @, no whitespace, a dot-suffixed domain. The credential
+// mail is the real test of an address — this only catches typos worth blocking upfront.
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@.]+$/;
+
+// Indian mobile: 10 digits starting 6-9, optionally +91 / 0091 / 0 prefixed.
+// Separators are stripped before this runs.
+const PHONE_RE = /^(?:\+?91|0)?([6-9]\d{9})$/;
+
+const PINCODE_RE = /^[1-9]\d{5}$/;
+
+// Strip spaces, hyphens, dots and brackets that schools type into phone cells.
+function normalizePhone(raw: string): string {
+  return raw.replace(/[\s\-().]/g, '');
+}
+
+// Returns the canonical 10-digit number, or null when the input isn't a valid
+// Indian mobile. Excel often turns a phone cell into a number (9876543210) or
+// mangles it to scientific notation (9.87654e+9) — both arrive here as strings.
+function canonicalPhone(raw: string): string | null {
+  const cleaned = normalizePhone(raw);
+  const m = PHONE_RE.exec(cleaned);
+  return m ? m[1] : null;
+}
 
 // â”€â”€â”€ Template download â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -65,7 +102,7 @@ function downloadTemplate() {
     '9876543210',
     'sunrise@school.com',
     '411001',
-    'Class 1:30,Class 2:25,Class 3:20',
+    'PG:15,Nur:20,LKG:25,UKG:25',
   ];
   const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
   ws['!cols'] = headers.map(() => ({ wch: 22 }));
@@ -120,6 +157,21 @@ function parseExcel(file: File): Promise<ParsedRow[]> {
           if (!state) errs.push('State missing');
           if (!district) errs.push('District missing');
 
+          // Optional fields: only validate when the school actually filled them in.
+          const rawEmail = get('Email');
+          const rawPhone = get('Phone');
+          const rawPincode = get('Pincode');
+          const rawClasses = col('Classes') !== -1 ? get('Classes') : '';
+
+          if (rawEmail && !EMAIL_RE.test(rawEmail)) errs.push(`Invalid email: ${rawEmail}`);
+
+          const phone = rawPhone ? canonicalPhone(rawPhone) : null;
+          if (rawPhone && !phone) errs.push(`Invalid phone: ${rawPhone}`);
+
+          if (rawPincode && !PINCODE_RE.test(rawPincode)) errs.push(`Invalid pincode: ${rawPincode}`);
+
+          if (rawClasses && !parseClasses(rawClasses)) errs.push(`Invalid classes: ${rawClasses}`);
+
           parsed.push({
             name,
             olympiadId,
@@ -128,10 +180,10 @@ function parseExcel(file: File): Promise<ParsedRow[]> {
             city: get('City') || undefined,
             address: get('Address') || undefined,
             contactPerson: get('Contact Person') || undefined,
-            phone: get('Phone') || undefined,
-            email: get('Email') || undefined,
-            pincode: get('Pincode') || undefined,
-            classes: col('Classes') !== -1 ? get('Classes') : '',
+            phone: phone || undefined,
+            email: rawEmail || undefined,
+            pincode: rawPincode || undefined,
+            classes: rawClasses,
             _rowIndex: i + 1,
             _errors: errs,
           });
@@ -152,7 +204,8 @@ function normalizeClassName(raw: string): string {
   const s = raw.trim();
   // Strip "Class " prefix for non-numeric classes (PG, Nursery, LKG, UKG)
   const stripped = s.replace(/^Class\s+/i, '');
-  if (['PG', 'Nursery', 'LKG', 'UKG'].includes(stripped)) return stripped;
+  const canonical = PRE_PRIMARY_ALIASES[stripped.toUpperCase()];
+  if (canonical) return canonical;
   return s; // keep as-is for "Class 1", "Class 2" etc.
 }
 
@@ -325,7 +378,7 @@ export default function BulkUploadPage() {
               City, Address, Contact Person, Phone, Email, Pincode, Classes (optional)
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              Classes format: <span className="font-mono bg-gray-100 px-1">Class 1:30,Class 2:25,PG:15</span>
+              Classes format: <span className="font-mono bg-gray-100 px-1">PG:15,Nur:20,LKG:25,UKG:25</span>
             </p>
           </div>
           <button

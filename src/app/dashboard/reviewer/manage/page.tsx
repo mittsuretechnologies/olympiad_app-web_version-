@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Loader2, UserCheck, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle } from 'lucide-react';
+import { authFetch } from '@/lib/swr';
 
 interface Reviewer {
   id: string;
@@ -26,8 +27,8 @@ export default function ReviewersPage() {
   const [formError, setFormError] = useState('');
 
   useEffect(() => {
-    fetch('/api/credentials/reviewers')
-      .then(r => r.json())
+    authFetch('/api/credentials/reviewers')
+      .then(r => r.ok ? r.json() : [])
       .then(d => setRows(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, []);
@@ -46,13 +47,13 @@ export default function ReviewersPage() {
     if (!name.trim() || !email.trim() || !password.trim()) { setFormError('All fields required'); return; }
     setSubmitting(true); setFormError('');
     try {
-      const res = await fetch('/api/credentials/reviewers', {
+      const res = await authFetch('/api/credentials/reviewers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to create reviewer');
       setRows(prev => [{ ...data, isActive: true, createdAt: new Date().toISOString() }, ...prev]);
       setShowForm(false); setName(''); setEmail(''); setPassword('');
     } catch (e: any) {
@@ -62,20 +63,31 @@ export default function ReviewersPage() {
     }
   };
 
+  // Both mutations below update the table optimistically, so a failed request
+  // has to roll the row back — otherwise the UI shows a change the server rejected.
   const toggleActive = async (r: Reviewer) => {
     const updated = { ...r, isActive: !r.isActive };
     setRows(prev => prev.map(x => x.id === r.id ? updated : x));
-    await fetch(`/api/credentials/reviewers/${r.id}`, {
+    const res = await authFetch(`/api/credentials/reviewers/${r.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: !r.isActive }),
     });
+    if (!res.ok) {
+      setRows(prev => prev.map(x => x.id === r.id ? r : x));
+      alert('Could not update this reviewer. Please try again.');
+    }
   };
 
   const handleDelete = async (r: Reviewer) => {
     if (!confirm(`Delete reviewer ${r.name}? This cannot be undone.`)) return;
+    const prevRows = rows;
     setRows(prev => prev.filter(x => x.id !== r.id));
-    await fetch(`/api/credentials/reviewers/${r.id}`, { method: 'DELETE' });
+    const res = await authFetch(`/api/credentials/reviewers/${r.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      setRows(prevRows);
+      alert('Could not delete this reviewer. Please try again.');
+    }
   };
 
   const stats = { total: rows.length, active: rows.filter(r => r.isActive).length };

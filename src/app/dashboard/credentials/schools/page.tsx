@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { fetcher, authFetch } from '@/lib/swr';
 import { KeyRound, Loader2, Search, RotateCw, X, Eye, EyeOff, RefreshCw, CheckCircle, Send, MessageSquare, Mail } from 'lucide-react';
 import {
   Dialog,
@@ -77,7 +77,7 @@ export default function SchoolCredentialsPage() {
         ? { action: 'username', username: customUsername.trim() }
         : { action: 'password', password: customPassword || undefined };
 
-      const res = await fetch(`/api/credentials/schools/${resetTarget.id}/reset`, {
+      const res = await authFetch(`/api/credentials/schools/${resetTarget.id}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
@@ -106,7 +106,7 @@ export default function SchoolCredentialsPage() {
     if (!sendTarget) return;
     setSendBusy(method);
     try {
-      const res = await fetch(`/api/credentials/schools/${sendTarget.id}/send`, {
+      const res = await authFetch(`/api/credentials/schools/${sendTarget.id}/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ method }),

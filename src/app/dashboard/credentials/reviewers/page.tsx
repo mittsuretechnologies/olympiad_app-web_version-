@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Search, Loader2, KeyRound, Eye, EyeOff, RotateCw, CheckCircle, X } from 'lucide-react';
+import { authFetch } from '@/lib/swr';
 
 interface ReviewerCred {
   id: string;
@@ -27,8 +28,8 @@ export default function ReviewerCredentialsPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/credentials/reviewers')
-      .then(r => r.json())
+    authFetch('/api/credentials/reviewers')
+      .then(r => r.ok ? r.json() : [])
       .then(d => setRows(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
   }, []);
@@ -60,13 +61,13 @@ export default function ReviewerCredentialsPage() {
     if (!resetTarget) return;
     setResetBusy(true);
     try {
-      const res = await fetch(`/api/credentials/reviewers/${resetTarget.id}/reset`, {
+      const res = await authFetch(`/api/credentials/reviewers/${resetTarget.id}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: customPassword || undefined }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to reset password');
       setRows(prev => prev.map(r =>
         r.id === resetTarget.id ? { ...r, plainPassword: data.plainPassword } : r
       ));

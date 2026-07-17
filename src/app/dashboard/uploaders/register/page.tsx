@@ -1,6 +1,7 @@
 ﻿'use client';
 
 import { useState } from 'react';
+import { authFetch } from '@/lib/swr';
 
 export default function RegisterUploaderPage() {
   const [name, setName] = useState('');
@@ -14,12 +15,12 @@ export default function RegisterUploaderPage() {
     setLoading(true);
     setMessage(null);
     try {
-      const res = await fetch('/api/uploaders', {
+      const res = await authFetch('/api/uploaders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, phone }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
         setMessage({ type: 'error', text: data.message || 'Failed to register uploader' });
       } else {

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Eye, Loader2, Search } from 'lucide-react';
+import { authFetch } from '@/lib/swr';
 
 interface ViewerCred {
   id:        string;
@@ -17,8 +18,8 @@ export default function ViewerCredentialsPage() {
   const [search,  setSearch]  = useState('');
 
   useEffect(() => {
-    fetch('/api/credentials/viewers')
-      .then((r) => r.json())
+    authFetch('/api/credentials/viewers')
+      .then((r) => r.ok ? r.json() : [])
       .then((d) => setRows(Array.isArray(d) ? d : []))
       .catch(() => setRows([]))
       .finally(() => setLoading(false));
