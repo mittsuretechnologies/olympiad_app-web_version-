@@ -93,14 +93,7 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // Rewrite stored URLs to use 10.0.2.2 so the Android emulator can reach the server.
-    // 10.0.2.2 is the emulator's alias for the host machine's localhost.
-    const normalized = videos.map(v => ({
-      ...v,
-      videoUrl: v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000') ?? v.videoUrl,
-    }));
-
-    return NextResponse.json(normalized);
+    return NextResponse.json(videos);
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }

@@ -15,20 +15,6 @@ function getViewerIdFromToken(request: NextRequest): string | null {
   } catch { return null; }
 }
 
-const SERVER_URL = process.env.SERVER_URL || 'http://localhost:3000';
-
-function fixUrl(url: string | null) {
-  if (!url) return null;
-  try {
-    const parsed = new URL(url);
-    const target = new URL(SERVER_URL);
-    parsed.protocol = target.protocol;
-    parsed.hostname = target.hostname;
-    parsed.port     = target.port;
-    return parsed.toString();
-  } catch { return url; }
-}
-
 // GET /api/school/videos?schoolId=<school.id>
 // Returns all approved public videos from a school, resolved via:
 // School.id → OlympiadIdAllocation.schoolId → AppUser.olympiadId → Video.appUserId
@@ -119,8 +105,8 @@ export async function GET(request: NextRequest) {
       const stu = v.studentId ? studentMap.get(v.studentId) : undefined;
       return {
         id:           v.id,
-        videoUrl:     fixUrl(v.videoUrl) ?? v.videoUrl,
-        thumbnailUrl: fixUrl(v.thumbnailUrl),
+        videoUrl:     v.videoUrl,
+        thumbnailUrl: v.thumbnailUrl,
         caption:      v.caption,
         tags:         v.tags,
         category:     v.category,
@@ -129,7 +115,7 @@ export async function GET(request: NextRequest) {
         viewsCount:   v.viewsCount,
         isEvaluation: v.isEvaluation,
         createdAt:    v.createdAt,
-        appUser: au ? { id: au.id, userId: au.userId, avatarUrl: fixUrl(au.avatarUrl) } : null,
+        appUser: au ? { id: au.id, userId: au.userId, avatarUrl: au.avatarUrl } : null,
         student: stu ? {
           id:         stu.id,
           name:       stu.name,

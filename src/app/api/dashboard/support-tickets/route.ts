@@ -16,11 +16,6 @@ function requireSuperAdmin(request: Request) {
   }
 }
 
-function fixUrl(url: string | null) {
-  if (!url) return url;
-  return url.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000');
-}
-
 // GET /api/dashboard/support-tickets?status=OPEN|RESOLVED — list all Help & Support queries. SuperAdmin only.
 export async function GET(request: Request) {
   const admin = requireSuperAdmin(request);
@@ -48,7 +43,7 @@ export async function GET(request: Request) {
       type:           t.type,
       category:       t.category,
       message:        t.message,
-      screenshotUrls: t.screenshotUrls ? t.screenshotUrls.split(',').map(fixUrl) : [],
+      screenshotUrls: t.screenshotUrls ? t.screenshotUrls.split(',') : [],
       status:         t.status,
       resolvedAt:     t.resolvedAt,
       adminResponse:  t.adminResponse,
@@ -59,7 +54,7 @@ export async function GET(request: Request) {
         userId:     t.user.userId,
         email:      t.user.email,
         mobile:     t.user.mobile,
-        avatarUrl:  fixUrl(t.user.avatarUrl),
+        avatarUrl:  t.user.avatarUrl,
         olympiadId: t.user.olympiadId,
       },
     }));

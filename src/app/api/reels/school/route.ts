@@ -15,21 +15,6 @@ function getViewerIdFromToken(request: NextRequest): string | null {
   } catch { return null; }
 }
 
-function fixUrlFactory() {
-  const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-  return (url: string | null) => {
-    if (!url) return null;
-    try {
-      const parsed = new URL(url);
-      const target = new URL(serverUrl);
-      parsed.protocol = target.protocol;
-      parsed.hostname = target.hostname;
-      parsed.port     = target.port;
-      return parsed.toString();
-    } catch { return url; }
-  };
-}
-
 // GET /api/reels/school?schoolId=<id>&userId=<appUserId>
 // Returns approved public videos whose uploader belongs to the given school.
 export async function GET(request: NextRequest) {
@@ -45,8 +30,6 @@ export async function GET(request: NextRequest) {
 
     const visWhere = await visibilityWhere(viewerId ?? null);
     const baseWhere = { status: 'APPROVED', isPublic: true, ...visWhere } as const;
-
-    const fixUrl = fixUrlFactory();
 
     // Videos uploaded by students whose allocation school matches schoolId
     const studentVideos = await prisma.video.findMany({
@@ -134,8 +117,8 @@ export async function GET(request: NextRequest) {
       const school      = v.student?.allocation?.school ?? null;
       return {
         id:           v.id,
-        videoUrl:     fixUrl(v.videoUrl) ?? v.videoUrl,
-        thumbnailUrl: fixUrl(v.thumbnailUrl),
+        videoUrl:     v.videoUrl,
+        thumbnailUrl: v.thumbnailUrl,
         caption:      v.caption,
         category:     v.category,
         subCategory:  v.subCategory,
@@ -150,7 +133,7 @@ export async function GET(request: NextRequest) {
           ? { id: v.student.id, name: v.student.name, schoolId: school?.id ?? null, schoolName: school?.name ?? null }
           : null,
         appUser: appUserRaw
-          ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: fixUrl(appUserRaw.avatarUrl) }
+          ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: appUserRaw.avatarUrl }
           : null,
       };
     });

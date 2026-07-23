@@ -109,19 +109,6 @@ export async function GET(request: NextRequest) {
       : [];
     const allocationMap = new Map(allocationsRaw.map(a => [a.code, a.school]));
 
-    const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-    const fixUrl = (url: string | null) => {
-      if (!url) return null;
-      try {
-        const parsed = new URL(url);
-        const target = new URL(serverUrl);
-        parsed.protocol = target.protocol;
-        parsed.hostname = target.hostname;
-        parsed.port     = target.port;
-        return parsed.toString();
-      } catch { return url; }
-    };
-
     const result = items.map(v => {
       const appUserRaw  = v.appUserId ? appUserMap.get(v.appUserId) : undefined;
       const studentSchool = v.student?.allocation?.school ?? null;
@@ -130,8 +117,8 @@ export async function GET(request: NextRequest) {
 
       return {
         id:           v.id,
-        videoUrl:     fixUrl(v.videoUrl) ?? v.videoUrl,
-        thumbnailUrl: fixUrl(v.thumbnailUrl),
+        videoUrl:     v.videoUrl,
+        thumbnailUrl: v.thumbnailUrl,
         caption:      v.caption,
         category:     v.category,
         subCategory:  v.subCategory,
@@ -161,7 +148,7 @@ export async function GET(request: NextRequest) {
         appUser: appUserRaw ? {
           id:        appUserRaw.id,
           userId:    appUserRaw.userId,
-          avatarUrl: fixUrl(appUserRaw.avatarUrl),
+          avatarUrl: appUserRaw.avatarUrl,
         } : null,
       };
     });

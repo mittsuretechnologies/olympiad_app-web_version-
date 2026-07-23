@@ -17,23 +17,6 @@ function getViewerIdFromToken(request: NextRequest): string | null {
 
 const ROW_LIMIT = 15;
 
-function fixUrlFactory() {
-  const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-  return (url: string | null) => {
-    if (!url) return null;
-    try {
-      const parsed = new URL(url);
-      const target = new URL(serverUrl);
-      parsed.protocol = target.protocol;
-      parsed.hostname = target.hostname;
-      parsed.port = target.port;
-      return parsed.toString();
-    } catch {
-      return url;
-    }
-  };
-}
-
 type RawVideo = {
   id: string;
   videoUrl: string;
@@ -80,8 +63,6 @@ const VIDEO_SELECT = {
 
 // Shape raw rows from multiple queries into the client video format, batching appUser/school lookups once.
 async function hydrate(items: RawVideo[], userId?: string) {
-  const fixUrl = fixUrlFactory();
-
   let likedIds: Set<string> = new Set();
   if (userId && items.length > 0) {
     const userLikes = await prisma.like.findMany({
@@ -117,8 +98,8 @@ async function hydrate(items: RawVideo[], userId?: string) {
 
     return {
       id: v.id,
-      videoUrl: fixUrl(v.videoUrl) ?? v.videoUrl,
-      thumbnailUrl: fixUrl(v.thumbnailUrl),
+      videoUrl: v.videoUrl,
+      thumbnailUrl: v.thumbnailUrl,
       caption: v.caption,
       category: v.category,
       subCategory: v.subCategory,
@@ -142,7 +123,7 @@ async function hydrate(items: RawVideo[], userId?: string) {
         : school
         ? { id: null, name: appUserRaw?.userId ?? null, schoolId: school.id, schoolName: school.name, state: school.state ?? null, city: school.city ?? null }
         : null,
-      appUser: appUserRaw ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: fixUrl(appUserRaw.avatarUrl) } : null,
+      appUser: appUserRaw ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: appUserRaw.avatarUrl } : null,
     };
   });
 }

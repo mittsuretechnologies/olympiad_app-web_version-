@@ -5,6 +5,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { probeVideo, cropTo9x16, compressVideo } from '@/lib/videoProbe';
 import { prisma } from '@/lib/prisma';
+import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
 
@@ -174,16 +175,31 @@ export async function POST(request: Request) {
       await rename(workingPath, filePath);
     }
 
-    const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-    const videoUrl  = `${serverUrl}/uploads/videos/${studentId}/${fileName}`;
-    let thumbnailUrl: string | null = null;
-
+    let thumbCreated = false;
     try {
       await extractThumbnail(filePath, thumbPath);
-      thumbnailUrl = `${serverUrl}/uploads/videos/${studentId}/${thumbName}`;
+      thumbCreated = true;
     } catch {
       // thumbnail generation is best-effort; upload still succeeds without it
     }
+
+    if (s3Enabled()) {
+      const keyBase  = `uploads/videos/${studentId}`;
+      const videoUrl = await uploadFileToS3(filePath, `${keyBase}/${fileName}`, 'video/mp4');
+      let thumbnailUrl: string | null = null;
+      if (thumbCreated) {
+        thumbnailUrl = await uploadFileToS3(thumbPath, `${keyBase}/${thumbName}`, 'image/jpeg');
+      }
+      await unlink(filePath).catch(() => {});
+      if (thumbCreated) await unlink(thumbPath).catch(() => {});
+      return NextResponse.json({ videoUrl, thumbnailUrl }, { status: 200 });
+    }
+
+    const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
+    const videoUrl  = `${serverUrl}/uploads/videos/${studentId}/${fileName}`;
+    const thumbnailUrl = thumbCreated
+      ? `${serverUrl}/uploads/videos/${studentId}/${thumbName}`
+      : null;
 
     return NextResponse.json({ videoUrl, thumbnailUrl }, { status: 200 });
   } catch (error: any) {

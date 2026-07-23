@@ -67,21 +67,6 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-    const fixUrl = (url: string | null) => {
-      if (!url) return null;
-      try {
-        const parsed = new URL(url);
-        const target = new URL(serverUrl);
-        parsed.protocol = target.protocol;
-        parsed.hostname = target.hostname;
-        parsed.port     = target.port;
-        return parsed.toString();
-      } catch { return url; }
-    };
-
-    conversations.forEach(c => { c.lastReelThumb = fixUrl(c.lastReelThumb); });
-
     // Sort by sentAt descending
     conversations.sort((a, b) => new Date(b.sentAt).getTime() - new Date(a.sentAt).getTime());
 
