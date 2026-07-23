@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
-const SERVER_URL  = process.env.SERVER_URL  || 'http://localhost:3000';
 
 function getAppUserFromToken(request: Request) {
   const authHeader = request.headers.get('Authorization');
@@ -15,11 +14,6 @@ function getAppUserFromToken(request: Request) {
     if (decoded.role !== 'APP_USER') return null;
     return decoded;
   } catch { return null; }
-}
-
-function normalizeUrl(url: string | null) {
-  if (!url) return url;
-  return url.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000');
 }
 
 async function searchUsers(q: string, appUserId: string) {
@@ -121,9 +115,7 @@ async function searchVideos(q: string, appUserId: string) {
 
   return videosRaw.map(v => ({
     ...v,
-    videoUrl:     normalizeUrl(v.videoUrl),
-    thumbnailUrl: normalizeUrl(v.thumbnailUrl),
-    uploader:     v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
+    uploader: v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
   }));
 }
 

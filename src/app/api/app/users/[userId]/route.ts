@@ -16,11 +16,6 @@ function getAppUserFromToken(request: Request) {
   } catch { return null; }
 }
 
-function normalizeUrl(url: string | null) {
-  if (!url) return url;
-  return url.replace(/^https?:\/\/[^/]+/, 'http://10.0.2.2:3000');
-}
-
 // GET /api/app/users/:userId — public profile by appUser UUID
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const appUser = getAppUserFromToken(request);
@@ -143,8 +138,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
       },
       videos: videos.map(v => ({
         id:           v.id,
-        videoUrl:     normalizeUrl(v.videoUrl),
-        thumbnailUrl: normalizeUrl(v.thumbnailUrl),
+        videoUrl:     v.videoUrl,
+        thumbnailUrl: v.thumbnailUrl,
         caption:      v.caption,
         tags:         v.tags,
         category:     v.category,

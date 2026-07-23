@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { probeVideo } from '@/lib/videoProbe';
+import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const MAX_BYTES  = 150 * 1024 * 1024; // 150 MB
@@ -63,6 +64,12 @@ export async function POST(request: Request) {
     if (meta.durationSeconds > MAX_DURATION_S) {
       await unlink(filePath).catch(() => {});
       return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
+    }
+
+    if (s3Enabled()) {
+      const videoUrl = await uploadFileToS3(filePath, `uploads/videos/${student.id}/${fileName}`, 'video/mp4');
+      await unlink(filePath).catch(() => {});
+      return NextResponse.json({ videoUrl }, { status: 200 });
     }
 
     const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';

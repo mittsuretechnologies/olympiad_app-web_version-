@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
+import { s3Enabled, uploadFileToS3, videoContentType } from '@/lib/s3';
 // ffmpeg-static resolves to the platform binary path at runtime (no Next.js bundler issues)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
@@ -108,16 +109,31 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Could not verify video duration. Please try a different file.' }, { status: 400 });
     }
 
-    const serverUrl  = process.env.SERVER_URL || 'http://localhost:3000';
-    const videoUrl   = `${serverUrl}/uploads/app-videos/${appUser.id}/${fileName}`;
-    let thumbnailUrl: string | null = null;
-
+    let thumbCreated = false;
     try {
       await extractThumbnail(filePath, thumbPath);
-      thumbnailUrl = `${serverUrl}/uploads/app-videos/${appUser.id}/${thumbName}`;
+      thumbCreated = true;
     } catch {
       // thumbnail generation is best-effort; upload still succeeds without it
     }
+
+    if (s3Enabled()) {
+      const keyBase  = `uploads/app-videos/${appUser.id}`;
+      const videoUrl = await uploadFileToS3(filePath, `${keyBase}/${fileName}`, videoContentType(ext));
+      let thumbnailUrl: string | null = null;
+      if (thumbCreated) {
+        thumbnailUrl = await uploadFileToS3(thumbPath, `${keyBase}/${thumbName}`, 'image/jpeg');
+      }
+      await unlink(filePath).catch(() => {});
+      if (thumbCreated) await unlink(thumbPath).catch(() => {});
+      return NextResponse.json({ videoUrl, thumbnailUrl }, { status: 200 });
+    }
+
+    const serverUrl  = process.env.SERVER_URL || 'http://localhost:3000';
+    const videoUrl   = `${serverUrl}/uploads/app-videos/${appUser.id}/${fileName}`;
+    const thumbnailUrl = thumbCreated
+      ? `${serverUrl}/uploads/app-videos/${appUser.id}/${thumbName}`
+      : null;
 
     return NextResponse.json({ videoUrl, thumbnailUrl }, { status: 200 });
   } catch (error: any) {

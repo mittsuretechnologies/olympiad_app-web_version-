@@ -11,6 +11,7 @@
     "db:generate": "prisma generate"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1090.0",
     "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@prisma/client": "^5.22.0",
     "@supabase/ssr": "^0.10.3",

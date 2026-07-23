@@ -50,8 +50,8 @@ export async function GET(
     return NextResponse.json({
       video: {
         id: video.id,
-        videoUrl: video.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? video.videoUrl,
-        thumbnailUrl: video.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? video.thumbnailUrl,
+        videoUrl: video.videoUrl,
+        thumbnailUrl: video.thumbnailUrl,
         caption: video.caption,
         category: video.category,
         subCategory: video.subCategory,

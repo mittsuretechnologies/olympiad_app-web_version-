@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { detectImageExtension } from '@/lib/fileSignature';
+import { s3Enabled, uploadBufferToS3, imageContentType } from '@/lib/s3';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 const MAX_BYTES  = 5 * 1024 * 1024; // 5 MB
@@ -46,6 +47,14 @@ export async function POST(request: Request) {
     }
 
     const fileName  = `${Date.now()}_${appUser.id.slice(0, 8)}.${ext}`;
+
+    if (s3Enabled()) {
+      const avatarUrl = await uploadBufferToS3(
+        buffer, `uploads/app-avatars/${appUser.id}/${fileName}`, imageContentType(ext),
+      );
+      return NextResponse.json({ avatarUrl }, { status: 200 });
+    }
+
     const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'app-avatars', appUser.id);
     const filePath  = path.join(uploadDir, fileName);
 

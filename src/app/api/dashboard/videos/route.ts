@@ -83,8 +83,8 @@ export async function GET(request: Request) {
     // ── Normalise URLs ────────────────────────────────────────────────────────
     let normalized = (videos ?? []).map(v => ({
       ...v,
-      videoUrl:     v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.videoUrl,
-      thumbnailUrl: v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.thumbnailUrl,
+      videoUrl:     v.videoUrl,
+      thumbnailUrl: v.thumbnailUrl,
       appUser: v.appUserId ? (appUserMap[v.appUserId] ?? null) : null,
     }));
 

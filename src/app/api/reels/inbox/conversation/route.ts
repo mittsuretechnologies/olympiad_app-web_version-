@@ -75,19 +75,6 @@ export async function GET(request: NextRequest) {
       : [];
     const appUserMap = new Map(appUsers.map(u => [u.id, u]));
 
-    const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-    const fixUrl = (url: string | null) => {
-      if (!url) return null;
-      try {
-        const parsed = new URL(url);
-        const target = new URL(serverUrl);
-        parsed.protocol = target.protocol;
-        parsed.hostname = target.hostname;
-        parsed.port     = target.port;
-        return parsed.toString();
-      } catch { return url; }
-    };
-
     const messages = shares.map(s => ({
       id:        s.id,
       sentAt:    s.sentAt.toISOString(),
@@ -95,8 +82,6 @@ export async function GET(request: NextRequest) {
       video: s.video
         ? {
             ...s.video,
-            videoUrl:     fixUrl(s.video.videoUrl),
-            thumbnailUrl: fixUrl(s.video.thumbnailUrl),
             appUser: s.video.appUserId ? (appUserMap.get(s.video.appUserId) ?? null) : null,
           }
         : null,

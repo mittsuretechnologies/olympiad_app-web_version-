@@ -71,8 +71,8 @@ export async function GET(request: Request) {
 
     const result = videos.map(v => ({
       videoId:          v.id,
-      thumbnailUrl:     v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.thumbnailUrl,
-      videoUrl:         v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.videoUrl,
+      thumbnailUrl:     v.thumbnailUrl,
+      videoUrl:         v.videoUrl,
       caption:          v.caption,
       category:         v.category,
       subCategory:      v.subCategory,
