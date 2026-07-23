@@ -65,8 +65,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
     }
 
-    const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-    const videoUrl  = `${serverUrl}/uploads/videos/${student.id}/${fileName}`;
+    // Store a root-relative path so it resolves on the same origin in both dev
+    // and production, independent of any SERVER_URL env var.
+    const videoUrl  = `/uploads/videos/${student.id}/${fileName}`;
 
     return NextResponse.json({ videoUrl }, { status: 200 });
   } catch (error: any) {

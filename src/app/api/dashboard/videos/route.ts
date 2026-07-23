@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
+import { toRelativeMedia } from '@/lib/mediaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,8 +84,8 @@ export async function GET(request: Request) {
     // ── Normalise URLs ────────────────────────────────────────────────────────
     let normalized = (videos ?? []).map(v => ({
       ...v,
-      videoUrl:     v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.videoUrl,
-      thumbnailUrl: v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.thumbnailUrl,
+      videoUrl:     toRelativeMedia(v.videoUrl),
+      thumbnailUrl: toRelativeMedia(v.thumbnailUrl),
       appUser: v.appUserId ? (appUserMap[v.appUserId] ?? null) : null,
     }));
 

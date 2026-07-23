@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getReportThreshold } from '@/lib/reportSettings';
 import { requireModule } from '@/lib/auth-guard';
+import { toRelativeMedia } from '@/lib/mediaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -71,8 +72,8 @@ export async function GET(request: Request) {
 
     const result = videos.map(v => ({
       videoId:          v.id,
-      thumbnailUrl:     v.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.thumbnailUrl,
-      videoUrl:         v.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? v.videoUrl,
+      thumbnailUrl:     toRelativeMedia(v.thumbnailUrl),
+      videoUrl:         toRelativeMedia(v.videoUrl),
       caption:          v.caption,
       category:         v.category,
       subCategory:      v.subCategory,

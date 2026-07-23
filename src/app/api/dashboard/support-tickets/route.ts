@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { toRelativeMedia } from '@/lib/mediaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,9 @@ function requireSuperAdmin(request: Request) {
 }
 
 function fixUrl(url: string | null) {
-  if (!url) return url;
-  return url.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000');
+  // Stored URLs carry a hardcoded dev host (localhost / 10.0.2.2); strip it to a
+  // root-relative path so it resolves on the same origin in production.
+  return toRelativeMedia(url);
 }
 
 // GET /api/dashboard/support-tickets?status=OPEN|RESOLVED — list all Help & Support queries. SuperAdmin only.

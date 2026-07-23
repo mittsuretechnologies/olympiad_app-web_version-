@@ -174,13 +174,15 @@ export async function POST(request: Request) {
       await rename(workingPath, filePath);
     }
 
-    const serverUrl = process.env.SERVER_URL || 'http://localhost:3000';
-    const videoUrl  = `${serverUrl}/uploads/videos/${studentId}/${fileName}`;
+    // Store a root-relative path (not an absolute host). Files are served from
+    // the same origin under /uploads, so this resolves correctly on both dev
+    // (localhost) and production without depending on a SERVER_URL env var.
+    const videoUrl  = `/uploads/videos/${studentId}/${fileName}`;
     let thumbnailUrl: string | null = null;
 
     try {
       await extractThumbnail(filePath, thumbPath);
-      thumbnailUrl = `${serverUrl}/uploads/videos/${studentId}/${thumbName}`;
+      thumbnailUrl = `/uploads/videos/${studentId}/${thumbName}`;
     } catch {
       // thumbnail generation is best-effort; upload still succeeds without it
     }

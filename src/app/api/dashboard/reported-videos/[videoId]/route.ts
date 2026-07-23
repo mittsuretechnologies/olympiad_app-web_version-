@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { requireModule } from '@/lib/auth-guard';
+import { toRelativeMedia } from '@/lib/mediaUrl';
 
 export const dynamic = 'force-dynamic';
 
@@ -50,8 +51,8 @@ export async function GET(
     return NextResponse.json({
       video: {
         id: video.id,
-        videoUrl: video.videoUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? video.videoUrl,
-        thumbnailUrl: video.thumbnailUrl?.replace(/^https?:\/\/[^/]+/, 'http://localhost:3000') ?? video.thumbnailUrl,
+        videoUrl: toRelativeMedia(video.videoUrl),
+        thumbnailUrl: toRelativeMedia(video.thumbnailUrl),
         caption: video.caption,
         category: video.category,
         subCategory: video.subCategory,
