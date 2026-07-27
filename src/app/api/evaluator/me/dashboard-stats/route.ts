@@ -45,18 +45,19 @@ export async function GET(request: Request) {
 
     // Get stats from evaluations
     const [evaluationsCount, scoreAggregates, recentEvaluations, approvedVideos] = await Promise.all([
-      // 1. Total evaluated count (kosh rows, not videos)
+      // 1. Total evaluated count (one row per video)
       prisma.videoEvaluation.count({
         where: filter,
       }),
-      // 2. Score aggregates (average of each criteria)
+      // 2. Score aggregates (average of each kosha criterion)
       prisma.videoEvaluation.aggregate({
         where: filter,
         _avg: {
-          confidenceScore: true,
-          creativityScore: true,
-          techniqueScore: true,
-          presentationScore: true,
+          coordinationScore: true,
+          memoryEnergyScore: true,
+          imaginationEmotionScore: true,
+          focusLanguageScore: true,
+          creativityJoyScore: true,
           totalScore: true,
         },
       }),
@@ -78,7 +79,7 @@ export async function GET(request: Request) {
           },
         },
       }),
-      // 4. All approved evaluation videos with their kosh count, to derive pending (< 2 koshas scored)
+      // 4. All approved evaluation videos with their evaluation count, to derive pending (unscored)
       prisma.video.findMany({
         where: { isEvaluation: true, status: 'APPROVED', deletedAt: null, OR: [{ studentId: { not: null } }, { appUserId: { not: null } }] },
         select: {
@@ -118,7 +119,7 @@ export async function GET(request: Request) {
         return stateCode !== null && regionFilter!.includes(stateCode);
       });
     }
-    const pendingQueue = regionScopedApproved.filter(v => v._count.evaluations < 2).length;
+    const pendingQueue = regionScopedApproved.filter(v => v._count.evaluations < 1).length;
 
     // Resolve app user details for recent evaluations if they were uploaded by app users
     const appUserIds = recentEvaluations
@@ -167,10 +168,11 @@ export async function GET(request: Request) {
         pendingQueue: pendingQueue,
       },
       criteriaAvg: {
-        confidenceScore: scoreAggregates._avg.confidenceScore ? Math.round(scoreAggregates._avg.confidenceScore * 10) / 10 : 0,
-        creativityScore: scoreAggregates._avg.creativityScore ? Math.round(scoreAggregates._avg.creativityScore * 10) / 10 : 0,
-        techniqueScore: scoreAggregates._avg.techniqueScore ? Math.round(scoreAggregates._avg.techniqueScore * 10) / 10 : 0,
-        presentationScore: scoreAggregates._avg.presentationScore ? Math.round(scoreAggregates._avg.presentationScore * 10) / 10 : 0,
+        coordinationScore: scoreAggregates._avg.coordinationScore ? Math.round(scoreAggregates._avg.coordinationScore * 10) / 10 : 0,
+        memoryEnergyScore: scoreAggregates._avg.memoryEnergyScore ? Math.round(scoreAggregates._avg.memoryEnergyScore * 10) / 10 : 0,
+        imaginationEmotionScore: scoreAggregates._avg.imaginationEmotionScore ? Math.round(scoreAggregates._avg.imaginationEmotionScore * 10) / 10 : 0,
+        focusLanguageScore: scoreAggregates._avg.focusLanguageScore ? Math.round(scoreAggregates._avg.focusLanguageScore * 10) / 10 : 0,
+        creativityJoyScore: scoreAggregates._avg.creativityJoyScore ? Math.round(scoreAggregates._avg.creativityJoyScore * 10) / 10 : 0,
       },
       recentEvaluations: formattedRecent,
     });

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
-import { koshesForSlot, videoPercentFromKoshes, KoshKey } from '@/lib/kosh';
+import { videoPercent } from '@/lib/kosh';
 
 export const dynamic = 'force-dynamic';
 
@@ -39,11 +39,11 @@ export async function GET(request: Request) {
         evaluations: {
           select: {
             id: true,
-            kosh: true,
-            confidenceScore: true,
-            creativityScore: true,
-            techniqueScore: true,
-            presentationScore: true,
+            coordinationScore: true,
+            memoryEnergyScore: true,
+            imaginationEmotionScore: true,
+            focusLanguageScore: true,
+            creativityJoyScore: true,
             totalScore: true,
             remarks: true,
             createdAt: true,
@@ -109,21 +109,21 @@ export async function GET(request: Request) {
         category: string | null;
         subCategory: string | null;
         createdAt: Date;
-        koshes: readonly [KoshKey, KoshKey];
+        slot: number;
         isEvaluated: boolean;
         isFullyScored: boolean;
         videoPercent: number | null;
-        koshScores: {
-          kosh: string | null;
+        evaluation: {
           totalScore: number;
-          confidenceScore: number;
-          creativityScore: number;
-          techniqueScore: number;
-          presentationScore: number;
+          coordinationScore: number;
+          memoryEnergyScore: number;
+          imaginationEmotionScore: number;
+          focusLanguageScore: number;
+          creativityJoyScore: number;
           remarks: string | null;
           evaluatorName: string;
           evaluatedAt: Date;
-        }[];
+        } | null;
       }[];
     }>();
 
@@ -185,18 +185,18 @@ export async function GET(request: Request) {
       }
       const group = groupMap.get(key)!;
       const slot = group.videos.length;
-      const koshes = koshesForSlot(slot);
-      const koshScores = v.evaluations.map(e => ({
-        kosh: e.kosh,
+      const e = v.evaluations[0] || null;
+      const evaluation = e ? {
         totalScore: e.totalScore,
-        confidenceScore: e.confidenceScore,
-        creativityScore: e.creativityScore,
-        techniqueScore: e.techniqueScore,
-        presentationScore: e.presentationScore,
+        coordinationScore: e.coordinationScore,
+        memoryEnergyScore: e.memoryEnergyScore,
+        imaginationEmotionScore: e.imaginationEmotionScore,
+        focusLanguageScore: e.focusLanguageScore,
+        creativityJoyScore: e.creativityJoyScore,
         remarks: e.remarks,
         evaluatorName: e.evaluator?.name || '-',
         evaluatedAt: e.createdAt,
-      }));
+      } : null;
 
       group.videos.push({
         id: v.id,
@@ -206,11 +206,11 @@ export async function GET(request: Request) {
         category: v.category,
         subCategory: v.subCategory,
         createdAt: v.createdAt,
-        koshes,
-        isEvaluated: v.evaluations.length > 0,
-        isFullyScored: koshes.every(k => v.evaluations.some(e => e.kosh === k)),
-        videoPercent: videoPercentFromKoshes(v.evaluations, koshes),
-        koshScores,
+        slot,
+        isEvaluated: !!e,
+        isFullyScored: !!e,
+        videoPercent: e ? videoPercent(e.totalScore) : null,
+        evaluation,
       });
     }
 

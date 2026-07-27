@@ -14,8 +14,7 @@ export async function POST(request: Request) {
     const { videoId, publish } = await request.json();
     if (!videoId) return NextResponse.json({ message: 'videoId is required' }, { status: 400 });
 
-    // A video has one scoring form whose result is stored under both of its
-    // koshas, so publish/unpublish always applies to both rows together.
+    // One evaluation row per video; publish/unpublish toggles that row.
     const where = { videoId };
     const existingList = await prisma.videoEvaluation.findMany({ where });
     if (existingList.length === 0) return NextResponse.json({ message: 'No evaluation found for this video' }, { status: 404 });

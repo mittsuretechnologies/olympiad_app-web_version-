@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import { Video as VideoIcon, User, School, CheckCircle, X, Star, Loader2, LayoutGrid } from 'lucide-react';
-import { KOSH_LABELS, type KoshKey } from '@/lib/kosh';
+import { KOSH_LABELS, KOSH_CRITERIA, criterionRubric, MAX_PER_CRITERION, VIDEO_MAX_SCORE, type CriterionKey } from '@/lib/kosh';
 
 interface ExistingScore {
-  confidenceScore: number;
-  creativityScore: number;
-  techniqueScore: number;
-  presentationScore: number;
+  coordinationScore: number;
+  memoryEnergyScore: number;
+  imaginationEmotionScore: number;
+  focusLanguageScore: number;
+  creativityJoyScore: number;
   remarks: string | null;
 }
 
@@ -25,28 +26,19 @@ interface QueueVideo {
   className: string | null;
   schoolName: string | null;
   slot: number;
-  koshes: [KoshKey, KoshKey];
   existingScore: ExistingScore | null;
   isFullyScored?: boolean;
   isFullyPublished?: boolean;
 }
 
-const MAX_PER_CRITERION = 5;
-
-const CRITERIA = [
-  { key: 'confidenceScore',   label: 'Confidence & Stage Presence' },
-  { key: 'creativityScore',   label: 'Creativity & Originality' },
-  { key: 'techniqueScore',    label: 'Technique & Skill' },
-  { key: 'presentationScore', label: 'Presentation & Overall Impact' },
-] as const;
-
-type ScoreState = Record<typeof CRITERIA[number]['key'], number>;
+type ScoreState = Record<CriterionKey, number>;
 
 const emptyScores: ScoreState = {
-  confidenceScore: 0,
-  creativityScore: 0,
-  techniqueScore: 0,
-  presentationScore: 0,
+  coordinationScore: 0,
+  memoryEnergyScore: 0,
+  imaginationEmotionScore: 0,
+  focusLanguageScore: 0,
+  creativityJoyScore: 0,
 };
 
 function scoreTotal(s: ScoreState) {
@@ -54,7 +46,7 @@ function scoreTotal(s: ScoreState) {
 }
 
 function scorePercent(total: number) {
-  return Math.round((total / 20) * 1000) / 10;
+  return Math.round((total / VIDEO_MAX_SCORE) * 1000) / 10;
 }
 
 // This page is used both by real evaluators and by SuperAdmin/Reviewer
@@ -125,10 +117,11 @@ export default function EvaluateContentPage() {
     setActiveColor(color);
     if (v.existingScore) {
       setScores({
-        confidenceScore: v.existingScore.confidenceScore,
-        creativityScore: v.existingScore.creativityScore,
-        techniqueScore: v.existingScore.techniqueScore,
-        presentationScore: v.existingScore.presentationScore,
+        coordinationScore: v.existingScore.coordinationScore,
+        memoryEnergyScore: v.existingScore.memoryEnergyScore,
+        imaginationEmotionScore: v.existingScore.imaginationEmotionScore,
+        focusLanguageScore: v.existingScore.focusLanguageScore,
+        creativityJoyScore: v.existingScore.creativityJoyScore,
       });
       setRemarks(v.existingScore.remarks || '');
     } else {
@@ -181,12 +174,14 @@ export default function EvaluateContentPage() {
     7: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-7',
   };
 
+  const activeSlot = Math.min(Math.max(active?.slot ?? 0, 0), 1);
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-medium text-[#004f9f]">Evaluate Content</h1>
-          <p className="text-sm text-gray-400 mt-1">Score each video out of 20 (4 criteria × 5 marks).</p>
+          <p className="text-sm text-gray-400 mt-1">Score each video out of {VIDEO_MAX_SCORE} (5 kosha criteria × {MAX_PER_CRITERION} marks).</p>
         </div>
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1">
           <LayoutGrid size={14} className="text-gray-400 ml-1.5" />
@@ -281,12 +276,12 @@ export default function EvaluateContentPage() {
                 </div>
                 {active.caption && <p className="text-sm text-gray-500 mt-3">{active.caption}</p>}
 
-                {/* This video's % is split evenly across its two koshas */}
+                {/* Each criterion feeds its own kosha (0-4 per video, both videos sum to /8 per kosha) */}
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
-                  {active.koshes.map(k => (
-                    <span key={k} className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-[#F6F9FF] text-[#004f9f] pl-2.5 pr-1 py-1 rounded-full border border-blue-100">
-                      {KOSH_LABELS[k]}
-                      <span className="bg-[#004f9f] text-white px-1.5 py-0.5 rounded-full">{Math.round((percent / 2) * 10) / 10}%</span>
+                  {KOSH_CRITERIA.map(c => (
+                    <span key={c.kosh} className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-[#F6F9FF] text-[#004f9f] pl-2.5 pr-1 py-1 rounded-full border border-blue-100">
+                      {KOSH_LABELS[c.kosh]}
+                      <span className="bg-[#004f9f] text-white px-1.5 py-0.5 rounded-full">{scores[c.key]}/{MAX_PER_CRITERION}</span>
                     </span>
                   ))}
                 </div>
@@ -304,38 +299,51 @@ export default function EvaluateContentPage() {
                     This evaluation is published and locked. Unpublish it from Evaluation History to make changes.
                   </div>
                 )}
-                <fieldset disabled={!canScore || active.isFullyPublished} className="space-y-4 disabled:opacity-60">
-                  {CRITERIA.map(c => (
-                    <div key={c.key}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="text-sm font-semibold text-gray-700">{c.label}</label>
-                        <div className="flex items-center gap-1">
-                          <input
-                            type="number" min={0} max={MAX_PER_CRITERION} step={1}
-                            value={scores[c.key]}
-                            onChange={e => {
-                              const v = Math.min(MAX_PER_CRITERION, Math.max(0, Number(e.target.value) || 0));
-                              setScores(prev => ({ ...prev, [c.key]: v }));
-                            }}
-                            className="w-16 h-9 border border-gray-300 rounded-lg text-base font-bold text-center text-[#004f9f] outline-none focus:border-[#06013E]/40"
-                          />
-                          <span className="text-sm font-bold text-[#004f9f]">/{MAX_PER_CRITERION}</span>
+                <fieldset disabled={!canScore || active.isFullyPublished} className="space-y-5 disabled:opacity-60">
+                  {KOSH_CRITERIA.map(c => {
+                    const rubric = criterionRubric(c, activeSlot);
+                    const val = scores[c.key];
+                    return (
+                      <div key={c.key}>
+                        <div className="flex items-start justify-between mb-1.5 gap-3">
+                          <div className="min-w-0">
+                            <label className="text-sm font-semibold text-gray-700">{c.labelBySlot[activeSlot]}</label>
+                            <p className="text-[10px] font-bold text-[#004f9f] uppercase tracking-wide">{KOSH_LABELS[c.kosh]}</p>
+                            <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{c.hint}</p>
+                          </div>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            <input
+                              type="number" min={0} max={MAX_PER_CRITERION} step={1}
+                              value={val}
+                              onChange={e => {
+                                const v = Math.min(MAX_PER_CRITERION, Math.max(0, Number(e.target.value) || 0));
+                                setScores(prev => ({ ...prev, [c.key]: v }));
+                              }}
+                              className="w-16 h-9 border border-gray-300 rounded-lg text-base font-bold text-center text-[#004f9f] outline-none focus:border-[#06013E]/40"
+                            />
+                            <span className="text-sm font-bold text-[#004f9f]">/{MAX_PER_CRITERION}</span>
+                          </div>
+                        </div>
+                        <input
+                          type="range" min={0} max={MAX_PER_CRITERION} step={1}
+                          value={val}
+                          onChange={e => setScores(prev => ({ ...prev, [c.key]: Number(e.target.value) }))}
+                          className="w-full accent-[#06013E]"
+                        />
+                        {/* Live descriptor for the selected level — keeps evaluators consistent */}
+                        <div className="mt-1 flex items-start gap-1.5 bg-[#F6F9FF] border border-blue-50 rounded-lg px-2.5 py-1.5">
+                          <span className="text-[10px] font-black text-white bg-[#004f9f] rounded px-1.5 py-0.5 flex-shrink-0 leading-none mt-px">{val}</span>
+                          <span className="text-[11px] text-gray-600 leading-snug">{rubric[val]}</span>
                         </div>
                       </div>
-                      <input
-                        type="range" min={0} max={MAX_PER_CRITERION} step={1}
-                        value={scores[c.key]}
-                        onChange={e => setScores(prev => ({ ...prev, [c.key]: Number(e.target.value) }))}
-                        className="w-full accent-[#06013E]"
-                      />
-                    </div>
-                  ))}
+                    );
+                  })}
 
                   <div className="flex items-center justify-between bg-[#F6F9FF] rounded-xl px-4 py-3">
                     <span className="text-sm font-bold text-gray-600 flex items-center gap-1.5">
                       <Star className="w-4 h-4 text-[#FF9000]" /> Total Score
                     </span>
-                    <span className="text-lg font-black text-[#06013E]">{total}/20 <span className="text-sm font-bold text-gray-400">({percent}%)</span></span>
+                    <span className="text-lg font-black text-[#06013E]">{total}/{VIDEO_MAX_SCORE} <span className="text-sm font-bold text-gray-400">({percent}%)</span></span>
                   </div>
 
                   <div>

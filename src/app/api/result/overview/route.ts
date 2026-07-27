@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
-import { koshesForSlot, videoPercentFromKoshes, koshContribution, combineKoshPercent, ALL_KOSH_LABELS, KoshKey, AnyKoshKey } from '@/lib/kosh';
+import {
+  KOSH_KEYS, KOSH_LABELS, KOSH_MAX_SCORE, VIDEO_MAX_SCORE, REQUIRED_VIDEOS,
+  koshScoresFromVideos, koshPercent, koshGrade, combineKoshPercent,
+  type KoshKey, type CriterionScores,
+} from '@/lib/kosh';
 import { getLatestExamResults } from '@/lib/scanner-exam';
 
 export const dynamic = 'force-dynamic';
-
-const VIDEO_MAX_SCORE = 20;
-const REQUIRED_VIDEOS = 2;
 
 export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
@@ -31,7 +32,9 @@ export async function GET(request: Request) {
         },
         evaluations: {
           select: {
-            kosh: true, totalScore: true, isPublished: true, publishedAt: true, createdAt: true,
+            coordinationScore: true, memoryEnergyScore: true, imaginationEmotionScore: true,
+            focusLanguageScore: true, creativityJoyScore: true,
+            totalScore: true, isPublished: true, publishedAt: true, createdAt: true,
             evaluator: { select: { name: true, evaluatorId: true } },
           },
         },
@@ -57,6 +60,19 @@ export async function GET(request: Request) {
       : [];
     const allocByCode = new Map(appAllocations.map(a => [a.code, a]));
 
+    type VideoEntry = {
+      id: string;
+      category: string | null;
+      subCategory: string | null;
+      slot: number;
+      criteria: CriterionScores | null;
+      totalScore: number | null;
+      isEvaluated: boolean;
+      isPublished: boolean;
+      videoPercent: number | null;
+      evaluatorName: string | null;
+    };
+
     const groupMap = new Map<string, {
       studentKey: string;
       studentId: string | null;
@@ -69,17 +85,7 @@ export async function GET(request: Request) {
       district: string | null;
       city: string | null;
       source: 'web' | 'app';
-      videos: {
-        id: string;
-        category: string | null;
-        subCategory: string | null;
-        koshes: readonly [KoshKey, KoshKey];
-        koshScores: { kosh: string | null; totalScore: number; isPublished: boolean; evaluatorName: string | null }[];
-        isEvaluated: boolean;
-        isPublished: boolean;
-        videoPercent: number | null;
-        evaluatorName: string | null;
-      }[];
+      videos: VideoEntry[];
     }>();
 
     for (const v of allVideos) {
@@ -130,19 +136,26 @@ export async function GET(request: Request) {
       }
       const group = groupMap.get(key)!;
       const slot = group.videos.length;
-      const koshes = koshesForSlot(slot);
-      const videoPercent = videoPercentFromKoshes(v.evaluations, koshes);
+      const evaluation = v.evaluations[0] || null;
+      const criteria: CriterionScores | null = evaluation ? {
+        coordinationScore: evaluation.coordinationScore,
+        memoryEnergyScore: evaluation.memoryEnergyScore,
+        imaginationEmotionScore: evaluation.imaginationEmotionScore,
+        focusLanguageScore: evaluation.focusLanguageScore,
+        creativityJoyScore: evaluation.creativityJoyScore,
+      } : null;
 
       group.videos.push({
         id: v.id,
         category: v.category,
         subCategory: v.subCategory,
-        koshes,
-        koshScores: v.evaluations.map(e => ({ kosh: e.kosh, totalScore: e.totalScore, isPublished: e.isPublished, evaluatorName: e.evaluator?.name || null })),
-        isEvaluated: v.evaluations.length > 0,
-        isPublished: koshes.every(k => v.evaluations.find(e => e.kosh === k)?.isPublished),
-        videoPercent,
-        evaluatorName: v.evaluations[0]?.evaluator?.name || null,
+        slot,
+        criteria,
+        totalScore: evaluation?.totalScore ?? null,
+        isEvaluated: !!evaluation,
+        isPublished: !!evaluation?.isPublished,
+        videoPercent: evaluation ? Math.round((evaluation.totalScore / VIDEO_MAX_SCORE) * 1000) / 10 : null,
+        evaluatorName: evaluation?.evaluator?.name || null,
       });
     }
 
@@ -152,33 +165,35 @@ export async function GET(request: Request) {
     const examResults = await getLatestExamResults(scannerStudentIds);
 
     const result = Array.from(groupMap.values()).map(g => {
-      const publishedVideos = g.videos.filter(v => v.isPublished && v.videoPercent !== null);
+      const publishedVideos = g.videos.filter(v => v.isPublished && v.criteria);
       const videosReady = g.videos.length >= REQUIRED_VIDEOS && publishedVideos.length >= REQUIRED_VIDEOS;
 
-      // Each video's own % contributes half its value to each of its 2 koshas.
-      const videoKoshContributions = new Map<AnyKoshKey, number>();
-      for (const v of publishedVideos) {
-        const contribution = koshContribution(v.videoPercent!);
-        for (const k of v.koshes) videoKoshContributions.set(k, contribution);
-      }
+      // Per-kosha video score = sum of the kosha's criterion across published
+      // videos (max 8 with both videos), graded Beginner/Progressing/Proficient.
+      // Each kosha is its own complete 100%: video 1 contributes 50% of it and
+      // video 2 the other 50% (i.e. the average of both videos' 0-4 scores).
+      // Only the first REQUIRED_VIDEOS published videos count, so extra
+      // uploads can't push a kosha past its /8 ceiling.
+      const { scores: koshScores, scoredVideos } = koshScoresFromVideos(publishedVideos.slice(0, REQUIRED_VIDEOS).map(v => v.criteria));
 
       const exam = g.studentId ? examResults.get(g.studentId) : undefined;
 
-      // Holistic kosh breakdown: union of every kosh either side has a
-      // number for (video side: 4 koshas; exam side: whatever the scanner's
-      // score_breakdown reports, which may include Manomaya).
-      const koshKeys = new Set<AnyKoshKey>([...videoKoshContributions.keys(), ...(exam ? Object.keys(exam.koshPercents) as AnyKoshKey[] : [])]);
-      const koshBreakdown = Array.from(koshKeys).map(kosh => {
-        const videoPct = videoKoshContributions.has(kosh) ? videoKoshContributions.get(kosh)! : null;
+      const koshBreakdown = KOSH_KEYS.map(kosh => {
+        const videoPct = koshPercent(koshScores[kosh], scoredVideos);
         const examPct = exam?.koshPercents[kosh] ?? null;
         return {
           kosh,
-          label: ALL_KOSH_LABELS[kosh] || kosh,
+          label: KOSH_LABELS[kosh],
+          videoScore: scoredVideos > 0 ? koshScores[kosh] : null,
+          // Marks are out of 4 per scored video — 8 once both videos are in,
+          // 4 while only one is, so the displayed fraction matches the %.
+          videoMaxScore: scoredVideos > 0 ? Math.min(scoredVideos, REQUIRED_VIDEOS) * 4 : KOSH_MAX_SCORE,
+          grade: videosReady ? koshGrade(koshScores[kosh]) : null,
           examPercent: examPct,
           videoPercent: videoPct,
           combinedPercent: combineKoshPercent(examPct, videoPct),
         };
-      }).sort((a, b) => a.kosh.localeCompare(b.kosh));
+      });
 
       const scoredKoshes = koshBreakdown.filter(k => k.combinedPercent !== null);
       const holisticPercent = scoredKoshes.length
@@ -186,7 +201,7 @@ export async function GET(request: Request) {
         : null;
 
       const videoScoreTotal = Math.round(
-        publishedVideos.reduce((sum, v) => sum + (v.videoPercent! / 100) * VIDEO_MAX_SCORE, 0) * 10
+        publishedVideos.reduce((sum, v) => sum + (v.totalScore ?? 0), 0) * 10
       ) / 10;
 
       return {

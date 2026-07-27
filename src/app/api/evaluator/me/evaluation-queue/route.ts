@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { koshesForSlot } from '@/lib/kosh';
 import { requireModule } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
@@ -110,14 +109,13 @@ export async function GET(request: Request) {
       schoolName: string | null;
       schoolStateCode: string | null;
       slot: number;
-      koshes: readonly [string, string];
-      // A video has one scoring form; its result is stored under both
-      // koshas with identical values, so any one row represents the video.
+      // One evaluation row per video: 5 criteria (0-4 each), one per kosha.
       existingScore: {
-        confidenceScore: number;
-        creativityScore: number;
-        techniqueScore: number;
-        presentationScore: number;
+        coordinationScore: number;
+        memoryEnergyScore: number;
+        imaginationEmotionScore: number;
+        focusLanguageScore: number;
+        creativityJoyScore: number;
         remarks: string | null;
       } | null;
       isFullyScored: boolean;
@@ -129,18 +127,18 @@ export async function GET(request: Request) {
     for (const [key, videos] of bySlotKey) {
       const sorted = [...videos].sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
       sorted.forEach((v: any, slot: number) => {
-        const koshes = koshesForSlot(slot);
         const evals = v.evaluations as any[];
         const anyEval = evals[0] || null;
         const existingScore = anyEval ? {
-          confidenceScore: anyEval.confidenceScore,
-          creativityScore: anyEval.creativityScore,
-          techniqueScore: anyEval.techniqueScore,
-          presentationScore: anyEval.presentationScore,
+          coordinationScore: anyEval.coordinationScore,
+          memoryEnergyScore: anyEval.memoryEnergyScore,
+          imaginationEmotionScore: anyEval.imaginationEmotionScore,
+          focusLanguageScore: anyEval.focusLanguageScore,
+          creativityJoyScore: anyEval.creativityJoyScore,
           remarks: anyEval.remarks,
         } : null;
-        const isFullyScored = koshes.every(k => evals.some(e => e.kosh === k));
-        const isFullyPublished = koshes.every(k => evals.find(e => e.kosh === k)?.isPublished);
+        const isFullyScored = !!anyEval;
+        const isFullyPublished = !!anyEval?.isPublished;
 
         let studentName = '-', olympiadCode = '-', className: string | null = null, schoolName: string | null = null;
         let schoolStateCode: string | null = null;
@@ -174,7 +172,6 @@ export async function GET(request: Request) {
           schoolName,
           schoolStateCode,
           slot,
-          koshes,
           existingScore,
           isFullyScored,
           isFullyPublished,

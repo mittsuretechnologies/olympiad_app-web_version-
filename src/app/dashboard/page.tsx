@@ -43,10 +43,11 @@ interface EvaluatorStats {
     pendingQueue: number;
   };
   criteriaAvg: {
-    confidenceScore: number;
-    creativityScore: number;
-    techniqueScore: number;
-    presentationScore: number;
+    coordinationScore: number;
+    memoryEnergyScore: number;
+    imaginationEmotionScore: number;
+    focusLanguageScore: number;
+    creativityJoyScore: number;
   };
   recentEvaluations: {
     id: string;
@@ -773,17 +774,18 @@ function EvaluatorDashboard() {
           </h3>
           <div className="space-y-4">
             {[
-              { label: 'Confidence & Stage Presence', val: criteria?.confidenceScore ?? 0, color: 'bg-green-500' },
-              { label: 'Creativity & Originality', val: criteria?.creativityScore ?? 0, color: 'bg-amber-500' },
-              { label: 'Technique & Skill', val: criteria?.techniqueScore ?? 0, color: 'bg-blue-500' },
-              { label: 'Presentation & Overall Impact', val: criteria?.presentationScore ?? 0, color: 'bg-purple-500' },
+              { label: 'Coordination (Annamaya)', val: criteria?.coordinationScore ?? 0, color: 'bg-green-500' },
+              { label: 'Memory and Energy (Pranamaya)', val: criteria?.memoryEnergyScore ?? 0, color: 'bg-amber-500' },
+              { label: 'Imagination and Emotion (Manomaya)', val: criteria?.imaginationEmotionScore ?? 0, color: 'bg-blue-500' },
+              { label: 'Focus / Language (Vijnanamaya)', val: criteria?.focusLanguageScore ?? 0, color: 'bg-purple-500' },
+              { label: 'Creativity and Joyfulness (Anandamaya)', val: criteria?.creativityJoyScore ?? 0, color: 'bg-rose-500' },
             ].map(c => {
-              const pct = (c.val / 5) * 100;
+              const pct = (c.val / 4) * 100;
               return (
                 <div key={c.label} className="space-y-1">
                   <div className="flex justify-between text-xs">
                     <span className="font-semibold text-gray-600 truncate mr-2">{c.label}</span>
-                    <span className="font-black text-gray-800 shrink-0">{c.val}/5</span>
+                    <span className="font-black text-gray-800 shrink-0">{c.val}/4</span>
                   </div>
                   <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
                     <div

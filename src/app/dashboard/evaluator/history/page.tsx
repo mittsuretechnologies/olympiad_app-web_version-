@@ -3,15 +3,15 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, Star, Loader2, Calendar, Pencil, Lock, Unlock, ChevronDown, ChevronUp, User, School } from 'lucide-react';
-import { KOSH_LABELS, type KoshKey } from '@/lib/kosh';
+import { KOSH_LABELS, KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, KOSH_MAX_SCORE, type KoshKey, type KoshGrade } from '@/lib/kosh';
 
-interface KoshRecord {
-  kosh: KoshKey;
+interface EvaluationRecord {
   id: string;
-  confidenceScore: number;
-  creativityScore: number;
-  techniqueScore: number;
-  presentationScore: number;
+  coordinationScore: number;
+  memoryEnergyScore: number;
+  imaginationEmotionScore: number;
+  focusLanguageScore: number;
+  creativityJoyScore: number;
   totalScore: number;
   remarks: string | null;
   createdAt: string;
@@ -28,12 +28,17 @@ interface VideoRecord {
   category: string;
   subCategory: string;
   slot: number;
-  koshes: [KoshKey, KoshKey];
-  koshScores: Record<string, KoshRecord>;
-  koshList: KoshRecord[];
-  videoPercent: number | null;
-  isFullyScored: boolean;
-  isFullyPublished: boolean;
+  evaluation: EvaluationRecord;
+  videoPercent: number;
+  isPublished: boolean;
+}
+
+interface KoshBreakdownEntry {
+  kosh: KoshKey;
+  score: number;
+  maxScore: number;
+  percent: number | null;
+  grade: KoshGrade | null;
 }
 
 interface StudentHistory {
@@ -45,16 +50,10 @@ interface StudentHistory {
   schoolName: string | null;
   videos: VideoRecord[];
   videoCount: number;
+  koshBreakdown: KoshBreakdownEntry[];
   combinedPercent: number | null;
   allPublished: boolean;
 }
-
-const CRITERIA = [
-  { key: 'confidenceScore',   label: 'Confidence & Stage Presence' },
-  { key: 'creativityScore',   label: 'Creativity & Originality' },
-  { key: 'techniqueScore',    label: 'Technique & Skill' },
-  { key: 'presentationScore', label: 'Presentation & Overall Impact' },
-] as const;
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';
@@ -71,6 +70,12 @@ function percentBandClass(pct: number) {
   if (pct >= 55) return 'bg-blue-50 text-[#004f9f] border-blue-200';
   if (pct >= 30) return 'bg-amber-50 text-amber-700 border-amber-200';
   return 'bg-red-50 text-red-600 border-red-200';
+}
+
+function gradeBandClass(grade: KoshGrade) {
+  if (grade === 'Proficient') return 'bg-green-50 text-green-700 border-green-200';
+  if (grade === 'Progressing') return 'bg-blue-50 text-[#004f9f] border-blue-200';
+  return 'bg-amber-50 text-amber-700 border-amber-200';
 }
 
 const CARD_PALETTE = [
@@ -130,21 +135,19 @@ export default function EvaluationHistoryPage() {
       const res = await fetch('/api/evaluator/me/evaluate/publish', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getAuthToken()}` },
-        body: JSON.stringify({ videoId: video.videoId, publish: !video.isFullyPublished }),
+        body: JSON.stringify({ videoId: video.videoId, publish: !video.isPublished }),
       });
-      const data: KoshRecord[] = await res.json();
+      const data = await res.json();
       if (!res.ok) throw new Error((data as any).message || 'Failed to update publish status');
+      const updated: EvaluationRecord = Array.isArray(data) ? data[0] : data;
       setStudents(prev => prev.map(s => {
         if (!s.videos.some(v => v.videoId === video.videoId)) return s;
         const videos = s.videos.map(v => {
           if (v.videoId !== video.videoId) return v;
-          const koshScores = { ...v.koshScores };
-          for (const updated of data) koshScores[updated.kosh] = { ...koshScores[updated.kosh], ...updated };
-          const koshList = v.koshList.map(k => koshScores[k.kosh] || k);
-          const isFullyPublished = v.koshes.every(k => koshScores[k]?.isPublished);
-          return { ...v, koshScores, koshList, isFullyPublished };
+          const evaluation = { ...v.evaluation, ...updated };
+          return { ...v, evaluation, isPublished: evaluation.isPublished };
         });
-        return { ...s, videos, allPublished: videos.every(v => v.isFullyPublished) };
+        return { ...s, videos, allPublished: videos.every(v => v.isPublished) };
       }));
     } catch (e: any) {
       alert(e.message || 'Failed to update publish status');
@@ -180,7 +183,7 @@ export default function EvaluationHistoryPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-medium text-[#004f9f]">Evaluation History</h1>
-        <p className="text-sm text-gray-400 mt-1">Combined report per student — all evaluated videos in one card.</p>
+        <p className="text-sm text-gray-400 mt-1">Combined report per student — per-kosha grades sum both videos ({KOSH_MAX_SCORE} max per kosha).</p>
       </div>
 
       {/* Filters Toolbar */}
@@ -285,134 +288,135 @@ export default function EvaluationHistoryPage() {
                   </div>
                 </button>
 
-                {/* Expanded detail — both videos, each with its 2 koshas */}
+                {/* Expanded detail — per-kosha grades + each video's 5 criteria */}
                 {isOpen && (
                   <div className="border-t border-gray-100 bg-gray-50/40 p-5 space-y-4">
-                    {s.videos.map(v => (
-                      <div key={v.videoId} className="bg-white border border-gray-100 rounded-xl overflow-hidden p-5 space-y-4">
-                        <div className="flex items-center justify-between flex-wrap gap-2">
-                          <div className="flex items-center gap-2">
-                            <User size={13} className="text-gray-400" />
-                            <span className="text-xs font-bold text-gray-700">Video {v.slot + 1}</span>
-                            {v.category && <span className="text-[10px] font-semibold bg-blue-50 text-[#004f9f] px-2 py-0.5 rounded-full">{v.category}</span>}
-                            {v.subCategory && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{v.subCategory}</span>}
-                          </div>
-                          {v.videoPercent !== null && (
+                    {/* Kosh grade summary (V1 + V2 sums, banded) */}
+                    <div className="bg-white border border-gray-100 rounded-xl p-4">
+                      <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2.5">Kosh Grades (both videos, /{KOSH_MAX_SCORE} each)</p>
+                      <div className="flex flex-wrap gap-2">
+                        {s.koshBreakdown.map(k => (
+                          <span key={k.kosh} className="inline-flex items-center gap-1.5 text-[10.5px] font-bold bg-[#F6F9FF] text-[#004f9f] pl-2.5 pr-1 py-1 rounded-full border border-blue-100">
+                            {KOSH_LABELS[k.kosh]}
+                            <span className="bg-[#004f9f] text-white px-1.5 py-0.5 rounded-full">{k.score}/{k.maxScore}</span>
+                            {k.percent !== null && (
+                              <span className={`px-1.5 py-0.5 rounded-full border ${percentBandClass(k.percent)}`}>{k.percent}%</span>
+                            )}
+                            {k.grade && s.videoCount >= 2 && (
+                              <span className={`px-1.5 py-0.5 rounded-full border ${gradeBandClass(k.grade)}`}>{k.grade}</span>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                      {s.videoCount < 2 && (
+                        <p className="text-[10px] text-amber-600 font-semibold mt-2">Grades finalize once both videos are scored.</p>
+                      )}
+                    </div>
+
+                    {s.videos.map(v => {
+                      const slot = Math.min(Math.max(v.slot, 0), 1);
+                      const e = v.evaluation;
+                      return (
+                        <div key={v.videoId} className="bg-white border border-gray-100 rounded-xl overflow-hidden p-5 space-y-4">
+                          <div className="flex items-center justify-between flex-wrap gap-2">
+                            <div className="flex items-center gap-2">
+                              <User size={13} className="text-gray-400" />
+                              <span className="text-xs font-bold text-gray-700">Video {v.slot + 1}</span>
+                              {v.category && <span className="text-[10px] font-semibold bg-blue-50 text-[#004f9f] px-2 py-0.5 rounded-full">{v.category}</span>}
+                              {v.subCategory && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{v.subCategory}</span>}
+                            </div>
                             <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${percentBandClass(v.videoPercent)}`}>
                               <Star size={11} className="fill-current" /> {v.videoPercent}%
                             </span>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                          <div className="rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
-                            <video src={v.videoUrl} controls className="w-full h-full object-contain" />
                           </div>
 
-                          {(() => {
-                            const k = v.koshScores[v.koshes[0]] || v.koshScores[v.koshes[1]];
-                            if (!k) {
-                              return (
-                                <div className="border border-dashed border-gray-200 rounded-xl p-4 flex items-center justify-center text-xs text-gray-400">
-                                  Not yet scored
-                                </div>
-                              );
-                            }
-                            return (
-                              <div className="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50/50">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  {v.koshes.map(kk => (
-                                    <span key={kk} className="inline-flex items-center gap-1.5 text-[10px] font-bold bg-[#F6F9FF] text-[#004f9f] pl-2 pr-1 py-0.5 rounded-full border border-blue-100">
-                                      {KOSH_LABELS[kk]}
-                                      {v.videoPercent !== null && (
-                                        <span className="bg-[#004f9f] text-white px-1.5 py-0.5 rounded-full">{Math.round((v.videoPercent / 2) * 10) / 10}%</span>
-                                      )}
-                                    </span>
-                                  ))}
-                                </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                            <div className="rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
+                              <video src={v.videoUrl} controls className="w-full h-full object-contain" />
+                            </div>
 
-                                <div className="space-y-2">
-                                  {CRITERIA.map(c => {
-                                    const score = k[c.key];
-                                    const pct = (score / 5) * 100;
-                                    return (
-                                      <div key={c.key} className="space-y-1">
-                                        <div className="flex items-center justify-between text-[10.5px] font-semibold text-gray-700">
-                                          <span>{c.label}</span>
-                                          <span className="font-bold text-[#004f9f]">{score}/5</span>
-                                        </div>
-                                        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
-                                          <div className="h-full bg-[#004f9f] rounded-full" style={{ width: `${pct}%` }} />
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-
-                                <div className="flex items-center justify-between bg-[#F6F9FF] rounded-xl px-3 py-2 border border-blue-50">
-                                  <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
-                                    <Star className="w-3.5 h-3.5 text-[#FF9000] fill-current" /> Total
-                                  </span>
-                                  <span className="text-base font-black text-[#004f9f]">{k.totalScore}/20</span>
-                                </div>
-
-                                {k.remarks && (
-                                  <div className="bg-white border border-gray-100 rounded-xl p-2.5 text-xs text-gray-700 italic">
-                                    {k.remarks}
-                                  </div>
-                                )}
-
-                                <div className="text-[10.5px] text-gray-400 flex items-center gap-1.5">
-                                  <Calendar size={11} /> {new Date(k.createdAt).toLocaleString('en-IN', {
-                                    day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
-                                  })} · by {k.evaluatorName}
-                                </div>
-
-                                <div className="flex items-center gap-2">
-                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${
-                                    v.isFullyPublished ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'
-                                  }`}>
-                                    {v.isFullyPublished ? <Lock size={10} /> : <Unlock size={10} />}
-                                    {v.isFullyPublished ? 'Published' : 'Draft'}
-                                  </span>
-                                </div>
-
-                                {(() => {
-                                  const isOwner = currentEvaluatorId === k.evaluatorId;
-                                  const showReEvaluateBtn = !v.isFullyPublished && (isSuperAdmin || isOwner);
-                                  const showPublishBtn = isSuperAdmin || (isOwner && !v.isFullyPublished);
-                                  if (!showReEvaluateBtn && !showPublishBtn) return null;
+                            <div className="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50/50">
+                              <div className="space-y-2">
+                                {KOSH_CRITERIA.map(c => {
+                                  const score = e[c.key];
+                                  const pct = (score / MAX_PER_CRITERION) * 100;
                                   return (
-                                    <div className="flex gap-2">
-                                      {showReEvaluateBtn && (
-                                        <Link
-                                          href={`/dashboard/evaluator/evaluate-content?videoId=${v.videoId}`}
-                                          className="flex-1 flex items-center justify-center gap-1.5 bg-amber-500 text-white py-2 rounded-lg font-bold text-xs hover:bg-amber-600 transition-colors"
-                                        >
-                                          <Pencil size={12} /> Re-evaluate
-                                        </Link>
-                                      )}
-                                      {showPublishBtn && (
-                                        <button
-                                          onClick={() => togglePublish(v)}
-                                          disabled={publishing === v.videoId}
-                                          className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg font-bold text-xs transition-colors disabled:opacity-50 ${
-                                            v.isFullyPublished ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-green-600 text-white hover:bg-green-700'
-                                          }`}
-                                        >
-                                          {v.isFullyPublished ? <Unlock size={12} /> : <Lock size={12} />}
-                                          {publishing === v.videoId ? 'Working...' : v.isFullyPublished ? 'Unpublish' : 'Publish'}
-                                        </button>
-                                      )}
+                                    <div key={c.key} className="space-y-1">
+                                      <div className="flex items-center justify-between text-[10.5px] font-semibold text-gray-700">
+                                        <span>{c.labelBySlot[slot]} <span className="text-[9px] text-[#004f9f] font-bold uppercase">· {KOSH_LABELS[c.kosh]}</span></span>
+                                        <span className="font-bold text-[#004f9f]">{score}/{MAX_PER_CRITERION}</span>
+                                      </div>
+                                      <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-[#004f9f] rounded-full" style={{ width: `${pct}%` }} />
+                                      </div>
                                     </div>
                                   );
-                                })()}
+                                })}
                               </div>
-                            );
-                          })()}
+
+                              <div className="flex items-center justify-between bg-[#F6F9FF] rounded-xl px-3 py-2 border border-blue-50">
+                                <span className="text-xs font-bold text-gray-600 flex items-center gap-1.5">
+                                  <Star className="w-3.5 h-3.5 text-[#FF9000] fill-current" /> Total
+                                </span>
+                                <span className="text-base font-black text-[#004f9f]">{e.totalScore}/{VIDEO_MAX_SCORE}</span>
+                              </div>
+
+                              {e.remarks && (
+                                <div className="bg-white border border-gray-100 rounded-xl p-2.5 text-xs text-gray-700 italic">
+                                  {e.remarks}
+                                </div>
+                              )}
+
+                              <div className="text-[10.5px] text-gray-400 flex items-center gap-1.5">
+                                <Calendar size={11} /> {new Date(e.createdAt).toLocaleString('en-IN', {
+                                  day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                                })} · by {e.evaluatorName}
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-bold border ${
+                                  v.isPublished ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'
+                                }`}>
+                                  {v.isPublished ? <Lock size={10} /> : <Unlock size={10} />}
+                                  {v.isPublished ? 'Published' : 'Draft'}
+                                </span>
+                              </div>
+
+                              {(() => {
+                                const isOwner = currentEvaluatorId === e.evaluatorId;
+                                const showReEvaluateBtn = !v.isPublished && (isSuperAdmin || isOwner);
+                                const showPublishBtn = isSuperAdmin || (isOwner && !v.isPublished);
+                                if (!showReEvaluateBtn && !showPublishBtn) return null;
+                                return (
+                                  <div className="flex gap-2">
+                                    {showReEvaluateBtn && (
+                                      <Link
+                                        href={`/dashboard/evaluator/evaluate-content?videoId=${v.videoId}`}
+                                        className="flex-1 flex items-center justify-center gap-1.5 bg-amber-500 text-white py-2 rounded-lg font-bold text-xs hover:bg-amber-600 transition-colors"
+                                      >
+                                        <Pencil size={12} /> Re-evaluate
+                                      </Link>
+                                    )}
+                                    {showPublishBtn && (
+                                      <button
+                                        onClick={() => togglePublish(v)}
+                                        disabled={publishing === v.videoId}
+                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg font-bold text-xs transition-colors disabled:opacity-50 ${
+                                          v.isPublished ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : 'bg-green-600 text-white hover:bg-green-700'
+                                        }`}
+                                      >
+                                        {v.isPublished ? <Unlock size={12} /> : <Lock size={12} />}
+                                        {publishing === v.videoId ? 'Working...' : v.isPublished ? 'Unpublish' : 'Publish'}
+                                      </button>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
