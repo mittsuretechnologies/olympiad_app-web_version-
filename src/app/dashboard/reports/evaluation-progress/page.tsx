@@ -13,12 +13,12 @@ import {
 /* ── Types ─────────────────────────────────────────────────── */
 
 interface EvaluationDetail {
-  kosh: string;
   totalScore: number;
-  confidenceScore: number;
-  creativityScore: number;
-  techniqueScore: number;
-  presentationScore: number;
+  coordinationScore: number;
+  memoryEnergyScore: number;
+  imaginationEmotionScore: number;
+  focusLanguageScore: number;
+  creativityJoyScore: number;
   remarks: string | null;
   evaluatorName: string;
   evaluatedAt: string;
@@ -32,11 +32,11 @@ interface VideoEntry {
   category: string | null;
   subCategory: string | null;
   createdAt: string;
-  koshes: [string, string];
+  slot: number;
   isEvaluated: boolean;
   isFullyScored: boolean;
   videoPercent: number | null;
-  koshScores: EvaluationDetail[];
+  evaluation: EvaluationDetail | null;
 }
 
 interface StudentProgress {
@@ -95,11 +95,11 @@ function ProgressBar({ evaluated, total }: { evaluated: number; total: number })
 /* ── Score Ring (for video detail) ────────────────────────── */
 
 function ScoreRing({ score, label }: { score: number; label: string }) {
-  const pct = (score / 10) * 100;
+  const pct = (score / 4) * 100;
   const radius = 22;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (pct / 100) * circumference;
-  const color = score >= 8 ? '#10b981' : score >= 5 ? '#f59e0b' : '#ef4444';
+  const color = score >= 3 ? '#10b981' : score >= 2 ? '#f59e0b' : '#ef4444';
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -411,7 +411,7 @@ export default function EvaluationProgressPage() {
                                         </div>
                                       ) : (
                                         <div className="flex items-center gap-2">
-                                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Clock size={10} /> {vid.isEvaluated ? 'Partially Scored' : 'Pending'}</span>
+                                          <span className="text-[10px] font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full flex items-center gap-0.5"><Clock size={10} /> Pending</span>
                                           <Link
                                             href={`/dashboard/evaluator/evaluate-content?videoId=${vid.id}`}
                                             className="text-[10px] font-bold text-white bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded-full flex items-center gap-1 transition-colors"
@@ -426,14 +426,12 @@ export default function EvaluationProgressPage() {
                                   </div>
 
                                   {/* Scores (if evaluated) */}
-                                  {vid.koshScores.length > 0 && (
+                                  {vid.evaluation && (
                                     <div className="hidden lg:flex items-center gap-3">
-                                      {vid.koshScores.map(k => (
-                                        <div key={k.kosh} className="flex flex-col items-center px-2 border-r border-gray-100 last:border-r-0">
-                                          <span className="text-[9px] text-gray-400 font-bold uppercase">{k.kosh}</span>
-                                          <span className="text-lg font-black text-gray-900">{k.totalScore}<span className="text-xs text-gray-400">/20</span></span>
-                                        </div>
-                                      ))}
+                                      <div className="flex flex-col items-center px-2 border-r border-gray-100">
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase">Total</span>
+                                        <span className="text-lg font-black text-gray-900">{vid.evaluation.totalScore}<span className="text-xs text-gray-400">/20</span></span>
+                                      </div>
                                       {vid.videoPercent !== null && (
                                         <div className="flex flex-col items-center">
                                           <span className="text-2xl font-black text-gray-900">{vid.videoPercent}%</span>
@@ -474,26 +472,29 @@ export default function EvaluationProgressPage() {
             <div className="aspect-video bg-black">
               <video src={videoModal.videoUrl} controls autoPlay className="w-full h-full" />
             </div>
-            {videoModal.koshScores.length > 0 && (
-              <div className="p-5 border-t border-gray-100 space-y-4">
-                <div className="flex items-center gap-3">
-                  <BarChart2 size={16} className="text-violet-500" />
-                  <span className="text-sm font-bold text-gray-700">Evaluation Scores</span>
-                  {videoModal.videoPercent !== null && (
-                    <span className="ml-auto text-sm font-black text-gray-900">{videoModal.videoPercent}%</span>
-                  )}
-                </div>
-                {videoModal.koshScores.map(k => (
-                  <div key={k.kosh} className="border-t border-gray-100 pt-3 first:border-t-0 first:pt-0">
+            {videoModal.evaluation && (() => {
+              const k = videoModal.evaluation;
+              // The Vijnanamaya criterion is "Focus" on video 1, "Language" on video 2.
+              const focusLanguageLabel = videoModal.slot === 1 ? 'Language' : 'Focus';
+              return (
+                <div className="p-5 border-t border-gray-100 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <BarChart2 size={16} className="text-violet-500" />
+                    <span className="text-sm font-bold text-gray-700">Evaluation Scores</span>
+                    {videoModal.videoPercent !== null && (
+                      <span className="ml-auto text-sm font-black text-gray-900">{videoModal.videoPercent}%</span>
+                    )}
+                  </div>
+                  <div>
                     <div className="flex items-center gap-2 mb-2">
-                      <span className="text-xs font-bold text-gray-700 uppercase">{k.kosh}</span>
                       <span className="ml-auto text-[11px] text-gray-400">By: {k.evaluatorName} • {new Date(k.evaluatedAt).toLocaleDateString('en-IN')}</span>
                     </div>
-                    <div className="flex items-center justify-center gap-6">
-                      <ScoreRing score={k.confidenceScore} label="Confidence" />
-                      <ScoreRing score={k.creativityScore} label="Creativity" />
-                      <ScoreRing score={k.techniqueScore} label="Technique" />
-                      <ScoreRing score={k.presentationScore} label="Presentation" />
+                    <div className="flex items-center justify-center gap-6 flex-wrap">
+                      <ScoreRing score={k.coordinationScore} label="Coordination" />
+                      <ScoreRing score={k.memoryEnergyScore} label="Memory" />
+                      <ScoreRing score={k.imaginationEmotionScore} label="Imagination" />
+                      <ScoreRing score={k.focusLanguageScore} label={focusLanguageLabel} />
+                      <ScoreRing score={k.creativityJoyScore} label="Creativity" />
                       <div className="flex flex-col items-center px-4 border-l border-gray-200">
                         <span className="text-3xl font-black text-gray-900">{k.totalScore}</span>
                         <span className="text-[11px] text-gray-400 font-bold">/20</span>
@@ -505,9 +506,9 @@ export default function EvaluationProgressPage() {
                       </div>
                     )}
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}

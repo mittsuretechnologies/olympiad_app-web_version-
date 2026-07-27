@@ -135,41 +135,45 @@ model Video {
   @@schema("public")
 }
 
-// Kosh = one of the five Panchkosh evaluation lenses. Each video is scored
-// against two koshas (see KOSHAS_BY_VIDEO_SLOT in the evaluate route), and
-// the video's final % is the average of its two kosh %s.
+// Kosh = one of the five Panchkosh evaluation lenses. Each video is scored on
+// 5 criteria (0-4 each), each criterion mapped 1:1 to a kosha (see
+// KOSH_CRITERIA in src/lib/kosh.ts). A student's per-kosha grade sums the
+// matching criterion from both videos (max 8) and is banded
+// Beginner (1-4) / Progressing (4.1-6) / Proficient (6.1-8).
 enum Kosh {
   ANNAMAYA
   PRANAMAYA
+  MANOMAYA
   VIJNANAMAYA
   ANANDAMAYA
 
   @@schema("public")
 }
 
+// One row per video (single scoring form). Criterion→kosha mapping:
+// coordination→Annamaya, memoryEnergy→Pranamaya, imaginationEmotion→Manomaya,
+// focusLanguage→Vijnanamaya (labeled "Focus" for video 1, "Language" for
+// video 2), creativityJoy→Anandamaya. Each criterion is 0-4; totalScore 0-20.
 model VideoEvaluation {
-  id                String          @id @default(uuid())
-  videoId           String
-  // Nullable only for rows created before the kosh system existed;
-  // every row created going forward always sets this.
-  kosh              Kosh?
-  evaluatorId       String
-  confidenceScore   Int
-  creativityScore   Int
-  techniqueScore    Int
-  presentationScore Int
-  totalScore        Int
-  remarks           String?
-  isPublished       Boolean         @default(false)
-  publishedAt       DateTime?
-  lastEditedBy      String?
-  lastEditedAt      DateTime?
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  video             Video           @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  evaluator         TalentEvaluator @relation(fields: [evaluatorId], references: [id], onDelete: Restrict)
+  id                      String          @id @default(uuid())
+  videoId                 String          @unique
+  evaluatorId             String
+  coordinationScore       Int
+  memoryEnergyScore       Int
+  imaginationEmotionScore Int
+  focusLanguageScore      Int
+  creativityJoyScore      Int
+  totalScore              Int
+  remarks                 String?
+  isPublished             Boolean         @default(false)
+  publishedAt             DateTime?
+  lastEditedBy            String?
+  lastEditedAt            DateTime?
+  createdAt               DateTime        @default(now())
+  updatedAt               DateTime        @updatedAt
+  video                   Video           @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  evaluator               TalentEvaluator @relation(fields: [evaluatorId], references: [id], onDelete: Restrict)
 
-  @@unique([videoId, kosh])
   @@index([evaluatorId])
   @@schema("public")
 }

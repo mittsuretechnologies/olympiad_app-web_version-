@@ -1,12 +1,10 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { koshesForSlot, videoSlot } from '@/lib/kosh';
+import { MAX_PER_CRITERION, CRITERION_KEYS, type CriterionKey } from '@/lib/kosh';
 import { recordAuditLog } from '@/lib/audit-log';
 import { evaluatorCanAccessVideo } from '@/lib/evaluatorRegion';
 import { requireModule } from '@/lib/auth-guard';
-
-const MAX_PER_CRITERION = 5;
 
 export async function POST(request: Request) {
   try {
@@ -56,13 +54,17 @@ export async function POST(request: Request) {
       }
     }
 
-    const { videoId, confidenceScore, creativityScore, techniqueScore, presentationScore, remarks } = await request.json();
+    const body = await request.json();
+    const { videoId, remarks } = body;
 
-    const scores = { confidenceScore, creativityScore, techniqueScore, presentationScore };
-    for (const [key, val] of Object.entries(scores)) {
+    // 5 criteria, one per kosha (see KOSH_CRITERIA in src/lib/kosh.ts), each 0-4.
+    const scores = {} as Record<CriterionKey, number>;
+    for (const key of CRITERION_KEYS) {
+      const val = body[key];
       if (typeof val !== 'number' || val < 0 || val > MAX_PER_CRITERION) {
         return NextResponse.json({ message: `${key} must be between 0 and ${MAX_PER_CRITERION}` }, { status: 400 });
       }
+      scores[key] = val;
     }
     if (!videoId) return NextResponse.json({ message: 'videoId is required' }, { status: 400 });
 
@@ -77,67 +79,51 @@ export async function POST(request: Request) {
       }
     }
 
-    // One scoring form per video, but the same score is recorded twice —
-    // once per kosh assigned to this video's slot (1st video: Annamaya +
-    // Pranamaya, 2nd video: Vijnanamaya + Anandamaya) — so each kosh gets
-    // this video's % as its contribution.
-    const siblingVideos = await prisma.video.findMany({
-      where: {
-        isEvaluation: true,
-        deletedAt: null,
-        ...(video.studentId ? { studentId: video.studentId } : { appUserId: video.appUserId }),
-      },
-      select: { id: true, createdAt: true },
-    });
-    const slot = videoSlot(video.createdAt, siblingVideos.map(v => v.createdAt));
-    const koshes = koshesForSlot(Math.max(slot, 0));
-
-    const existingByKosh = new Map(video.evaluations.map(e => [e.kosh, e]));
-    for (const kosh of koshes) {
-      const existing = existingByKosh.get(kosh);
-      const isOwner = existing?.evaluatorId === payload.id;
-      if (existing && payload.role !== 'SUPERADMIN' && !isOwner) {
+    // One evaluation row per video (the per-kosha breakdown lives in the
+    // criterion columns, each criterion mapped 1:1 to a kosha).
+    const existing = video.evaluations[0] || null;
+    if (existing) {
+      const isOwner = existing.evaluatorId === payload.id;
+      if (payload.role !== 'SUPERADMIN' && !isOwner) {
         return NextResponse.json({ message: 'This video has already been evaluated by another evaluator' }, { status: 409 });
       }
-      if (existing?.isPublished) {
+      if (existing.isPublished) {
         return NextResponse.json({ message: 'This evaluation has been published and is locked. Unpublish it first to make changes.' }, { status: 409 });
       }
     }
 
-    const totalScore = confidenceScore + creativityScore + techniqueScore + presentationScore;
+    const totalScore = CRITERION_KEYS.reduce((sum, k) => sum + scores[k], 0);
     const data = {
-      confidenceScore,
-      creativityScore,
-      techniqueScore,
-      presentationScore,
+      ...scores,
       totalScore,
       remarks: remarks?.trim() || null,
     };
 
-    const results = await Promise.all(koshes.map(kosh => {
-      const existing = existingByKosh.get(kosh);
-      return existing
-        ? prisma.videoEvaluation.update({ where: { videoId_kosh: { videoId, kosh } }, data: { ...data, lastEditedBy: payload.id, lastEditedAt: new Date() } })
-        : prisma.videoEvaluation.create({ data: { videoId, kosh, evaluatorId, ...data } });
-    }));
+    const result = existing
+      ? await prisma.videoEvaluation.update({ where: { videoId }, data: { ...data, lastEditedBy: payload.id, lastEditedAt: new Date() } })
+      : await prisma.videoEvaluation.create({ data: { videoId, evaluatorId, ...data } });
 
-    await Promise.all(koshes.map(kosh => {
-      const existing = existingByKosh.get(kosh);
-      return recordAuditLog({
-        actorId: payload.id,
-        actorRole: payload.role,
-        actorName: payload.email || payload.name || null,
-        action: existing ? 'EVALUATION_EDITED' : 'EVALUATION_SUBMITTED',
-        entityType: 'VideoEvaluation',
-        entityId: videoId,
-        previousValue: existing
-          ? { confidenceScore: existing.confidenceScore, creativityScore: existing.creativityScore, techniqueScore: existing.techniqueScore, presentationScore: existing.presentationScore, remarks: existing.remarks, kosh }
-          : null,
-        newValue: { ...data, kosh },
-      });
-    }));
+    await recordAuditLog({
+      actorId: payload.id,
+      actorRole: payload.role,
+      actorName: payload.email || payload.name || null,
+      action: existing ? 'EVALUATION_EDITED' : 'EVALUATION_SUBMITTED',
+      entityType: 'VideoEvaluation',
+      entityId: videoId,
+      previousValue: existing
+        ? {
+            coordinationScore: existing.coordinationScore,
+            memoryEnergyScore: existing.memoryEnergyScore,
+            imaginationEmotionScore: existing.imaginationEmotionScore,
+            focusLanguageScore: existing.focusLanguageScore,
+            creativityJoyScore: existing.creativityJoyScore,
+            remarks: existing.remarks,
+          }
+        : null,
+      newValue: data,
+    });
 
-    return NextResponse.json(results[0]);
+    return NextResponse.json(result);
   } catch (error) {
     console.error('POST evaluator/me/evaluate failed:', error);
     return NextResponse.json({ message: 'Failed to submit evaluation' }, { status: 500 });

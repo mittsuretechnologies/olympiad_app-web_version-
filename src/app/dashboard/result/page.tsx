@@ -5,15 +5,18 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import {
   Award, Loader2, Search, Download, ChevronDown, ChevronUp,
-  Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock,
+  Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock, BookOpen,
 } from 'lucide-react';
+import ResultPassport, { type PassportStudent } from '@/components/ResultPassport';
+import type { CriterionKey } from '@/lib/kosh';
 
 interface VideoResultEntry {
   id: string;
   category: string | null;
   subCategory: string | null;
-  koshes: [string, string];
-  koshScores: { kosh: string; totalScore: number; isPublished: boolean; evaluatorName: string | null }[];
+  slot: number;
+  criteria: Record<CriterionKey, number> | null;
+  totalScore: number | null;
   isEvaluated: boolean;
   isPublished: boolean;
   videoPercent: number | null;
@@ -23,6 +26,9 @@ interface VideoResultEntry {
 interface KoshBreakdownEntry {
   kosh: string;
   label: string;
+  videoScore: number | null;
+  videoMaxScore: number;
+  grade: 'Beginner' | 'Progressing' | 'Proficient' | null;
   examPercent: number | null;
   videoPercent: number | null;
   combinedPercent: number | null;
@@ -68,6 +74,12 @@ function percentBandClass(pct: number) {
   return 'text-red-600';
 }
 
+function gradeBadgeClass(grade: string) {
+  if (grade === 'Proficient') return 'bg-emerald-50 border-emerald-200 text-emerald-700';
+  if (grade === 'Progressing') return 'bg-blue-50 border-blue-200 text-[#004f9f]';
+  return 'bg-amber-50 border-amber-200 text-amber-700';
+}
+
 export default function ResultPage() {
   const { data, isLoading: loading } = useSWR<StudentResult[]>('/api/result/overview', fetcher);
   const rows: StudentResult[] = Array.isArray(data) ? data : [];
@@ -77,6 +89,7 @@ export default function ResultPage() {
   const [filterSchool, setFilterSchool] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
   const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [passportFor, setPassportFor] = useState<StudentResult | null>(null);
 
   const states = useMemo(() => ['All', ...Array.from(new Set(rows.map(r => r.state).filter(Boolean) as string[])).sort()], [rows]);
   const schools = useMemo(() => {
@@ -112,13 +125,24 @@ export default function ResultPage() {
 
   const downloadCSV = () => {
     const koshLabels = Array.from(new Set(filtered.flatMap(r => r.koshBreakdown.map(k => k.label))));
-    const header = ['Name', 'Olympiad Code', 'Class', 'School', 'Exam %', 'Video Score', ...koshLabels.map(l => `${l} %`), 'Holistic %', 'Status'];
+    const header = [
+      'Name', 'Olympiad Code', 'Class', 'School', 'Exam %', 'Video Score',
+      ...koshLabels.flatMap(l => [`${l} Marks`, `${l} Grade`, `${l} Overall %`]),
+      'Holistic %', 'Status',
+    ];
     const csvRows = filtered.map(r => {
-      const koshByLabel = new Map(r.koshBreakdown.map(k => [k.label, k.combinedPercent]));
+      const koshByLabel = new Map(r.koshBreakdown.map(k => [k.label, k]));
       return [
         r.name, r.olympiadCode, r.className || '-', r.schoolName || '-',
         r.examPercentage ?? '-', `${r.videoScoreTotal}/${r.videoMaxScore}`,
-        ...koshLabels.map(l => koshByLabel.get(l) ?? '-'),
+        ...koshLabels.flatMap(l => {
+          const k = koshByLabel.get(l);
+          return [
+            k && k.videoScore !== null ? `${k.videoScore}/${k.videoMaxScore}` : '-',
+            k?.grade ?? '-',
+            k?.combinedPercent ?? '-',
+          ];
+        }),
         r.holisticPercent ?? '-', r.status,
       ];
     });
@@ -222,11 +246,12 @@ export default function ResultPage() {
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Videos /40</th>
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Holistic %</th>
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Passport</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={9} className="py-16 text-center text-gray-400 font-medium">No students found.</td></tr>
+                <tr><td colSpan={10} className="py-16 text-center text-gray-400 font-medium">No students found.</td></tr>
               )}
               {filtered.map((row, idx) => {
                 const isExpanded = expandedRow === row.studentKey;
@@ -259,11 +284,20 @@ export default function ResultPage() {
                         )}
                       </td>
                       <td className="py-3 px-4 text-center"><StatusBadge status={row.status} /></td>
+                      <td className="py-3 px-4 text-center">
+                        <button
+                          onClick={e => { e.stopPropagation(); setPassportFor(row); }}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-[#06013E] text-[#F5E9C8] hover:bg-[#0a0258] transition-colors cursor-pointer shadow-sm"
+                          aria-label={`Open result passport for ${row.name}`}
+                        >
+                          <BookOpen size={12} /> Open
+                        </button>
+                      </td>
                     </tr>
 
                     {isExpanded && (
                       <tr>
-                        <td colSpan={9} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
+                        <td colSpan={10} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
                           <div className="space-y-4">
                             <div>
                               <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Kosh Breakdown</p>
@@ -272,13 +306,28 @@ export default function ResultPage() {
                                   <div key={k.kosh} className="bg-white rounded-xl border border-gray-200 p-3">
                                     <div className="flex items-center justify-between mb-2">
                                       <span className="text-xs font-bold text-gray-700">{k.label}</span>
-                                      {k.combinedPercent !== null && (
-                                        <span className={`text-sm font-black ${percentBandClass(k.combinedPercent)}`}>{k.combinedPercent}%</span>
+                                      {k.grade && (
+                                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${gradeBadgeClass(k.grade)}`}>{k.grade}</span>
                                       )}
                                     </div>
-                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold">
+                                    {/* Marks + overall % — the two headline numbers per kosha */}
+                                    <div className="flex items-end justify-between mb-2">
+                                      <div className="flex flex-col">
+                                        <span className="text-lg font-black text-gray-900 leading-none">
+                                          {k.videoScore !== null ? <>{k.videoScore}<span className="text-xs font-bold text-gray-400">/{k.videoMaxScore}</span></> : '—'}
+                                        </span>
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Marks</span>
+                                      </div>
+                                      <div className="flex flex-col items-end">
+                                        <span className={`text-lg font-black leading-none ${k.combinedPercent !== null ? percentBandClass(k.combinedPercent) : 'text-gray-400'}`}>
+                                          {k.combinedPercent !== null ? `${k.combinedPercent}%` : '—'}
+                                        </span>
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Overall %</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold border-t border-gray-100 pt-1.5">
                                       <span>Exam: {k.examPercent !== null ? `${k.examPercent}%` : '—'}</span>
-                                      <span>Video: {k.videoPercent !== null ? `${k.videoPercent}%` : '—'}</span>
+                                      <span>Videos: {k.videoPercent !== null ? `${k.videoPercent}%` : '—'}</span>
                                     </div>
                                   </div>
                                 ))}
@@ -339,6 +388,11 @@ export default function ResultPage() {
           Showing {filtered.length} of {rows.length} students
         </div>
       </div>
+
+      {/* Result Passport booklet */}
+      {passportFor && (
+        <ResultPassport student={passportFor as PassportStudent} onClose={() => setPassportFor(null)} />
+      )}
     </div>
   );
 }
