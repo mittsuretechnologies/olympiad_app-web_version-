@@ -15,13 +15,17 @@ function getAppUserFromToken(request: Request) {
   } catch { return null; }
 }
 
-// GET /api/app/users/:userId/following
-// Returns the list of AppUsers that :userId follows
+// GET /api/app/users/:userId/following?cursor=<lastFollowId>&limit=20
+// Returns the list of AppUsers that :userId follows, one page at a time —
+// a popular account can follow thousands of people, so this must stay bounded.
 export async function GET(request: Request, { params }: { params: Promise<{ userId: string }> }) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { userId } = await params;
+  const { searchParams } = new URL(request.url);
+  const cursor = searchParams.get('cursor') ?? undefined;
+  const limit  = Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 50);
 
   try {
     const target = await prisma.appUser.findUnique({
@@ -45,13 +49,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     }
 
     // Get Follow records where followerId = userId (people this user follows)
-    const follows = await prisma.follow.findMany({
-      where: { followerId: userId },
-      select: { followingId: true, createdAt: true },
+    const followsRaw = await prisma.follow.findMany({
+      where:   { followerId: userId },
+      select:  { id: true, followingId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },
+      take:    limit + 1,
+      cursor:  cursor ? { id: cursor } : undefined,
+      skip:    cursor ? 1 : 0,
     });
 
-    if (follows.length === 0) return NextResponse.json([]);
+    const hasMore    = followsRaw.length > limit;
+    const follows     = hasMore ? followsRaw.slice(0, limit) : followsRaw;
+    const nextCursor = hasMore ? follows[follows.length - 1].id : null;
+
+    if (follows.length === 0) return NextResponse.json({ users: [], nextCursor: null, hasMore: false });
 
     const followingIds = follows.map(f => f.followingId);
 
@@ -61,11 +72,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
       select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
     });
 
-    // Count how many followers each of these users has (followingId = their id)
-    const followerCounts = await Promise.all(
-      followingIds.map(id => prisma.follow.count({ where: { followingId: id } }))
-    );
-    const followerCountMap = new Map(followingIds.map((id, i) => [id, followerCounts[i]]));
+    // Count how many followers each of these users has — one batched query
+    // instead of firing a separate count() per person in the list.
+    const followerCountGroups = await prisma.follow.groupBy({
+      by: ['followingId'],
+      where: { followingId: { in: followingIds } },
+      _count: { _all: true },
+    });
+    const followerCountMap = new Map(followerCountGroups.map(g => [g.followingId, g._count._all]));
 
     // Which of these does the current viewer follow?
     const myFollows = await prisma.follow.findMany({
@@ -92,7 +106,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
       })
       .filter(Boolean);
 
-    return NextResponse.json(list);
+    return NextResponse.json({ users: list, nextCursor, hasMore });
   } catch (error: any) {
     console.error('following error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

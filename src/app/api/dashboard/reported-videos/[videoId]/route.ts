@@ -47,6 +47,24 @@ export async function GET(
       include: { reporter: { select: { userId: true } } },
     });
 
+    // Tally reports by category from what's already fetched above — cheaper
+    // than a second groupBy query since the full list is already in memory.
+    const categoryCounts: Record<string, number> = {};
+    for (const r of reports) {
+      categoryCounts[r.category] = (categoryCounts[r.category] ?? 0) + 1;
+    }
+    const reportBreakdown = Object.entries(categoryCounts)
+      .map(([category, count]) => ({ category, count }))
+      .sort((a, b) => b.count - a.count);
+
+    // Every approval goes through the dashboard's approve action, which already
+    // writes an AuditLog row — surface the most recent one for this video.
+    const approvalLog = await prisma.auditLog.findFirst({
+      where:   { entityType: 'Video', entityId: videoId, action: 'VIDEO_APPROVED' },
+      orderBy: { createdAt: 'desc' },
+      select:  { actorName: true, actorRole: true, createdAt: true },
+    });
+
     return NextResponse.json({
       video: {
         id: video.id,
@@ -59,7 +77,11 @@ export async function GET(
         ownerName: video.student?.name || ownerAppUser?.userId || 'Unknown',
         createdAt: video.createdAt,
         deletedAt: video.deletedAt,
+        approvedBy:   approvalLog?.actorName ?? null,
+        approvedRole: approvalLog?.actorRole ?? null,
+        approvedAt:   approvalLog?.createdAt ?? null,
       },
+      reportBreakdown,
       reports: reports.map(r => ({
         id: r.id,
         category: r.category,

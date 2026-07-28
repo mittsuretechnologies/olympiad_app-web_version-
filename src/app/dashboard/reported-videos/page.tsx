@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { Flag, RefreshCw, X, CheckCircle, Trash2, Play, AlertTriangle, Settings, Award, Eye } from 'lucide-react';
+import { Flag, RefreshCw, X, CheckCircle, Trash2, Play, AlertTriangle, Settings, Award, Eye, ShieldCheck, BarChart3 } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -45,10 +45,19 @@ interface DetailVideo {
   ownerName: string;
   createdAt: string;
   deletedAt: string | null;
+  approvedBy: string | null;
+  approvedRole: string | null;
+  approvedAt: string | null;
+}
+
+interface ReportBreakdownEntry {
+  category: string;
+  count: number;
 }
 
 interface DetailResponse {
   video: DetailVideo;
+  reportBreakdown: ReportBreakdownEntry[];
   reports: ReportDetail[];
 }
 
@@ -341,6 +350,39 @@ export default function ReportedVideosPage() {
                     </div>
                     <p className="text-[12px] font-black text-white/80">{detail.video.ownerName}</p>
                   </div>
+
+                  {/* Approved by */}
+                  <div className="flex items-center gap-2 text-[11px] text-white/50 bg-white/5 rounded-lg px-3 py-2">
+                    <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
+                    {detail.video.approvedBy ? (
+                      <span>
+                        Approved by <span className="font-bold text-white/80">{detail.video.approvedBy}</span>
+                        {detail.video.approvedRole ? ` (${detail.video.approvedRole})` : ''}
+                        {' · '}{formatDate(detail.video.approvedAt)}
+                      </span>
+                    ) : (
+                      <span>Approval record not available</span>
+                    )}
+                  </div>
+
+                  {/* Report breakdown by category */}
+                  {detail.reportBreakdown.length > 0 && (
+                    <div>
+                      <h3 className="text-xs font-black text-white/60 uppercase tracking-wide mb-2 flex items-center gap-1.5">
+                        <BarChart3 size={13} /> Reported For
+                      </h3>
+                      <div className="flex flex-wrap gap-1.5">
+                        {detail.reportBreakdown.map(b => (
+                          <span
+                            key={b.category}
+                            className="flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full bg-red-500/10 text-red-300 border border-red-500/20"
+                          >
+                            {CATEGORY_LABELS[b.category] ?? b.category} · {b.count}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Reports */}
                   <div>

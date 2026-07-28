@@ -124,7 +124,9 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         id:            target.id,
         userId:        target.userId,
         avatarUrl:     target.avatarUrl,
-        olympiadId:    target.olympiadId,
+        // The olympiad ID doubles as a claim code elsewhere (see update-olympiad-id) —
+        // only the account owner should ever see their own raw code.
+        olympiadId:    isOwnProfile ? target.olympiadId : null,
         isPrivate:     target.isPrivate,
         studentName,
         followersCount,

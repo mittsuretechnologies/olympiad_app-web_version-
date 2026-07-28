@@ -126,7 +126,10 @@ export async function DELETE(request: Request) {
 
     const existing = await prisma.video.findMany({
       where: { id: { in: videoIds } },
-      select: { id: true, status: true, olympiadVisibility: true },
+      select: {
+        id: true, status: true, olympiadVisibility: true,
+        appUserId: true, caption: true, category: true, subCategory: true,
+      },
     });
 
     const { count } = await prisma.video.deleteMany({
@@ -143,6 +146,23 @@ export async function DELETE(request: Request) {
       previousValue: v,
       newValue: null,
     })));
+
+    // Notify each video's owner, same as the reported-video removal flow —
+    // moderation deletes previously left the user with no explanation at all.
+    const notifyTargets = existing.filter(
+      (v): v is typeof v & { appUserId: string } => Boolean(v.appUserId)
+    );
+    await Promise.all(notifyTargets.map(v => {
+      const label = v.caption?.trim() || v.subCategory || v.category || 'your video';
+      return prisma.notification.create({
+        data: {
+          userId:  v.appUserId,
+          type:    'VIDEO_REMOVED',
+          title:   'Video Removed',
+          message: `Your video "${label}" was removed by an admin during content moderation.`,
+        },
+      });
+    }));
 
     return NextResponse.json({ message: `${count} video(s) deleted successfully`, count });
   } catch (error) {
