@@ -80,7 +80,7 @@ async function searchSchools(q: string) {
   return schoolsRaw.map((sc, i) => ({ ...sc, videoCount: schoolVideosCounts[i] }));
 }
 
-async function searchVideos(q: string, appUserId: string) {
+async function searchVideos(q: string, appUserId: string, cursor: string | undefined, limit: number) {
   const visWhere = await visibilityWhere(appUserId);
 
   const videosRaw = await prisma.video.findMany({
@@ -101,10 +101,16 @@ async function searchVideos(q: string, appUserId: string) {
       likesCount: true, viewsCount: true, createdAt: true,
     },
     orderBy: { createdAt: 'desc' },
-    take:    30,
+    take:    limit + 1,
+    cursor:  cursor ? { id: cursor } : undefined,
+    skip:    cursor ? 1 : 0,
   });
 
-  const appUserIds = [...new Set(videosRaw.map(v => v.appUserId).filter(Boolean))] as string[];
+  const hasMore    = videosRaw.length > limit;
+  const items      = hasMore ? videosRaw.slice(0, limit) : videosRaw;
+  const nextCursor = hasMore ? items[items.length - 1].id : null;
+
+  const appUserIds = [...new Set(items.map(v => v.appUserId).filter(Boolean))] as string[];
   const uploaders = appUserIds.length
     ? await prisma.appUser.findMany({
         where:  { id: { in: appUserIds } },
@@ -113,10 +119,12 @@ async function searchVideos(q: string, appUserId: string) {
     : [];
   const uploaderMap = new Map(uploaders.map(u => [u.id, u]));
 
-  return videosRaw.map(v => ({
+  const videos = items.map(v => ({
     ...v,
     uploader: v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
   }));
+
+  return { videos, nextCursor, hasMore };
 }
 
 export async function GET(request: Request) {
@@ -124,22 +132,31 @@ export async function GET(request: Request) {
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { searchParams } = new URL(request.url);
-  const q = searchParams.get('q')?.trim() || '';
+  const q      = searchParams.get('q')?.trim() || '';
+  const cursor = searchParams.get('cursor') ?? undefined;
+  const limit  = Math.min(parseInt(searchParams.get('limit') ?? '12', 10) || 12, 30);
 
   if (!q || q.length < 1) {
-    return NextResponse.json({ users: [], schools: [], videos: [] });
+    return NextResponse.json({ users: [], schools: [], videos: [], nextCursor: null, hasMore: false });
   }
 
   try {
     // Users / Schools / Videos are independent — run them concurrently
     // instead of paying for each section's latency one after another.
-    const [users, schools, videos] = await Promise.all([
-      searchUsers(q, appUser.id),
-      searchSchools(q),
-      searchVideos(q, appUser.id),
+    // Users/schools are only ever fetched on a fresh search (cursor is unset then),
+    // so skip re-running them when this call is just paging in more videos.
+    const [users, schools, videoPage] = await Promise.all([
+      cursor ? Promise.resolve([]) : searchUsers(q, appUser.id),
+      cursor ? Promise.resolve([]) : searchSchools(q),
+      searchVideos(q, appUser.id, cursor, limit),
     ]);
 
-    return NextResponse.json({ users, schools, videos });
+    return NextResponse.json({
+      users, schools,
+      videos:     videoPage.videos,
+      nextCursor: videoPage.nextCursor,
+      hasMore:    videoPage.hasMore,
+    });
   } catch (error: any) {
     console.error('search error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

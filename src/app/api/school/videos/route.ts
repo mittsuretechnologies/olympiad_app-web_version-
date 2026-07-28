@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const schoolId  = searchParams.get('schoolId')?.trim();
   const viewerId  = getViewerIdFromToken(request);
+  const cursor    = searchParams.get('cursor') ?? undefined;
+  const limit     = Math.min(parseInt(searchParams.get('limit') ?? '12', 10) || 12, 30);
 
   if (!schoolId) {
     return NextResponse.json({ error: 'schoolId is required' }, { status: 400 });
@@ -59,14 +61,18 @@ export async function GET(request: NextRequest) {
 
     // If no members found for this school, return empty
     if (appUserIds.length === 0 && studentIds.length === 0) {
-      return NextResponse.json({ videos: [], school: await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true, city: true, state: true } }) });
+      return NextResponse.json({
+        videos: [], nextCursor: null, hasMore: false,
+        school: await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true, city: true, state: true } }),
+      });
     }
 
     // Apply profile-privacy visibility filter
     const visWhere = await visibilityWhere(viewerId);
 
-    // Fetch approved public videos from both appUsers and students
-    const videos = await prisma.video.findMany({
+    // Fetch approved public videos from both appUsers and students, one page at a time —
+    // a popular school can accumulate hundreds of videos, so this must stay bounded.
+    const videosRaw = await prisma.video.findMany({
       where: {
         status:   'APPROVED',
         isPublic: true,
@@ -77,6 +83,9 @@ export async function GET(request: NextRequest) {
         ],
       },
       orderBy: { createdAt: 'desc' },
+      take:    limit + 1,
+      cursor:  cursor ? { id: cursor } : undefined,
+      skip:    cursor ? 1 : 0,
       select: {
         id:           true,
         videoUrl:     true,
@@ -100,7 +109,11 @@ export async function GET(request: NextRequest) {
       select: { id: true, name: true, city: true, state: true },
     });
 
-    const result = videos.map(v => {
+    const hasMore    = videosRaw.length > limit;
+    const items       = hasMore ? videosRaw.slice(0, limit) : videosRaw;
+    const nextCursor  = hasMore ? items[items.length - 1].id : null;
+
+    const result = items.map(v => {
       const au  = v.appUserId ? appUserMap.get(v.appUserId) : undefined;
       const stu = v.studentId ? studentMap.get(v.studentId) : undefined;
       return {
@@ -134,7 +147,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ videos: result, school });
+    return NextResponse.json({ videos: result, nextCursor, hasMore, school });
   } catch (error) {
     console.error('GET /api/school/videos failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

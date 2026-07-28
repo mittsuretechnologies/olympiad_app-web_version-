@@ -96,26 +96,29 @@ export async function POST(request: Request) {
     const buffer = Buffer.from(await file.arrayBuffer());
     await writeFile(filePath, buffer);
 
-    try {
-      const durationSeconds = await getVideoDurationSeconds(filePath);
-      if (durationSeconds > MAX_DURATION_SECONDS) {
-        await unlink(filePath).catch(() => {});
-        return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
-      }
-    } catch (durationError) {
+    // Duration check and thumbnail extraction are independent ffmpeg passes over the
+    // same file — run them concurrently instead of back-to-back to roughly halve the
+    // server-side processing time the client has to wait out after the upload completes.
+    const [durationResult, thumbnailResult] = await Promise.allSettled([
+      getVideoDurationSeconds(filePath),
+      extractThumbnail(filePath, thumbPath),
+    ]);
+
+    if (durationResult.status === 'rejected') {
       // Could not read duration (corrupt file / unsupported codec) — reject rather than upload an unverifiable video.
-      console.error('Video duration check failed:', durationError);
+      console.error('Video duration check failed:', durationResult.reason);
       await unlink(filePath).catch(() => {});
+      if (thumbnailResult.status === 'fulfilled') await unlink(thumbPath).catch(() => {});
       return NextResponse.json({ error: 'Could not verify video duration. Please try a different file.' }, { status: 400 });
     }
-
-    let thumbCreated = false;
-    try {
-      await extractThumbnail(filePath, thumbPath);
-      thumbCreated = true;
-    } catch {
-      // thumbnail generation is best-effort; upload still succeeds without it
+    if (durationResult.value > MAX_DURATION_SECONDS) {
+      await unlink(filePath).catch(() => {});
+      if (thumbnailResult.status === 'fulfilled') await unlink(thumbPath).catch(() => {});
+      return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
     }
+
+    // Thumbnail generation is best-effort; upload still succeeds without it.
+    const thumbCreated = thumbnailResult.status === 'fulfilled';
 
     if (s3Enabled()) {
       const keyBase  = `uploads/app-videos/${appUser.id}`;
