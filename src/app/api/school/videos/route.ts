@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
     // If no members found for this school, return empty
     if (appUserIds.length === 0 && studentIds.length === 0) {
       return NextResponse.json({
-        videos: [], nextCursor: null, hasMore: false,
+        videos: [], nextCursor: null, hasMore: false, totalCount: 0,
         school: await prisma.school.findUnique({ where: { id: schoolId }, select: { id: true, name: true, city: true, state: true } }),
       });
     }
@@ -70,44 +70,49 @@ export async function GET(request: NextRequest) {
     // Apply profile-privacy visibility filter
     const visWhere = await visibilityWhere(viewerId);
 
+    const videoWhere = {
+      status:   'APPROVED' as const,
+      isPublic: true,
+      ...visWhere,
+      OR: [
+        ...(appUserIds.length > 0 ? [{ appUserId: { in: appUserIds } }] : []),
+        ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
+      ],
+    };
+
     // Fetch approved public videos from both appUsers and students, one page at a time —
     // a popular school can accumulate hundreds of videos, so this must stay bounded.
-    const videosRaw = await prisma.video.findMany({
-      where: {
-        status:   'APPROVED',
-        isPublic: true,
-        ...visWhere,
-        OR: [
-          ...(appUserIds.length > 0 ? [{ appUserId: { in: appUserIds } }] : []),
-          ...(studentIds.length > 0 ? [{ studentId: { in: studentIds } }] : []),
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-      take:    limit + 1,
-      cursor:  cursor ? { id: cursor } : undefined,
-      skip:    cursor ? 1 : 0,
-      select: {
-        id:           true,
-        videoUrl:     true,
-        thumbnailUrl: true,
-        caption:      true,
-        tags:         true,
-        category:     true,
-        subCategory:  true,
-        likesCount:   true,
-        viewsCount:   true,
-        isEvaluation: true,
-        appUserId:    true,
-        studentId:    true,
-        createdAt:    true,
-      },
-    });
-
-    // Fetch school info for the response
-    const school = await prisma.school.findUnique({
-      where: { id: schoolId },
-      select: { id: true, name: true, city: true, state: true },
-    });
+    // Total only needs to be known once — the client captures it on the first page and
+    // keeps displaying it while paginating, so skip the count query on "load more" calls.
+    const [videosRaw, school, totalCount] = await Promise.all([
+      prisma.video.findMany({
+        where:   videoWhere,
+        orderBy: { createdAt: 'desc' },
+        take:    limit + 1,
+        cursor:  cursor ? { id: cursor } : undefined,
+        skip:    cursor ? 1 : 0,
+        select: {
+          id:           true,
+          videoUrl:     true,
+          thumbnailUrl: true,
+          caption:      true,
+          tags:         true,
+          category:     true,
+          subCategory:  true,
+          likesCount:   true,
+          viewsCount:   true,
+          isEvaluation: true,
+          appUserId:    true,
+          studentId:    true,
+          createdAt:    true,
+        },
+      }),
+      prisma.school.findUnique({
+        where:  { id: schoolId },
+        select: { id: true, name: true, city: true, state: true },
+      }),
+      cursor ? Promise.resolve(null) : prisma.video.count({ where: videoWhere }),
+    ]);
 
     const hasMore    = videosRaw.length > limit;
     const items       = hasMore ? videosRaw.slice(0, limit) : videosRaw;
@@ -128,6 +133,7 @@ export async function GET(request: NextRequest) {
         viewsCount:   v.viewsCount,
         isEvaluation: v.isEvaluation,
         createdAt:    v.createdAt,
+        appUserId:    v.appUserId,
         appUser: au ? { id: au.id, userId: au.userId, avatarUrl: au.avatarUrl } : null,
         student: stu ? {
           id:         stu.id,
@@ -147,7 +153,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    return NextResponse.json({ videos: result, nextCursor, hasMore, school });
+    return NextResponse.json({ videos: result, nextCursor, hasMore, totalCount, school });
   } catch (error) {
     console.error('GET /api/school/videos failed:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

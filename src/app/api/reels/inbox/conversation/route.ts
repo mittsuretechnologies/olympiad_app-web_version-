@@ -17,13 +17,17 @@ function getAppUserIdFromToken(request: Request): string | null {
   }
 }
 
-// GET /api/reels/inbox/conversation?otherId=<id>
-// Returns all reels shared between the authenticated caller and otherId in BOTH directions, newest first.
+// GET /api/reels/inbox/conversation?otherId=<id>&cursor=<lastShareId>&limit=20
+// Returns reels shared between the authenticated caller and otherId in BOTH directions,
+// newest first, one page at a time — a long-running conversation can accumulate a lot
+// of shares over time, so this must stay bounded like every other list in the app.
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const userId  = getAppUserIdFromToken(request);
     const otherId = searchParams.get('otherId') ?? '';
+    const cursor  = searchParams.get('cursor') ?? undefined;
+    const limit   = Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 50);
 
     if (!userId) {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
@@ -33,7 +37,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Both directions: user→other and other→user
-    const shares = await prisma.reelShare.findMany({
+    const sharesRaw = await prisma.reelShare.findMany({
       where: {
         OR: [
           { senderId: userId,  recipientId: otherId },
@@ -41,6 +45,9 @@ export async function GET(request: NextRequest) {
         ],
       },
       orderBy: { sentAt: 'desc' },
+      take:    limit + 1,
+      cursor:  cursor ? { id: cursor } : undefined,
+      skip:    cursor ? 1 : 0,
       include: {
         video: {
           select: {
@@ -62,6 +69,10 @@ export async function GET(request: NextRequest) {
         },
       },
     });
+
+    const hasMore    = sharesRaw.length > limit;
+    const shares      = hasMore ? sharesRaw.slice(0, limit) : sharesRaw;
+    const nextCursor = hasMore ? shares[shares.length - 1].id : null;
 
     // Fetch appUser details for video creators
     const appUserIds = [...new Set(
@@ -87,7 +98,7 @@ export async function GET(request: NextRequest) {
         : null,
     }));
 
-    return NextResponse.json({ messages });
+    return NextResponse.json({ messages, nextCursor, hasMore });
   } catch (error) {
     console.error('GET /api/reels/inbox/conversation failed:', error);
     return NextResponse.json({ message: 'Failed to fetch conversation' }, { status: 500 });

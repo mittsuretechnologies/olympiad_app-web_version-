@@ -83,28 +83,36 @@ async function searchSchools(q: string) {
 async function searchVideos(q: string, appUserId: string, cursor: string | undefined, limit: number) {
   const visWhere = await visibilityWhere(appUserId);
 
-  const videosRaw = await prisma.video.findMany({
-    where: {
-      status:   'APPROVED',
-      isPublic: true,
-      ...visWhere,
-      OR: [
-        { caption:     { contains: q, mode: 'insensitive' } },
-        { category:    { contains: q, mode: 'insensitive' } },
-        { subCategory: { contains: q, mode: 'insensitive' } },
-        { tags:        { contains: q, mode: 'insensitive' } },
-      ],
-    },
-    select: {
-      id: true, appUserId: true, videoUrl: true, thumbnailUrl: true,
-      caption: true, category: true, subCategory: true, tags: true,
-      likesCount: true, viewsCount: true, createdAt: true,
-    },
-    orderBy: { createdAt: 'desc' },
-    take:    limit + 1,
-    cursor:  cursor ? { id: cursor } : undefined,
-    skip:    cursor ? 1 : 0,
-  });
+  const where = {
+    status:   'APPROVED' as const,
+    isPublic: true,
+    ...visWhere,
+    OR: [
+      { caption:     { contains: q, mode: 'insensitive' as const } },
+      { category:    { contains: q, mode: 'insensitive' as const } },
+      { subCategory: { contains: q, mode: 'insensitive' as const } },
+      { tags:        { contains: q, mode: 'insensitive' as const } },
+    ],
+  };
+
+  // Total only needs to be known once — the client captures it on the first page
+  // and keeps displaying it unchanged while paginating, so skip the count query
+  // entirely on "load more" requests.
+  const [videosRaw, totalCount] = await Promise.all([
+    prisma.video.findMany({
+      where,
+      select: {
+        id: true, appUserId: true, videoUrl: true, thumbnailUrl: true,
+        caption: true, category: true, subCategory: true, tags: true,
+        likesCount: true, viewsCount: true, createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+      take:    limit + 1,
+      cursor:  cursor ? { id: cursor } : undefined,
+      skip:    cursor ? 1 : 0,
+    }),
+    cursor ? Promise.resolve(null) : prisma.video.count({ where }),
+  ]);
 
   const hasMore    = videosRaw.length > limit;
   const items      = hasMore ? videosRaw.slice(0, limit) : videosRaw;
@@ -124,7 +132,7 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
     uploader: v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
   }));
 
-  return { videos, nextCursor, hasMore };
+  return { videos, nextCursor, hasMore, totalCount };
 }
 
 export async function GET(request: Request) {
@@ -137,7 +145,7 @@ export async function GET(request: Request) {
   const limit  = Math.min(parseInt(searchParams.get('limit') ?? '12', 10) || 12, 30);
 
   if (!q || q.length < 1) {
-    return NextResponse.json({ users: [], schools: [], videos: [], nextCursor: null, hasMore: false });
+    return NextResponse.json({ users: [], schools: [], videos: [], nextCursor: null, hasMore: false, totalCount: 0 });
   }
 
   try {
@@ -156,6 +164,7 @@ export async function GET(request: Request) {
       videos:     videoPage.videos,
       nextCursor: videoPage.nextCursor,
       hasMore:    videoPage.hasMore,
+      totalCount: videoPage.totalCount,
     });
   } catch (error: any) {
     console.error('search error:', error);
