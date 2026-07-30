@@ -15,7 +15,7 @@ function getAppUserFromToken(request: Request) {
   } catch { return null; }
 }
 
-// GET /api/app/videos/:id/likes?cursor=<lastLikeId>&limit=20 — owner-only: who liked this video
+// GET /api/app/videos/:id/likes?cursor=<lastLikeId>&limit=20 — who starred this video (any signed-in app user)
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -31,12 +31,9 @@ export async function GET(
   try {
     const video = await prisma.video.findFirst({
       where:  { id, deletedAt: null },
-      select: { id: true, appUserId: true },
+      select: { id: true },
     });
     if (!video) return NextResponse.json({ error: 'Video not found' }, { status: 404 });
-    if (video.appUserId !== appUser.id) {
-      return NextResponse.json({ error: 'Only the video owner can view its likes' }, { status: 403 });
-    }
 
     const likesRaw = await prisma.like.findMany({
       where:   { videoId: id },
