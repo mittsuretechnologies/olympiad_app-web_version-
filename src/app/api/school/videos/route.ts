@@ -118,6 +118,17 @@ export async function GET(request: NextRequest) {
     const items       = hasMore ? videosRaw.slice(0, limit) : videosRaw;
     const nextCursor  = hasMore ? items[items.length - 1].id : null;
 
+    // This response previously had no isLiked field at all, so every video from
+    // a school feed always rendered as unliked regardless of the real Like row.
+    let likedIds: Set<string> = new Set();
+    if (viewerId && items.length > 0) {
+      const userLikes = await prisma.like.findMany({
+        where: { userId: viewerId, videoId: { in: items.map(v => v.id) } },
+        select: { videoId: true },
+      });
+      likedIds = new Set(userLikes.map(l => l.videoId));
+    }
+
     const result = items.map(v => {
       const au  = v.appUserId ? appUserMap.get(v.appUserId) : undefined;
       const stu = v.studentId ? studentMap.get(v.studentId) : undefined;
@@ -132,6 +143,7 @@ export async function GET(request: NextRequest) {
         likesCount:   v.likesCount,
         viewsCount:   v.viewsCount,
         isEvaluation: v.isEvaluation,
+        isLiked:      likedIds.has(v.id),
         createdAt:    v.createdAt,
         appUserId:    v.appUserId,
         appUser: au ? { id: au.id, userId: au.userId, avatarUrl: au.avatarUrl } : null,

@@ -119,6 +119,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
       videosCount = videos.length;
     }
 
+    // This response previously had no isLiked field, so every video on a public
+    // profile always rendered as unliked regardless of the real Like row.
+    const likedIds = videos.length > 0
+      ? new Set((await prisma.like.findMany({
+          where:  { userId: appUser.id, videoId: { in: videos.map(v => v.id) } },
+          select: { videoId: true },
+        })).map(l => l.videoId))
+      : new Set<string>();
+
     return NextResponse.json({
       user: {
         id:            target.id,
@@ -150,6 +159,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         olympiadVisibility: v.olympiadVisibility,
         likesCount:   v.likesCount,
         viewsCount:   v.viewsCount,
+        isLiked:      likedIds.has(v.id),
         createdAt:    v.createdAt,
       })),
     });

@@ -102,11 +102,13 @@ export async function GET(request: NextRequest) {
       : [];
     const appUserMap = new Map(appUsersRaw.map(u => [u.id, u]));
 
-    // Resolve likes for authenticated user
+    // Resolve likes for authenticated user — trust the JWT-derived viewerId over
+    // the client-supplied userId query param, which is only a fallback.
     let likedIds = new Set<string>();
-    if (userId && merged.length > 0) {
+    const effectiveUserId = viewerId ?? userId;
+    if (effectiveUserId && merged.length > 0) {
       const likes = await prisma.like.findMany({
-        where: { userId, videoId: { in: merged.map(v => v.id) } },
+        where: { userId: effectiveUserId, videoId: { in: merged.map(v => v.id) } },
         select: { videoId: true },
       });
       likedIds = new Set(likes.map(l => l.videoId));

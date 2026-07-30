@@ -127,8 +127,20 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
     : [];
   const uploaderMap = new Map(uploaders.map(u => [u.id, u]));
 
+  // This response previously had no isLiked field, so every video from search
+  // results always rendered as unliked regardless of the real Like row.
+  let likedIds: Set<string> = new Set();
+  if (items.length > 0) {
+    const userLikes = await prisma.like.findMany({
+      where: { userId: appUserId, videoId: { in: items.map(v => v.id) } },
+      select: { videoId: true },
+    });
+    likedIds = new Set(userLikes.map(l => l.videoId));
+  }
+
   const videos = items.map(v => ({
     ...v,
+    isLiked:  likedIds.has(v.id),
     uploader: v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
   }));
 

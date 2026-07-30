@@ -62,11 +62,13 @@ const VIDEO_SELECT = {
 } as const;
 
 // Shape raw rows from multiple queries into the client video format, batching appUser/school lookups once.
-async function hydrate(items: RawVideo[], userId?: string) {
+// `effectiveUserId` should be the JWT-derived viewerId whenever available — trusting
+// the client-supplied query param alone lets isLiked desync from the real Like rows.
+async function hydrate(items: RawVideo[], effectiveUserId?: string) {
   let likedIds: Set<string> = new Set();
-  if (userId && items.length > 0) {
+  if (effectiveUserId && items.length > 0) {
     const userLikes = await prisma.like.findMany({
-      where: { userId, videoId: { in: items.map(v => v.id) } },
+      where: { userId: effectiveUserId, videoId: { in: items.map(v => v.id) } },
       select: { videoId: true },
     });
     likedIds = new Set(userLikes.map(l => l.videoId));
@@ -197,10 +199,11 @@ export async function GET(request: NextRequest) {
       )
     );
 
+    const effectiveUserId = viewerId ?? userId;
     const [trending, releases, ...categoryRows] = await Promise.all([
-      hydrate(trendingRaw, userId),
-      hydrate(newReleases, userId),
-      ...categoryRowsRaw.map(rows => hydrate(rows, userId)),
+      hydrate(trendingRaw, effectiveUserId),
+      hydrate(newReleases, effectiveUserId),
+      ...categoryRowsRaw.map(rows => hydrate(rows, effectiveUserId)),
     ]);
 
     const rows = [
