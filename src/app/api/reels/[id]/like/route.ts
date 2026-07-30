@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { notifyVideoLiked } from '@/lib/notifications';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -34,7 +35,7 @@ export async function POST(
     // Check video exists and is public + approved
     const video = await prisma.video.findFirst({
       where: { id: videoId, status: 'APPROVED', isPublic: true, deletedAt: null },
-      select: { id: true, likesCount: true },
+      select: { id: true, likesCount: true, appUserId: true },
     });
     if (!video) {
       return NextResponse.json({ message: 'Video not found' }, { status: 404 });
@@ -72,6 +73,12 @@ export async function POST(
         where:  { id: videoId },
         select: { likesCount: true },
       });
+
+      if (video.appUserId && video.appUserId !== userId) {
+        const liker = await prisma.appUser.findUnique({ where: { id: userId }, select: { userId: true } });
+        await notifyVideoLiked({ ownerId: video.appUserId, videoId, likerUserId: liker?.userId ?? 'Someone' });
+      }
+
       return NextResponse.json({ liked: true, likesCount: updated?.likesCount ?? 0 });
     }
   } catch (error) {

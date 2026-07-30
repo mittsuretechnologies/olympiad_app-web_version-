@@ -464,19 +464,23 @@ model AuditLog {
 }
 
 // Generic system-originated alerts for the app's Home-screen notification bell
-// (currently used for admin video removals; separate from SupportTicket responses,
-// which are fetched via /api/app/support/notifications).
+// (used for admin video removals, approvals/rejections, and star/like alerts;
+// separate from SupportTicket responses, which are fetched via /api/app/support/notifications).
 model Notification {
-  id        String   @id @default(uuid())
-  userId    String
-  type      String   // "VIDEO_REMOVED"
-  title     String
-  message   String
-  isRead    Boolean  @default(false)
-  createdAt DateTime @default(now())
-  user      AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id             String   @id @default(uuid())
+  userId         String
+  type           String   // "VIDEO_REMOVED" | "VIDEO_APPROVED" | "VIDEO_REJECTED" | "VIDEO_LIKED"
+  title          String
+  message        String
+  isRead         Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  videoId        String?  // links back to the video, e.g. for VIDEO_LIKED aggregation
+  count          Int      @default(1)      // how many actors this row represents (VIDEO_LIKED)
+  recentActorIds String[] @default([])     // most recent likers' userIds, for "X and N others"
+  user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isRead])
+  @@index([userId, videoId, type, isRead])
   @@schema("public")
 }

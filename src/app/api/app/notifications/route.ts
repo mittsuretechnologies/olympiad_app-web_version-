@@ -44,14 +44,26 @@ export async function GET(request: Request) {
       take:    limit + 1,
       cursor:  cursor ? { id: cursor } : undefined,
       skip:    cursor ? 1 : 0,
-      select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true },
+      select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true, videoId: true },
     });
 
     const hasMore      = notificationsRaw.length > limit;
     const notifications = hasMore ? notificationsRaw.slice(0, limit) : notificationsRaw;
     const nextCursor    = hasMore ? notifications[notifications.length - 1].id : null;
 
-    return NextResponse.json({ notifications, nextCursor, hasMore });
+    // Attach each notification's video thumbnail (if any) so the client can show
+    // a preview next to star/approval/rejection alerts without a second round-trip.
+    const videoIds = [...new Set(notifications.map(n => n.videoId).filter((id): id is string => !!id))];
+    const videos = videoIds.length > 0
+      ? await prisma.video.findMany({ where: { id: { in: videoIds } }, select: { id: true, thumbnailUrl: true } })
+      : [];
+    const thumbByVideoId = new Map(videos.map(v => [v.id, v.thumbnailUrl]));
+    const notificationsWithThumb = notifications.map(n => ({
+      ...n,
+      thumbnailUrl: n.videoId ? (thumbByVideoId.get(n.videoId) ?? null) : null,
+    }));
+
+    return NextResponse.json({ notifications: notificationsWithThumb, nextCursor, hasMore });
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
