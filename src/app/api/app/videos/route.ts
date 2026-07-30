@@ -179,10 +179,21 @@ export async function GET(request: Request) {
       include: { evaluations: { select: { id: true } } },
     });
 
+    // This response previously had no isLiked field, so the star always showed
+    // empty on your own videos (e.g. in the Profile "Videos" tab) even if you'd
+    // starred your own upload.
+    const likedIds = videos.length > 0
+      ? new Set((await prisma.like.findMany({
+          where:  { userId: appUser.id, videoId: { in: videos.map(v => v.id) } },
+          select: { videoId: true },
+        })).map(l => l.videoId))
+      : new Set<string>();
+
     // Expose only whether marks exist (not the scores themselves — those stay
     // gated behind VideoEvaluation.isPublished) so the app can block/explain deletion.
     const normalized = videos.map(({ evaluations, ...v }) => ({
       ...v,
+      isLiked: likedIds.has(v.id),
       hasEvaluation: !!evaluations?.length,
     }));
 

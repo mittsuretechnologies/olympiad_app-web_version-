@@ -75,12 +75,17 @@ export async function GET(request: NextRequest) {
     const items     = hasMore ? videos.slice(0, limit) : videos;
     const nextCursor = hasMore ? items[items.length - 1].id : null;
 
-    // Check which videos the requesting userId has liked
+    // Check which videos the requesting user has liked — trust the authenticated
+    // token over the client-supplied userId query param, which is only kept as a
+    // fallback (e.g. old app builds); the token is what the like-toggle endpoint
+    // itself trusts, so this must agree with it or the star shown here can
+    // desync from the real Like row.
     let likedIds: Set<string> = new Set();
-    if (userId && items.length > 0) {
+    const effectiveUserId = viewerId ?? userId;
+    if (effectiveUserId && items.length > 0) {
       const videoIds = items.map(v => v.id);
       const userLikes = await prisma.like.findMany({
-        where: { userId, videoId: { in: videoIds } },
+        where: { userId: effectiveUserId, videoId: { in: videoIds } },
         select: { videoId: true },
       });
       likedIds = new Set(userLikes.map(l => l.videoId));

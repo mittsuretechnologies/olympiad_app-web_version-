@@ -86,6 +86,16 @@ export async function GET(request: NextRequest) {
       : [];
     const appUserMap = new Map(appUsers.map(u => [u.id, u]));
 
+    // This response previously had no isLiked field, so every shared video always
+    // rendered as unliked in the conversation player regardless of the real Like row.
+    const videoIds = [...new Set(shares.map(s => s.video?.id).filter(Boolean) as string[])];
+    const likedIds = videoIds.length > 0
+      ? new Set((await prisma.like.findMany({
+          where:  { userId, videoId: { in: videoIds } },
+          select: { videoId: true },
+        })).map(l => l.videoId))
+      : new Set<string>();
+
     const messages = shares.map(s => ({
       id:        s.id,
       sentAt:    s.sentAt.toISOString(),
@@ -93,6 +103,7 @@ export async function GET(request: NextRequest) {
       video: s.video
         ? {
             ...s.video,
+            isLiked: likedIds.has(s.video.id),
             appUser: s.video.appUserId ? (appUserMap.get(s.video.appUserId) ?? null) : null,
           }
         : null,
