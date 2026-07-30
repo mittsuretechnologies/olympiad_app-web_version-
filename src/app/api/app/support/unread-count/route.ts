@@ -25,8 +25,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const unreadCount = await prisma.supportTicket.count({
-      where: { userId: appUser.id, adminResponse: { not: null }, isReadByUser: false },
+      where: { userId: appUser.id, adminResponse: { not: null }, isReadByUser: false, respondedAt: { gte: cutoff } },
     });
     return NextResponse.json({ unreadCount });
   } catch (error: any) {

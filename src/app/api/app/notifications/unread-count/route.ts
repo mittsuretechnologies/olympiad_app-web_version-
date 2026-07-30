@@ -25,8 +25,9 @@ export async function GET(request: Request) {
   }
 
   try {
+    const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const unreadCount = await prisma.notification.count({
-      where: { userId: appUser.id, isRead: false },
+      where: { userId: appUser.id, isRead: false, createdAt: { gte: cutoff } },
     });
     return NextResponse.json({ unreadCount });
   } catch (error: any) {

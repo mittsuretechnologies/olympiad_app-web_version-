@@ -2,8 +2,34 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
+import { createNotification } from '@/lib/notifications';
 
 export const dynamic = 'force-dynamic';
+
+function buildVideoStatusNotification(
+  video: { id: string; appUserId: string | null; caption: string | null; category: string | null; subCategory: string | null },
+  status: 'APPROVED' | 'REJECTED',
+  rejectionReason?: string | null,
+) {
+  const label = video.caption?.trim() || video.subCategory || video.category || 'your video';
+  return status === 'APPROVED'
+    ? {
+        userId:  video.appUserId as string,
+        type:    'VIDEO_APPROVED',
+        title:   'Video Approved',
+        message: `Your video "${label}" has been approved and is now live!`,
+        videoId: video.id,
+      }
+    : {
+        userId:  video.appUserId as string,
+        type:    'VIDEO_REJECTED',
+        title:   'Video Rejected',
+        message: rejectionReason
+          ? `Your video "${label}" was not approved. Reason: ${rejectionReason}`
+          : `Your video "${label}" was not approved.`,
+        videoId: video.id,
+      };
+}
 
 export async function GET(request: Request) {
   try {
@@ -196,7 +222,10 @@ export async function POST(request: Request) {
     if (Array.isArray(videoIds) && videoIds.length > 0) {
       const existing = await prisma.video.findMany({
         where: { id: { in: videoIds } },
-        select: { id: true, status: true, rejectionReason: true },
+        select: {
+          id: true, status: true, rejectionReason: true,
+          appUserId: true, caption: true, category: true, subCategory: true,
+        },
       });
 
       await prisma.video.updateMany({
@@ -217,6 +246,10 @@ export async function POST(request: Request) {
         reason: status === 'REJECTED' ? (rejectionReason || null) : null,
       })));
 
+      await Promise.all(existing.map(v => v.appUserId
+        ? createNotification(buildVideoStatusNotification(v, status, rejectionReason))
+        : Promise.resolve()));
+
       return NextResponse.json({ message: `${videoIds.length} video(s) ${status.toLowerCase()}` });
     }
 
@@ -225,7 +258,10 @@ export async function POST(request: Request) {
 
     const before = await prisma.video.findUnique({
       where: { id: videoId },
-      select: { status: true, rejectionReason: true },
+      select: {
+        status: true, rejectionReason: true,
+        appUserId: true, caption: true, category: true, subCategory: true,
+      },
     });
 
     const video = await prisma.video.update({
@@ -245,6 +281,14 @@ export async function POST(request: Request) {
       newValue: { status: video.status, rejectionReason: video.rejectionReason },
       reason: status === 'REJECTED' ? (rejectionReason || null) : null,
     });
+
+    if (before?.appUserId) {
+      await createNotification(buildVideoStatusNotification(
+        { id: videoId, ...before },
+        status,
+        rejectionReason,
+      ));
+    }
 
     return NextResponse.json({ message: `Video ${status.toLowerCase()} successfully`, video });
   } catch (error) {
