@@ -26,6 +26,42 @@ export async function createNotification(entry: CreateNotificationInput) {
   }
 }
 
+export async function notifyFollow({
+  followerId, followerUserId, followingId,
+}: { followerId: string; followerUserId: string; followingId: string }) {
+  try {
+    await prisma.notification.create({
+      data: {
+        userId:  followingId,
+        type:    'FOLLOW',
+        title:   'New Follower',
+        message: `${followerUserId} started following you`,
+        actorId: followerId,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to create follow notification:', error);
+  }
+}
+
+export async function notifyFollowRequest({
+  senderId, senderUserId, receiverId,
+}: { senderId: string; senderUserId: string; receiverId: string }) {
+  try {
+    await prisma.notification.create({
+      data: {
+        userId:  receiverId,
+        type:    'FOLLOW_REQUEST',
+        title:   'Follow Request',
+        message: `${senderUserId} requested to follow you`,
+        actorId: senderId,
+      },
+    });
+  } catch (error) {
+    console.error('Failed to create follow-request notification:', error);
+  }
+}
+
 function formatLikeMessage(firstActorUserId: string, count: number): string {
   if (count <= 1) return `${firstActorUserId} starred your video`;
   if (count === 2) return `${firstActorUserId} and 1 other starred your video`;

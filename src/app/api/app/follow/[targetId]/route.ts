@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { notifyFollow, notifyFollowRequest } from '@/lib/notifications';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -57,11 +58,23 @@ export async function POST(request: Request, { params }: { params: Promise<{ tar
   if (target.isPrivate) {
     // Private account: create a follow request instead
     try {
+      const existingRequest = await prisma.followRequest.findUnique({
+        where: { senderId_receiverId: { senderId: appUser.id, receiverId: targetId } },
+        select: { status: true },
+      });
+
       await prisma.followRequest.upsert({
         where: { senderId_receiverId: { senderId: appUser.id, receiverId: targetId } },
         create: { senderId: appUser.id, receiverId: targetId, status: 'PENDING' },
         update: { status: 'PENDING' },
       });
+
+      // Only notify when this created a genuinely new pending state — not on a
+      // repeat tap while already PENDING (avoids spamming the receiver).
+      const isNewPendingState = !existingRequest || existingRequest.status !== 'PENDING';
+      if (isNewPendingState) {
+        await notifyFollowRequest({ senderId: appUser.id, senderUserId: appUser.userId, receiverId: targetId });
+      }
     } catch (e: any) {
       console.error('follow request error:', e);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -79,12 +92,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ tar
     await prisma.follow.create({
       data: { followerId: appUser.id, followingId: targetId },
     });
+    await notifyFollow({ followerId: appUser.id, followerUserId: appUser.userId, followingId: targetId });
   } catch (e: any) {
     if (e.code !== 'P2002') {
       console.error('follow error:', e);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-    // already following — treat as success
+    // already following — treat as success, no re-notification
   }
 
   const [followersCount, followingCount] = await Promise.all([

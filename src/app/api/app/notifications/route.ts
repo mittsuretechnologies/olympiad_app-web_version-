@@ -44,7 +44,7 @@ export async function GET(request: Request) {
       take:    limit + 1,
       cursor:  cursor ? { id: cursor } : undefined,
       skip:    cursor ? 1 : 0,
-      select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true, videoId: true },
+      select: { id: true, type: true, title: true, message: true, isRead: true, createdAt: true, videoId: true, actorId: true },
     });
 
     const hasMore      = notificationsRaw.length > limit;

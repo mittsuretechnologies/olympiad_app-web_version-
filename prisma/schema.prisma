@@ -469,12 +469,13 @@ model AuditLog {
 model Notification {
   id             String   @id @default(uuid())
   userId         String
-  type           String   // "VIDEO_REMOVED" | "VIDEO_APPROVED" | "VIDEO_REJECTED" | "VIDEO_LIKED"
+  type           String   // "VIDEO_REMOVED" | "VIDEO_APPROVED" | "VIDEO_REJECTED" | "VIDEO_LIKED" | "FOLLOW" | "FOLLOW_REQUEST"
   title          String
   message        String
   isRead         Boolean  @default(false)
   createdAt      DateTime @default(now())
   videoId        String?  // links back to the video, e.g. for VIDEO_LIKED aggregation
+  actorId        String?  // AppUser.id of whoever triggered this (FOLLOW / FOLLOW_REQUEST)
   count          Int      @default(1)      // how many actors this row represents (VIDEO_LIKED)
   recentActorIds String[] @default([])     // most recent likers' userIds, for "X and N others"
   user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
