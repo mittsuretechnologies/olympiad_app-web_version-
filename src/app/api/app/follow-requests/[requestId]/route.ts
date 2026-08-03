@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { notifyFollowAccepted } from '@/lib/notifications';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -43,6 +44,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ re
       }),
       prisma.followRequest.update({ where: { id: requestId }, data: { status: 'APPROVED' } }),
     ]);
+
+    // Tell the requester their request went through.
+    const receiver = await prisma.appUser.findUnique({
+      where: { id: followRequest.receiverId }, select: { userId: true },
+    });
+    await notifyFollowAccepted({
+      senderId:   followRequest.senderId,
+      receiverId: followRequest.receiverId,
+      receiverUserId: receiver?.userId ?? 'Someone',
+    });
+
     return NextResponse.json({ status: 'APPROVED' });
   }
 

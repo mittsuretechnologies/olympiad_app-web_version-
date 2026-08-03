@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { notifyNewFollower, notifyFollowRequest } from '@/lib/notifications';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -67,6 +68,13 @@ export async function POST(request: Request, { params }: { params: Promise<{ tar
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
+    const sender = await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { userId: true } });
+    await notifyFollowRequest({
+      receiverId: targetId,
+      senderId:   appUser.id,
+      senderUserId: sender?.userId ?? 'Someone',
+    });
+
     const [followersCount, followingCount] = await Promise.all([
       prisma.follow.count({ where: { followingId: targetId } }),
       prisma.follow.count({ where: { followerId:  targetId } }),
@@ -75,16 +83,27 @@ export async function POST(request: Request, { params }: { params: Promise<{ tar
   }
 
   // Public account: follow immediately
+  let didFollow = false;
   try {
     await prisma.follow.create({
       data: { followerId: appUser.id, followingId: targetId },
     });
+    didFollow = true;
   } catch (e: any) {
     if (e.code !== 'P2002') {
       console.error('follow error:', e);
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
-    // already following — treat as success
+    // already following — treat as success, but don't re-notify
+  }
+
+  if (didFollow) {
+    const follower = await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { userId: true } });
+    await notifyNewFollower({
+      followedId: targetId,
+      followerId: appUser.id,
+      followerUserId: follower?.userId ?? 'Someone',
+    });
   }
 
   const [followersCount, followingCount] = await Promise.all([
