@@ -31,7 +31,9 @@ export async function GET(request: Request) {
           id:        true,
           userId:    true,
           avatarUrl: true,
-          olympiadId: true,
+          // olympiadId is deliberately not selected: the receiving user sees
+          // only the username, so there is no reason to expose another
+          // student's Olympiad ID over the wire.
         },
       },
     },

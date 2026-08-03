@@ -26,40 +26,71 @@ export async function createNotification(entry: CreateNotificationInput) {
   }
 }
 
-export async function notifyFollow({
-  followerId, followerUserId, followingId,
-}: { followerId: string; followerUserId: string; followingId: string }) {
+// Follow alerts are deduped per (recipient, actor) rather than inserting a row
+// per event: unfollow/re-follow cycles would otherwise stack up identical
+// entries in the recipient's feed. recentActorIds carries the actor, matching
+// how VIDEO_LIKED below reuses the same row.
+async function upsertActorNotification({
+  userId, actorId, type, title, message,
+}: { userId: string; actorId: string; type: string; title: string; message: string }) {
   try {
-    await prisma.notification.create({
-      data: {
-        userId:  followingId,
-        type:    'FOLLOW',
-        title:   'New Follower',
-        message: `${followerUserId} started following you`,
-        actorId: followerId,
-      },
+    const existing = await prisma.notification.findFirst({
+      where: { userId, type, recentActorIds: { has: actorId } },
+      orderBy: { createdAt: 'desc' },
     });
+
+    if (existing) {
+      await prisma.notification.update({
+        where: { id: existing.id },
+        data: { title, message, isRead: false, createdAt: new Date() },
+      });
+    } else {
+      await prisma.notification.create({
+        data: { userId, type, title, message, count: 1, recentActorIds: [actorId] },
+      });
+    }
   } catch (error) {
-    console.error('Failed to create follow notification:', error);
+    console.error(`Failed to record ${type} notification:`, error);
   }
 }
 
+// Someone followed a public account.
+export async function notifyNewFollower({
+  followedId, followerId, followerUserId,
+}: { followedId: string; followerId: string; followerUserId: string }) {
+  await upsertActorNotification({
+    userId:  followedId,
+    actorId: followerId,
+    type:    'FOLLOW',
+    title:   'New Follower',
+    message: `${followerUserId} started following you`,
+  });
+}
+
+// Someone asked to follow a private account.
 export async function notifyFollowRequest({
-  senderId, senderUserId, receiverId,
-}: { senderId: string; senderUserId: string; receiverId: string }) {
-  try {
-    await prisma.notification.create({
-      data: {
-        userId:  receiverId,
-        type:    'FOLLOW_REQUEST',
-        title:   'Follow Request',
-        message: `${senderUserId} requested to follow you`,
-        actorId: senderId,
-      },
-    });
-  } catch (error) {
-    console.error('Failed to create follow-request notification:', error);
-  }
+  receiverId, senderId, senderUserId,
+}: { receiverId: string; senderId: string; senderUserId: string }) {
+  await upsertActorNotification({
+    userId:  receiverId,
+    actorId: senderId,
+    type:    'FOLLOW_REQUEST',
+    title:   'Follow Request',
+    message: `${senderUserId} requested to follow you`,
+  });
+}
+
+// A private account approved a pending request — tell the person who asked.
+export async function notifyFollowAccepted({
+  senderId, receiverId, receiverUserId,
+}: { senderId: string; receiverId: string; receiverUserId: string }) {
+  await upsertActorNotification({
+    userId:  senderId,
+    actorId: receiverId,
+    type:    'FOLLOW',
+    title:   'Follow Request Accepted',
+    message: `${receiverUserId} accepted your follow request`,
+  });
 }
 
 function formatLikeMessage(firstActorUserId: string, count: number): string {
