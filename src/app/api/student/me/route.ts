@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
   try {
@@ -10,7 +11,7 @@ export async function GET(request: Request) {
     }
 
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
+    const decoded = jwt.verify(token, getJwtSecret()) as any;
 
     if (!decoded || decoded.role !== 'STUDENT') {
       return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });

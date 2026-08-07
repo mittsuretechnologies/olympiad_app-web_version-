@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 function generatePassword(length = 10): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnpqrstuvwxyz';
@@ -22,7 +23,7 @@ export async function POST(
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     let payload: any;
-    try { payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret'); }
+    try { payload = jwt.verify(token, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });

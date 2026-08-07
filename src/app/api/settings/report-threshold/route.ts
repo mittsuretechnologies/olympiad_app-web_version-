@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getReportThreshold, setReportThreshold } from '@/lib/reportSettings';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 function requireSuperAdmin(request: Request) {
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
+    const payload = jwt.verify(token, getJwtSecret()) as any;
     return payload?.role === 'SUPERADMIN' ? payload : null;
   } catch {
     return null;

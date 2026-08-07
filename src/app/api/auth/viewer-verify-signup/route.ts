@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { viewerOtpStore, MAX_VIEWER_OTP_ATTEMPTS } from '@/lib/viewerOtpStore';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 // Completes viewer signup: confirms the OTP sent by POST /api/auth/viewer-login
 // for an email with no existing account, then creates the Viewer.
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
 
     const token = jwt.sign(
       { id: viewer.id, email: viewer.email, role: 'VIEWER' },
-      process.env.JWT_SECRET || 'fallback_secret',
+      getJwtSecret(),
       { expiresIn: '30d' }
     );
 

@@ -6,10 +6,11 @@ import { spawn } from 'child_process';
 import { probeVideo, cropTo9x16, compressVideo } from '@/lib/videoProbe';
 import { prisma } from '@/lib/prisma';
 import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
+import { getJwtSecret } from '@/lib/auth-guard';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
 
-const JWT_SECRET      = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET      = getJwtSecret();
 const MAX_BYTES       = 150 * 1024 * 1024; // 150 MB — above this, auto-compress (no hard upper cap)
 const MAX_DURATION_S  = 120; // 2 minutes
 const TARGET_RATIO    = 9 / 16;

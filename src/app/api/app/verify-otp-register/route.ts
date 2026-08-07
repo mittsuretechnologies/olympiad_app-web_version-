@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 const MAX_APP_OTP_ATTEMPTS = 5;
 
@@ -99,7 +100,7 @@ export async function POST(request: Request) {
 
     const token = jwt.sign(
       { id: user.id, userId: user.userId, role: 'APP_USER' },
-      process.env.JWT_SECRET || 'fallback_secret',
+      getJwtSecret(),
       { expiresIn: '30d' }
     );
 

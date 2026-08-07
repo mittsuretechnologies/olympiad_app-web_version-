@@ -4,8 +4,9 @@ import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { detectImageExtension } from '@/lib/fileSignature';
 import { s3Enabled, uploadBufferToS3, imageContentType } from '@/lib/s3';
+import { getJwtSecret } from '@/lib/auth-guard';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 const MAX_BYTES  = 5 * 1024 * 1024; // 5 MB
 
 export const dynamic = 'force-dynamic';

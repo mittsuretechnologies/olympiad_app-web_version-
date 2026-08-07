@@ -6,10 +6,11 @@ import os from 'os';
 import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
 import { s3PublicUrl, uploadFileToS3, deleteFromS3, downloadFromS3 } from '@/lib/s3';
+import { getJwtSecret } from '@/lib/auth-guard';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 const MAX_DURATION_SECONDS = 120;
 
 export const dynamic     = 'force-dynamic';

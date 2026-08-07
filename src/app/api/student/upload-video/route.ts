@@ -4,8 +4,9 @@ import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { probeVideo } from '@/lib/videoProbe';
 import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
+import { getJwtSecret } from '@/lib/auth-guard';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 const MAX_BYTES  = 150 * 1024 * 1024; // 150 MB
 const MAX_DURATION_S = 120; // 2 minutes
 

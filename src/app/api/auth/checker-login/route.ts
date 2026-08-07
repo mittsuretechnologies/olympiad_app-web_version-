@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 /**
  * Unified login for the Olympiad CHECKER portal (apps/portal, the AI-grading
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+    const JWT_SECRET = getJwtSecret();
 
     // ── 1. SuperAdmin (by email) ────────────────────────────────────────────
     if (identifier.includes('@')) {

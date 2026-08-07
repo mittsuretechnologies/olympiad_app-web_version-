@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
 
     let payload: any;
     try {
-      payload = jwt.verify(resetToken, process.env.JWT_SECRET || 'fallback_secret');
+      payload = jwt.verify(resetToken, getJwtSecret());
     } catch {
       return NextResponse.json({ message: 'Reset session expired. Please start again.' }, { status: 401 });
     }

@@ -4,11 +4,12 @@ import { writeFile, mkdir, unlink } from 'fs/promises';
 import path from 'path';
 import { spawn } from 'child_process';
 import { s3Enabled, uploadFileToS3, videoContentType } from '@/lib/s3';
+import { getJwtSecret } from '@/lib/auth-guard';
 // ffmpeg-static resolves to the platform binary path at runtime (no Next.js bundler issues)
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 const MAX_BYTES  = 150 * 1024 * 1024;
 const MAX_DURATION_SECONDS = 120;
 

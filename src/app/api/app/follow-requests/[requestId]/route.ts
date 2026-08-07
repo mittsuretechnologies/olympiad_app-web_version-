@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { notifyFollowAccepted } from '@/lib/notifications';
+import { getJwtSecret } from '@/lib/auth-guard';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 
 function getAppUserFromToken(request: Request) {
   const authHeader = request.headers.get('Authorization');

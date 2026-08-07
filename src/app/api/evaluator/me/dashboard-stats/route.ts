@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { requireModule } from '@/lib/auth-guard';
-
+import { requireModule, getJwtSecret } from '@/lib/auth-guard';
 export async function GET(request: Request) {
   try {
     const auth = request.headers.get('authorization') || '';
@@ -11,7 +10,7 @@ export async function GET(request: Request) {
 
     let payload: any;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      payload = jwt.verify(token, getJwtSecret());
     } catch {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }

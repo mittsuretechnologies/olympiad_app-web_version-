@@ -2,6 +2,16 @@ import jwt from 'jsonwebtoken';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
+// Fails closed instead of silently signing/verifying with a guessable,
+// source-visible default when JWT_SECRET is misconfigured.
+export function getJwtSecret(): string {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET environment variable is not set');
+  }
+  return secret;
+}
+
 export function requireRole(request: Request, allowedRoles: string[]) {
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
@@ -11,7 +21,7 @@ export function requireRole(request: Request, allowedRoles: string[]) {
 
   let payload: any;
   try {
-    payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    payload = jwt.verify(token, getJwtSecret());
   } catch {
     return { error: NextResponse.json({ message: 'Invalid token' }, { status: 401 }) };
   }

@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { viewerOtpStore } from '@/lib/viewerOtpStore';
 import { sendOtpEmail } from '@/lib/mailer';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 export async function POST(request: Request) {
   try {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       }
       const token = jwt.sign(
         { id: existing.id, email: existing.email, role: 'VIEWER' },
-        process.env.JWT_SECRET || 'fallback_secret',
+        getJwtSecret(),
         { expiresIn: '30d' }
       );
       return NextResponse.json({

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { recordAuditLog } from '@/lib/audit-log';
+import { getJwtSecret } from '@/lib/auth-guard';
 
 // PATCH /api/school/me/videos/:id/visibility — school-side Olympiad public/private
 // visibility toggle. Requires BOTH the normal school session token AND a short-lived
@@ -17,14 +18,14 @@ export async function PATCH(
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     let payload: any;
-    try { payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret'); }
+    try { payload = jwt.verify(token, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
     const stepUpHeader = request.headers.get('x-step-up-token') || '';
     let stepUpPayload: any;
-    try { stepUpPayload = jwt.verify(stepUpHeader, process.env.JWT_SECRET || 'fallback_secret'); }
+    try { stepUpPayload = jwt.verify(stepUpHeader, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'OTP verification required or expired.' }, { status: 401 }); }
     if (stepUpPayload?.role !== 'SCHOOL_VIDEO_VISIBILITY' || stepUpPayload?.schoolId !== payload.id) {
       return NextResponse.json({ message: 'OTP verification required or expired.' }, { status: 401 });
