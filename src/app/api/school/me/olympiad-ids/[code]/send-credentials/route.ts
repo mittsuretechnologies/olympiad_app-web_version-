@@ -25,6 +25,8 @@ export async function POST(
     if (!allocation) return NextResponse.json({ message: 'Olympiad ID not found' }, { status: 404 });
     if (allocation.schoolId !== payload.id) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
+    const school = await prisma.school.findUnique({ where: { id: payload.id }, select: { name: true } });
+
     const appUser = await prisma.appUser.findFirst({ where: { olympiadId: code } });
     if (!appUser) return NextResponse.json({ message: 'No app account linked to this student' }, { status: 404 });
     if (!appUser.plainPassword) return NextResponse.json({ message: 'Password unavailable — ask the student to reset it' }, { status: 409 });
@@ -43,6 +45,7 @@ export async function POST(
     await sendStudentCredentialsEmail({
       to: emailNormalized,
       studentName: allocation.assignedName || appUser.userId,
+      schoolName: school?.name,
       olympiadCode: code,
       userId: appUser.userId,
       password: appUser.plainPassword,

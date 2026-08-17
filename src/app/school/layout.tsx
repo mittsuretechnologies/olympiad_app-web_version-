@@ -3,9 +3,10 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Hash, LayoutDashboard, Users, UserCircle, UploadCloud, PlaySquare, KeyRound, Menu, X } from 'lucide-react';
+import { LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, KeyRound, Menu, X } from 'lucide-react';
 import Image from 'next/image';
 import { isTokenExpired, clearSchoolSession } from '@/lib/session-token';
+import { initialsOf } from './ui';
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -51,86 +52,82 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
 
   if (!ready) return null;
 
+  // Nav items carry no per-item colour: the active item is marked by the accent
+  // fill alone, so the eye tracks one signal down the list instead of seven.
+  // Icons match each page's own header icon, so the sidebar and the page you
+  // land on always show the same mark for the same thing.
   const navItems = [
-    { name: 'Dashboard',      href: '/school',                       icon: LayoutDashboard, gradient: 'from-[#2a78d6] to-[#1559C7]' },
-    { name: 'Olympiad IDs',   href: '/school/olympiad-ids',          icon: Hash,            gradient: 'from-[#1baf7a] to-[#0d9f6e]' },
-    { name: 'My Students',    href: '/school/registered-students',   icon: Users,           gradient: 'from-[#eda100] to-[#d98600]' },
-    { name: 'Student Videos', href: '/school/student-videos',        icon: PlaySquare,      gradient: 'from-[#7a6ad6] to-[#4a3aa7]' },
-    { name: 'Upload Video',   href: '/school/upload-video',          icon: UploadCloud,     gradient: 'from-[#e34948] to-[#c73a3a]' },
-    { name: 'School Profile', href: '/school/profile',               icon: UserCircle,      gradient: 'from-[#eb6834] to-[#d95926]' },
-    { name: 'Manage Credentials', href: '/school/credentials',       icon: KeyRound,        gradient: 'from-[#7a6ad6] to-[#4a3aa7]' },
+    { name: 'Dashboard',          href: '/school',                     icon: LayoutDashboard },
+    { name: 'Olympiad IDs',       href: '/school/olympiad-ids',        icon: Contact },
+    { name: 'My Students',        href: '/school/registered-students', icon: Users },
+    { name: 'Student Videos',     href: '/school/student-videos',      icon: Clapperboard },
+    { name: 'Upload Video',       href: '/school/upload-video',        icon: UploadCloud },
+    { name: 'School Profile',     href: '/school/profile',             icon: School },
+    { name: 'Manage Credentials', href: '/school/credentials',         icon: KeyRound },
   ];
 
-  const initials = (user?.name || 'S')
-    .split(' ').map((w: string) => w[0]).slice(0, 2).join('').toUpperCase();
+  const initials = initialsOf(user?.name || 'School');
 
   return (
-    <div className="min-h-screen bg-[#F1F3F7]" style={{ fontFamily: 'Inter, sans-serif' }}>
+    // No inline fontFamily here: the root layout loads Inter through next/font
+    // and exposes it as --font-inter (which `font-sans` resolves to). Naming
+    // 'Inter' literally would miss that and silently fall back to a system face.
+    <div className="min-h-screen bg-[#F6F7F9] font-sans">
 
       {/* Mobile top bar */}
-      <header className="lg:hidden fixed top-0 inset-x-0 h-16 z-30 flex items-center gap-3 px-4 bg-gradient-to-r from-[#0d1a6e] to-[#123a8f] border-b border-white/10 shadow-lg shadow-black/20">
+      <header className="lg:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center gap-3 px-4 bg-[#0E2A5C] border-b border-white/10">
         <button
           onClick={() => setSidebarOpen(true)}
           aria-label="Open menu"
-          className="p-2 -ml-2 rounded-xl text-white hover:bg-white/10 active:bg-white/20 transition-colors"
+          className="p-2 -ml-2 cursor-pointer rounded-lg text-white transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
         >
-          <Menu size={22} />
+          <Menu size={20} />
         </button>
-        <div className="flex items-center gap-2.5">
-          <div className="w-9 h-9 rounded-lg overflow-hidden flex-shrink-0 shadow-md">
-            <Image src="/mittmee-icon.jpeg" alt="mittmee" width={36} height={36} className="object-cover w-full h-full" priority />
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-md overflow-hidden flex-shrink-0">
+            <Image src="/mittmee-icon.jpeg" alt="" width={28} height={28} className="object-cover w-full h-full" priority />
           </div>
-          <span className="text-lg font-bold tracking-tight">
-            <span className="text-white">mitt</span><span className="text-[#4ADE80]">mee</span>
-          </span>
+          <span className="text-[15px] font-semibold tracking-tight text-white">mittmee</span>
         </div>
-        <div className="ml-auto w-9 h-9 rounded-full bg-gradient-to-br from-[#eda100] to-[#eb6834] text-white font-bold text-xs flex items-center justify-center shadow-sm">
+        <span className="ml-auto w-8 h-8 rounded-full bg-white/15 text-white font-semibold text-[11px] flex items-center justify-center">
           {initials}
-        </div>
+        </span>
       </header>
 
       {/* Drawer backdrop */}
       <div
         onClick={() => setSidebarOpen(false)}
         aria-hidden="true"
-        className={`lg:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 ${
+        className={`lg:hidden fixed inset-0 z-40 bg-[#0E1726]/50 transition-opacity duration-200 ${
           sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
         }`}
       />
 
       {/* Sidebar */}
-      <aside className={`w-[260px] max-w-[85vw] flex flex-col fixed top-0 h-screen z-50 bg-gradient-to-b from-[#0d1a6e] via-[#123a8f] to-[#052E5C] transition-transform duration-300 ease-in-out lg:transition-none shadow-2xl shadow-black/40 lg:shadow-none ${
+      <aside className={`w-[248px] max-w-[85vw] flex flex-col fixed top-0 h-screen z-50 bg-[#0E2A5C] transition-transform duration-200 ease-out lg:transition-none ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
-        {/* Drawer close */}
         <button
           onClick={() => setSidebarOpen(false)}
           aria-label="Close menu"
-          className="lg:hidden absolute top-3 right-3 z-10 p-2 rounded-xl bg-black/25 text-white hover:bg-black/45 transition-colors"
+          className="lg:hidden absolute top-3 right-3 z-10 cursor-pointer p-2 rounded-lg text-white/70 transition-colors hover:bg-white/10 hover:text-white"
         >
           <X size={18} />
         </button>
-        <div className="flex-1 flex flex-col overflow-hidden relative">
-        <div className="absolute -top-10 -right-16 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
-        <div className="absolute top-1/2 -left-14 w-32 h-32 rounded-full bg-white/5 pointer-events-none" />
 
         {/* Logo */}
-        <div className="h-16 flex-shrink-0 flex items-center gap-2.5 px-6 relative">
-          <div className="w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
-            <Image
-              src="/mittmee-icon.jpeg"
-              alt="mittmee"
-              width={44}
-              height={44}
-              className="object-cover w-full h-full"
-              priority
-            />
+        <div className="h-14 flex-shrink-0 flex items-center gap-2.5 px-5 border-b border-white/10">
+          <div className="w-8 h-8 rounded-md flex-shrink-0 overflow-hidden">
+            <Image src="/mittmee-icon.jpeg" alt="" width={32} height={32} className="object-cover w-full h-full" priority />
           </div>
-          <span className="text-xl font-bold tracking-tight"><span className="text-white">mitt</span><span className="text-[#4ADE80]">mee</span></span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-semibold tracking-tight text-white leading-none">mittmee</p>
+            <p className="text-[10.5px] text-white/50 mt-1 leading-none">School Panel</p>
+          </div>
         </div>
 
         {/* Nav items */}
-        <nav className="flex-1 px-3 space-y-1.5 overflow-y-auto pt-6 relative [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((item) => {
             const Icon = item.icon;
             const isActive = item.href === '/school'
@@ -140,60 +137,45 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
               <Link
                 key={item.href}
                 href={item.href}
-                className={`relative flex items-center gap-3 pl-4 pr-3 h-12 rounded-xl transition-all duration-150 ${
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex items-center gap-3 px-3 h-10 rounded-lg text-[13.5px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40 ${
                   isActive
-                    ? `bg-gradient-to-r ${item.gradient} text-white shadow-[0_4px_14px_rgba(0,0,0,0.25)]`
-                    : 'text-white hover:bg-white/10'
+                    ? 'bg-[#1559C7] text-white font-semibold'
+                    : 'text-white/70 font-medium hover:bg-white/[0.07] hover:text-white'
                 }`}
               >
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${
-                  isActive ? 'bg-white/20' : 'bg-white/5'
-                }`}>
-                  <Icon
-                    size={17}
-                    strokeWidth={1.75}
-                    className="text-white"
-                  />
-                </div>
-                <span className={`text-[14px] leading-none flex-1 ${isActive ? 'font-bold' : 'font-medium'}`}>
-                  {item.name}
-                </span>
+                <Icon size={16} strokeWidth={2} className="flex-shrink-0" />
+                <span className="truncate">{item.name}</span>
               </Link>
             );
           })}
         </nav>
 
-        {/* Account switcher + Logout */}
-        <div className="px-3 pb-4 pt-3 flex-shrink-0 relative">
-          <div className="rounded-xl border border-white/10 bg-white/10 backdrop-blur-sm shadow-[0_1px_2px_rgba(0,0,0,0.1)] p-3">
-            <div className="flex items-center gap-3">
-              <div className="relative flex-shrink-0">
-                <div className="w-9 h-9 rounded-full bg-gradient-to-br from-[#eda100] to-[#eb6834] text-white font-bold text-xs flex items-center justify-center shadow-sm">
-                  {initials}
-                </div>
-                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-2 ring-[#123a8f]" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-white font-semibold text-[13px] leading-tight truncate">{user?.name || 'School'}</p>
-                <p className="text-white/50 text-[11px] mt-0.5 truncate">{user?.schoolId}</p>
-              </div>
+        {/* Account + Logout */}
+        <div className="px-3 pb-4 pt-3 flex-shrink-0 border-t border-white/10">
+          <div className="flex items-center gap-2.5 px-2 py-2">
+            <span className="w-8 h-8 flex-shrink-0 rounded-full bg-white/15 text-white font-semibold text-[11px] flex items-center justify-center">
+              {initials}
+            </span>
+            <div className="min-w-0">
+              <p className="text-white font-medium text-[12.5px] leading-tight truncate">{user?.name || 'School'}</p>
+              <p className="text-white/50 text-[11px] mt-0.5 truncate">{user?.schoolId}</p>
             </div>
           </div>
 
           <button
             onClick={handleLogout}
-            className="w-full mt-3 flex items-center gap-3 px-3 h-11 rounded-xl text-white/60 hover:bg-red-500/15 hover:text-red-200 transition-colors duration-150"
+            className="w-full mt-1 flex cursor-pointer items-center gap-3 px-3 h-10 rounded-lg text-[13.5px] font-medium text-white/70 transition-colors hover:bg-white/[0.07] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
           >
-            <LogOut size={18} strokeWidth={1.75} className="flex-shrink-0" />
-            <span className="text-[14px] font-medium">Log out</span>
+            <LogOut size={16} strokeWidth={2} className="flex-shrink-0" />
+            Log out
           </button>
-        </div>
         </div>
       </aside>
 
       {/* Main content */}
-      <main className="lg:ml-[260px] min-h-screen pt-16 lg:pt-0">
-        <div className="px-2.5 py-2.5 max-w-[1600px] mx-auto">{children}</div>
+      <main className="lg:ml-[248px] min-h-screen pt-14 lg:pt-0">
+        <div className="px-4 py-5 sm:px-6 max-w-[1560px] mx-auto">{children}</div>
       </main>
     </div>
   );

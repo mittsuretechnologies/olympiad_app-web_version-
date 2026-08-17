@@ -2,10 +2,18 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  KeyRound, Loader2, Search, RotateCw, X,
-  ChevronDown, ChevronRight, Eye, EyeOff, RefreshCw, CheckCircle, BookOpen
+  KeyRound, Search, RotateCw, ChevronDown, ChevronRight,
+  Eye, EyeOff, RefreshCw, CheckCircle2, BookOpen, Clock, AlertCircle,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+  CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL, FOCUS,
+  BTN_PRIMARY, BTN_SECONDARY, BTN_SUBTLE,
+} from '../ui';
+import {
+  PageHeader, StatTile, StatusBadge,
+  LoadingState, ErrorState, EmptyState, RowCount,
+} from '../components';
 
 interface StudentCred {
   id: string;
@@ -154,293 +162,276 @@ export default function SchoolCredentialsPage() {
   const totalStudents = rows.filter(r => r.student).length;
 
   return (
-    <div className="space-y-4">
+    <div className={STACK}>
       {toast && (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#0d9f6e] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold">
-          <CheckCircle size={16} /> {toast}
+        <div
+          role="status"
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2 rounded-lg bg-[#111827] px-4 py-2.5 text-[12.5px] font-medium text-white shadow-lg"
+        >
+          <CheckCircle2 size={15} className="text-[#4ADE80]" /> {toast}
         </div>
       )}
 
-      {/* Header banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a3aa7] to-[#7a6ad6] p-6 text-white shadow-[0_8px_24px_rgba(74,58,167,0.25)]">
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
-        <div className="absolute -bottom-14 right-24 w-28 h-28 rounded-full bg-white/10" />
-        <div className="relative flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <KeyRound size={20} className="text-white" />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">School Panel</p>
-            <h1 className="text-xl font-black tracking-tight">Student Credentials</h1>
-          </div>
-        </div>
+      <PageHeader
+        icon={KeyRound}
+        title="Student Credentials"
+        subtitle="Usernames and passwords by class"
+        actions={
+          <button onClick={handleExpandAll} className={BTN_SUBTLE}>
+            {expandAll ? 'Collapse all' : 'Expand all'}
+          </button>
+        }
+      />
+
+      {/* Metrics */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatTile label="Classes" value={classes.length} icon={BookOpen} loading={loading} />
+        <StatTile label="Allocated IDs" value={rows.length} icon={KeyRound} loading={loading} />
+        <StatTile label="Registered" value={totalStudents} icon={CheckCircle2} loading={loading} />
       </div>
 
-      <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] overflow-hidden">
-        {/* Toolbar */}
-        <div className="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-[#E7EBF2]">
-          <div className="flex items-center gap-4 text-sm">
-            <span>
-              <span className="text-gray-400">Classes: </span>
-              <span className="font-bold text-[#1559C7]">{classes.length}</span>
-            </span>
-            <span className="text-gray-200">|</span>
-            <span>
-              <span className="text-gray-400">Allocated IDs: </span>
-              <span className="font-bold text-[#1559C7]">{rows.length}</span>
-            </span>
-            <span className="text-gray-200">|</span>
-            <span>
-              <span className="text-gray-400">Registered: </span>
-              <span className="font-bold text-[#0d9f6e]">{totalStudents}</span>
-            </span>
-          </div>
-          <div className="flex items-center gap-2 flex-1 justify-end min-w-0 max-w-xl">
-            <div className="relative flex-1 min-w-[220px] max-w-sm">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-              <input
-                type="text"
-                placeholder="Search class, student, Olympiad ID..."
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                autoComplete="off"
-                className="w-full pl-9 pr-3 py-2 border border-[#E7EBF2] rounded-full text-[12px] focus:outline-none focus:border-[#1559C7] transition-colors"
-              />
-            </div>
-            <button
-              onClick={handleExpandAll}
-              className="px-3 py-2 text-[11px] font-bold rounded-full bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors whitespace-nowrap"
-            >
-              {expandAll ? 'Collapse All' : 'Expand All'}
-            </button>
-          </div>
+      {/* Toolbar */}
+      <div className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
+        <div className="relative min-w-[220px] flex-1 max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={13} />
+          <input
+            type="text"
+            placeholder="Search class, student, Olympiad ID…"
+            aria-label="Search credentials"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            autoComplete="off"
+            className={`${INPUT} pl-8`}
+          />
         </div>
-
-        {/* Body */}
-        <div className="overflow-x-auto">
-          {loading ? (
-            <div className="py-20 flex flex-col items-center gap-3">
-              <Loader2 className="w-5 h-5 animate-spin text-[#1559C7]" />
-              <p className="text-sm text-gray-500">Loading credentials...</p>
-            </div>
-          ) : error ? (
-            <div className="py-16 text-center text-red-600 text-sm">{error}</div>
-          ) : classes.length === 0 ? (
-            <div className="py-20 text-center text-gray-500 text-sm">
-              {rows.length === 0 ? 'No Olympiad IDs allocated yet.' : 'No records match your search.'}
-            </div>
-          ) : (
-            <table className="w-full text-sm border-collapse">
-              <tbody>
-                {classes.map((cls, ci) => {
-                  const isOpen = expanded.has(cls.classCode);
-                  const registered = cls.rows.filter(r => r.student).length;
-                  const pending = cls.rows.length - registered;
-                  return (
-                    <React.Fragment key={cls.classCode}>
-                      {/* Class header row */}
-                      <tr
-                        onClick={() => toggle(cls.classCode)}
-                        className="cursor-pointer select-none bg-gradient-to-r from-[#1559C7]/5 to-transparent hover:from-[#1559C7]/10 transition-colors"
-                      >
-                        <td className="w-10 px-3 py-3 text-[#1559C7]">
-                          {isOpen
-                            ? <ChevronDown size={16} className="text-[#1559C7]" />
-                            : <ChevronRight size={16} className="text-gray-400" />}
-                        </td>
-                        <td className="py-3 pr-4" colSpan={7}>
-                          <div className="flex items-center gap-2.5 flex-wrap">
-                            <div className="w-7 h-7 rounded-lg bg-[#1559C7]/10 flex items-center justify-center flex-shrink-0">
-                              <BookOpen size={13} className="text-[#1559C7]" />
-                            </div>
-                            <span className="text-[12.5px] font-bold text-black uppercase tracking-wide">{cls.label}</span>
-                            <span className="text-[10px] text-gray-500 font-mono bg-gray-100 rounded-full px-2 py-0.5">{cls.rows.length} IDs</span>
-                            <span className="ml-auto flex items-center gap-2 text-[11px]">
-                              <span className="bg-[#0d9f6e]/10 text-[#0d9f6e] rounded-full px-2.5 py-1 font-bold">{registered} registered</span>
-                              {pending > 0 && <span className="bg-[#d98600]/10 text-[#d98600] rounded-full px-2.5 py-1 font-bold">{pending} pending</span>}
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-
-                      {/* Students sub-header */}
-                      {isOpen && (
-                        <tr className="bg-gray-50/70 text-gray-500">
-                          <td className="w-10 px-3" />
-                          <td className="px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide w-8">#</td>
-                          <td className="px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide">Olympiad ID</td>
-                          <td className="px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide">Student Name</td>
-                          <td className="px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide">Phone</td>
-                          <td className="px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide">Username</td>
-                          <td className="px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide">Password</td>
-                          <td className="px-3 py-2 text-[10.5px] font-bold uppercase tracking-wide text-center">Action</td>
-                        </tr>
-                      )}
-
-                      {/* Student rows */}
-                      {isOpen && cls.rows.map((r, ri) => (
-                        <tr
-                          key={r.id}
-                          className={`border-t border-gray-50 ${ri % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'} hover:bg-[#1559C7]/[0.03] transition-colors`}
-                        >
-                          <td className="w-10 px-3" />
-                          <td className="px-3 py-2.5 text-gray-400 text-xs">{ri + 1}</td>
-                          <td className="px-3 py-2.5">
-                            <span className="font-mono font-bold text-[#1559C7] text-sm select-all">{r.code}</span>
-                          </td>
-                          <td className="px-3 py-2.5 font-semibold text-black text-sm">
-                            {r.student ? r.student.name : <span className="text-gray-300 font-normal">-</span>}
-                          </td>
-                          <td className="px-3 py-2.5 font-mono text-xs text-gray-500">
-                            {r.student ? r.student.phone : '-'}
-                          </td>
-                          <td className="px-3 py-2.5 font-mono text-sm font-bold text-[#1559C7] select-all">
-                            {r.student
-                              ? r.student.username
-                                ? r.student.username
-                                : <span className="text-gray-300 italic text-xs">—</span>
-                              : <span className="text-gray-300 italic text-xs">—</span>}
-                          </td>
-                          <td className="px-3 py-2.5">
-                            {r.student ? (
-                              r.student.plainPassword
-                                ? <span className="font-mono font-bold text-[#1559C7] select-all text-sm">{r.student.plainPassword}</span>
-                                : r.student.source === 'app'
-                                  ? <span className="text-xs text-[#4a3aa7] font-semibold">App Login</span>
-                                  : <span className="text-xs text-gray-300 italic">Reset to generate</span>
-                            ) : '-'}
-                          </td>
-                          <td className="px-3 py-2.5 text-center">
-                            {r.student ? (
-                              <button
-                                onClick={() => { setResetTarget(r); setResetAction('choose'); setCustomUsername(r.student?.username || ''); setCustomPassword(''); setShowPassword(false); }}
-                                className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#0d9f6e] text-white hover:bg-[#0b8a5e] transition-colors"
-                                title="Edit credentials"
-                              >
-                                <RotateCw size={12} />
-                              </button>
-                            ) : (
-                              <span className="text-gray-200">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-
-                      {/* Spacing between classes */}
-                      {ci < classes.length - 1 && (
-                        <tr><td colSpan={8} className="h-1 bg-gray-50" /></tr>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
-          )}
-        </div>
-
         {!loading && rows.length > 0 && (
-          <div className="px-5 py-2.5 border-t border-gray-100 flex justify-between items-center text-[11px] text-gray-400 bg-gray-50/50">
-            <span>Showing <span className="font-bold text-gray-600">{filtered.length}</span> of <span className="font-bold text-gray-600">{rows.length}</span> records</span>
-            <span className="font-semibold">mittmee</span>
-          </div>
+          <p className="ml-auto text-[11.5px] text-[#6B7280]">
+            <RowCount shown={filtered.length} total={rows.length} noun="records" />
+          </p>
         )}
       </div>
 
+      {/* Body */}
+      {loading ? (
+        <LoadingState label="Loading credentials…" />
+      ) : error ? (
+        <ErrorState message={error} />
+      ) : classes.length === 0 ? (
+        <EmptyState
+          icon={KeyRound}
+          title={rows.length === 0 ? 'No Olympiad IDs allocated yet' : 'No records match your search'}
+        />
+      ) : (
+        <div className="space-y-3">
+          {classes.map(cls => {
+            const isOpen = expanded.has(cls.classCode);
+            const registered = cls.rows.filter(r => r.student).length;
+            const pending = cls.rows.length - registered;
+
+            return (
+              <div key={cls.classCode} className={`${CARD} overflow-hidden`}>
+                <button
+                  onClick={() => toggle(cls.classCode)}
+                  aria-expanded={isOpen}
+                  className={`flex w-full items-center justify-between gap-3 bg-[#FAFBFC] px-3 py-2 transition-colors hover:bg-[#F3F5F8] ${isOpen ? 'border-b border-[#E4E8EE]' : ''} ${FOCUS}`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    {isOpen
+                      ? <ChevronDown size={14} className="flex-shrink-0 text-[#1559C7]" />
+                      : <ChevronRight size={14} className="flex-shrink-0 text-[#9CA3AF]" />}
+                    <BookOpen size={14} className="flex-shrink-0 text-[#6B7280]" />
+                    <span className="truncate text-[13px] font-semibold text-[#0E2A5C]">{cls.label}</span>
+                    <span className="flex-shrink-0 rounded bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+                      {cls.rows.length} IDs
+                    </span>
+                  </span>
+                  <span className="flex flex-shrink-0 items-center gap-1.5">
+                    <StatusBadge tone="success" icon={CheckCircle2}>{registered} registered</StatusBadge>
+                    {pending > 0 && <StatusBadge tone="warning" icon={Clock}>{pending} pending</StatusBadge>}
+                  </span>
+                </button>
+
+                {isOpen && (
+                  <div className="overflow-x-auto">
+                    <table className={TABLE}>
+                      <thead>
+                        <tr>
+                          <th className={`${TH} w-10`}>#</th>
+                          <th className={`${TH} w-36`}>Olympiad ID</th>
+                          <th className={TH}>Student name</th>
+                          <th className={`${TH} w-32`}>Phone</th>
+                          <th className={`${TH} w-36`}>Username</th>
+                          <th className={`${TH} w-36`}>Password</th>
+                          <th className={`${TH} w-20 text-center`}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cls.rows.map((r, ri) => (
+                          <tr key={r.id} className={TR}>
+                            <td className={`${TD} text-[#9CA3AF]`}>{ri + 1}</td>
+                            <td className={`${TD} select-all font-mono font-semibold text-[#1559C7]`}>{r.code}</td>
+                            <td className={`${TD} font-medium text-[#111827]`}>
+                              {r.student ? r.student.name : <span className="font-normal text-[#9CA3AF]">—</span>}
+                            </td>
+                            <td className={`${TD} font-mono text-[#6B7280]`}>
+                              {r.student ? r.student.phone : <span className="text-[#9CA3AF]">—</span>}
+                            </td>
+                            <td className={`${TD} select-all font-mono font-semibold text-[#1559C7]`}>
+                              {r.student?.username || <span className="font-normal text-[#9CA3AF]">—</span>}
+                            </td>
+                            <td className={TD}>
+                              {r.student ? (
+                                r.student.plainPassword
+                                  ? <span className="select-all font-mono font-semibold text-[#111827]">{r.student.plainPassword}</span>
+                                  : r.student.source === 'app'
+                                    ? <span className="text-[#6B7280]">App login</span>
+                                    : <span className="text-[#9CA3AF]">Reset to generate</span>
+                              ) : <span className="text-[#9CA3AF]">—</span>}
+                            </td>
+                            <td className={`${TD} text-center`}>
+                              {r.student ? (
+                                <button
+                                  onClick={() => {
+                                    setResetTarget(r); setResetAction('choose');
+                                    setCustomUsername(r.student?.username || '');
+                                    setCustomPassword(''); setShowPassword(false);
+                                  }}
+                                  aria-label={`Edit credentials for ${r.student.name}`}
+                                  title="Edit credentials"
+                                  className={`inline-flex h-7 w-7 items-center justify-center rounded-md border border-[#D3DAE4] text-[#4B5563] transition-colors hover:bg-[#F6F7F9] hover:text-[#111827] ${FOCUS}`}
+                                >
+                                  <RotateCw size={12} />
+                                </button>
+                              ) : <span className="text-[#9CA3AF]">—</span>}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       {/* Reset Dialog */}
       <Dialog open={!!resetTarget} onOpenChange={open => { if (!open) closeDialog(); }}>
-        <DialogContent className="max-w-sm p-0 border-0 rounded-2xl shadow-2xl overflow-hidden [&>button]:hidden">
-          <DialogHeader className="sr-only"><DialogTitle>Edit Credentials</DialogTitle></DialogHeader>
-          <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] text-white px-5 py-4 flex items-center justify-between">
-            <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-                {resetAction === 'choose' ? 'Edit Credentials' : resetAction === 'username' ? 'Change Username' : 'Set Password'}
-              </p>
-              {resetTarget?.student && <p className="text-white font-bold text-sm mt-0.5">{resetTarget.student.name} — <span className="font-mono">{resetTarget.code}</span></p>}
-            </div>
-            <button onClick={closeDialog} className="text-white/60 hover:text-white transition-colors"><X className="w-4 h-4" /></button>
-          </div>
+        <DialogContent className="max-w-sm overflow-hidden rounded-xl border-0 p-0 shadow-2xl">
+          <DialogHeader className="border-b border-[#E4E8EE] px-5 py-4 text-left space-y-0">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#6B7280]">
+              {resetAction === 'choose' ? 'Edit credentials' : resetAction === 'username' ? 'Change username' : 'Set password'}
+            </p>
+            <DialogTitle className="mt-0.5 text-[15px] font-semibold text-[#0E2A5C]">
+              {resetTarget?.student
+                ? <>{resetTarget.student.name} · <span className="font-mono text-[13px] text-[#6B7280]">{resetTarget.code}</span></>
+                : 'Edit credentials'}
+            </DialogTitle>
+          </DialogHeader>
 
-          <div className="p-5 bg-white">
-
-            {/* Choose */}
+          <div className="p-5">
             {resetAction === 'choose' && (
-              <div className="space-y-3">
-                <p className="text-xs text-gray-400 mb-1">What do you want to change?</p>
-                <button onClick={() => setResetAction('username')} className="w-full flex items-center gap-3 px-4 py-3 border border-[#E7EBF2] rounded-xl hover:border-[#0d9f6e] hover:bg-[#0d9f6e]/5 transition-all text-left">
-                  <KeyRound size={18} className="text-[#0d9f6e] shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Change Username</p>
-                    <p className="text-xs text-gray-400">Current: <span className="font-mono">{resetTarget?.student?.username || '—'}</span></p>
-                  </div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => setResetAction('username')}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-[#E4E8EE] px-3.5 py-3 text-left transition-colors hover:border-[#1559C7]/40 hover:bg-[#1559C7]/[0.03] ${FOCUS}`}
+                >
+                  <KeyRound size={16} className="flex-shrink-0 text-[#1559C7]" />
+                  <span>
+                    <span className="block text-[13px] font-semibold text-[#111827]">Change username</span>
+                    <span className="block text-[11.5px] text-[#6B7280]">
+                      Current: <span className="font-mono">{resetTarget?.student?.username || '—'}</span>
+                    </span>
+                  </span>
                 </button>
-                <button onClick={() => setResetAction('password')} className="w-full flex items-center gap-3 px-4 py-3 border border-[#E7EBF2] rounded-xl hover:border-[#0d9f6e] hover:bg-[#0d9f6e]/5 transition-all text-left">
-                  <RotateCw size={18} className="text-[#0d9f6e] shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-gray-800">Set Password</p>
-                    <p className="text-xs text-gray-400">Set a custom or auto-generated password</p>
-                  </div>
+                <button
+                  onClick={() => setResetAction('password')}
+                  className={`flex w-full items-center gap-3 rounded-lg border border-[#E4E8EE] px-3.5 py-3 text-left transition-colors hover:border-[#1559C7]/40 hover:bg-[#1559C7]/[0.03] ${FOCUS}`}
+                >
+                  <RotateCw size={16} className="flex-shrink-0 text-[#1559C7]" />
+                  <span>
+                    <span className="block text-[13px] font-semibold text-[#111827]">Set password</span>
+                    <span className="block text-[11.5px] text-[#6B7280]">Custom or auto-generated</span>
+                  </span>
                 </button>
-                <button onClick={closeDialog} className="w-full h-9 text-sm text-gray-400 hover:text-gray-600 transition-colors">Cancel</button>
+                <button onClick={closeDialog} className={`cursor-pointer ${BTN_SECONDARY} w-full`}>Cancel</button>
               </div>
             )}
 
-            {/* Username */}
             {resetAction === 'username' && (
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">New Username</label>
+                  <label htmlFor="cred-username" className={LABEL}>New username</label>
                   <input
+                    id="cred-username"
                     type="text"
                     value={customUsername}
                     onChange={e => { setCustomUsername(e.target.value.replace(/\s/g, '')); setUsernameError(''); }}
                     autoComplete="off"
-                    className={`w-full rounded-xl border px-3 py-2 text-sm font-mono focus:outline-none focus:ring-1 ${usernameError ? 'border-red-400 focus:ring-red-300' : 'border-[#E7EBF2] focus:border-[#0d9f6e] focus:ring-[#0d9f6e]'}`}
+                    className={`${INPUT} font-mono ${usernameError ? 'border-[#B91C1C]' : ''}`}
                   />
-                  {usernameError && <p className="text-xs text-red-500 mt-1">{usernameError}</p>}
+                  {usernameError && (
+                    <p className="mt-1.5 flex items-center gap-1.5 text-[12px] text-[#B91C1C]">
+                      <AlertCircle size={12} /> {usernameError}
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setResetAction('choose')} className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">Back</button>
-                  <button onClick={handleSave} disabled={resetBusy} className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(13,159,110,0.35)] transition-shadow disabled:opacity-50">
-                    {resetBusy ? 'Saving...' : 'Save Username'}
+                  <button onClick={() => setResetAction('choose')} className={`${BTN_SECONDARY} flex-1`}>Back</button>
+                  <button onClick={handleSave} disabled={resetBusy} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+                    {resetBusy ? 'Saving…' : 'Save username'}
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Password */}
             {resetAction === 'password' && (
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">New Password</label>
+                  <label htmlFor="cred-password" className={LABEL}>New password</label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
+                        id="cred-password"
                         type={showPassword ? 'text' : 'password'}
                         value={customPassword}
                         onChange={e => setCustomPassword(e.target.value)}
                         placeholder="Leave blank to auto-generate"
                         autoComplete="new-password"
-                        className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 pr-9 text-sm font-mono focus:outline-none focus:border-[#0d9f6e] focus:ring-1 focus:ring-[#0d9f6e]"
+                        className={`${INPUT} pr-9 font-mono`}
                       />
-                      <button type="button" onClick={() => setShowPassword(v => !v)} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <button
+                        type="button" onClick={() => setShowPassword(v => !v)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#9CA3AF] hover:text-[#4B5563]"
+                      >
                         {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     </div>
-                    <button type="button" onClick={() => { const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'; setCustomPassword(Array.from({length:10},()=>c[Math.floor(Math.random()*c.length)]).join('')); setShowPassword(true); }} className="rounded-xl px-3 border border-[#E7EBF2] text-gray-500 hover:bg-gray-50 transition-colors">
+                    <button
+                      type="button"
+                      aria-label="Generate random password"
+                      onClick={() => {
+                        const c = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+                        setCustomPassword(Array.from({ length: 10 }, () => c[Math.floor(Math.random() * c.length)]).join(''));
+                        setShowPassword(true);
+                      }}
+                      className={`rounded-lg border border-[#D3DAE4] px-3 text-[#4B5563] transition-colors hover:bg-[#F6F7F9] ${FOCUS}`}
+                    >
                       <RefreshCw size={14} />
                     </button>
                   </div>
-                  <p className="text-[11px] text-gray-400 mt-1">Leave blank to auto-generate.</p>
+                  <p className="mt-1 text-[11.5px] text-[#6B7280]">Leave blank to auto-generate.</p>
                 </div>
                 <div className="flex gap-2">
-                  <button onClick={() => setResetAction('choose')} className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">Back</button>
-                  <button onClick={handleSave} disabled={resetBusy} className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(13,159,110,0.35)] transition-shadow disabled:opacity-50">
-                    {resetBusy ? 'Saving...' : 'Save Password'}
+                  <button onClick={() => setResetAction('choose')} className={`${BTN_SECONDARY} flex-1`}>Back</button>
+                  <button onClick={handleSave} disabled={resetBusy} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+                    {resetBusy ? 'Saving…' : 'Save password'}
                   </button>
                 </div>
               </div>
             )}
-
           </div>
         </DialogContent>
       </Dialog>

@@ -2,9 +2,17 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Hash, Loader2, Search, Download,
-  Clock, BookOpen, ChevronDown, ChevronUp, UserPlus, X, Pencil, Trash2, CheckCircle, Phone, Eye, EyeOff, Mail
+  Contact, Loader2, Search, Download, Clock, BookOpen, ChevronDown, ChevronUp,
+  UserPlus, Pencil, Trash2, CheckCircle, CheckCircle2, Phone, Mail, AlertCircle,
 } from 'lucide-react';
+import {
+  CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL, FOCUS,
+  BTN_PRIMARY, BTN_SECONDARY, BTN_SUBTLE, BTN_ICON,
+} from '../ui';
+import {
+  PageHeader, StatTile, StatusBadge, FilterPill,
+  LoadingState, ErrorState, EmptyState, ModalShell, RowCount,
+} from '../components';
 
 interface Allocation {
   id: string;
@@ -22,10 +30,6 @@ interface Allocation {
 
 type StatusFilter = 'ALL' | 'ASSIGNED' | 'PENDING';
 
-const dotTexture: React.CSSProperties = {
-  backgroundImage: 'repeating-linear-gradient(45deg, rgba(11,11,11,0.035) 0px, rgba(11,11,11,0.035) 1px, transparent 1px, transparent 10px)',
-};
-
 export default function SchoolOlympiadIdsPage() {
   const [allocations, setAllocations] = useState<Allocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,22 +39,21 @@ export default function SchoolOlympiadIdsPage() {
   const [activeClass, setActiveClass] = useState<string>('ALL');
   const [collapsedClasses, setCollapsedClasses] = useState<Set<string>>(new Set());
 
-  // Assign modal
-  const [modal, setModal] = useState<{ code: string; current: string | null } | null>(null);
-  const [assignName, setAssignName] = useState('');
-  const [assigning, setAssigning] = useState(false);
-  const [assignError, setAssignError] = useState('');
-
-  // Register modal
-  const [regModal, setRegModal] = useState<{ code: string; assignedName: string } | null>(null);
-  const [regName, setRegName] = useState('');
-  const [regPhone, setRegPhone] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regPassword, setRegPassword] = useState('');
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [registering, setRegistering] = useState(false);
-  const [regError, setRegError] = useState('');
-  const [regSuccess, setRegSuccess] = useState<{ userId: string; email: string; emailSent: boolean; emailError: string | null } | null>(null);
+  /**
+   * Allot modal. Opened from a specific row, so the Olympiad ID and class are
+   * already known — the school only fills in the student's details. There is no
+   * class picker and no separate "assign name first, register later" step.
+   */
+  const [allotRow, setAllotRow] = useState<Allocation | null>(null);
+  const [allotName, setAllotName] = useState('');
+  const [allotPhone, setAllotPhone] = useState('');
+  const [allotEmail, setAllotEmail] = useState('');
+  const [allotting, setAllotting] = useState(false);
+  const [allotError, setAllotError] = useState('');
+  const [allotSuccess, setAllotSuccess] = useState<{
+    code: string; userId: string; password: string;
+    email: string; emailSent: boolean; emailError: string | null;
+  } | null>(null);
 
   // Edit app account modal (for ALLOTTED rows — name + phone)
   const [editAppModal, setEditAppModal] = useState<{ code: string } | null>(null);
@@ -58,16 +61,6 @@ export default function SchoolOlympiadIdsPage() {
   const [editAppPhone, setEditAppPhone] = useState('');
   const [editingApp, setEditingApp] = useState(false);
   const [editAppError, setEditAppError] = useState('');
-
-  // Allot Student modal
-  const [allotOpen, setAllotOpen] = useState(false);
-  const [allotName, setAllotName] = useState('');
-  const [allotPhone, setAllotPhone] = useState('');
-  const [allotEmail, setAllotEmail] = useState('');
-  const [allotClass, setAllotClass] = useState('');
-  const [allotting, setAllotting] = useState(false);
-  const [allotError, setAllotError] = useState('');
-  const [allotSuccess, setAllotSuccess] = useState<{ code: string; userId: string; password: string; email: string; emailSent: boolean; emailError: string | null } | null>(null);
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') : '';
 
@@ -85,33 +78,59 @@ export default function SchoolOlympiadIdsPage() {
 
   useEffect(() => { fetchAllocations(); }, []);
 
-  // Assign handlers
-  const openModal = (code: string, current: string | null) => {
-    setModal({ code, current });
-    setAssignName(current || '');
-    setAssignError('');
+  // Allot handlers — one flow, opened from the row whose ID is being filled.
+  const openAllotModal = (row: Allocation) => {
+    setAllotRow(row);
+    setAllotName(row.assignedName || '');
+    setAllotPhone('');
+    setAllotEmail('');
+    setAllotError('');
+    setAllotSuccess(null);
   };
-  const closeModal = () => { setModal(null); setAssignName(''); setAssignError(''); };
+  const closeAllotModal = () => {
+    setAllotRow(null); setAllotName(''); setAllotPhone(''); setAllotEmail('');
+    setAllotError(''); setAllotSuccess(null);
+  };
 
-  const handleAssign = async () => {
-    if (!assignName.trim()) { setAssignError('Student name required'); return; }
-    setAssigning(true); setAssignError('');
+  const handleAllot = async () => {
+    if (!allotRow) return;
+    if (!allotName.trim()) { setAllotError('Student name is required'); return; }
+    if (!allotPhone.trim() || allotPhone.trim().length < 10) { setAllotError('Valid phone number is required'); return; }
+    if (allotEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) {
+      setAllotError('Enter a valid email address'); return;
+    }
+    setAllotting(true); setAllotError('');
     try {
-      const res = await fetch(`/api/school/me/olympiad-ids/${modal!.code}/assign`, {
-        method: 'PATCH',
+      // Registers against this exact code. The password is generated server-side
+      // so the school never has to invent one.
+      const res = await fetch(`/api/school/me/olympiad-ids/${allotRow.code}/register`, {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ assignedName: assignName.trim() }),
+        body: JSON.stringify({
+          name: allotName.trim(),
+          phone: allotPhone.trim(),
+          email: allotEmail.trim() || null,
+        }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setAllocations(prev => prev.map(a =>
-        a.code === modal!.code ? { ...a, assignedName: assignName.trim(), assignedAt: new Date().toISOString() } : a
+        a.code === allotRow.code
+          ? { ...a, assignedName: allotName.trim(), assignedAt: new Date().toISOString(), hasAppUser: true, appUserPhone: allotPhone.trim() }
+          : a
       ));
-      closeModal();
+      setAllotSuccess({
+        code: allotRow.code,
+        userId: data.userId,
+        password: data.password,
+        email: allotEmail.trim(),
+        emailSent: !!data.emailSent,
+        emailError: data.emailError || null,
+      });
     } catch (e: any) {
-      setAssignError(e.message);
+      setAllotError(e.message);
     } finally {
-      setAssigning(false);
+      setAllotting(false);
     }
   };
 
@@ -166,83 +185,6 @@ export default function SchoolOlympiadIdsPage() {
     }
   };
 
-  // Register handlers
-  const openRegModal = (code: string, assignedName: string) => {
-    setRegModal({ code, assignedName });
-    setRegName(assignedName);
-    setRegPhone('');
-    setRegEmail('');
-    setRegPassword('');
-    setRegError('');
-    setRegSuccess(null);
-  };
-  const closeRegModal = () => {
-    setRegModal(null); setRegName(''); setRegPhone(''); setRegEmail('');
-    setRegPassword(''); setRegError(''); setRegSuccess(null);
-  };
-
-  const handleRegister = async () => {
-    if (!regName.trim()) { setRegError('Student name is required'); return; }
-    if (!regPhone.trim() || regPhone.trim().length < 10) { setRegError('Valid phone number is required'); return; }
-    if (regEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(regEmail.trim())) { setRegError('Enter a valid email address'); return; }
-    if (!regPassword.trim() || regPassword.trim().length < 6) { setRegError('Password must be at least 6 characters'); return; }
-    setRegistering(true); setRegError('');
-    try {
-      const res = await fetch(`/api/school/me/olympiad-ids/${regModal!.code}/register`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: regName.trim(), phone: regPhone.trim(), email: regEmail.trim() || null, password: regPassword.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      // Mark as registered (hasAppUser = true) in local state
-      setAllocations(prev => prev.map(a =>
-        a.code === regModal!.code
-          ? { ...a, assignedName: regName.trim(), hasAppUser: true }
-          : a
-      ));
-      setRegSuccess({ userId: data.userId, email: regEmail.trim(), emailSent: !!data.emailSent, emailError: data.emailError || null });
-    } catch (e: any) {
-      setRegError(e.message);
-    } finally {
-      setRegistering(false);
-    }
-  };
-
-  // Allot handlers
-  const openAllotModal = () => {
-    setAllotOpen(true);
-    setAllotName(''); setAllotPhone(''); setAllotEmail(''); setAllotClass(activeClass !== 'ALL' ? activeClass : '');
-    setAllotError(''); setAllotSuccess(null);
-  };
-  const closeAllotModal = () => {
-    setAllotOpen(false); setAllotName(''); setAllotPhone(''); setAllotEmail(''); setAllotClass('');
-    setAllotError(''); setAllotSuccess(null);
-  };
-
-  const handleAllot = async () => {
-    if (!allotName.trim()) { setAllotError('Student name is required'); return; }
-    if (!allotPhone.trim() || allotPhone.trim().length < 10) { setAllotError('Valid phone number is required'); return; }
-    if (allotEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) { setAllotError('Enter a valid email address'); return; }
-    if (!allotClass.trim()) { setAllotError('Please select a class'); return; }
-    setAllotting(true); setAllotError('');
-    try {
-      const res = await fetch('/api/school/me/olympiad-ids/allot', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: allotName.trim(), phone: allotPhone.trim(), email: allotEmail.trim() || null, classCode: allotClass.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      setAllotSuccess({ code: data.code, userId: data.userId, password: data.password, email: allotEmail.trim(), emailSent: !!data.emailSent, emailError: data.emailError || null });
-      fetchAllocations();
-    } catch (e: any) {
-      setAllotError(e.message);
-    } finally {
-      setAllotting(false);
-    }
-  };
-
   const classes = useMemo(() => {
     const map = new Map<string, string>();
     for (const a of allocations) {
@@ -276,11 +218,21 @@ export default function SchoolOlympiadIdsPage() {
     return Array.from(map.entries()).map(([code, { label, items }]) => ({ code, label, items })).sort((a, b) => a.label.localeCompare(b.label));
   }, [filtered]);
 
-  const stats = useMemo(() => ({
-    total: allocations.length,
-    assigned: allocations.filter(a => a.assignedName).length,
-    pending: allocations.filter(a => !a.assignedName).length,
-  }), [allocations]);
+  /**
+   * Counts respect the active class tab but not the status filter — a tile has
+   * to keep showing its own total even while a different tile is selected,
+   * otherwise the two unselected tiles would collapse to zero.
+   */
+  const stats = useMemo(() => {
+    const inScope = activeClass === 'ALL'
+      ? allocations
+      : allocations.filter(a => (a.classCode || 'UNKNOWN') === activeClass);
+    return {
+      total: inScope.length,
+      assigned: inScope.filter(a => a.assignedName).length,
+      pending: inScope.filter(a => !a.assignedName).length,
+    };
+  }, [allocations, activeClass]);
 
   const exportCSV = () => {
     if (filtered.length === 0) return;
@@ -303,216 +255,161 @@ export default function SchoolOlympiadIdsPage() {
   };
 
   const toggleCollapse = (code: string) => {
-    setCollapsedClasses(prev => { const n = new Set(prev); n.has(code) ? n.delete(code) : n.add(code); return n; });
+    setCollapsedClasses(prev => {
+      const n = new Set(prev);
+      if (n.has(code)) n.delete(code); else n.add(code);
+      return n;
+    });
+  };
+
+  /** Status badge for one allocation row. Icon + text, never colour alone. */
+  const renderStatus = (a: Allocation) => {
+    if (a.student) return <StatusBadge tone="success" icon={CheckCircle2}>Registered</StatusBadge>;
+    if (a.hasAppUser) return <StatusBadge tone="info" icon={CheckCircle}>Allotted</StatusBadge>;
+    if (a.assignedName) return <StatusBadge tone="warning" icon={Clock}>Assigned</StatusBadge>;
+    return <StatusBadge tone="neutral" icon={AlertCircle}>Pending</StatusBadge>;
   };
 
   return (
-    <div className="space-y-4">
+    <div className={STACK}>
 
-      {/* Header banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0d6b4f] via-[#0d9f6e] to-[#1baf7a] p-6 text-white shadow-[0_8px_24px_rgba(13,159,110,0.25)]">
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
-        <div className="absolute -bottom-14 right-24 w-28 h-28 rounded-full bg-white/10" />
-        <div className="relative flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <Hash size={20} className="text-white" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">School Panel</p>
-              <h1 className="text-xl font-black tracking-tight">Olympiad ID Allotment</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={exportCSV} disabled={filtered.length === 0}
-              className="inline-flex items-center gap-1.5 bg-white/15 backdrop-blur-sm text-white px-4 py-2 text-xs font-bold rounded-full hover:bg-white/25 transition-colors disabled:opacity-40">
-              <Download size={14} /> Export CSV
-            </button>
-            <button onClick={openAllotModal}
-              className="inline-flex items-center gap-1.5 bg-white text-[#1559C7] px-4 py-2 text-xs font-bold rounded-full hover:bg-white/90 transition-colors shadow-sm animate-pulse-scale">
-              <UserPlus size={14} /> Allot Student
-            </button>
-          </div>
-        </div>
+      <PageHeader
+        icon={Contact}
+        title="Olympiad IDs"
+        subtitle="Allot roll numbers to students"
+        actions={
+          <button onClick={exportCSV} disabled={filtered.length === 0} className={BTN_SUBTLE}>
+            <Download size={13} /> Export
+          </button>
+        }
+      />
+
+      {/* Metrics — each tile is the filter that produces its own count, so the
+          number you are looking at and the rows below always agree. */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatTile
+          label="Total allotted" value={stats.total} icon={Contact} loading={loading}
+          active={statusFilter === 'ALL'} onClick={() => setStatusFilter('ALL')}
+        />
+        <StatTile
+          label="Assigned" value={stats.assigned} icon={CheckCircle2} loading={loading}
+          active={statusFilter === 'ASSIGNED'} onClick={() => setStatusFilter('ASSIGNED')}
+        />
+        <StatTile
+          label="Pending" value={stats.pending} icon={Clock} loading={loading}
+          active={statusFilter === 'PENDING'} onClick={() => setStatusFilter('PENDING')}
+        />
       </div>
 
-      {/* Stats strip — reuse the 3-stat-card gradient pattern */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#1559C7] to-[#2a78d6] rounded-2xl shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-5 text-white">
-          <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-6 w-20 h-20 rounded-full bg-white/10" />
-          <div className="relative flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-              <Hash size={16} className="text-white" />
-            </div>
-            <p className="text-xs text-white/85 font-semibold">Total Allotted</p>
-          </div>
-          <p className="relative text-2xl font-black mt-3">{stats.total}</p>
+      {/* Toolbar */}
+      <div className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
+        <div className="relative min-w-[190px] flex-1 max-w-xs">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={13} />
+          <input
+            type="text"
+            placeholder="Search ID or name"
+            aria-label="Search Olympiad IDs"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className={`${INPUT} pl-8`}
+          />
         </div>
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#0d9f6e] to-[#1baf7a] rounded-2xl shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-5 text-white">
-          <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-6 w-20 h-20 rounded-full bg-white/10" />
-          <div className="relative flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-              <CheckCircle size={16} className="text-white" />
-            </div>
-            <p className="text-xs text-white/85 font-semibold">Assigned</p>
-          </div>
-          <p className="relative text-2xl font-black mt-3">{stats.assigned}</p>
-        </div>
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#e34948] to-[#eb6834] rounded-2xl shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-5 text-white">
-          <div className="absolute -top-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-          <div className="absolute -bottom-8 -left-6 w-20 h-20 rounded-full bg-white/10" />
-          <div className="relative flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-white/20 flex items-center justify-center flex-shrink-0">
-              <Clock size={16} className="text-white" />
-            </div>
-            <p className="text-xs text-white/85 font-semibold">Unassigned</p>
-          </div>
-          <p className="relative text-2xl font-black mt-3">{stats.pending}</p>
-        </div>
-      </div>
 
-      {/* Class tabs + Search + Filter — single utility bar */}
-      <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] px-4 py-3 flex flex-wrap items-center gap-3">
+        {/* Status filtering lives on the stat tiles above — repeating it here
+            would give the same control two places to disagree. */}
         {classes.length > 1 && (
-          <div className="flex items-center gap-1.5 flex-wrap">
-            {[{ code: 'ALL', name: 'All Classes' }, ...classes].map((cls) => (
-              <button key={cls.code} onClick={() => setActiveClass(cls.code)}
-                className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-colors whitespace-nowrap ${
-                  activeClass === cls.code ? 'bg-[#1559C7] text-white shadow-sm' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-                }`}>
-                {cls.name} ({cls.code === 'ALL' ? allocations.length : allocations.filter(a => (a.classCode || 'UNKNOWN') === cls.code).length})
-              </button>
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            {[{ code: 'ALL', name: 'All classes' }, ...classes].map(cls => (
+              <FilterPill key={cls.code} active={activeClass === cls.code} onClick={() => setActiveClass(cls.code)}>
+                {cls.name}
+                <span className="ml-1 opacity-60">
+                  {cls.code === 'ALL' ? allocations.length : allocations.filter(a => (a.classCode || 'UNKNOWN') === cls.code).length}
+                </span>
+              </FilterPill>
             ))}
           </div>
         )}
-        <div className="relative flex-1 min-w-[200px] max-w-xs">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
-          <input type="text" placeholder="Search ID or name" value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-[#E7EBF2] rounded-full text-[12px] focus:outline-none focus:border-[#1559C7] transition-colors" />
-        </div>
-        <div className="flex items-center gap-1.5 ml-auto">
-          {(['ALL', 'ASSIGNED', 'PENDING'] as StatusFilter[]).map((s) => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 text-[11px] font-bold uppercase tracking-wide rounded-full transition-colors ${
-                statusFilter === s ? 'bg-[#1559C7] text-white shadow-sm' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
-              }`}>{s}</button>
-          ))}
-        </div>
       </div>
 
       {/* Content */}
       {loading ? (
-        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] py-20 flex flex-col items-center gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-[#1559C7]" />
-          <p className="text-sm text-gray-500">Loading records...</p>
-        </div>
+        <LoadingState label="Loading records…" />
       ) : error ? (
-        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-red-200 py-16 text-center text-red-600 text-sm">{error}</div>
+        <ErrorState message={error} />
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] py-20 text-center text-gray-500 text-sm">
-          {allocations.length === 0 ? 'No Olympiad IDs allocated yet.' : 'No records match your filters.'}
-        </div>
+        <EmptyState
+          icon={Contact}
+          title={allocations.length === 0 ? 'No Olympiad IDs allocated yet' : 'No records match your filters'}
+          hint={allocations.length === 0 ? 'Contact your Mittsure coordinator to get IDs allocated.' : undefined}
+        />
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {grouped.map(({ code, label, items }) => {
             const isCollapsed = collapsedClasses.has(code);
             const classAssigned = items.filter(a => a.assignedName).length;
 
             return (
-              <div key={code} className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] overflow-hidden">
-                <button onClick={() => toggleCollapse(code)}
-                  className="w-full flex items-center justify-between px-4 py-3 bg-gradient-to-r from-[#1559C7]/5 to-transparent hover:from-[#1559C7]/10 transition-colors">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-7 h-7 rounded-lg bg-[#1559C7]/10 flex items-center justify-center flex-shrink-0">
-                      <BookOpen size={13} className="text-[#1559C7]" />
-                    </div>
-                    <span className="text-[12.5px] font-bold text-black uppercase tracking-wide">{label}</span>
-                    <span className="text-[10px] text-gray-500 font-mono bg-gray-100 rounded-full px-2 py-0.5">{items.length} IDs</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <div className="hidden sm:flex items-center gap-3 text-[11px] text-gray-500 font-semibold">
-                      <span>{classAssigned}/{items.length} assigned</span>
-                    </div>
-                    {isCollapsed ? <ChevronDown size={14} className="text-gray-400" /> : <ChevronUp size={14} className="text-gray-400" />}
-                  </div>
+              <div key={code} className={`${CARD} overflow-hidden`}>
+                <button
+                  onClick={() => toggleCollapse(code)}
+                  aria-expanded={!isCollapsed}
+                  className={`flex w-full items-center justify-between gap-3 border-b border-[#E4E8EE] bg-[#FAFBFC] px-3 py-2 transition-colors hover:bg-[#F3F5F8] ${FOCUS}`}
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <BookOpen size={14} className="flex-shrink-0 text-[#6B7280]" />
+                    <span className="truncate text-[13px] font-semibold text-[#0E2A5C]">{label}</span>
+                    <span className="flex-shrink-0 rounded bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+                      {items.length} IDs
+                    </span>
+                  </span>
+                  <span className="flex flex-shrink-0 items-center gap-2.5 text-[12px] text-[#6B7280]">
+                    <span className="hidden sm:inline">{classAssigned}/{items.length} assigned</span>
+                    {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
+                  </span>
                 </button>
 
                 {!isCollapsed && (
-                  <div className="overflow-x-auto" style={dotTexture}>
-                    <table className="w-full text-sm border-collapse table-fixed">
+                  <div className="overflow-x-auto">
+                    <table className={TABLE}>
                       <thead>
-                        <tr className="bg-gray-50/70 text-gray-500">
-                          <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide w-12">Sr.No.</th>
-                          <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide w-40">Olympiad ID</th>
-                          <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide">Student Name</th>
-                          <th className="px-4 py-2.5 text-left text-[10.5px] font-bold uppercase tracking-wide w-32">Status</th>
-                          <th className="px-4 py-2.5 text-center text-[10.5px] font-bold uppercase tracking-wide w-32">Action</th>
+                        <tr>
+                          <th className={`${TH} w-12`}>#</th>
+                          <th className={`${TH} w-36`}>Olympiad ID</th>
+                          <th className={TH}>Student name</th>
+                          <th className={`${TH} w-32`}>Status</th>
+                          <th className={`${TH} w-32 text-center`}>Action</th>
                         </tr>
                       </thead>
                       <tbody>
                         {items.map((a, idx) => (
-                          <tr key={a.id} className={`border-t border-gray-50 hover:bg-[#1559C7]/[0.03] transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
-                            <td className="px-4 py-2.5 text-gray-400 text-xs">{idx + 1}</td>
-                            <td className="px-4 py-2.5 font-mono font-bold text-[#1559C7]">{a.code}</td>
-                            <td className="px-4 py-2.5">
-                              {a.assignedName ? (
-                                <span className="font-semibold text-black">{a.assignedName}</span>
-                              ) : (
-                                <span className="text-gray-400 text-xs">— Not Assigned —</span>
-                              )}
+                          <tr key={a.id} className={TR}>
+                            <td className={`${TD} text-[#9CA3AF]`}>{idx + 1}</td>
+                            <td className={`${TD} font-mono font-semibold text-[#1559C7]`}>{a.code}</td>
+                            <td className={TD}>
+                              {a.assignedName
+                                ? <span className="font-medium text-[#111827]">{a.assignedName}</span>
+                                : <span className="text-[#9CA3AF]">Not assigned</span>}
                             </td>
-                            <td className="px-4 py-2.5">
+                            <td className={TD}>{renderStatus(a)}</td>
+                            <td className={`${TD} text-center`}>
                               {a.student ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-[#0d9f6e] bg-[#0d9f6e]/10">
-                                  REGISTERED
-                                </span>
-                              ) : a.hasAppUser ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-[#1559C7] bg-[#1559C7]/10">
-                                  ALLOTTED
-                                </span>
-                              ) : a.assignedName ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-[#d98600] bg-[#d98600]/10">
-                                  ASSIGNED
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold text-[#e34948] bg-[#e34948]/10">
-                                  PENDING
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-4 py-2.5 text-center">
-                              {a.student ? (
-                                <span className="text-[11px] text-gray-300">—</span>
-                              ) : a.hasAppUser ? (
+                                <span className="text-[#9CA3AF]">—</span>
+                              ) : a.hasAppUser || a.assignedName ? (
                                 <div className="flex items-center justify-center gap-1.5">
-                                  <button onClick={() => openEditAppModal(a)}
-                                    className="p-1.5 rounded-full bg-gray-50 text-gray-500 hover:bg-[#1559C7]/10 hover:text-[#1559C7] transition-colors" title="Edit name & phone">
-                                    <Pencil size={11} />
+                                  <button onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`} title="Edit name & phone">
+                                    <Pencil size={12} />
                                   </button>
-                                  <button onClick={() => handleUnassign(a.code)}
-                                    className="p-1.5 rounded-full bg-gray-50 text-red-500 hover:bg-red-50 transition-colors" title="Remove">
-                                    <Trash2 size={11} />
-                                  </button>
-                                </div>
-                              ) : a.assignedName ? (
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button onClick={() => openRegModal(a.code, a.assignedName!)}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-[10px] font-bold hover:shadow-sm transition-shadow">
-                                    Register
-                                  </button>
-                                  <button onClick={() => openModal(a.code, a.assignedName)}
-                                    className="p-1.5 rounded-full bg-gray-50 text-gray-500 hover:bg-[#1559C7]/10 hover:text-[#1559C7] transition-colors" title="Edit name">
-                                    <Pencil size={11} />
-                                  </button>
-                                  <button onClick={() => handleUnassign(a.code)}
-                                    className="p-1.5 rounded-full bg-gray-50 text-red-500 hover:bg-red-50 transition-colors" title="Remove">
-                                    <Trash2 size={11} />
+                                  <button onClick={() => handleUnassign(a.code)} className={`${BTN_ICON} hover:!text-[#B91C1C]`} aria-label={`Remove assignment for ${a.code}`} title="Remove">
+                                    <Trash2 size={12} />
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-[11px] text-gray-300">—</span>
+                                <button
+                                  onClick={() => openAllotModal(a)}
+                                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#D3DAE4] px-2.5 py-1 text-[11.5px] font-semibold text-[#374151] transition-colors hover:border-[#1559C7]/50 hover:bg-[#1559C7]/[0.04] hover:text-[#1559C7] ${FOCUS}`}
+                                >
+                                  <UserPlus size={11} /> Allot
+                                </button>
                               )}
                             </td>
                           </tr>
@@ -524,381 +421,174 @@ export default function SchoolOlympiadIdsPage() {
               </div>
             );
           })}
+
+          <p className="px-1 text-right text-[11.5px] text-[#6B7280]">
+            <RowCount shown={filtered.length} total={allocations.length} noun="records" />
+          </p>
         </div>
       )}
 
-      {!loading && filtered.length > 0 && (
-        <div className="text-[11px] text-gray-400 text-right px-1">
-          Showing {filtered.length} of {allocations.length} records · <span className="font-semibold">mittmee</span>
-        </div>
-      )}
-
-      {/* Assign Modal */}
-      {modal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.2)] w-full max-w-sm mx-4 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] px-5 py-4 flex items-center justify-between">
+      {/* Allot modal — the single path for filling an Olympiad ID. The class and
+          the code come from the row that was clicked, so neither is asked for. */}
+      {allotRow && (
+        <ModalShell
+          eyebrow="Allot student"
+          title={
+            <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="font-mono">{allotRow.code}</span>
+              {/* The class is the school's check that they opened the right
+                  row, so it is a chip rather than muted trailing text. */}
+              <span className="rounded-md bg-[#1559C7]/[0.10] px-2 py-0.5 text-[12px] font-semibold text-[#1559C7]">
+                {allotRow.className || allotRow.classCode || 'Unknown class'}
+              </span>
+            </span>
+          }
+          onClose={closeAllotModal}
+          maxWidth="max-w-sm"
+        >
+          {allotSuccess ? (
+            <div className="space-y-4 p-5 text-center">
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#047857]/10">
+                <CheckCircle2 className="h-6 w-6 text-[#047857]" />
+              </div>
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">
-                  {modal.current ? 'Edit Assignment' : 'Assign Student'}
+                <p className="text-[14.5px] font-semibold text-[#111827]">Student allotted</p>
+                <p className="mt-0.5 text-[12px] text-[#6B7280]">Share these login details with the student</p>
+              </div>
+              <dl className="space-y-1.5 rounded-lg border border-[#E4E8EE] bg-[#FAFBFC] p-3 text-left">
+                {[
+                  ['Olympiad ID', allotSuccess.code],
+                  ['User ID', allotSuccess.userId],
+                  ['Password', allotSuccess.password],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between gap-3 text-[12px]">
+                    <dt className="text-[#6B7280]">{k}</dt>
+                    <dd className="select-all font-mono font-semibold text-[#111827]">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+              {allotSuccess.emailSent ? (
+                <p className="flex items-start gap-1.5 rounded-lg bg-[#047857]/10 px-3 py-2 text-left text-[12px] text-[#047857]">
+                  <CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" />
+                  Credentials emailed to {allotSuccess.email}.
                 </p>
-                <p className="text-white font-bold text-sm mt-0.5 font-mono">{modal.code}</p>
-              </div>
-              <button onClick={closeModal} className="text-white/60 hover:text-white transition-colors">
-                <X size={18} />
-              </button>
+              ) : allotSuccess.email ? (
+                <p className="flex items-start gap-1.5 rounded-lg bg-[#B91C1C]/10 px-3 py-2 text-left text-[12px] text-[#B91C1C]">
+                  <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+                  Could not email credentials ({allotSuccess.emailError || 'mail error'}) — note them down and share manually.
+                </p>
+              ) : (
+                <p className="rounded-lg bg-[#F6F7F9] px-3 py-2 text-left text-[12px] text-[#4B5563]">
+                  No email was given — note these details down before closing.
+                </p>
+              )}
+              <button onClick={closeAllotModal} className={`cursor-pointer ${BTN_PRIMARY} w-full`}>Done</button>
             </div>
-            <div className="p-5 space-y-4">
+          ) : (
+            <div className="space-y-3 p-5">
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                  Student Name
-                </label>
+                <label htmlFor="allot-name" className={LABEL}>Student name <span className="text-[#B91C1C]">*</span></label>
                 <input
-                  type="text"
-                  placeholder="Enter student full name"
-                  value={assignName}
-                  onChange={e => setAssignName(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && handleAssign()}
-                  autoFocus
-                  className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm focus:outline-none focus:border-[#1559C7] focus:ring-1 focus:ring-[#1559C7]"
-                />
-                {assignError && <p className="text-xs text-red-500 mt-1">{assignError}</p>}
-              </div>
-              <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-xs text-gray-600 leading-relaxed">
-                After assigning, use the Register button to create their account directly.
-              </div>
-              <div className="flex gap-2">
-                <button onClick={closeModal}
-                  className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
-                  Cancel
-                </button>
-                <button onClick={handleAssign} disabled={assigning}
-                  className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(21,89,199,0.35)] transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
-                  {assigning ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-                  {modal.current ? 'Update' : 'Assign'}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Edit App Account Modal (ALLOTTED rows) */}
-      {editAppModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.2)] w-full max-w-sm mx-4 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] px-5 py-4 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Edit Student Details</p>
-                <p className="text-white font-bold text-sm mt-0.5 font-mono">{editAppModal.code}</p>
-              </div>
-              <button onClick={closeEditAppModal} className="text-white/60 hover:text-white transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                  Student Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter student full name"
-                  value={editAppName}
-                  onChange={e => setEditAppName(e.target.value)}
-                  autoFocus
-                  className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm focus:outline-none focus:border-[#1559C7] focus:ring-1 focus:ring-[#1559C7]"
+                  id="allot-name" type="text" placeholder="Full name" value={allotName}
+                  onChange={e => setAllotName(e.target.value)} autoFocus className={INPUT}
                 />
               </div>
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">
-                  Phone Number
-                </label>
+                <label htmlFor="allot-phone" className={LABEL}>Phone number <span className="text-[#B91C1C]">*</span></label>
                 <div className="relative">
-                  <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <Phone size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
                   <input
-                    type="tel"
-                    placeholder="10-digit mobile"
-                    value={editAppPhone}
-                    onChange={e => setEditAppPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    onKeyDown={e => e.key === 'Enter' && handleEditApp()}
-                    className="w-full pl-8 pr-3 rounded-xl border border-[#E7EBF2] py-2 text-sm focus:outline-none focus:border-[#1559C7] focus:ring-1 focus:ring-[#1559C7]"
+                    id="allot-phone" type="tel" placeholder="10-digit mobile" value={allotPhone}
+                    onChange={e => setAllotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    onKeyDown={e => e.key === 'Enter' && handleAllot()}
+                    className={`${INPUT} pl-8`}
                   />
                 </div>
               </div>
-              {editAppError && <p className="text-xs text-red-500">{editAppError}</p>}
-              <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-xs text-gray-600 leading-relaxed">
-                This updates the student&apos;s app account. The login password stays unchanged.
+              <div>
+                <label htmlFor="allot-email" className={LABEL}>Email address</label>
+                <div className="relative">
+                  <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                  <input
+                    id="allot-email" type="email" placeholder="student@example.com" value={allotEmail}
+                    onChange={e => setAllotEmail(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleAllot()}
+                    className={`${INPUT} pl-8`}
+                  />
+                </div>
+                <p className="mt-1 text-[11.5px] text-[#6B7280]">Optional — credentials are emailed here if given.</p>
               </div>
-              <div className="flex gap-2">
-                <button onClick={closeEditAppModal}
-                  className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
-                  Cancel
-                </button>
-                <button onClick={handleEditApp} disabled={editingApp}
-                  className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(21,89,199,0.35)] transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
-                  {editingApp ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
-                  Update
+              {allotError && (
+                <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
+                  <AlertCircle size={12} /> {allotError}
+                </p>
+              )}
+              {/* Warm tint: this note tells the school something will happen
+                  on submit, so it should read as a heads-up rather than as
+                  another neutral panel. Line-height is snug rather than relaxed
+                  — at two lines the block otherwise stands as tall as an input
+                  field, which overstates a passive note. */}
+              <p className="rounded-lg border border-[#FAEBBF] bg-[#FEF9E7] px-3 py-2 text-[12px] leading-snug text-[#713F12]">
+                A login account and password are created automatically for this ID.
+              </p>
+              <div className="flex gap-2 pt-1">
+                <button onClick={closeAllotModal} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
+                <button onClick={handleAllot} disabled={allotting} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+                  {allotting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                  Allot
                 </button>
               </div>
             </div>
-          </div>
-        </div>
+          )}
+        </ModalShell>
       )}
 
-      {/* Register Modal */}
-      {regModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.2)] w-full max-w-sm mx-4 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] px-5 py-4 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Register Student</p>
-                <p className="text-white font-bold text-sm mt-0.5 font-mono">{regModal.code}</p>
+      {/* Edit App Account Modal */}
+      {editAppModal && (
+        <ModalShell
+          eyebrow="Edit student details"
+          title={<span className="font-mono">{editAppModal.code}</span>}
+          onClose={closeEditAppModal}
+          maxWidth="max-w-sm"
+        >
+          <div className="space-y-3.5 p-5">
+            <div>
+              <label htmlFor="edit-name" className={LABEL}>Student name</label>
+              <input
+                id="edit-name" type="text" placeholder="Enter student full name"
+                value={editAppName} onChange={e => setEditAppName(e.target.value)}
+                autoFocus className={INPUT}
+              />
+            </div>
+            <div>
+              <label htmlFor="edit-phone" className={LABEL}>Phone number</label>
+              <div className="relative">
+                <Phone size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <input
+                  id="edit-phone" type="tel" placeholder="10-digit mobile" value={editAppPhone}
+                  onChange={e => setEditAppPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onKeyDown={e => e.key === 'Enter' && handleEditApp()}
+                  className={`${INPUT} pl-8`}
+                />
               </div>
-              <button onClick={closeRegModal} className="text-white/60 hover:text-white transition-colors">
-                <X size={18} />
+            </div>
+            {editAppError && (
+              <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
+                <AlertCircle size={12} /> {editAppError}
+              </p>
+            )}
+            <p className="rounded-lg border border-[#FAEBBF] bg-[#FEF9E7] px-3 py-2 text-[12px] leading-snug text-[#713F12]">
+              This updates the student&apos;s app account. The login password stays unchanged.
+            </p>
+            <div className="flex gap-2">
+              <button onClick={closeEditAppModal} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
+              <button onClick={handleEditApp} disabled={editingApp} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+                {editingApp ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
+                Update
               </button>
             </div>
-
-            {regSuccess ? (
-              /* ── Success screen ── */
-              <div className="p-6 text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0d9f6e] to-[#1baf7a] flex items-center justify-center mx-auto shadow-[0_4px_14px_rgba(13,159,110,0.3)]">
-                  <CheckCircle className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                  <p className="font-black text-black text-base">Account Created!</p>
-                  <p className="text-xs text-gray-400 mt-1">Share these login details with the student</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400 font-semibold uppercase tracking-wide">User ID</span>
-                    <span className="font-mono font-bold text-black">{regSuccess.userId}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400 font-semibold uppercase tracking-wide">Olympiad ID</span>
-                    <span className="font-mono font-bold text-black">{regModal.code}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400 font-semibold uppercase tracking-wide">Phone</span>
-                    <span className="font-mono text-gray-700">{regPhone}</span>
-                  </div>
-                </div>
-                {regSuccess.emailSent ? (
-                  <p className="text-xs text-green-800 bg-green-50 border border-green-300 px-3 py-2">
-                    Credentials emailed to {regSuccess.email}. Student can log in to the app using their phone number and password.
-                  </p>
-                ) : regSuccess.email ? (
-                  <p className="text-xs text-red-800 bg-red-50 border border-red-300 px-3 py-2">
-                    Could not email credentials ({regSuccess.emailError || 'mail error'}) — share the login details with the student manually.
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-700 bg-gray-50 border border-gray-300 px-3 py-2">
-                    Student can now log in to the app using their phone number and password.
-                  </p>
-                )}
-                <button onClick={closeRegModal}
-                  className="w-full py-2.5 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(13,159,110,0.35)] transition-shadow">
-                  Done
-                </button>
-              </div>
-            ) : (
-              /* ── Form ── */
-              <div className="p-5 space-y-3.5">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Student Name</label>
-                  <input
-                    type="text" placeholder="Full name" value={regName}
-                    onChange={e => setRegName(e.target.value)} autoFocus
-                    className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm focus:outline-none focus:border-[#0d9f6e] focus:ring-1 focus:ring-[#0d9f6e]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Phone Number</label>
-                  <div className="relative">
-                    <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="tel" placeholder="10-digit mobile" value={regPhone}
-                      onChange={e => setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      className="w-full pl-8 pr-3 rounded-xl border border-[#E7EBF2] py-2 text-sm focus:outline-none focus:border-[#0d9f6e] focus:ring-1 focus:ring-[#0d9f6e]"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email Address</label>
-                  <div className="relative">
-                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email" placeholder="student@example.com (credentials will be emailed)" value={regEmail}
-                      onChange={e => setRegEmail(e.target.value)}
-                      className="w-full pl-8 pr-3 border border-gray-300 py-2 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Password</label>
-                  <div className="relative">
-                    <input
-                      type={showRegPassword ? 'text' : 'password'}
-                      placeholder="Min 6 characters"
-                      value={regPassword}
-                      onChange={e => setRegPassword(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleRegister()}
-                      className="w-full pr-10 pl-3 rounded-xl border border-[#E7EBF2] py-2 text-sm focus:outline-none focus:border-[#0d9f6e] focus:ring-1 focus:ring-[#0d9f6e]"
-                    />
-                    <button type="button" onClick={() => setShowRegPassword(v => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                      {showRegPassword ? <EyeOff size={14} /> : <Eye size={14} />}
-                    </button>
-                  </div>
-                </div>
-                {regError && <p className="text-xs text-red-500">{regError}</p>}
-                <div className="bg-gray-50 rounded-xl px-3 py-2.5 text-xs text-gray-600">
-                  Account will be created on the app. Student can log in with their User ID + password.
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={closeRegModal}
-                    className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
-                    Cancel
-                  </button>
-                  <button onClick={handleRegister} disabled={registering}
-                    className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(13,159,110,0.35)] transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
-                    {registering ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} />}
-                    Register
-                  </button>
-                </div>
-              </div>
-            )}
           </div>
-        </div>
-      )}
-
-      {/* Allot Student Modal */}
-      {allotOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-          <div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.2)] w-full max-w-sm mx-4 overflow-hidden">
-            <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] px-5 py-4 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Allot Student</p>
-                <p className="text-white font-bold text-sm mt-0.5">An Olympiad ID will be auto-assigned</p>
-              </div>
-              <button onClick={closeAllotModal} className="text-white/60 hover:text-white transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-
-            {allotSuccess ? (
-              <div className="p-6 text-center space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#0d9f6e] to-[#1baf7a] flex items-center justify-center mx-auto shadow-[0_4px_14px_rgba(13,159,110,0.3)]">
-                  <CheckCircle className="w-7 h-7 text-white" />
-                </div>
-                <div>
-                  <p className="font-black text-black text-base">Student Allotted!</p>
-                  <p className="text-xs text-gray-400 mt-1">Share these login details with the student</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4 text-left space-y-2">
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400 font-semibold uppercase tracking-wide">Olympiad ID</span>
-                    <span className="font-mono font-bold text-black">{allotSuccess.code}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400 font-semibold uppercase tracking-wide">User ID</span>
-                    <span className="font-mono font-bold text-black">{allotSuccess.userId}</span>
-                  </div>
-                  <div className="flex justify-between text-xs">
-                    <span className="text-gray-400 font-semibold uppercase tracking-wide">Password</span>
-                    <span className="font-mono font-bold text-black">{allotSuccess.password}</span>
-                  </div>
-                </div>
-                {allotSuccess.emailSent ? (
-                  <p className="text-xs text-green-800 bg-green-50 border border-green-300 px-3 py-2">
-                    Credentials emailed to {allotSuccess.email}. Student can log in to the app using their phone number and this password.
-                  </p>
-                ) : allotSuccess.email ? (
-                  <p className="text-xs text-red-800 bg-red-50 border border-red-300 px-3 py-2">
-                    Could not email credentials ({allotSuccess.emailError || 'mail error'}) — share these details with the student manually.
-                  </p>
-                ) : (
-                  <p className="text-xs text-gray-700 bg-gray-50 border border-gray-300 px-3 py-2">
-                    Student can now log in to the app using their phone number and this password.
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <button onClick={openAllotModal}
-                    className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
-                    Allot Another
-                  </button>
-                  <button onClick={closeAllotModal}
-                    className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(13,159,110,0.35)] transition-shadow">
-                    Done
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div className="p-5 space-y-3.5">
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Student Name</label>
-                  <input
-                    type="text" placeholder="Full name" value={allotName}
-                    onChange={e => setAllotName(e.target.value)} autoFocus
-                    className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm focus:outline-none focus:border-[#0d9f6e] focus:ring-1 focus:ring-[#0d9f6e]"
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Class</label>
-                  <select
-                    value={allotClass} onChange={e => setAllotClass(e.target.value)}
-                    className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm focus:outline-none focus:border-[#0d9f6e] focus:ring-1 focus:ring-[#0d9f6e] bg-white"
-                  >
-                    <option value="">Select class</option>
-                    {classes.map(cls => (
-                      <option key={cls.code} value={cls.code}>{cls.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Phone Number</label>
-                  <div className="relative">
-                    <Phone size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="tel" placeholder="10-digit mobile" value={allotPhone}
-                      onChange={e => setAllotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      onKeyDown={e => e.key === 'Enter' && handleAllot()}
-                      className="w-full pl-8 pr-3 rounded-xl border border-[#E7EBF2] py-2 text-sm focus:outline-none focus:border-[#0d9f6e] focus:ring-1 focus:ring-[#0d9f6e]"
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email Address</label>
-                  <div className="relative">
-                    <Mail size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="email" placeholder="student@example.com (credentials will be emailed)" value={allotEmail}
-                      onChange={e => setAllotEmail(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleAllot()}
-                      className="w-full pl-8 pr-3 border border-gray-300 py-2 text-sm focus:outline-none focus:border-green-500 focus:ring-1 focus:ring-green-500"
-                    />
-                  </div>
-                </div>
-                {allotError && <p className="text-xs text-red-500">{allotError}</p>}
-                <div className="bg-gray-50 border border-gray-300 px-3 py-2 text-xs text-gray-700">
-                  The next available Olympiad ID for this class will be assigned automatically, and a password will be generated for the student. If an email is entered, the credentials will be sent there automatically.
-                </div>
-                <div className="flex gap-2 pt-1">
-                  <button onClick={closeAllotModal}
-                    className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
-                    Cancel
-                  </button>
-                  <button onClick={handleAllot} disabled={allotting}
-                    className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#0d9f6e] to-[#1baf7a] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(13,159,110,0.35)] transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
-                    {allotting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
-                    Allot
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        </ModalShell>
       )}
     </div>
   );

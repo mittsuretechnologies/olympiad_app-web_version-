@@ -56,6 +56,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No unassigned Olympiad IDs left for this class' }, { status: 409 });
     }
 
+    const school = await prisma.school.findUnique({ where: { id: payload.id }, select: { name: true } });
+
     const userId = await generateUserId(name.trim());
     const plainPassword = generatePassword();
     const passwordHash = await bcrypt.hash(plainPassword, 10);
@@ -87,6 +89,7 @@ export async function POST(request: Request) {
         await sendStudentCredentialsEmail({
           to: emailNormalized,
           studentName: name.trim(),
+          schoolName: school?.name,
           olympiadCode: available.code,
           userId: appUser.userId,
           password: plainPassword,
