@@ -414,3 +414,163 @@ Unexpected token `div`. Expected jsx identifier
  GET /api/school/me/registered-students 200 in 2019ms
  GET /api/school/me/olympiad-ids 200 in 1334ms
  GET /api/school/me/olympiad-ids 200 in 912ms
+ GET /school/olympiad-ids 200 in 181ms
+ GET /api/school/me/olympiad-ids 200 in 578ms
+ GET /api/school/me/olympiad-ids 200 in 539ms
+ ✓ Compiled in 117ms
+ ✓ Compiled in 143ms
+ GET /school/registered-students 200 in 300ms
+ GET /api/school/me/registered-students 200 in 1440ms
+ GET /api/school/me/registered-students 200 in 1260ms
+ GET /school/olympiad-ids 200 in 288ms
+ GET /api/school/me/olympiad-ids 200 in 642ms
+ GET /api/school/me/olympiad-ids 200 in 623ms
+ ✓ Compiled in 216ms
+ ✓ Compiled in 235ms
+ ✓ Compiled in 143ms
+ ✓ Compiled in 193ms
+ ✓ Compiled in 399ms
+ GET /school 200 in 602ms
+ GET /school/olympiad-ids 200 in 330ms
+ GET /school/registered-students 200 in 325ms
+ GET /school/credentials 200 in 324ms
+ GET /school/upload-video 200 in 314ms
+ GET /school/student-videos 200 in 315ms
+ GET /school/profile 200 in 319ms
+ GET /school/registered-students 200 in 191ms
+ GET /api/school/me/registered-students 200 in 1336ms
+ GET /api/school/me/registered-students 200 in 805ms
+ GET /school/student-videos 200 in 188ms
+ GET /api/school/me/student-videos 200 in 1350ms
+ GET /school/registered-students 200 in 171ms
+ GET /api/school/me/student-videos 200 in 780ms
+ GET /api/school/me/registered-students 200 in 1663ms
+ GET /api/school/me/registered-students 200 in 1043ms
+ GET /school/student-videos 200 in 180ms
+ GET /api/school/me/student-videos 200 in 1079ms
+ GET /api/school/me/student-videos 200 in 1583ms
+ GET /school/student-videos 200 in 189ms
+ GET /api/school/me/student-videos 200 in 1670ms
+ GET /api/school/me/student-videos 200 in 1668ms
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+ GET /login 200 in 389ms
+ ○ Compiling /api/auth/login ...
+ ✓ Compiled /api/auth/login in 654ms
+ POST /api/auth/login 200 in 1416ms
+ GET /dashboard 200 in 283ms
+ GET /api/dashboard/overview 200 in 2341ms
+ GET /api/dashboard/overview 200 in 2279ms
+ ○ Compiling /dashboard/evaluator/evaluate-content ...
+ ✓ Compiled /dashboard/evaluator/evaluate-content in 616ms
+ GET /dashboard/evaluator/evaluate-content 200 in 692ms
+ ✓ Compiled /api/evaluator/me/evaluation-queue in 165ms
+ GET /api/evaluator/me/evaluation-queue 200 in 1638ms
+ GET /api/evaluator/me/evaluation-queue 200 in 1409ms
+ ✓ Compiled /api/evaluator/me/evaluate in 288ms
+ POST /api/evaluator/me/evaluate 200 in 2226ms
+ ✓ Compiled /dashboard/evaluator/history in 385ms
+ GET /dashboard/evaluator/history 200 in 520ms
+ ✓ Compiled /api/evaluator/me/evaluation-history in 281ms
+ GET /api/evaluator/me/evaluation-history 200 in 1749ms
+ GET /api/evaluator/me/evaluation-history 200 in 1562ms
+ ✓ Compiled /api/evaluator/me/evaluate/publish in 243ms
+ POST /api/evaluator/me/evaluate/publish 200 in 2862ms
+ GET /dashboard/evaluator/evaluate-content 200 in 187ms
+ GET /api/evaluator/me/evaluation-queue 200 in 3059ms
+ GET /api/evaluator/me/evaluation-queue 200 in 2605ms
+ POST /api/evaluator/me/evaluate 200 in 1696ms
+ GET /dashboard/evaluator/history 200 in 222ms
+ GET /api/evaluator/me/evaluation-history 200 in 1850ms
+ GET /api/evaluator/me/evaluation-history 200 in 2045ms
+ POST /api/evaluator/me/evaluate/publish 200 in 1249ms
+ ○ Compiling /dashboard/result ...
+ ✓ Compiled /dashboard/result in 697ms
+ GET /dashboard/result 200 in 835ms
+ ✓ Compiled /api/result/overview in 298ms
+ GET /api/result/overview 200 in 3598ms
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+prisma:error Error in PostgreSQL connection: Error { kind: Io, cause: Some(Os { code: 10054, kind: ConnectionReset, message: "An existing connection was forcibly closed by the remote host." }) }
+ GET /api/result/overview 200 in 1430ms
+ GET /api/result/overview 200 in 923ms
+ GET /api/result/overview 200 in 930ms
+ GET /api/result/overview 200 in 934ms
+ GET /api/result/overview 200 in 910ms
+ GET /api/result/overview 200 in 897ms
+ GET /api/result/overview 200 in 875ms
+ ○ Compiling /dashboard/credentials/schools ...
+ ✓ Compiled /dashboard/credentials/schools in 666ms
+ GET /dashboard/credentials/schools 200 in 793ms
+ ✓ Compiled /api/credentials/schools in 201ms
+ GET /api/credentials/schools 200 in 674ms
+ ✓ Compiled / in 367ms
+ GET / 307 in 549ms
+ GET /login 200 in 225ms
+ GET /api/credentials/schools 200 in 724ms
+ GET /api/credentials/schools 200 in 355ms
+ POST /api/auth/login 200 in 481ms
+ GET /school 200 in 594ms
+ GET /api/school/me/stats 200 in 605ms
+ GET /api/school/me/stats 200 in 591ms
+ GET /school/olympiad-ids 200 in 238ms
+ GET /api/school/me/olympiad-ids 200 in 627ms
+ GET /api/school/me/olympiad-ids 200 in 618ms
+ GET /school/registered-students 200 in 204ms
+ GET /api/school/me/registered-students 200 in 1529ms
+ GET /api/school/me/registered-students 200 in 1049ms
+ GET /api/credentials/schools 200 in 563ms
+ GET /school/student-videos 200 in 232ms
+ GET /api/school/me/student-videos 200 in 2177ms
+ GET /api/school/me/student-videos 200 in 1100ms
+ GET /api/credentials/schools 200 in 460ms
+ GET /dashboard/result 200 in 187ms
+ GET /api/result/overview 200 in 1122ms
+ GET /school/registered-students 200 in 221ms
+ GET /school/student-videos 200 in 202ms
+ GET /api/school/me/registered-students 200 in 1105ms
+ GET /api/school/me/registered-students 200 in 1049ms
+ GET /api/school/me/student-videos 200 in 3137ms
+ GET /api/school/me/student-videos 200 in 2465ms
+ GET /school/upload-video 200 in 224ms
+ GET /api/school/me/upload-students 200 in 1157ms
+ GET /api/school/me/upload-students 200 in 689ms
+ GET /school/profile 200 in 223ms
+ ✓ Compiled /api/school/me/profile in 267ms
+ GET /api/school/me/profile 200 in 613ms
+ GET /api/school/me/profile 200 in 416ms
+ GET /school/student-videos 200 in 185ms
+ GET /api/school/me/student-videos 200 in 1069ms
+ GET /api/school/me/student-videos 200 in 1077ms
+ GET /school/upload-video 200 in 257ms
+ GET /api/school/me/upload-students 200 in 1054ms
+ GET /api/school/me/upload-students 200 in 991ms
+ GET /school/student-videos 200 in 190ms
+ GET /api/school/me/student-videos 200 in 1097ms
+ GET /api/school/me/student-videos 200 in 1054ms
+ GET /school/upload-video 200 in 185ms
+ GET /api/school/me/upload-students 200 in 725ms
+ GET /api/school/me/upload-students 200 in 741ms
+ GET /school/profile 200 in 187ms
+ GET /api/school/me/profile 200 in 405ms
+ GET /api/school/me/profile 200 in 398ms
+ GET /school/credentials 200 in 252ms
+ ✓ Compiled /api/school/me/credentials in 345ms
+ GET /api/school/me/credentials 200 in 1325ms
+ GET /api/school/me/credentials 200 in 1026ms
+ GET /school/profile 200 in 185ms
+ GET /api/school/me/profile 200 in 404ms
+ GET /school/upload-video 200 in 225ms
+ GET /api/school/me/profile 200 in 443ms
+ GET /api/school/me/upload-students 200 in 712ms
+ GET /api/school/me/upload-students 200 in 692ms
+ GET /school/registered-students 200 in 186ms
+ GET /api/school/me/registered-students 200 in 1417ms
+ GET /api/school/me/registered-students 200 in 1091ms
