@@ -2,13 +2,34 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, Video, X, CheckCircle, AlertCircle, User, Music, Palette, ChevronDown, Lock, RefreshCw, Globe, EyeOff } from 'lucide-react';
+import {
+  Upload, Video, X, CheckCircle2, AlertCircle, User, Music, Palette,
+  ChevronDown, Lock, RefreshCw, Globe, EyeOff,
+} from 'lucide-react';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, getCatBSubs } from '@/lib/olympiad-categories';
 import { clearSchoolSession } from '@/lib/session-token';
+import { CARD, CARD_HEADER, CARD_TITLE, STACK, INPUT, LABEL, FOCUS, BTN_PRIMARY, avatarTint } from '../ui';
+import { PageHeader, StatusBadge, Avatar, ProgressBar } from '../components';
 
 type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
 type Slots = { slotA: boolean; slotB: boolean; rejectedA: boolean; rejectedB: boolean; approvedCount: number };
+
+/** Card section wrapper — every form group on this page uses the same chrome. */
+function Section({ title, required, children, muted }: {
+  title: string; required?: boolean; children: React.ReactNode; muted?: boolean;
+}) {
+  return (
+    <div className={`${CARD} ${muted ? 'opacity-55' : ''}`}>
+      <div className={CARD_HEADER}>
+        <h2 className={CARD_TITLE}>
+          {title}{required && <span className="ml-1 text-[#B91C1C]">*</span>}
+        </h2>
+      </div>
+      <div className="p-3.5">{children}</div>
+    </div>
+  );
+}
 
 export default function UploadVideoPage() {
   const [students, setStudents]               = useState<Student[]>([]);
@@ -89,7 +110,7 @@ export default function UploadVideoPage() {
   // so block selection until a student is chosen and their class has loaded.
   const canPickCategory = !!selectedStudent && !slotsLoading;
 
-  // Both slots approved â†’ only general feed
+  // Both slots approved → only general feed
   const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
 
   const getCatStatus = (catValue: string) => {
@@ -216,40 +237,31 @@ export default function UploadVideoPage() {
   if (uploadState === 'done') {
     const isEval = lastVideoMeta?.isEvaluation ?? true;
     return (
-      <div className="min-h-[70vh] flex items-center justify-center p-6">
-        <div className="relative overflow-hidden bg-white rounded-2xl border border-[#E7EBF2] shadow-[0_8px_28px_rgba(0,0,0,0.1)] p-10 text-center max-w-md w-full">
-          <div className="absolute -top-10 -right-10 w-32 h-32 rounded-full bg-emerald-50" />
-          <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0d9f6e] to-[#1baf7a] flex items-center justify-center mx-auto mb-5 shadow-[0_6px_16px_rgba(13,159,110,0.3)]">
-            <CheckCircle className="w-8 h-8 text-white" />
+      <div className="flex min-h-[65vh] items-center justify-center p-4">
+        <div className={`${CARD} w-full max-w-md p-8 text-center`}>
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#047857]/10">
+            <CheckCircle2 className="h-6 w-6 text-[#047857]" />
           </div>
-          <h2 className="relative text-xl font-black text-black mb-1">Video Uploaded</h2>
-          <p className="relative text-gray-600 text-sm mb-5">
-            For <span className="font-semibold text-black">{selectedStudent?.name}</span>
+          <h2 className="text-[17px] font-semibold text-[#111827]">Video uploaded</h2>
+          <p className="mt-1 text-[12.5px] text-[#6B7280]">
+            For <span className="font-medium text-[#374151]">{selectedStudent?.name}</span>
             {lastVideoMeta?.subCategory ? ` · ${lastVideoMeta.subCategory}` : ''}
           </p>
 
-          {isEval ? (
-            <div className="relative mx-auto mb-5 inline-flex flex-col items-center gap-1.5 bg-gradient-to-br from-[#d98600] to-[#eda100] rounded-2xl px-6 py-4 text-white shadow-[0_4px_14px_rgba(0,0,0,0.12)]">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white/75">Video Type</span>
-              <span className="text-base font-black">Olympiad Evaluation</span>
-              <p className="text-xs text-white/85 leading-snug max-w-[220px]">
-                This video will be reviewed and scored as an olympiad participation entry.
-              </p>
-            </div>
-          ) : (
-            <div className="relative mx-auto mb-5 inline-flex flex-col items-center gap-1.5 bg-gradient-to-br from-[#1559C7] to-[#2a78d6] rounded-2xl px-6 py-4 text-white shadow-[0_4px_14px_rgba(0,0,0,0.12)]">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-white/75">Video Type</span>
-              <span className="text-base font-black">General Feed</span>
-              <p className="text-xs text-white/85 leading-snug max-w-[240px]">
-                This student already has 2 approved olympiad videos. This video will appear in the general public feed only.
-              </p>
-            </div>
-          )}
+          <div className="mx-auto mt-5 rounded-lg border border-[#E4E8EE] bg-[#FAFBFC] p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#6B7280]">Video type</p>
+            <p className="mt-1 text-[14px] font-semibold text-[#111827]">
+              {isEval ? 'Olympiad evaluation' : 'General feed'}
+            </p>
+            <p className="mx-auto mt-1.5 max-w-[260px] text-[12px] leading-relaxed text-[#4B5563]">
+              {isEval
+                ? 'This video will be reviewed and scored as an olympiad participation entry.'
+                : 'This student already has 2 approved olympiad videos, so this video appears in the general public feed only.'}
+            </p>
+          </div>
 
-          <p className="relative text-xs text-gray-500 mb-7">Status will update after admin review.</p>
-          <button onClick={reset} className="relative bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white px-6 py-2.5 text-sm font-bold rounded-full hover:shadow-[0_4px_14px_rgba(21,89,199,0.35)] transition-shadow">
-            Upload Another
-          </button>
+          <p className="mt-4 text-[12px] text-[#6B7280]">Status will update after admin review.</p>
+          <button onClick={reset} className={`cursor-pointer ${BTN_PRIMARY} mt-5`}>Upload another</button>
         </div>
       </div>
     );
@@ -257,124 +269,118 @@ export default function UploadVideoPage() {
 
   /* — Main — */
   return (
-    <div className="space-y-4">
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#e34948] to-[#eb6834] p-6 text-white shadow-[0_8px_24px_rgba(227,73,72,0.25)]">
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
-        <div className="absolute -bottom-14 right-24 w-28 h-28 rounded-full bg-white/10" />
-        <div className="relative flex items-center gap-3">
-          <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-            <Upload size={20} className="text-white" />
-          </div>
-          <div>
-            <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">School Panel</p>
-            <h1 className="text-xl font-black tracking-tight">Upload Student Video</h1>
-          </div>
-        </div>
-      </div>
+    <div className={STACK}>
+      {/* The 9:16 / 2-minute limits are stated inside the drop zone where they
+          are acted on, so they are not repeated in a hover-only subtitle. */}
+      <PageHeader icon={Upload} title="Upload Student Video" subtitle="Upload on behalf of a student" />
 
       <form onSubmit={handleSubmit}>
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
 
           {/* — LEFT column (3/5) — */}
-          <div className="xl:col-span-3 space-y-4">
+          <div className="space-y-3 xl:col-span-3">
 
             {/* Student selector */}
-            <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2.5">
-                Select Student <span className="text-red-500">*</span>
-              </p>
-
+            <Section title="Select student" required>
               {loadingStudents ? (
-                <div className="h-11 bg-gray-50 rounded-xl animate-pulse" />
+                <div className="h-10 animate-pulse rounded-lg bg-[#F1F3F6]" />
               ) : students.length === 0 ? (
-                <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-dashed border-gray-300 text-gray-500 text-sm">
-                  <User className="w-4 h-4" /> No registered students found
+                <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-[#D3DAE4] px-3.5 py-2.5 text-[12.5px] text-[#6B7280]">
+                  <User className="h-4 w-4" /> No registered students found
                 </div>
               ) : (
                 <div className="relative">
-                  <div
+                  <button
+                    type="button"
                     onClick={() => setShowDropdown(v => !v)}
-                    className="flex items-center gap-3 rounded-xl border border-[#E7EBF2] px-4 py-2.5 cursor-pointer hover:border-[#1559C7] transition-colors bg-white"
+                    aria-expanded={showDropdown}
+                    className={`flex w-full items-center gap-2.5 rounded-lg border border-[#E4E8EE] bg-white px-3 py-2 text-left transition-colors hover:border-[#1559C7]/50 ${FOCUS}`}
                   >
                     {selectedStudent ? (
                       <>
-                        <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#1559C7] to-[#2a78d6] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-sm">
-                          {selectedStudent.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-black text-sm truncate">{selectedStudent.name}</p>
-                          <p className="text-xs text-gray-500">{selectedStudent.olympiadCode}{selectedStudent.className ? ` · ${selectedStudent.className}` : ''}</p>
-                        </div>
-                        <button type="button" onClick={e => { e.stopPropagation(); setSelectedStudent(null); }} className="text-gray-400 hover:text-gray-600 p-1">
-                          <X className="w-4 h-4" />
-                        </button>
+                        <Avatar name={selectedStudent.name} tint={avatarTint(0)} size={28} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-[13px] font-medium text-[#111827]">{selectedStudent.name}</span>
+                          <span className="block truncate text-[11.5px] text-[#6B7280]">
+                            {selectedStudent.olympiadCode}{selectedStudent.className ? ` · ${selectedStudent.className}` : ''}
+                          </span>
+                        </span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Clear selected student"
+                          onClick={e => { e.stopPropagation(); setSelectedStudent(null); }}
+                          onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setSelectedStudent(null); } }}
+                          className="flex-shrink-0 cursor-pointer rounded p-1 text-[#9CA3AF] hover:text-[#374151]"
+                        >
+                          <X className="h-4 w-4" />
+                        </span>
                       </>
                     ) : (
                       <>
-                        <User className="w-4 h-4 text-gray-400" />
-                        <span className="text-gray-500 text-sm flex-1">Choose a student...</span>
-                        <ChevronDown className="w-4 h-4 text-gray-400" />
+                        <User className="h-4 w-4 flex-shrink-0 text-[#9CA3AF]" />
+                        <span className="flex-1 text-[13px] text-[#6B7280]">Choose a student…</span>
+                        <ChevronDown className="h-4 w-4 flex-shrink-0 text-[#9CA3AF]" />
                       </>
                     )}
-                  </div>
+                  </button>
 
                   {showDropdown && (
-                    <div className="absolute top-full left-0 right-0 mt-1.5 bg-white rounded-xl border border-[#E7EBF2] shadow-[0_8px_28px_rgba(0,0,0,0.12)] z-30 overflow-hidden">
-                      <div className="p-2 border-b border-gray-100">
-                        <input autoFocus type="text" placeholder="Search name or ID..."
+                    <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-lg border border-[#E4E8EE] bg-white shadow-[0_8px_24px_rgba(16,24,40,0.12)]">
+                      <div className="border-b border-[#F1F3F6] p-2">
+                        <input
+                          autoFocus type="text" placeholder="Search name or ID…"
+                          aria-label="Search students"
                           value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
-                          className="w-full px-3 py-2 text-sm rounded-full border border-[#E7EBF2] outline-none focus:border-[#1559C7]"
+                          className={INPUT}
                         />
                       </div>
-                      <div className="max-h-56 overflow-y-auto">
-                        {filtered.length === 0
-                          ? <p className="text-center text-gray-500 text-sm py-5">No students found</p>
-                          : filtered.map(s => (
-                            <button key={s.id} type="button"
-                              onClick={() => { setSelectedStudent(s); setShowDropdown(false); setStudentSearch(''); }}
-                              className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#1559C7]/[0.04] text-left transition-colors border-b border-gray-50 last:border-0"
-                            >
-                              <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#1559C7] to-[#2a78d6] text-white flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-sm">
-                                {s.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
-                              </div>
-                              <div>
-                                <p className="font-medium text-black text-sm">{s.name}</p>
-                                <p className="text-xs text-gray-500">{s.olympiadCode}{s.className ? ` · ${s.className}` : ''}</p>
-                              </div>
-                            </button>
-                          ))
-                        }
+                      <div className="max-h-60 overflow-y-auto">
+                        {filtered.length === 0 ? (
+                          <p className="py-5 text-center text-[12.5px] text-[#6B7280]">No students found</p>
+                        ) : filtered.map((s, i) => (
+                          <button
+                            key={s.id} type="button"
+                            onClick={() => { setSelectedStudent(s); setShowDropdown(false); setStudentSearch(''); }}
+                            className="flex w-full items-center gap-2.5 border-b border-[#F6F7F9] px-3 py-2 text-left transition-colors last:border-0 hover:bg-[#1559C7]/[0.04]"
+                          >
+                            <Avatar name={s.name} tint={avatarTint(i)} size={26} />
+                            <span className="min-w-0">
+                              <span className="block truncate text-[12.5px] font-medium text-[#111827]">{s.name}</span>
+                              <span className="block truncate text-[11.5px] text-[#6B7280]">
+                                {s.olympiadCode}{s.className ? ` · ${s.className}` : ''}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Slot status banner */}
+              {/* Slot status */}
               {selectedStudent && (
-                <div className="mt-3">
+                <div className="mt-2.5">
                   {slotsLoading ? (
-                    <div className="h-8 bg-gray-50 rounded-xl animate-pulse" />
+                    <div className="h-7 animate-pulse rounded-lg bg-[#F1F3F6]" />
                   ) : slots && (
                     isGeneralOnly ? (
-                      <div className="flex items-center gap-2 bg-[#1559C7]/10 rounded-full px-3 py-2 text-xs text-[#1559C7] font-bold">
-                        <CheckCircle className="w-3.5 h-3.5 text-[#1559C7] flex-shrink-0" />
-                        Both olympiad slots filled — this video will go to General Feed
-                      </div>
+                      <StatusBadge tone="info" icon={CheckCircle2}>
+                        Both olympiad slots filled — this video goes to General Feed
+                      </StatusBadge>
                     ) : (
-                      <div className="flex items-center gap-2">
-                        {CATEGORIES.map((catInfo) => {
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {CATEGORIES.map(catInfo => {
                           const status = getCatStatus(catInfo.value);
                           return (
-                            <div key={catInfo.value} className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold ${
-                              status === 'filled'    ? 'bg-[#0d9f6e]/10 text-[#0d9f6e]' :
-                              status === 'rejected'  ? 'bg-red-50 text-red-600' :
-                              'bg-gray-100 text-gray-500'
-                            }`}>
-                              {status === 'filled'   && <CheckCircle className="w-3 h-3" />}
-                              {status === 'rejected' && <RefreshCw className="w-3 h-3" />}
+                            <StatusBadge
+                              key={catInfo.value}
+                              tone={status === 'filled' ? 'success' : status === 'rejected' ? 'danger' : 'neutral'}
+                              icon={status === 'filled' ? CheckCircle2 : status === 'rejected' ? RefreshCw : undefined}
+                            >
                               {catInfo.label} — {status === 'filled' ? 'Submitted' : status === 'rejected' ? 'Re-upload' : 'Pending'}
-                            </div>
+                            </StatusBadge>
                           );
                         })}
                       </div>
@@ -382,45 +388,46 @@ export default function UploadVideoPage() {
                   )}
                 </div>
               )}
-            </div>
+            </Section>
 
             {/* Video drop zone */}
-            <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2.5">
-                Video File <span className="text-red-500">*</span>
-              </p>
-
+            <Section title="Video file" required>
               {videoPreview ? (
-                <div className="space-y-3">
-                  <div className="relative rounded-xl overflow-hidden bg-black">
-                    <video src={videoPreview} controls className="w-full max-h-64 object-contain" />
-                    <button type="button" onClick={() => { setVideoFile(null); setVideoPreview(null); setAspectMismatch(false); setAutoCrop(false); }}
-                      className="absolute top-2 right-2 bg-black/60 text-white p-1.5 rounded-full hover:bg-black/80 transition-colors">
-                      <X className="w-4 h-4" />
+                <div className="space-y-2.5">
+                  <div className="relative overflow-hidden rounded-lg bg-[#0E1726]">
+                    <video src={videoPreview} controls className="max-h-64 w-full object-contain" />
+                    <button
+                      type="button"
+                      aria-label="Remove video"
+                      onClick={() => { setVideoFile(null); setVideoPreview(null); setAspectMismatch(false); setAutoCrop(false); }}
+                      className="absolute right-2 top-2 rounded-lg bg-black/60 p-1.5 text-white transition-colors hover:bg-black/80"
+                    >
+                      <X className="h-4 w-4" />
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-2 px-1">
-                    <Video className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                    <p className="text-xs text-gray-600 truncate">{videoFile?.name}</p>
-                    <span className="text-xs text-gray-500 flex-shrink-0">· {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB</span>
-                  </div>
+                  <p className="flex items-center gap-1.5 text-[12px] text-[#4B5563]">
+                    <Video className="h-3.5 w-3.5 flex-shrink-0 text-[#9CA3AF]" />
+                    <span className="truncate">{videoFile?.name}</span>
+                    <span className="flex-shrink-0 text-[#6B7280]">
+                      · {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB
+                    </span>
+                  </p>
 
                   {aspectMismatch && (
-                    <div className="flex items-start gap-2 bg-red-50 border border-red-100 rounded-xl px-3.5 py-2.5 text-red-600 text-xs">
-                      <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <p className="flex items-start gap-2 rounded-lg bg-[#B91C1C]/[0.08] px-3 py-2.5 text-[12px] text-[#B91C1C]">
+                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
                       This video is not in 9:16 (portrait) format. Enable auto-crop below, or upload a portrait video.
-                    </div>
+                    </p>
                   )}
 
-                  <label className="flex items-center gap-2 px-1 cursor-pointer">
+                  <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#4B5563]">
                     <input
-                      type="checkbox"
-                      checked={autoCrop}
+                      type="checkbox" checked={autoCrop}
                       onChange={e => setAutoCrop(e.target.checked)}
-                      className="w-3.5 h-3.5 rounded accent-[#1559C7]"
+                      className="h-3.5 w-3.5 rounded accent-[#1559C7]"
                     />
-                    <span className="text-xs text-gray-600">Auto-crop to 9:16 if not already portrait</span>
+                    Auto-crop to 9:16 if not already portrait
                   </label>
                 </div>
               ) : (
@@ -429,45 +436,48 @@ export default function UploadVideoPage() {
                   onDragLeave={() => setDragOver(false)}
                   onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`rounded-2xl border-2 border-dashed p-12 text-center cursor-pointer transition-all ${
-                    dragOver ? 'border-[#1559C7] bg-[#1559C7]/5' : 'border-gray-300 hover:border-[#1559C7] hover:bg-gray-50'
+                  className={`cursor-pointer rounded-lg border-2 border-dashed p-9 text-center transition-colors ${
+                    dragOver ? 'border-[#1559C7] bg-[#1559C7]/[0.04]' : 'border-[#D3DAE4] hover:border-[#1559C7] hover:bg-[#FAFBFC]'
                   }`}
                 >
-                  <div className={`w-12 h-12 mx-auto mb-3 flex items-center justify-center rounded-2xl transition-all ${dragOver ? 'bg-gradient-to-br from-[#1559C7] to-[#2a78d6] text-white shadow-[0_4px_14px_rgba(21,89,199,0.3)]' : 'bg-gray-50 text-gray-500'}`}>
-                    <Upload className="w-5 h-5" />
+                  <div className={`mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+                    dragOver ? 'bg-[#1559C7] text-white' : 'bg-[#F1F3F6] text-[#6B7280]'
+                  }`}>
+                    <Upload className="h-4 w-4" />
                   </div>
-                  <p className="font-semibold text-gray-700 text-sm mb-1">
+                  <p className="text-[13px] font-medium text-[#374151]">
                     {dragOver ? 'Drop it here' : 'Click to select or drag & drop'}
                   </p>
-                  <p className="text-xs text-gray-500">MP4, MOV, AVI · 9:16 portrait · Max 2 min · Auto-compressed above 150 MB</p>
+                  <p className="mt-1 text-[11.5px] text-[#6B7280]">
+                    MP4, MOV, AVI · 9:16 portrait · Max 2 min · Auto-compressed above 150 MB
+                  </p>
                   <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
                 </div>
               )}
-            </div>
+            </Section>
 
             {/* Caption */}
-            <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2.5">Caption</p>
+            <Section title="Caption">
               <textarea
                 value={caption} onChange={e => setCaption(e.target.value)}
-                placeholder="Add a description for this video..."
+                placeholder="Add a description for this video…"
+                aria-label="Video caption"
                 rows={3}
-                className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2.5 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-[#1559C7] resize-none transition-colors"
+                className={`${INPUT} resize-none`}
               />
-            </div>
+            </Section>
           </div>
 
           {/* — RIGHT column (2/5) — */}
-          <div className="xl:col-span-2 space-y-4">
+          <div className="space-y-3 xl:col-span-2">
 
             {/* Visibility */}
-            <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] p-4">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2.5">Visibility</p>
-              <div className="space-y-2">
+            <Section title="Visibility">
+              <div className="space-y-1.5">
                 {[
-                  { val: true,  icon: Globe,   label: 'Public',  desc: 'Anyone on Mittmee can see this video' },
-                  { val: false, icon: EyeOff,  label: 'Private', desc: 'Only reviewers and school can see this video' },
+                  { val: true,  icon: Globe,  label: 'Public',  desc: 'Anyone on Mittmee can see this video' },
+                  { val: false, icon: EyeOff, label: 'Private', desc: 'Only reviewers and school can see this' },
                 ].map(opt => {
                   const Icon = opt.icon;
                   const active = isPublic === opt.val;
@@ -476,45 +486,50 @@ export default function UploadVideoPage() {
                       key={String(opt.val)}
                       type="button"
                       onClick={() => setIsPublic(opt.val)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl border text-left transition-all ${
-                        active ? 'border-[#1559C7] bg-[#1559C7]/5' : 'border-[#E7EBF2] hover:border-gray-300 hover:bg-gray-50'
+                      aria-pressed={active}
+                      className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${FOCUS} ${
+                        active ? 'border-[#1559C7] bg-[#1559C7]/[0.04]' : 'border-[#E4E8EE] hover:bg-[#FAFBFC]'
                       }`}
                     >
-                      <Icon className={`w-4 h-4 flex-shrink-0 ${active ? 'text-[#1559C7]' : 'text-gray-500'}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-semibold ${active ? 'text-[#1559C7]' : 'text-gray-700'}`}>{opt.label}</p>
-                        <p className="text-xs text-gray-500 mt-0.5">{opt.desc}</p>
-                      </div>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 ${active ? 'border-[#1559C7] bg-[#1559C7]' : 'border-gray-300'}`}>
-                        {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
-                      </div>
+                      <Icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-[#1559C7]' : 'text-[#9CA3AF]'}`} />
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-[12.5px] font-semibold ${active ? 'text-[#1559C7]' : 'text-[#374151]'}`}>
+                          {opt.label}
+                        </span>
+                        <span className="block text-[11.5px] text-[#6B7280]">{opt.desc}</span>
+                      </span>
+                      <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
+                        active ? 'border-[#1559C7] bg-[#1559C7]' : 'border-[#D3DAE4]'
+                      }`}>
+                        {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                      </span>
                     </button>
                   );
                 })}
               </div>
-            </div>
+            </Section>
 
             {/* General feed notice */}
             {isGeneralOnly && (
-              <div className="bg-[#1559C7]/10 rounded-2xl p-4 text-sm">
-                <p className="font-bold mb-1 text-xs uppercase tracking-wide text-[#1559C7]">General Feed Upload</p>
-                <p className="text-xs text-[#1559C7]/80 leading-relaxed">
-                  This student has 2 approved olympiad videos. Any further uploads will go to the general feed — not olympiad evaluation.
+              <div className={`${CARD} p-3.5`}>
+                <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1559C7]">
+                  <AlertCircle size={13} /> General feed upload
+                </p>
+                <p className="mt-1 text-[12px] leading-relaxed text-[#4B5563]">
+                  This student has 2 approved olympiad videos. Any further uploads go to the general feed —
+                  not olympiad evaluation.
                 </p>
               </div>
             )}
 
             {/* Category */}
-            <div className={`bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] p-4 ${!canPickCategory ? 'opacity-50' : ''}`}>
-              <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2.5">
-                Category <span className="text-red-500">*</span>
-              </p>
+            <Section title="Category" required muted={!canPickCategory}>
               {!canPickCategory && (
-                <p className="text-xs text-gray-500 mb-2.5">
+                <p className="mb-2 text-[12px] text-[#6B7280]">
                   {selectedStudent ? 'Loading student details…' : 'Select a student first to choose a category.'}
                 </p>
               )}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {CATEGORIES.map(cat => {
                   const Icon = cat.icon;
                   const isSelected = category === cat.value;
@@ -528,59 +543,61 @@ export default function UploadVideoPage() {
                       key={cat.value}
                       type="button"
                       disabled={isDisabled}
+                      aria-pressed={isSelected}
                       onClick={() => {
                         if (isDisabled) return;
                         setCategory(isSelected ? '' : cat.value);
                         setSubCategory(''); setCustomTalent('');
                       }}
-                      className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl border text-left transition-all ${
+                      className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${FOCUS} ${
                         isFilled
-                          ? 'border-[#0d9f6e]/30 bg-[#0d9f6e]/5 opacity-60 cursor-not-allowed'
+                          ? 'cursor-not-allowed border-[#E4E8EE] bg-[#FAFBFC]'
                           : !canPickCategory
-                            ? 'border-gray-200 cursor-not-allowed'
+                            ? 'cursor-not-allowed border-[#E4E8EE]'
                             : isSelected
-                              ? 'border-[#1559C7] bg-[#1559C7]/5'
-                              : 'border-[#E7EBF2] hover:border-gray-300 hover:bg-gray-50'
+                              ? 'border-[#1559C7] bg-[#1559C7]/[0.04]'
+                              : 'border-[#E4E8EE] hover:bg-[#FAFBFC]'
                       }`}
                     >
                       {isFilled
-                        ? <Lock className="w-4 h-4 text-[#0d9f6e] flex-shrink-0" />
-                        : <Icon className={`w-4 h-4 flex-shrink-0 ${isSelected ? 'text-[#1559C7]' : 'text-gray-500'}`} />
-                      }
-                      <div className="flex-1 min-w-0">
-                        <span className={`text-sm font-semibold leading-tight block ${
-                          isFilled ? 'text-[#0d9f6e]' : isSelected ? 'text-[#1559C7]' : 'text-gray-700'
-                        }`}>
-                          {cat.label}
-                        </span>
-                        {isFilled && <span className="text-[11px] text-[#0d9f6e]">Already submitted</span>}
-                        {isRejected && !isFilled && <span className="text-[11px] text-red-600 flex items-center gap-1"><RefreshCw className="w-2.5 h-2.5" /> Re-upload available</span>}
-                      </div>
-                      {isFilled
-                        ? <CheckCircle className="w-4 h-4 text-[#0d9f6e] flex-shrink-0" />
-                        : isSelected
-                          ? <CheckCircle className="w-4 h-4 text-[#1559C7] flex-shrink-0" />
-                          : null
-                      }
+                        ? <Lock className="h-4 w-4 flex-shrink-0 text-[#047857]" />
+                        : <Icon className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-[#1559C7]' : 'text-[#9CA3AF]'}`} />}
+                      <span className="min-w-0 flex-1">
+                        <span className={`block text-[12.5px] font-semibold ${
+                          isFilled ? 'text-[#047857]' : isSelected ? 'text-[#1559C7]' : 'text-[#374151]'
+                        }`}>{cat.label}</span>
+                        {isFilled && <span className="block text-[11.5px] text-[#047857]">Already submitted</span>}
+                        {isRejected && !isFilled && (
+                          <span className="flex items-center gap-1 text-[11.5px] text-[#B91C1C]">
+                            <RefreshCw className="h-2.5 w-2.5" /> Re-upload available
+                          </span>
+                        )}
+                      </span>
+                      {(isFilled || isSelected) && (
+                        <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${isFilled ? 'text-[#047857]' : 'text-[#1559C7]'}`} />
+                      )}
                     </button>
                   );
                 })}
               </div>
-            </div>
+            </Section>
 
             {/* Subcategory */}
             {selectedCat && (
-              <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] p-4">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-gray-500 mb-2.5">
-                  Sub Category <span className="text-red-500">*</span>
-                </p>
+              <Section title="Sub category" required>
                 <div className="flex flex-wrap gap-1.5">
                   {selectedCat.subCategories.map(sub => (
-                    <button key={sub} type="button" onClick={() => { setSubCategory(sub); if (sub !== 'Any Other Special Talent' && sub !== 'Any Other') setCustomTalent(''); }}
-                      className={`px-3 py-1.5 text-xs font-semibold rounded-full border transition-all ${
+                    <button
+                      key={sub} type="button"
+                      onClick={() => {
+                        setSubCategory(sub);
+                        if (sub !== 'Any Other Special Talent' && sub !== 'Any Other') setCustomTalent('');
+                      }}
+                      aria-pressed={subCategory === sub}
+                      className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${FOCUS} ${
                         subCategory === sub
-                          ? 'bg-[#1559C7] text-white border-[#1559C7]'
-                          : 'border-[#E7EBF2] text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+                          ? 'border-[#1559C7] bg-[#1559C7] text-white'
+                          : 'border-[#E4E8EE] text-[#4B5563] hover:bg-[#FAFBFC]'
                       }`}
                     >
                       {sub}
@@ -589,46 +606,42 @@ export default function UploadVideoPage() {
                 </div>
 
                 {isCustomTalent && (
-                  <div className="mt-3">
-                    <label className="block text-[10px] font-bold uppercase tracking-wide text-gray-400 mb-1.5">
-                      {subCategory === 'Any Other' ? 'Topic' : 'Talent Name'} <span className="text-red-500">*</span>
+                  <div className="mt-2.5">
+                    <label htmlFor="custom-talent" className={LABEL}>
+                      {subCategory === 'Any Other' ? 'Topic' : 'Talent name'} <span className="text-[#B91C1C]">*</span>
                     </label>
                     <input
+                      id="custom-talent"
                       type="text"
                       value={customTalent}
                       onChange={e => setCustomTalent(e.target.value)}
-                      placeholder={subCategory === 'Any Other' ? 'Enter the topic...' : 'Enter the talent name...'}
+                      placeholder={subCategory === 'Any Other' ? 'Enter the topic…' : 'Enter the talent name…'}
                       autoFocus
-                      className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm text-gray-700 placeholder-gray-400 outline-none focus:border-[#1559C7] transition-colors"
+                      className={INPUT}
                     />
                   </div>
                 )}
-              </div>
+              </Section>
             )}
 
             {/* Error */}
             {errorMsg && (
-              <div className="flex items-start gap-2.5 bg-red-50 rounded-xl px-3.5 py-2.5 text-red-600 text-sm">
-                <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <p className="flex items-start gap-2 rounded-lg bg-[#B91C1C]/[0.08] px-3 py-2.5 text-[12.5px] text-[#B91C1C]" role="alert">
+                <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 {errorMsg}
-              </div>
+              </p>
             )}
 
             {/* Progress */}
             {(uploadState === 'uploading' || uploadState === 'saving') && (
-              <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] p-4">
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm font-semibold text-gray-700">
-                    {uploadState === 'uploading' ? 'Uploading...' : 'Saving details...'}
+              <div className={`${CARD} p-3.5`}>
+                <div className="mb-2 flex items-center justify-between text-[12.5px]">
+                  <span className="font-medium text-[#374151]">
+                    {uploadState === 'uploading' ? 'Uploading…' : 'Saving details…'}
                   </span>
-                  <span className="text-sm font-bold text-[#1559C7]">{progress}%</span>
+                  <span className="font-semibold text-[#1559C7]">{progress}%</span>
                 </div>
-                <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] transition-all duration-500"
-                    style={{ width: `${progress}%` }}
-                  />
-                </div>
+                <ProgressBar value={progress} />
               </div>
             )}
 
@@ -636,16 +649,16 @@ export default function UploadVideoPage() {
             <button
               type="submit"
               disabled={uploadState === 'uploading' || uploadState === 'saving'}
-              className="w-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white py-3 text-sm font-bold rounded-full flex items-center justify-center gap-2.5 hover:shadow-[0_4px_14px_rgba(21,89,199,0.35)] transition-shadow disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+              className={`cursor-pointer ${BTN_PRIMARY} w-full !py-2.5`}
             >
-              <Upload className="w-4 h-4" />
-              {uploadState === 'uploading' ? 'Uploading...' : uploadState === 'saving' ? 'Saving...' : 'Upload Video'}
+              <Upload className="h-4 w-4" />
+              {uploadState === 'uploading' ? 'Uploading…' : uploadState === 'saving' ? 'Saving…' : 'Upload video'}
             </button>
           </div>
         </div>
       </form>
 
-      {showDropdown && <div className="fixed inset-0 z-20" onClick={() => setShowDropdown(false)} />}
+      {showDropdown && <div className="fixed inset-0 z-20 cursor-default" onClick={() => setShowDropdown(false)} />}
     </div>
   );
 }

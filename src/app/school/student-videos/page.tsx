@@ -2,10 +2,15 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import {
-  Video, Star, Eye, Heart, BookOpen, Search,
-  Filter, Calendar, Tag, Loader2, Share2, Check, Lock, Globe, ShieldCheck, X
+  Video, Clapperboard, Star, Eye, Heart, BookOpen, Search, Filter, Calendar, Tag,
+  Loader2, Share2, Check, Lock, Globe, ShieldCheck, AlertCircle,
 } from 'lucide-react';
 import { getCategoryDisplayLabel } from '@/lib/olympiad-categories';
+import { CARD, STACK, INPUT, LABEL, FOCUS, BTN_PRIMARY, BTN_SECONDARY, avatarTint } from '../ui';
+import {
+  PageHeader, StatTile, StatusBadge, FilterPill, Avatar,
+  LoadingState, ErrorState, EmptyState, ModalShell,
+} from '../components';
 
 interface VideoItem {
   id: string;
@@ -58,18 +63,6 @@ function cacheStepUpToken(token: string, expiresInSeconds: number) {
 
 function clearCachedStepUpToken() {
   sessionStorage.removeItem(STEP_UP_STORAGE_KEY);
-}
-
-const avatarGradients = [
-  'from-[#1559C7] to-[#2a78d6]',
-  'from-[#0d9f6e] to-[#1baf7a]',
-  'from-[#4a3aa7] to-[#7a6ad6]',
-  'from-[#e34948] to-[#eb6834]',
-  'from-[#d98600] to-[#eda100]',
-];
-
-function getInitials(name: string) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase();
 }
 
 export default function StudentVideosPage() {
@@ -177,79 +170,60 @@ export default function StudentVideosPage() {
   };
 
   return (
-    <div className="space-y-4">
+    <div className={STACK}>
 
-      {/* Header banner */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#4a3aa7] to-[#7a6ad6] p-6 text-white shadow-[0_8px_24px_rgba(74,58,167,0.25)]">
-        <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full bg-white/10" />
-        <div className="absolute -bottom-14 right-24 w-28 h-28 rounded-full bg-white/10" />
-        <div className="relative flex items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center flex-shrink-0">
-              <Video size={20} className="text-white" />
-            </div>
-            <div>
-              <p className="text-[11px] font-bold uppercase tracking-widest text-white/70">School Panel</p>
-              <h1 className="text-xl font-black tracking-tight">Student Video Submissions</h1>
-            </div>
-          </div>
-          <span className="text-[11px] font-bold bg-white/15 backdrop-blur-sm rounded-full px-3 py-1.5">{filtered.length} video{filtered.length !== 1 ? 's' : ''} shown</span>
-        </div>
+      <PageHeader
+        icon={Clapperboard}
+        title="Student Videos"
+        subtitle="Submissions from your students"
+        actions={
+          // A live count belongs next to the data, not in the hover-only
+          // subtitle — it changes as filters are applied.
+          <span className="text-[12px] text-[#6B7280]">
+            {filtered.length} of {videos.length} shown
+          </span>
+        }
+      />
+
+      {/* Metrics */}
+      <div className="grid grid-cols-3 gap-3">
+        <StatTile label="Total in feed" value={videos.length} icon={Video} loading={loading} />
+        <StatTile label="Olympiad entries" value={olympiadCount} icon={Star} loading={loading} />
+        <StatTile label="General feed" value={generalCount} icon={Globe} loading={loading} />
       </div>
 
-      {/* Stats strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#1559C7] to-[#2a78d6] rounded-2xl shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-4 text-white">
-          <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/10" />
-          <p className="relative text-[11px] font-semibold text-white/85">Total in Feed</p>
-          <p className="relative text-2xl font-black mt-1">{videos.length}</p>
-        </div>
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#d98600] to-[#eda100] rounded-2xl shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-4 text-white">
-          <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/10" />
-          <p className="relative text-[11px] font-semibold text-white/85">Olympiad Entries</p>
-          <p className="relative text-2xl font-black mt-1">{olympiadCount}</p>
-        </div>
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#0d9f6e] to-[#1baf7a] rounded-2xl shadow-[0_6px_20px_rgba(0,0,0,0.12)] p-4 text-white">
-          <div className="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-white/10" />
-          <p className="relative text-[11px] font-semibold text-white/85">General Feed</p>
-          <p className="relative text-2xl font-black mt-1">{generalCount}</p>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] px-4 py-3 flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={13} />
+      {/* Toolbar */}
+      <div className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
+        <div className="relative min-w-[200px] flex-1 max-w-sm">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={13} />
           <input
             type="text"
             placeholder="Search student, ID, category"
+            aria-label="Search videos"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 border border-[#E7EBF2] rounded-full text-[12px] focus:outline-none focus:border-[#1559C7] transition-colors"
+            className={`${INPUT} pl-8`}
           />
         </div>
 
         <div className="flex items-center gap-1.5">
           {(['ALL', 'OLYMPIAD', 'GENERAL'] as const).map(t => (
-            <button key={t} onClick={() => setTypeFilter(t)}
-              className={`px-3 py-1.5 text-[11px] font-bold rounded-full transition-colors ${
-                typeFilter === t ? 'bg-[#4a3aa7] text-white shadow-sm' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
-              }`}
-            >
-              {t === 'ALL' ? 'All Videos' : t === 'OLYMPIAD' ? 'Olympiad' : 'General'}
-            </button>
+            <FilterPill key={t} active={typeFilter === t} onClick={() => setTypeFilter(t)}>
+              {t === 'ALL' ? 'All' : t === 'OLYMPIAD' ? 'Olympiad' : 'General'}
+            </FilterPill>
           ))}
         </div>
 
         {classes.length > 0 && (
-          <div className="flex items-center gap-1.5">
-            <Filter size={13} className="text-gray-400" />
+          <div className="ml-auto flex items-center gap-1.5">
+            <Filter size={13} className="text-[#9CA3AF]" />
             <select
               value={classFilter}
               onChange={e => setClassFilter(e.target.value)}
-              className="text-[12px] border border-[#E7EBF2] rounded-full px-3 py-1.5 outline-none focus:border-[#1559C7] text-gray-700 bg-white"
+              aria-label="Filter by class"
+              className={`${INPUT} !w-auto !py-1.5`}
             >
-              <option value="ALL">All Classes</option>
+              <option value="ALL">All classes</option>
               {classes.map(c => <option key={c.code} value={c.code}>{c.name}</option>)}
             </select>
           </div>
@@ -258,23 +232,21 @@ export default function StudentVideosPage() {
 
       {/* Content */}
       {loading ? (
-        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] py-20 flex flex-col items-center gap-3">
-          <Loader2 className="w-5 h-5 animate-spin text-[#1559C7]" />
-          <p className="text-sm text-gray-500">Loading videos...</p>
-        </div>
+        <LoadingState label="Loading videos…" />
       ) : error ? (
-        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-red-200 py-16 text-center text-red-600 text-sm">{error}</div>
+        <ErrorState message={error} />
       ) : filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] py-20 text-center text-gray-500 text-sm">
-          {videos.length === 0 ? 'No approved videos from your students yet.' : 'No videos match your filters.'}
-        </div>
+        <EmptyState
+          icon={Video}
+          title={videos.length === 0 ? 'No approved videos yet' : 'No videos match your filters'}
+        />
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
           {filtered.map((v, i) => (
             <VideoCard
               key={v.id}
               video={v}
-              avatarGradient={avatarGradients[i % avatarGradients.length]}
+              tint={avatarTint(i)}
               isPlaying={playing === v.id}
               onPlay={() => setPlaying(playing === v.id ? null : v.id)}
               onToggleVisibility={() => handleToggleVisibility(v)}
@@ -345,55 +317,52 @@ function VisibilityOtpModal({ token, onVerified, onClose }: {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.2)] w-full max-w-sm mx-4 overflow-hidden">
-        <div className="bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] px-5 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <ShieldCheck size={16} className="text-white" />
-            <p className="text-white font-bold text-sm">Verify it&apos;s you</p>
+    <ModalShell
+      title={<span className="flex items-center gap-2"><ShieldCheck size={16} className="text-[#1559C7]" /> Verify it&apos;s you</span>}
+      onClose={onClose}
+      maxWidth="max-w-sm"
+    >
+      <div className="space-y-3 p-5">
+        <p className="text-[12px] leading-relaxed text-[#4B5563]">
+          Changing a student&apos;s video visibility requires verifying an OTP sent to your school&apos;s
+          registered contact.
+        </p>
+        {stage === 'request' ? (
+          <div className="flex flex-col items-center gap-2 py-6">
+            <Loader2 className="h-4 w-4 animate-spin text-[#1559C7]" />
+            <p className="text-[12px] text-[#6B7280]">Sending OTP…</p>
           </div>
-          <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
-            <X size={18} />
+        ) : (
+          <>
+            {channelMsg && (
+              <p className="rounded-lg bg-[#F6F7F9] px-3 py-2.5 text-[12px] text-[#4B5563]">{channelMsg}</p>
+            )}
+            <div>
+              <label htmlFor="otp" className={LABEL}>Enter OTP</label>
+              <input
+                id="otp"
+                type="text" inputMode="numeric" placeholder="6-digit code" value={otp} autoFocus
+                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                onKeyDown={e => e.key === 'Enter' && verify()}
+                className={`${INPUT} tracking-[0.3em]`}
+              />
+            </div>
+          </>
+        )}
+        {error && (
+          <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]">
+            <AlertCircle size={12} /> {error}
+          </p>
+        )}
+        <div className="flex gap-2 pt-1">
+          <button onClick={onClose} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
+          <button onClick={stage === 'request' ? requestOtp : verify} disabled={busy || stage === 'request'} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+            {busy && <Loader2 size={14} className="animate-spin" />}
+            Verify
           </button>
         </div>
-        <div className="p-5 space-y-3.5">
-          <p className="text-xs text-gray-500">
-            Changing a student&apos;s video visibility requires verifying an OTP sent to your school&apos;s registered contact.
-          </p>
-          {stage === 'request' ? (
-            <div className="py-6 flex flex-col items-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin text-[#1559C7]" />
-              <p className="text-xs text-gray-500">Sending OTP...</p>
-            </div>
-          ) : (
-            <>
-              {channelMsg && <p className="text-xs text-gray-600 bg-gray-50 rounded-xl px-3 py-2.5">{channelMsg}</p>}
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Enter OTP</label>
-                <input
-                  type="text" inputMode="numeric" placeholder="6-digit code" value={otp} autoFocus
-                  onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  onKeyDown={e => e.key === 'Enter' && verify()}
-                  className="w-full rounded-xl border border-[#E7EBF2] px-3 py-2 text-sm tracking-widest focus:outline-none focus:border-[#1559C7] focus:ring-1 focus:ring-[#1559C7]"
-                />
-              </div>
-            </>
-          )}
-          {error && <p className="text-xs text-red-500">{error}</p>}
-          <div className="flex gap-2 pt-1">
-            <button onClick={onClose}
-              className="flex-1 py-2.5 rounded-full border border-[#E7EBF2] text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors">
-              Cancel
-            </button>
-            <button onClick={stage === 'request' ? requestOtp : verify} disabled={busy || stage === 'request'}
-              className="flex-1 py-2.5 rounded-full bg-gradient-to-r from-[#1559C7] to-[#2a78d6] text-white text-sm font-bold hover:shadow-[0_4px_14px_rgba(21,89,199,0.35)] transition-shadow disabled:opacity-50 flex items-center justify-center gap-2">
-              {busy && <Loader2 size={14} className="animate-spin" />}
-              Verify
-            </button>
-          </div>
-        </div>
       </div>
-    </div>
+    </ModalShell>
   );
 }
 
@@ -419,9 +388,9 @@ async function shareVideo(v: VideoItem, onCopied: () => void) {
   }
 }
 
-function VideoCard({ video: v, avatarGradient, isPlaying, onPlay, onToggleVisibility }: {
+function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
   video: VideoItem;
-  avatarGradient: string;
+  tint: string;
   isPlaying: boolean;
   onPlay: () => void;
   onToggleVisibility: () => void;
@@ -437,137 +406,112 @@ function VideoCard({ video: v, avatarGradient, isPlaying, onPlay, onToggleVisibi
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow-[0_2px_14px_rgba(0,0,0,0.06)] border border-[#E7EBF2] overflow-hidden hover:shadow-[0_6px_20px_rgba(0,0,0,0.1)] transition-shadow">
+    <div className={`${CARD} overflow-hidden`}>
 
       {/* Video player / thumbnail */}
-      <div className="relative bg-black aspect-video">
+      <div className="relative aspect-video bg-[#0E1726]">
         {isPlaying ? (
-          <video
-            src={v.videoUrl}
-            controls
-            autoPlay
-            className="w-full h-full object-contain"
-            onEnded={onPlay}
-          />
+          <video src={v.videoUrl} controls autoPlay className="h-full w-full object-contain" onEnded={onPlay} />
         ) : (
           <button
             onClick={onPlay}
-            className="w-full h-full flex items-center justify-center group relative"
+            aria-label={`Play video by ${v.studentName}`}
+            className="cursor-pointer group relative flex h-full w-full items-center justify-center"
           >
             {v.thumbnailUrl ? (
-              <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+              <img src={v.thumbnailUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-[#0d1a6e] to-[#1559C7] flex items-center justify-center">
-                <Video className="w-10 h-10 text-white/30" />
+              <div className="flex h-full w-full items-center justify-center bg-[#0E2A5C]">
+                <Video className="h-8 w-8 text-white/25" />
               </div>
             )}
-            <div className="absolute inset-0 bg-black/30 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-              <div className="w-12 h-12 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                <div className="w-0 h-0 border-t-[8px] border-t-transparent border-b-[8px] border-b-transparent border-l-[14px] border-l-[#1559C7] ml-1" />
-              </div>
-            </div>
+            <span className="absolute inset-0 flex items-center justify-center bg-black/25 transition-colors group-hover:bg-black/15">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-white/95 shadow-md">
+                <span className="ml-0.5 h-0 w-0 border-b-[7px] border-l-[12px] border-t-[7px] border-b-transparent border-l-[#1559C7] border-t-transparent" />
+              </span>
+            </span>
           </button>
         )}
 
-        {/* Olympiad badge — top left */}
         {v.isEvaluation && (
-          <div className="absolute top-2 left-2 flex items-center gap-1 bg-gradient-to-r from-[#d98600] to-[#eda100] text-white px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm">
-            <Star className="w-2.5 h-2.5 fill-current" />
-            OLYMPIAD
-          </div>
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-[#111827]/85 px-2 py-1 text-[10.5px] font-semibold text-white backdrop-blur-sm">
+            <Star className="h-2.5 w-2.5 fill-current" /> Olympiad
+          </span>
         )}
-
-        {/* Uploader type — top right */}
         {v.uploaderType === 'SCHOOL' && (
-          <div className="absolute top-2 right-2 bg-gradient-to-r from-[#0d1a6e] to-[#1559C7] text-white px-2.5 py-1 rounded-full text-[10px] font-bold shadow-sm">
-            By School
-          </div>
+          <span className="absolute right-2 top-2 rounded-md bg-[#111827]/85 px-2 py-1 text-[10.5px] font-semibold text-white backdrop-blur-sm">
+            By school
+          </span>
         )}
       </div>
 
       {/* Card body */}
-      <div className="p-4 space-y-2.5">
+      <div className="space-y-2 p-3">
 
-        {/* Student info */}
-        <div className="flex items-center gap-2.5">
-          <div className={`w-8 h-8 rounded-full bg-gradient-to-br ${avatarGradient} text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0 shadow-sm`}>
-            {getInitials(v.studentName)}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="font-semibold text-black text-sm truncate">{v.studentName}</p>
-              {v.username && (
-                <span className="text-[9px] font-semibold text-[#1559C7] bg-[#1559C7]/10 px-1.5 py-0.5 rounded-full flex-shrink-0">
-                  @{v.username}
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] text-[#1559C7] font-mono font-semibold">{v.olympiadCode}</p>
+        <div className="flex items-center gap-2">
+          <Avatar name={v.studentName} tint={tint} size={28} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[12.5px] font-semibold text-[#111827]">{v.studentName}</p>
+            <p className="truncate font-mono text-[11px] font-medium text-[#1559C7]">{v.olympiadCode}</p>
           </div>
           {v.className && (
-            <span className="ml-auto flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#1559C7]/10 text-[#1559C7] flex-shrink-0">
-              <BookOpen className="w-2.5 h-2.5" />{v.className}
+            <span className="flex flex-shrink-0 items-center gap-1 rounded-md bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+              <BookOpen className="h-2.5 w-2.5" />{v.className}
             </span>
           )}
         </div>
 
-        {/* Category */}
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{getCategoryDisplayLabel(v.category)}</span>
-          {v.subCategory && (
-            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">{v.subCategory}</span>
-          )}
+          <StatusBadge tone="neutral">{getCategoryDisplayLabel(v.category)}</StatusBadge>
+          {v.subCategory && <StatusBadge tone="neutral">{v.subCategory}</StatusBadge>}
           {v.isEvaluation && (
             <button
               onClick={onToggleVisibility}
               title={isPrivate ? 'Private — click to make public' : 'Public — click to make private'}
-              className={`ml-auto flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full transition-colors ${
-                isPrivate ? 'bg-gray-800 text-white hover:bg-gray-700' : 'bg-[#0d9f6e]/10 text-[#0d9f6e] hover:bg-[#0d9f6e]/20'
+              className={`cursor-pointer ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${FOCUS} ${
+                isPrivate
+                  ? 'bg-[#4B5563]/10 text-[#4B5563] hover:bg-[#4B5563]/20'
+                  : 'bg-[#047857]/10 text-[#047857] hover:bg-[#047857]/20'
               }`}
             >
-              {isPrivate ? <Lock className="w-2.5 h-2.5" /> : <Globe className="w-2.5 h-2.5" />}
+              {isPrivate ? <Lock className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
               {isPrivate ? 'Private' : 'Public'}
             </button>
           )}
         </div>
 
-        {/* Caption */}
         {v.caption && (
-          <p className="text-xs text-gray-600 line-clamp-2 leading-relaxed">{v.caption}</p>
+          <p className="line-clamp-2 text-[12px] leading-relaxed text-[#4B5563]">{v.caption}</p>
         )}
 
-        {/* Tags */}
         {v.tags && (
-          <div className="flex items-center gap-1 flex-wrap">
-            <Tag className="w-3 h-3 text-gray-400 flex-shrink-0" />
+          <div className="flex flex-wrap items-center gap-1">
+            <Tag className="h-2.5 w-2.5 flex-shrink-0 text-[#9CA3AF]" />
             {v.tags.split(',').slice(0, 4).map(tag => (
-              <span key={tag} className="text-[10px] text-gray-600 font-medium">#{tag.trim()}</span>
+              <span key={tag} className="text-[11px] text-[#6B7280]">#{tag.trim()}</span>
             ))}
           </div>
         )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between pt-2.5 border-t border-gray-100">
-          <div className="flex items-center gap-3 text-xs text-gray-500">
-            <span className="flex items-center gap-1"><Heart className="w-3 h-3 text-[#e34948]" />{v.likesCount}</span>
-            <span className="flex items-center gap-1"><Eye className="w-3 h-3 text-[#1559C7]" />{v.viewsCount}</span>
-          </div>
+        <div className="flex items-center justify-between border-t border-[#F1F3F6] pt-2 text-[11.5px] text-[#6B7280]">
           <div className="flex items-center gap-2.5">
-            <span className="flex items-center gap-1 text-[10px] text-gray-400">
-              <Calendar className="w-3 h-3" />
-              {new Date(v.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+            <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{v.likesCount}</span>
+            <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{v.viewsCount}</span>
+            <span className="flex items-center gap-1">
+              <Calendar className="h-3 w-3" />
+              {new Date(v.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
             </span>
-            <button
-              onClick={handleShare}
-              title={copied ? 'Link copied!' : 'Share'}
-              className={`flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full transition-colors ${
-                copied ? 'bg-[#0d9f6e]/10 text-[#0d9f6e]' : 'bg-gray-100 text-gray-600 hover:bg-[#1559C7]/10 hover:text-[#1559C7]'
-              }`}
-            >
-              {copied ? <Check className="w-3 h-3" /> : <Share2 className="w-3 h-3" />}
-              {copied ? 'Copied' : 'Share'}
-            </button>
           </div>
+          <button
+            onClick={handleShare}
+            title={copied ? 'Link copied' : 'Share'}
+            className={`cursor-pointer inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium transition-colors ${FOCUS} ${
+              copied ? 'bg-[#047857]/10 text-[#047857]' : 'text-[#4B5563] hover:bg-[#F6F7F9]'
+            }`}
+          >
+            {copied ? <Check className="h-3 w-3" /> : <Share2 className="h-3 w-3" />}
+            {copied ? 'Copied' : 'Share'}
+          </button>
         </div>
       </div>
     </div>

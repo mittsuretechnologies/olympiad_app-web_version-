@@ -1,0 +1,416 @@
+
+> olympiad-app@0.1.0 dev
+> next dev --turbo
+
+   ▲ Next.js 15.0.3 (Turbopack)
+   - Local:        http://localhost:3000
+   - Environments: .env
+
+ ✓ Starting...
+ ✓ Ready in 1432ms
+ ○ Compiling /school/registered-students ...
+ GET /school/registered-students 200 in 4890ms
+ ✓ Compiled /school/registered-students in 5s
+ GET /school/registered-students 200 in 976ms
+ GET /dashboard 200 in 5832ms
+ GET /dashboard 200 in 1064ms
+ ○ Compiling /api/school/me/registered-students ...
+ ✓ Compiled /api/school/me/registered-students in 561ms
+ ✓ Compiled /api/dashboard/overview in 341ms
+ GET /api/school/me/registered-students 200 in 2934ms
+ GET /api/dashboard/overview 200 in 3098ms
+ GET /api/school/me/registered-students 200 in 1310ms
+ GET /api/dashboard/overview 200 in 2484ms
+ ✓ Compiled /school in 340ms
+ GET /school 200 in 796ms
+ ✓ Compiled /api/school/me/stats in 195ms
+ GET /api/school/me/stats 200 in 857ms
+ GET /api/school/me/stats 200 in 719ms
+ ✓ Compiled /school/olympiad-ids in 427ms
+ GET /school/olympiad-ids 200 in 573ms
+ ✓ Compiled /api/school/me/olympiad-ids in 202ms
+ GET /api/school/me/olympiad-ids 200 in 1174ms
+ GET /api/school/me/olympiad-ids 200 in 695ms
+ ✓ Compiled /school/upload-video in 304ms
+ GET /school/upload-video 200 in 432ms
+ ✓ Compiled /api/school/me/upload-students in 182ms
+ GET /api/school/me/upload-students 200 in 1109ms
+ GET /school/olympiad-ids 200 in 212ms
+ GET /api/school/me/upload-students 200 in 1048ms
+ GET /api/school/me/olympiad-ids 200 in 1045ms
+ GET /api/school/me/olympiad-ids 200 in 1049ms
+ ✓ Compiled in 113ms
+ ✓ Compiled in 115ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled /school/olympiad-ids in 87ms
+ GET /dashboard 200 in 414ms
+ GET /school/olympiad-ids 200 in 418ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 118ms
+ ✓ Compiled /school/olympiad-ids in 83ms
+ GET /dashboard 200 in 307ms
+ GET /school/olympiad-ids 200 in 379ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 171ms
+ ✓ Compiled /school/olympiad-ids in 62ms
+ GET /dashboard 200 in 365ms
+ GET /school/olympiad-ids 200 in 389ms
+ ✓ Compiled in 134ms
+ ⨯ ./src/app/school/olympiad-ids/page.tsx:264:6
+Parsing ecmascript source code failed
+[0m [90m 262 |[39m[0m
+[0m [90m 263 |[39m   [36mreturn[39m ([0m
+[0m[31m[1m>[22m[39m[90m 264 |[39m     [33m<[39m[33mdiv[39m className[33m=[39m{[33mSTACK[39m}[33m>[39m[0m
+[0m [90m     |[39m      [31m[1m^[22m[39m[31m[1m^[22m[39m[31m[1m^[22m[39m[0m
+[0m [90m 265 |[39m[0m
+[0m [90m 266 |[39m       [33m<[39m[33mPageHeader[39m[0m
+[0m [90m 267 |[39m         icon[33m=[39m{[33mHash[39m}[0m
+
+Unexpected token `div`. Expected jsx identifier
+
+
+ ○ Compiling /_error ...
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 706ms
+ GET /dashboard 200 in 575ms
+ ✓ Compiled /_error in 1383ms
+ GET /school/olympiad-ids 500 in 1920ms
+ ✓ Compiled /school/olympiad-ids in 83ms
+ GET /school/olympiad-ids 200 in 387ms
+ GET /api/school/me/olympiad-ids 200 in 1533ms
+ GET /api/school/me/olympiad-ids 200 in 858ms
+ GET /school/olympiad-ids 200 in 194ms
+ ✓ Compiled in 204ms
+ ✓ Compiled in 246ms
+ GET /school/olympiad-ids 200 in 206ms
+ GET /school 200 in 542ms
+ GET /api/school/me/stats 200 in 574ms
+ GET /school/olympiad-ids 200 in 166ms
+ GET /api/school/me/stats 200 in 517ms
+ GET /api/school/me/olympiad-ids 200 in 505ms
+ GET /api/school/me/olympiad-ids 200 in 510ms
+ ✓ Compiled in 251ms
+ ✓ Compiled in 229ms
+ ✓ Compiled in 284ms
+ ✓ Compiled in 235ms
+ ✓ Compiled in 291ms
+ ✓ Compiled in 305ms
+ GET /school/olympiad-ids 200 in 374ms
+ ✓ Compiled in 128ms
+ ✓ Compiled in 194ms
+ ✓ Compiled in 117ms
+ ✓ Compiled in 131ms
+ ✓ Compiled in 125ms
+ ✓ Compiled in 285ms
+ ✓ Compiled in 215ms
+ ✓ Compiled in 282ms
+ ✓ Compiled in 287ms
+ GET /school/olympiad-ids 200 in 354ms
+ ✓ Compiled in 221ms
+ ✓ Compiled in 196ms
+ ✓ Compiled in 197ms
+ ✓ Compiled in 206ms
+ GET /school/olympiad-ids 200 in 203ms
+ GET /school 200 in 288ms
+ ○ Compiling /login ...
+ ✓ Compiled /login in 719ms
+ GET /login 200 in 820ms
+ GET /login 200 in 110ms
+ ✓ Compiled in 128ms
+ ✓ Compiled in 159ms
+ ✓ Compiled in 126ms
+ ✓ Compiled in 115ms
+ GET /school/olympiad-ids 200 in 560ms
+ GET /api/school/me/olympiad-ids 200 in 793ms
+ ✓ Compiled in 204ms
+ GET /api/school/me/olympiad-ids 200 in 589ms
+ GET /school 200 in 585ms
+ ✓ Compiled in 165ms
+ ✓ Compiled /school/olympiad-ids in 119ms
+ GET /dashboard 200 in 896ms
+ GET /school/olympiad-ids 200 in 996ms
+ GET /school/olympiad-ids 200 in 1018ms
+ GET /dashboard 200 in 577ms
+ GET /dashboard 200 in 387ms
+ GET /dashboard 200 in 384ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 234ms
+ ✓ Compiled /school/olympiad-ids in 104ms
+ GET /school/olympiad-ids 200 in 894ms
+ GET /dashboard 200 in 709ms
+ GET /dashboard 200 in 485ms
+ GET /dashboard 200 in 377ms
+ GET /dashboard 200 in 553ms
+ GET /api/school/me/olympiad-ids 200 in 1528ms
+ GET /api/school/me/olympiad-ids 200 in 603ms
+ ✓ Compiled in 207ms
+ ✓ Compiled /school/olympiad-ids in 110ms
+ GET /school/olympiad-ids 200 in 368ms
+ GET /dashboard 200 in 606ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 422ms
+ GET /dashboard 200 in 666ms
+ GET /api/school/me/olympiad-ids 200 in 656ms
+ GET /school/olympiad-ids 200 in 684ms
+ GET /api/school/me/olympiad-ids 200 in 543ms
+ GET /api/school/me/olympiad-ids 200 in 542ms
+ ✓ Compiled in 189ms
+ GET /school/olympiad-ids 200 in 482ms
+ GET /dashboard 200 in 484ms
+ ✓ Compiled /school in 97ms
+ GET /school 200 in 666ms
+ GET /school/olympiad-ids 200 in 173ms
+ ✓ Compiled /school/student-videos in 327ms
+ GET /school/student-videos 200 in 455ms
+ ✓ Compiled /school/profile in 268ms
+ GET /school/profile 200 in 392ms
+ ✓ Compiled /school/registered-students in 104ms
+ GET /school/registered-students 200 in 369ms
+ ○ Compiling /school/credentials ...
+ ✓ Compiled /school/credentials in 645ms
+ GET /school/credentials 200 in 766ms
+ ✓ Compiled /school/upload-video in 79ms
+ GET /school/upload-video 200 in 342ms
+ ✓ Compiled in 336ms
+ ✓ Compiled in 207ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 194ms
+ GET /api/school/me/olympiad-ids 200 in 382ms
+ GET /school/olympiad-ids 200 in 389ms
+ GET /api/school/me/olympiad-ids 200 in 1282ms
+ GET /api/school/me/olympiad-ids 200 in 1080ms
+ GET /school/olympiad-ids 200 in 108ms
+ GET /school/registered-students 200 in 198ms
+ GET /school/credentials 200 in 181ms
+ ✓ Compiled in 120ms
+ GET /school 200 in 242ms
+ GET /school 200 in 227ms
+ GET /school/olympiad-ids 200 in 314ms
+ GET /api/school/me/olympiad-ids 200 in 811ms
+ GET /api/school/me/olympiad-ids 200 in 760ms
+ ✓ Compiled in 313ms
+ ✓ Compiled in 204ms
+ GET /school/olympiad-ids 200 in 407ms
+ ✓ Compiled in 224ms
+ ✓ Compiled in 193ms
+ ✓ Compiled in 205ms
+ GET /school/olympiad-ids 200 in 347ms
+ ✓ Compiled in 296ms
+ GET /school/olympiad-ids 200 in 331ms
+ ✓ Compiled in 183ms
+ ✓ Compiled in 195ms
+ ✓ Compiled in 212ms
+ ✓ Compiled in 192ms
+ ✓ Compiled in 213ms
+ GET /school/olympiad-ids 200 in 360ms
+ GET /school/olympiad-ids 200 in 195ms
+ GET /api/school/me/olympiad-ids 200 in 809ms
+ GET /api/school/me/olympiad-ids 200 in 540ms
+ ✓ Compiled /_not-found/page in 263ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 368ms
+ ○ Compiling /api/school/me/olympiad-ids/[code]/register ...
+ ✓ Compiled /api/school/me/olympiad-ids/[code]/register in 545ms
+ POST /api/school/me/olympiad-ids/921609L0012/register 201 in 6467ms
+ GET /school/olympiad-ids 200 in 259ms
+ GET /api/school/me/olympiad-ids 200 in 1045ms
+ GET /api/school/me/olympiad-ids 200 in 575ms
+ POST /api/school/me/olympiad-ids/921609L0013/register 201 in 7737ms
+ GET /school/registered-students 200 in 551ms
+ GET /api/school/me/registered-students 200 in 1289ms
+ GET /school/student-videos 200 in 440ms
+ ✓ Compiled /api/school/me/student-videos in 242ms
+ GET /api/school/me/registered-students 200 in 1054ms
+ GET /school/registered-students 200 in 194ms
+ GET /api/school/me/student-videos 200 in 1033ms
+ GET /api/school/me/student-videos 200 in 791ms
+ GET /api/school/me/registered-students 200 in 1061ms
+ GET /api/school/me/registered-students 200 in 795ms
+ ✓ Compiled /api/school/me/olympiad-ids/[code]/send-credentials in 398ms
+ POST /api/school/me/olympiad-ids/921609L0012/send-credentials 200 in 6631ms
+ GET /school/student-videos 200 in 196ms
+ GET /school/registered-students 200 in 193ms
+ GET /api/school/me/student-videos 200 in 1130ms
+ GET /api/school/me/registered-students 200 in 1168ms
+ GET /api/school/me/student-videos 200 in 1117ms
+ GET /school/registered-students 200 in 280ms
+ GET /api/school/me/registered-students 200 in 878ms
+ GET /api/school/me/registered-students 200 in 823ms
+ POST /api/school/me/olympiad-ids/921609L0012/send-credentials 200 in 6011ms
+ POST /api/school/me/olympiad-ids/921609L0012/send-credentials 200 in 7424ms
+ POST /api/school/me/olympiad-ids/921609L0012/send-credentials 200 in 9733ms
+ GET /school/olympiad-ids 200 in 208ms
+ GET /api/school/me/olympiad-ids 200 in 673ms
+ GET /api/school/me/olympiad-ids 200 in 588ms
+ GET /school/registered-students 200 in 209ms
+ GET /api/school/me/registered-students 200 in 1353ms
+ GET /api/school/me/registered-students 200 in 845ms
+ GET /school/olympiad-ids 200 in 185ms
+ GET /api/school/me/olympiad-ids 200 in 554ms
+ GET /api/school/me/olympiad-ids 200 in 635ms
+ GET /school/registered-students 200 in 182ms
+ GET /api/school/me/registered-students 200 in 1369ms
+ GET /api/school/me/registered-students 200 in 1546ms
+ GET /school/olympiad-ids 200 in 206ms
+ GET /api/school/me/olympiad-ids 200 in 616ms
+ GET /api/school/me/olympiad-ids 200 in 555ms
+ GET /school/registered-students 200 in 184ms
+ GET /api/school/me/registered-students 200 in 828ms
+ GET /api/school/me/registered-students 200 in 814ms
+ GET /school/olympiad-ids 200 in 212ms
+ GET /api/school/me/olympiad-ids 200 in 608ms
+ GET /school/registered-students 200 in 249ms
+ GET /api/school/me/olympiad-ids 200 in 613ms
+ GET /api/school/me/registered-students 200 in 847ms
+ GET /api/school/me/registered-students 200 in 808ms
+ GET /school/olympiad-ids 200 in 215ms
+ GET /api/school/me/olympiad-ids 200 in 685ms
+ GET /api/school/me/olympiad-ids 200 in 554ms
+ GET /school/student-videos 200 in 193ms
+ GET /school/registered-students 200 in 223ms
+ GET /api/school/me/student-videos 200 in 1049ms
+ GET /api/school/me/registered-students 200 in 1666ms
+ GET /api/school/me/student-videos 200 in 1344ms
+ GET /api/school/me/registered-students 200 in 836ms
+ GET /school/olympiad-ids 200 in 184ms
+ GET /api/school/me/olympiad-ids 200 in 876ms
+ GET /api/school/me/olympiad-ids 200 in 609ms
+ GET /school/registered-students 200 in 210ms
+ GET /api/school/me/registered-students 200 in 909ms
+ GET /api/school/me/registered-students 200 in 823ms
+ GET /school/olympiad-ids 200 in 287ms
+ GET /api/school/me/olympiad-ids 200 in 683ms
+ GET /api/school/me/olympiad-ids 200 in 704ms
+ GET /school/registered-students 200 in 212ms
+ GET /api/school/me/registered-students 200 in 1923ms
+ GET /api/school/me/registered-students 200 in 1109ms
+ GET /school/olympiad-ids 200 in 265ms
+ GET /api/school/me/olympiad-ids 200 in 1151ms
+ GET /api/school/me/olympiad-ids 200 in 705ms
+ GET /school/registered-students 200 in 288ms
+ GET /api/school/me/registered-students 200 in 1084ms
+ GET /api/school/me/registered-students 200 in 929ms
+ GET /school/olympiad-ids 200 in 219ms
+ GET /api/school/me/olympiad-ids 200 in 864ms
+ GET /api/school/me/olympiad-ids 200 in 751ms
+ GET /school/registered-students 200 in 257ms
+ GET /api/school/me/registered-students 200 in 1976ms
+ GET /api/school/me/registered-students 200 in 1002ms
+ ✓ Compiled in 406ms
+ ✓ Compiled /school/registered-students in 101ms
+ GET /school/registered-students 200 in 365ms
+ GET /api/school/me/registered-students 200 in 1861ms
+ ✓ Compiled in 278ms
+ ✓ Compiled in 305ms
+ ✓ Compiled /school/registered-students in 79ms
+ GET /school/registered-students 200 in 324ms
+ GET /school/registered-students 200 in 182ms
+ ✓ Compiled in 278ms
+ ✓ Compiled in 348ms
+ ✓ Compiled in 290ms
+ GET /school/registered-students 200 in 285ms
+ ✓ Compiled in 251ms
+ ✓ Compiled in 223ms
+ ✓ Compiled in 345ms
+ GET /school/registered-students 200 in 228ms
+ ✓ Compiled in 267ms
+ ✓ Compiled in 268ms
+ GET /school/registered-students 200 in 373ms
+ ✓ Compiled in 337ms
+ GET /school/registered-students 200 in 332ms
+ ✓ Compiled in 207ms
+ GET /school/registered-students 200 in 234ms
+ ✓ Compiled in 153ms
+ GET /school/registered-students 200 in 372ms
+ GET /school/registered-students 200 in 163ms
+ GET /api/school/me/registered-students 200 in 4749ms
+ GET /api/school/me/registered-students 200 in 3507ms
+ GET /school/registered-students 200 in 209ms
+ GET /api/school/me/registered-students 200 in 2564ms
+ ✓ Compiled in 337ms
+ ✓ Compiled /school/registered-students in 172ms
+ GET /school/registered-students 200 in 461ms
+ GET /api/school/me/registered-students 200 in 3677ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 406ms
+ ✓ Compiled /school/registered-students in 116ms
+ GET /school/registered-students 200 in 414ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 222ms
+ ✓ Compiled /school/registered-students in 76ms
+ GET /school/registered-students 200 in 372ms
+ GET /school/registered-students 200 in 297ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 268ms
+ ✓ Compiled /school/registered-students in 78ms
+ GET /school/registered-students 200 in 361ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 184ms
+ ✓ Compiled /school/registered-students in 76ms
+ GET /school/registered-students 200 in 360ms
+ GET /api/school/me/registered-students 200 in 2948ms
+ GET /api/school/me/registered-students 200 in 1327ms
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ ✓ Compiled in 229ms
+ ✓ Compiled /school/registered-students in 74ms
+ GET /school/registered-students 200 in 330ms
+ GET /api/school/me/registered-students 200 in 1371ms
+ GET /api/school/me/registered-students 200 in 1014ms
+ GET /school/registered-students 200 in 225ms
+ GET /school/olympiad-ids 200 in 614ms
+ GET /api/school/me/olympiad-ids 200 in 3265ms
+ GET /api/school/me/olympiad-ids 200 in 1297ms
+ ✓ Compiled in 244ms
+ GET /school/registered-students 200 in 315ms
+ GET /school/student-videos 200 in 259ms
+ GET /school/registered-students 200 in 212ms
+ GET /api/school/me/registered-students 200 in 1371ms
+ GET /api/school/me/registered-students 200 in 1321ms
+ GET /school/registered-students 200 in 222ms
+ GET /api/school/me/registered-students 200 in 1059ms
+ GET /api/school/me/registered-students 200 in 1021ms
+ ✓ Compiled in 199ms
+ ✓ Compiled in 265ms
+ GET /school/registered-students 200 in 288ms
+ GET /school/olympiad-ids 200 in 208ms
+ GET /api/school/me/olympiad-ids 200 in 975ms
+ GET /api/school/me/olympiad-ids 200 in 605ms
+ GET /school/registered-students 200 in 192ms
+ GET /api/school/me/registered-students 200 in 1050ms
+ ✓ Compiled in 332ms
+ GET /api/school/me/registered-students 200 in 802ms
+ ✓ Compiled in 401ms
+ GET /school/registered-students 200 in 312ms
+ ✓ Compiled in 379ms
+ GET /school/registered-students 200 in 397ms
+ ✓ Compiled in 389ms
+ ✓ Compiled in 389ms
+ GET /school/registered-students 200 in 238ms
+ ✓ Compiled in 187ms
+ ✓ Compiled in 179ms
+ GET /school/registered-students 200 in 356ms
+ ✓ Compiled in 124ms
+ ✓ Compiled in 157ms
+ ✓ Compiled in 109ms
+ GET /school 200 in 358ms
+ GET /school/olympiad-ids 200 in 96ms
+ GET /school/registered-students 200 in 98ms
+ GET /school/credentials 200 in 197ms
+ GET /school/upload-video 200 in 200ms
+ GET /school/student-videos 200 in 120ms
+ GET /school/olympiad-ids 200 in 187ms
+ GET /api/school/me/olympiad-ids 200 in 1413ms
+ GET /api/school/me/olympiad-ids 200 in 903ms
+ GET /school/registered-students 200 in 168ms
+ GET /school 200 in 401ms
+ GET /api/school/me/registered-students 200 in 1854ms
+ GET /api/school/me/stats 200 in 1340ms
+ GET /api/school/me/registered-students 200 in 1277ms
+ GET /api/school/me/stats 200 in 794ms
+ GET /school/registered-students 200 in 160ms
+ GET /api/school/me/registered-students 200 in 1763ms
+ GET /school/olympiad-ids 200 in 167ms
+ GET /api/school/me/registered-students 200 in 2019ms
+ GET /api/school/me/olympiad-ids 200 in 1334ms
+ GET /api/school/me/olympiad-ids 200 in 912ms

@@ -1,6 +1,38 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
+
+/** One evaluation-slot's worth of state for a student's directory row. */
+type SlotInfo = {
+  status: 'empty' | 'pending' | 'approved' | 'rejected';
+  subCategory: string | null;
+  videoUrl: string | null;
+  thumbnailUrl: string | null;
+};
+
+function emptySlot(): SlotInfo {
+  return { status: 'empty', subCategory: null, videoUrl: null, thumbnailUrl: null };
+}
+
+/**
+ * Reduces a student's evaluation videos (both categories, any number of
+ * re-uploads after rejection) down to "what does slot A/B look like right
+ * now" — the same precedence the upload page itself uses: an approved or
+ * pending entry wins over an older rejected one, since a re-upload replaces
+ * the slot rather than adding to it.
+ */
+function resolveSlots(videos: { category: string | null; status: string; subCategory: string | null; videoUrl: string; thumbnailUrl: string | null }[]) {
+  const forCategory = (label: string): SlotInfo => {
+    const matches = videos.filter(v => v.category === label || v.category === (label === OLYMPIAD_CAT_A_LABEL ? 'Cat A' : 'Cat B'));
+    if (matches.length === 0) return emptySlot();
+    const live = matches.find(v => v.status === 'APPROVED') || matches.find(v => v.status === 'PENDING');
+    const chosen = live || matches[matches.length - 1];
+    const status = chosen.status === 'APPROVED' ? 'approved' : chosen.status === 'PENDING' ? 'pending' : 'rejected';
+    return { status, subCategory: chosen.subCategory, videoUrl: chosen.videoUrl, thumbnailUrl: chosen.thumbnailUrl };
+  };
+  return { slotA: forCategory(OLYMPIAD_CAT_A_LABEL), slotB: forCategory(OLYMPIAD_CAT_B_LABEL) };
+}
 
 export async function GET(request: Request) {
   try {
@@ -42,47 +74,65 @@ export async function GET(request: Request) {
     // App-registered users (AppUser table) — only those not already in Student table
     const appUsers = await prisma.appUser.findMany({
       where: { olympiadId: { in: codes }, isVerified: true },
-      select: { id: true, userId: true, mobile: true, email: true, olympiadId: true, isVerified: true, createdAt: true },
+      select: {
+        id: true, userId: true, mobile: true, email: true, olympiadId: true,
+        isVerified: true, createdAt: true, plainPassword: true,
+      },
     });
 
-    // Olympiad video counts — web students (studentId) + app users (appUserId)
     const webStudentIds = webStudents.map(s => s.id);
     const appUserIds    = appUsers.filter(u => !webCodes.has(u.olympiadId!)).map(u => u.id);
 
-    const [webVideoCounts, appVideoCounts] = await Promise.all([
-      prisma.video.groupBy({
-        by: ['studentId'],
-        where: { studentId: { in: webStudentIds }, isEvaluation: true, status: 'APPROVED', deletedAt: null },
-        _count: { id: true },
+    // Full evaluation-video rows (not just counts) — the directory needs to
+    // show *what* each slot contains, not just how many videos exist.
+    const [webVideos, appVideos] = await Promise.all([
+      prisma.video.findMany({
+        where: { studentId: { in: webStudentIds }, isEvaluation: true, deletedAt: null },
+        select: { studentId: true, category: true, subCategory: true, status: true, videoUrl: true, thumbnailUrl: true },
       }),
-      prisma.video.groupBy({
-        by: ['appUserId'],
-        where: { appUserId: { in: appUserIds }, isEvaluation: true, status: 'APPROVED', deletedAt: null },
-        _count: { id: true },
+      prisma.video.findMany({
+        where: { appUserId: { in: appUserIds }, isEvaluation: true, deletedAt: null },
+        select: { appUserId: true, category: true, subCategory: true, status: true, videoUrl: true, thumbnailUrl: true },
       }),
     ]);
 
-    const webVideoCountById  = new Map(webVideoCounts.map((r: any) => [r.studentId, r._count.id]));
-    const appVideoCountById  = new Map(appVideoCounts.map((r: any) => [r.appUserId,  r._count.id]));
+    const webVideosById = new Map<string, typeof webVideos>();
+    for (const v of webVideos) {
+      if (!v.studentId) continue;
+      (webVideosById.get(v.studentId) ?? webVideosById.set(v.studentId, []).get(v.studentId)!).push(v);
+    }
+    const appVideosById = new Map<string, typeof appVideos>();
+    for (const v of appVideos) {
+      if (!v.appUserId) continue;
+      (appVideosById.get(v.appUserId) ?? appVideosById.set(v.appUserId, []).get(v.appUserId)!).push(v);
+    }
 
     const result = [
-      ...webStudents.map(s => ({
-        id: s.id,
-        name: s.name,
-        phone: s.phone,
-        olympiadCode: s.olympiadCode,
-        isVerified: s.isVerified,
-        createdAt: s.createdAt,
-        classCode: s.allocation?.classCode || null,
-        className: s.allocation?.className || null,
-        source: 'web' as const,
-        olympiadVideos: webVideoCountById.get(s.id) || 0,
-        email: null as string | null,
-      })),
+      ...webStudents.map(s => {
+        const slots = resolveSlots(webVideosById.get(s.id) ?? []);
+        return {
+          id: s.id,
+          name: s.name,
+          phone: s.phone,
+          olympiadCode: s.olympiadCode,
+          isVerified: s.isVerified,
+          createdAt: s.createdAt,
+          classCode: s.allocation?.classCode || null,
+          className: s.allocation?.className || null,
+          source: 'web' as const,
+          olympiadVideos: (slots.slotA.status === 'approved' ? 1 : 0) + (slots.slotB.status === 'approved' ? 1 : 0),
+          email: null as string | null,
+          username: null as string | null,
+          password: null as string | null,
+          slotA: slots.slotA,
+          slotB: slots.slotB,
+        };
+      }),
       ...appUsers
         .filter(u => !webCodes.has(u.olympiadId!))
         .map(u => {
           const alloc = allocationByCode.get(u.olympiadId!);
+          const slots = resolveSlots(appVideosById.get(u.id) ?? []);
           return {
             id: u.id,
             name: (allocationByCode.get(u.olympiadId!) as any)?.assignedName || u.userId,
@@ -93,8 +143,12 @@ export async function GET(request: Request) {
             classCode: alloc?.classCode || null,
             className: alloc?.className || null,
             source: 'app' as const,
-            olympiadVideos: appVideoCountById.get(u.id) || 0,
+            olympiadVideos: (slots.slotA.status === 'approved' ? 1 : 0) + (slots.slotB.status === 'approved' ? 1 : 0),
             email: u.email || null,
+            username: u.userId,
+            password: u.plainPassword,
+            slotA: slots.slotA,
+            slotB: slots.slotB,
           };
         }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
