@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { fetcher, getDashboardToken } from '@/lib/swr';
 import {
   Play, CheckCircle, XCircle, Clock, School,
   Eye, Globe, Lock, Award, RefreshCw, Trash2,
@@ -77,8 +77,11 @@ function getCategoryLabel(cat: string) {
   return null;
 }
 
+// Must check every role's token key (token / reviewerToken / evaluatorToken /
+// moderatorToken), same as the GET requests on this page already do via
+// fetcher() — a moderator's token lives under moderatorToken, not token.
 function authHeaders(): Record<string, string> {
-  const token = typeof window !== 'undefined' ? sessionStorage.getItem('token') || '' : '';
+  const token = getDashboardToken() || '';
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
