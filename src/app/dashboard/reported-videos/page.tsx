@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import useSWR from 'swr';
 import { Flag, RefreshCw, X, CheckCircle, Trash2, Play, AlertTriangle, Settings, Award, Eye, ShieldCheck, BarChart3 } from 'lucide-react';
+import { getDashboardToken } from '@/lib/swr';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -73,9 +74,10 @@ const CATEGORY_LABELS: Record<string, string> = {
   OTHER: 'Other',
 };
 
+// Checks every role's token key (token / reviewerToken / evaluatorToken /
+// moderatorToken) — a moderator's token lives under moderatorToken, not token.
 function getAuthToken() {
-  if (typeof window === 'undefined') return '';
-  return sessionStorage.getItem('token') || '';
+  return getDashboardToken() || '';
 }
 
 function authedFetcher(url: string) {
