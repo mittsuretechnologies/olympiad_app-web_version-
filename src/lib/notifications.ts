@@ -35,7 +35,7 @@ async function upsertActorNotification({
 }: { userId: string; actorId: string; type: string; title: string; message: string }) {
   try {
     const existing = await prisma.notification.findFirst({
-      where: { userId, type, recentActorIds: { has: actorId } },
+      where: { userId, type, actorId },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -46,7 +46,7 @@ async function upsertActorNotification({
       });
     } else {
       await prisma.notification.create({
-        data: { userId, type, title, message, count: 1, recentActorIds: [actorId] },
+        data: { userId, type, title, message, actorId, count: 1, recentActorIds: [actorId] },
       });
     }
   } catch (error) {

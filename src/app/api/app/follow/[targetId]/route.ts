@@ -80,13 +80,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ tar
       return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
     }
 
-    const sender = await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { userId: true } });
-    await notifyFollowRequest({
-      receiverId: targetId,
-      senderId:   appUser.id,
-      senderUserId: sender?.userId ?? 'Someone',
-    });
-
     const [followersCount, followingCount] = await Promise.all([
       prisma.follow.count({ where: { followingId: targetId } }),
       prisma.follow.count({ where: { followerId:  targetId } }),
