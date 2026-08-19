@@ -1,15 +1,15 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   Video, Clapperboard, Star, Eye, Heart, BookOpen, Search, Filter, Calendar, Tag,
-  Loader2, Share2, Check, Lock, Globe, ShieldCheck, AlertCircle,
+  Loader2, Share2, Check, Lock, Globe, ShieldCheck, AlertCircle, ChevronRight,
 } from 'lucide-react';
 import { getCategoryDisplayLabel } from '@/lib/olympiad-categories';
-import { CARD, STACK, INPUT, LABEL, FOCUS, BTN_PRIMARY, BTN_SECONDARY, avatarTint } from '../ui';
+import { CARD, STACK, INPUT, LABEL, FOCUS, BTN_PRIMARY, BTN_SECONDARY, TABLE, TH, TD, TR, avatarTint } from '../ui';
 import {
   PageHeader, StatTile, StatusBadge, FilterPill, Avatar,
-  LoadingState, ErrorState, EmptyState, ModalShell,
+  LoadingState, ErrorState, EmptyState, ModalShell, TableShell, RowCount,
 } from '../components';
 
 interface VideoItem {
@@ -118,6 +118,36 @@ export default function StudentVideosPage() {
 
   const olympiadCount = videos.filter(v => v.isEvaluation).length;
   const generalCount  = videos.filter(v => !v.isEvaluation).length;
+
+  // Group the flat, filtered video list into one row per student so the
+  // table stays scannable — the videos themselves only render once a row
+  // is expanded, which is what keeps the page from feeling congested.
+  const studentGroups = useMemo(() => {
+    const map = new Map<string, {
+      key: string; studentName: string; username: string | null; olympiadCode: string;
+      className: string | null; videos: VideoItem[];
+    }>();
+    for (const v of filtered) {
+      const key = v.studentId || v.olympiadCode || v.studentName;
+      let g = map.get(key);
+      if (!g) {
+        g = { key, studentName: v.studentName, username: v.username, olympiadCode: v.olympiadCode, className: v.className, videos: [] };
+        map.set(key, g);
+      }
+      g.videos.push(v);
+    }
+    return Array.from(map.values()).sort((a, b) => a.studentName.localeCompare(b.studentName));
+  }, [filtered]);
+
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpanded = (key: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   // Applies a visibility change against the API using a valid step-up token.
   // Returns true on success, false if the step-up token was rejected (expired/invalid).
@@ -241,18 +271,88 @@ export default function StudentVideosPage() {
           title={videos.length === 0 ? 'No approved videos yet' : 'No videos match your filters'}
         />
       ) : (
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {filtered.map((v, i) => (
-            <VideoCard
-              key={v.id}
-              video={v}
-              tint={avatarTint(i)}
-              isPlaying={playing === v.id}
-              onPlay={() => setPlaying(playing === v.id ? null : v.id)}
-              onToggleVisibility={() => handleToggleVisibility(v)}
-            />
-          ))}
-        </div>
+        <TableShell footer={<RowCount shown={studentGroups.length} total={studentGroups.length} noun="students" />}>
+          <table className={TABLE}>
+            <thead>
+              <tr>
+                <TH_CELL className="w-8" />
+                <TH_CELL>Student</TH_CELL>
+                <TH_CELL>Class</TH_CELL>
+                <TH_CELL>Olympiad ID</TH_CELL>
+                <TH_CELL className="text-center">Videos</TH_CELL>
+                <TH_CELL className="text-center">Olympiad</TH_CELL>
+                <TH_CELL className="text-center">General</TH_CELL>
+              </tr>
+            </thead>
+            <tbody>
+              {studentGroups.map((g, i) => {
+                const isOpen = expanded.has(g.key);
+                const oCount = g.videos.filter(v => v.isEvaluation).length;
+                const gCount = g.videos.length - oCount;
+                return (
+                  <React.Fragment key={g.key}>
+                    <tr
+                      className={`${TR} cursor-pointer`}
+                      onClick={() => toggleExpanded(g.key)}
+                      aria-expanded={isOpen}
+                    >
+                      <TD_CELL className="!py-2">
+                        <ChevronRight
+                          size={14}
+                          className={`text-[#9CA3AF] transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                        />
+                      </TD_CELL>
+                      <TD_CELL className="!py-2">
+                        <div className="flex items-center gap-2">
+                          <Avatar name={g.studentName} tint={avatarTint(i)} size={26} />
+                          <div className="min-w-0">
+                            <p className="truncate text-[13px] font-semibold text-[#111827]">{g.studentName}</p>
+                            {g.username && <p className="truncate text-[11px] text-[#6B7280]">@{g.username}</p>}
+                          </div>
+                        </div>
+                      </TD_CELL>
+                      <TD_CELL className="!py-2">
+                        {g.className ? (
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+                            <BookOpen className="h-2.5 w-2.5" />{g.className}
+                          </span>
+                        ) : (
+                          <span className="text-[#9CA3AF]">—</span>
+                        )}
+                      </TD_CELL>
+                      <TD_CELL className="!py-2 font-mono text-[12px] text-[#1559C7]">{g.olympiadCode}</TD_CELL>
+                      <TD_CELL className="!py-2 text-center font-semibold text-[#111827]">{g.videos.length}</TD_CELL>
+                      <TD_CELL className="!py-2 text-center">
+                        {oCount > 0 ? <StatusBadge tone="info" icon={Star}>{oCount}</StatusBadge> : <span className="text-[#9CA3AF]">—</span>}
+                      </TD_CELL>
+                      <TD_CELL className="!py-2 text-center">
+                        {gCount > 0 ? <StatusBadge tone="neutral" icon={Globe}>{gCount}</StatusBadge> : <span className="text-[#9CA3AF]">—</span>}
+                      </TD_CELL>
+                    </tr>
+                    {isOpen && (
+                      <tr>
+                        <td colSpan={7} className="border border-[#E4E8EE] bg-[#FAFBFC] p-3">
+                          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+                            {g.videos.map(v => (
+                              <VideoCard
+                                key={v.id}
+                                video={v}
+                                tint={avatarTint(i)}
+                                isPlaying={playing === v.id}
+                                onPlay={() => setPlaying(playing === v.id ? null : v.id)}
+                                onToggleVisibility={() => handleToggleVisibility(v)}
+                              />
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </TableShell>
       )}
 
       {pendingVisibility && (
@@ -364,6 +464,14 @@ function VisibilityOtpModal({ token, onVerified, onClose }: {
       </div>
     </ModalShell>
   );
+}
+
+/** Header/body cell — thin wrappers over the shared `TH`/`TD` tokens so callers can add layout classes. */
+function TH_CELL({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
+  return <th className={`${TH} ${className}`}>{children}</th>;
+}
+function TD_CELL({ children, className = '' }: { children?: React.ReactNode; className?: string }) {
+  return <td className={`${TD} ${className}`}>{children}</td>;
 }
 
 async function shareVideo(v: VideoItem, onCopied: () => void) {
