@@ -4,14 +4,19 @@ import { normalizeKoshKey, type AnyKoshKey } from '@/lib/kosh';
 export interface ExamQuestionResult {
   questionNumber: number;
   pageNumber: number;
-  score: number;
-  maxMarks: number;
-  percentage: number;
-  koshas: { kosha: string; earned: number; weight: number }[];
-  // question_type is a code (e.g. "circle_correct") — scanner.questions has
-  // no free-text instruction column yet. Once one lands, join it in here so
-  // every caller (passport, dashboard) picks it up without further changes.
+  questionText: string | null;
   questionType: string | null;
+  maxMarks: number;
+  aiMarks: number | null;
+  aiConfidence: number | null;
+  manualMarks: number | null;
+  manualMarksDisplay: string | null;
+  reviewedBy: string | null;
+  // "Effective" score: manual marks when a human has reviewed this question,
+  // otherwise the AI's — mirrors how the scanner's own audit view treats it.
+  score: number | null;
+  percentage: number | null;
+  koshas: { kosha: string; earned: number; weight: number }[];
 }
 
 export interface ExamResult {
@@ -25,45 +30,34 @@ export interface ExamResult {
 
 interface SheetResultRow {
   student_id: string;
-  paper_version_id: string;
+  sheet_id: string;
+  sheet_uuid: string;
   total_score: number;
   max_total_score: number;
   percentage: number;
   score_breakdown: {
     per_kosha?: Record<string, { earned: number; possible: number; percentage: number }>;
-    per_question?: {
-      question_number: number;
-      page_number: number;
-      score: number;
-      max_marks: number;
-      percentage: number;
-      koshas?: { kosha: string; earned: number; weight: number }[];
-    }[];
   } | null;
 }
 
-interface QuestionTypeRow {
-  paper_version_id: string;
+interface AiMarksRow {
+  sheet_uuid: string;
   question_number: number;
-  question_type: string;
+  page_number: number;
+  question_text: string | null;
+  question_type: string | null;
+  max_marks: number;
+  ai_marks: number | null;
+  ai_confidence: number | null;
+  ai_panchakosha: { kosha: string; earned: number; weight: number }[] | null;
 }
 
-// question_type → a readable instruction label, until scanner.questions gets
-// a real free-text instruction column. Unknown/new types fall back to a
-// title-cased version of the raw code so nothing renders blank.
-const QUESTION_TYPE_LABELS: Record<string, string> = {
-  trace_dotted_bands: 'Trace the dotted lines.',
-  circle_correct: 'Circle the correct answer.',
-  color_image: 'Colour the picture.',
-  color_by_rule: 'Colour as indicated.',
-  color_correct_picture: 'Identify and colour the correct picture.',
-  missing_letter: 'Fill in the missing letter.',
-};
-
-function labelForQuestionType(type: string | null): string | null {
-  if (!type) return null;
-  if (QUESTION_TYPE_LABELS[type]) return QUESTION_TYPE_LABELS[type];
-  return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + '.';
+interface ManualMarksRow {
+  sheet_uuid: string;
+  question_number: number;
+  manual_marks: number | null;
+  manual_marks_display: string | null;
+  reviewed_by: string | null;
 }
 
 // The scanner app (a separate Python/Celery service) shares this Postgres
@@ -77,10 +71,13 @@ function labelForQuestionType(type: string | null): string | null {
 export async function getLatestExamResults(studentIds: string[]): Promise<Map<string, ExamResult>> {
   if (studentIds.length === 0) return new Map();
 
-  const rows = await prisma.$queryRaw<SheetResultRow[]>`
+  // Overall totals and per-kosha % still come from sheet_results — it's the
+  // one place the scanner pre-aggregates a sheet's full score.
+  const sheetRows = await prisma.$queryRaw<SheetResultRow[]>`
     SELECT DISTINCT ON (sh.student_id)
       sh.student_id,
-      sr.paper_version_id,
+      sh.id AS sheet_id,
+      sh.sheet_uuid,
       sr.total_score,
       sr.max_total_score,
       sr.percentage,
@@ -90,41 +87,64 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
     WHERE sh.student_id = ANY(${studentIds})
     ORDER BY sh.student_id, sr.generated_at DESC NULLS LAST
   `;
+  if (sheetRows.length === 0) return new Map();
 
-  const paperVersionIds = [...new Set(rows.map(r => r.paper_version_id))];
-  const questionTypeRows = paperVersionIds.length
-    ? await prisma.$queryRaw<QuestionTypeRow[]>`
-        SELECT paper_version_id, question_number, question_type
-        FROM scanner.questions
-        WHERE paper_version_id = ANY(${paperVersionIds}::uuid[])
-      `
-    : [];
-  const typeByPaperAndQuestion = new Map(
-    questionTypeRows.map(q => [`${q.paper_version_id}:${q.question_number}`, q.question_type])
-  );
+  // ai_marks/manual_marks are keyed by scanner.sheets.sheet_uuid — a
+  // different column from sheets.id despite the similar name — so join on
+  // that, not on the sheet's own primary key.
+  const sheetUuids = sheetRows.map(r => r.sheet_uuid);
+
+  // Per-question detail — instruction text, AI marks/confidence/kosha weights
+  // — comes straight from the scanner's own ai_marks view.
+  const aiRows = await prisma.$queryRaw<AiMarksRow[]>`
+    SELECT sheet_uuid, question_number, page_number, question_text, question_type,
+           max_marks, ai_marks, ai_confidence, ai_panchakosha
+    FROM scanner.ai_marks
+    WHERE sheet_uuid = ANY(${sheetUuids}::uuid[])
+  `;
+
+  // Manual (human-reviewed) marks, when a reviewer has been through this
+  // question — most rows will have manual_marks = null until reviewed.
+  const manualRows = await prisma.$queryRaw<ManualMarksRow[]>`
+    SELECT sheet_uuid, question_number, manual_marks, manual_marks_display, reviewed_by
+    FROM scanner.manual_marks
+    WHERE sheet_uuid = ANY(${sheetUuids}::uuid[])
+  `;
+  const manualByKey = new Map(manualRows.map(m => [`${m.sheet_uuid}:${m.question_number}`, m]));
+
+  const questionsBySheet = new Map<string, ExamQuestionResult[]>();
+  for (const q of aiRows) {
+    const manual = manualByKey.get(`${q.sheet_uuid}:${q.question_number}`);
+    const effectiveScore = manual?.manual_marks ?? q.ai_marks;
+    const entry: ExamQuestionResult = {
+      questionNumber: q.question_number,
+      pageNumber: q.page_number,
+      questionText: q.question_text,
+      questionType: q.question_type,
+      maxMarks: q.max_marks,
+      aiMarks: q.ai_marks,
+      aiConfidence: q.ai_confidence,
+      manualMarks: manual?.manual_marks ?? null,
+      manualMarksDisplay: manual?.manual_marks_display ?? null,
+      reviewedBy: manual?.reviewed_by ?? null,
+      score: effectiveScore,
+      percentage: effectiveScore !== null && q.max_marks ? Math.round((effectiveScore / q.max_marks) * 1000) / 10 : null,
+      koshas: (q.ai_panchakosha || []).map(k => ({ kosha: k.kosha, earned: k.earned, weight: k.weight })),
+    };
+    const list = questionsBySheet.get(q.sheet_uuid) ?? [];
+    list.push(entry);
+    questionsBySheet.set(q.sheet_uuid, list);
+  }
 
   const result = new Map<string, ExamResult>();
-  for (const row of rows) {
+  for (const row of sheetRows) {
     const koshPercents: Partial<Record<AnyKoshKey, number>> = {};
     const perKosha = row.score_breakdown?.per_kosha || {};
     for (const [rawKey, val] of Object.entries(perKosha)) {
       const key = normalizeKoshKey(rawKey);
       if (key) koshPercents[key] = val.percentage;
     }
-    const questions: ExamQuestionResult[] = (row.score_breakdown?.per_question || [])
-      .map(q => {
-        const type = typeByPaperAndQuestion.get(`${row.paper_version_id}:${q.question_number}`) ?? null;
-        return {
-          questionNumber: q.question_number,
-          pageNumber: q.page_number,
-          score: q.score,
-          maxMarks: q.max_marks,
-          percentage: q.percentage,
-          koshas: (q.koshas || []).map(k => ({ kosha: k.kosha, earned: k.earned, weight: k.weight })),
-          questionType: type,
-        };
-      })
-      .sort((a, b) => a.questionNumber - b.questionNumber);
+    const questions = (questionsBySheet.get(row.sheet_uuid) || []).sort((a, b) => a.questionNumber - b.questionNumber);
     result.set(row.student_id, {
       studentId: row.student_id,
       totalScore: row.total_score,
@@ -136,5 +156,3 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
   }
   return result;
 }
-
-export { labelForQuestionType };

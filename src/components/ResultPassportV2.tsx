@@ -17,11 +17,12 @@ import type { CriterionKey } from '@/lib/kosh';
 interface PassportExamQuestion {
   questionNumber: number;
   pageNumber: number;
-  score: number;
-  maxMarks: number;
-  percentage: number;
-  koshas: { kosha: string; earned: number; weight: number }[];
+  questionText: string | null;
   questionType: string | null;
+  maxMarks: number;
+  score: number | null;
+  percentage: number | null;
+  koshas: { kosha: string; earned: number; weight: number }[];
 }
 
 interface PassportVideo {
@@ -96,7 +97,11 @@ const QUESTION_TYPE_LABELS: Record<string, string> = {
   missing_letter: 'Fill in the missing letter.',
 };
 
-function questionLabel(type: string | null, num: number): string {
+// Prefers the real instruction text (now stored on scanner.questions); falls
+// back to a readable label derived from question_type for older scans that
+// predate that column, and finally to a plain "Question N." placeholder.
+function questionLabel(text: string | null, type: string | null, num: number): string {
+  if (text) return text;
   if (!type) return `Question ${num}.`;
   if (QUESTION_TYPE_LABELS[type]) return QUESTION_TYPE_LABELS[type];
   return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + '.';
@@ -277,15 +282,15 @@ function WrittenRoundPage({ questions, part, totalParts, pageNo }: {
           <span>Question Instruction</span><span>Performance Level</span>
         </div>
         {questions.map((q, i) => {
-          const grade = bandFromPercent(q.percentage);
+          const grade = q.percentage !== null ? bandFromPercent(q.percentage) : 'Beginner';
           const style = GRADE_STYLE[grade];
           return (
             <Rise key={q.questionNumber} delay={80 + i * 40}>
               <div className="grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 border-t border-[#EADCB8] bg-white/60">
-                <span className="text-[10.5px] font-semibold text-gray-700">{q.questionNumber}. {questionLabel(q.questionType, q.questionNumber)}</span>
+                <span className="text-[10.5px] font-semibold text-gray-700">{q.questionNumber}. {questionLabel(q.questionText, q.questionType, q.questionNumber)}</span>
                 <span className="text-[8.5px] font-black uppercase tracking-wide px-2 py-1 rounded-full border whitespace-nowrap"
                   style={{ color: style.color, background: style.bg, borderColor: style.border }}>
-                  {grade}
+                  {q.score !== null ? grade : 'Pending'}
                 </span>
               </div>
             </Rise>

@@ -26,11 +26,17 @@ interface VideoResultEntry {
 interface ExamQuestionEntry {
   questionNumber: number;
   pageNumber: number;
-  score: number;
-  maxMarks: number;
-  percentage: number;
-  koshas: { kosha: string; earned: number; weight: number }[];
+  questionText: string | null;
   questionType: string | null;
+  maxMarks: number;
+  aiMarks: number | null;
+  aiConfidence: number | null;
+  manualMarks: number | null;
+  manualMarksDisplay: string | null;
+  reviewedBy: string | null;
+  score: number | null;
+  percentage: number | null;
+  koshas: { kosha: string; earned: number; weight: number }[];
 }
 
 interface KoshBreakdownEntry {
@@ -363,7 +369,7 @@ export default function ResultPage() {
                         <td colSpan={10} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
                           <div className="space-y-5">
                             <LegendSection
-                              title="Written Round — Per-Question Breakdown"
+                              title={`Olympiad Checker (Scanned Exam Sheet) — ${row.examQuestions.length} Questions`}
                               right={
                                 <span className="px-2.5 py-1 rounded-full bg-white border border-gray-200 shadow-sm text-[11px] font-bold text-gray-700">
                                   {row.examTotalScore !== null ? row.examTotalScore : '—'}
@@ -373,30 +379,59 @@ export default function ResultPage() {
                               }
                             >
                               {row.examQuestions.length > 0 ? (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                  {row.examQuestions.map(q => (
-                                    <div key={q.questionNumber} className="bg-white rounded-xl border border-gray-200 p-3">
-                                      <div className="flex items-center justify-between mb-1.5">
-                                        <span className="text-xs font-bold text-gray-700">Q{q.questionNumber} <span className="text-gray-400 font-semibold">· page {q.pageNumber}</span></span>
-                                        <span className={`text-sm font-black ${percentBandClass(q.percentage)}`}>{q.score}<span className="text-xs text-gray-400 font-bold">/{q.maxMarks}</span></span>
-                                      </div>
-                                      <div className="w-full h-1.5 rounded-full bg-gray-100 overflow-hidden mb-2">
-                                        <div
-                                          className={`h-full rounded-full ${q.percentage >= 70 ? 'bg-emerald-500' : q.percentage >= 40 ? 'bg-[#004f9f]' : q.percentage > 0 ? 'bg-amber-500' : 'bg-gray-300'}`}
-                                          style={{ width: `${Math.min(100, q.percentage)}%` }}
-                                        />
-                                      </div>
-                                      <div className="space-y-1">
-                                        {q.koshas.map(k => (
-                                          <div key={k.kosha} className="flex items-center justify-between text-[10px] text-gray-500 font-semibold">
-                                            <span>{k.kosha}</span>
-                                            <span className="text-gray-700 font-bold">{k.earned}/{k.weight} <span className="text-gray-400 font-semibold">({k.weight ? Math.round((k.earned / k.weight) * 100) : 0}%)</span></span>
-                                          </div>
-                                        ))}
-                                        {q.koshas.length === 0 && <p className="text-[10px] text-gray-300">No kosha weights recorded.</p>}
-                                      </div>
-                                    </div>
-                                  ))}
+                                <div className="overflow-x-auto -mx-1">
+                                  <table className="w-full text-xs border-collapse min-w-[720px]">
+                                    <thead>
+                                      <tr className="border-b border-gray-200">
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-8">#</th>
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Question</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-14">Max</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">AI Marks</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">Manual Marks</th>
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Kosh</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {row.examQuestions.map(q => (
+                                        <tr key={q.questionNumber} className="border-b border-gray-100 align-top hover:bg-gray-50/60">
+                                          <td className="py-2.5 px-2 text-gray-400 font-semibold">{q.questionNumber}</td>
+                                          <td className="py-2.5 px-2">
+                                            <p className="font-semibold text-gray-800">{q.questionText || `Question ${q.questionNumber}`}</p>
+                                            {q.questionType && <p className="text-[10px] text-gray-400 font-mono mt-0.5">{q.questionType}</p>}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-center font-bold text-gray-700">{q.maxMarks}</td>
+                                          <td className="py-2.5 px-2 text-center">
+                                            {q.aiMarks !== null ? (
+                                              <>
+                                                <span className={`font-black ${percentBandClass(q.maxMarks ? (q.aiMarks / q.maxMarks) * 100 : 0)}`}>
+                                                  {Number.isInteger(q.aiMarks) ? q.aiMarks : q.aiMarks.toFixed(2)}
+                                                </span>
+                                                {q.aiConfidence !== null && (
+                                                  <p className="text-[9px] text-gray-400 mt-0.5">{Math.round(q.aiConfidence * 100)}% conf.</p>
+                                                )}
+                                              </>
+                                            ) : <span className="text-gray-300">—</span>}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-center">
+                                            {q.manualMarks !== null ? (
+                                              <span className="font-black text-gray-800">{q.manualMarksDisplay ?? q.manualMarks}</span>
+                                            ) : <span className="text-gray-300">—</span>}
+                                          </td>
+                                          <td className="py-2.5 px-2">
+                                            <div className="flex flex-wrap gap-1">
+                                              {q.koshas.map(k => (
+                                                <span key={k.kosha} className="inline-flex flex-col items-start px-2 py-1 rounded-lg border border-amber-200 bg-amber-50/70">
+                                                  <span className="text-[10px] font-bold text-amber-800">{k.kosha}</span>
+                                                  <span className="text-[9px] text-amber-600 font-semibold">{k.earned}/{k.weight} marks · {k.weight ? Math.round((k.earned / k.weight) * 100) : 0}%</span>
+                                                </span>
+                                              ))}
+                                              {q.koshas.length === 0 && <span className="text-[10px] text-gray-300">—</span>}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
                                 </div>
                               ) : (
                                 <p className="text-xs text-gray-400">No written-round data yet — pending exam scan.</p>
@@ -501,6 +536,14 @@ export default function ResultPage() {
                                 ))}
                                 {row.koshBreakdown.length === 0 && (
                                   <p className="text-xs text-gray-400 col-span-full">No kosh data yet — pending exam scan and/or video evaluation.</p>
+                                )}
+                                {row.koshBreakdown.length === 5 && (
+                                  <div className="hidden lg:flex items-end justify-center">
+                                    {/* mix-blend-mode blends the image's own white backdrop into the
+                                        card's near-white ground, so it reads as a cutout, not a tile. */}
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src="/Binku & Binki (2).png" alt="Binku and Binki mascots" className="h-40 w-auto object-contain [mix-blend-mode:multiply]" />
+                                  </div>
                                 )}
                               </div>
                             </LegendSection>
