@@ -15,6 +15,15 @@ import { KOSH_CRITERIA, MAX_PER_CRITERION, type KoshKey, type CriterionKey } fro
 
 /* ── Data shapes (mirrors /api/result/overview) ─────────────── */
 
+interface PassportExamQuestion {
+  questionNumber: number;
+  pageNumber: number;
+  score: number;
+  maxMarks: number;
+  percentage: number;
+  koshas: { kosha: string; earned: number; weight: number }[];
+}
+
 interface PassportVideo {
   id: string;
   category: string | null;
@@ -49,6 +58,7 @@ export interface PassportStudent {
   city: string | null;
   videos: PassportVideo[];
   examPercentage: number | null;
+  examQuestions: PassportExamQuestion[];
   videoScoreTotal: number;
   videoMaxScore: number;
   koshBreakdown: PassportKosh[];
@@ -332,6 +342,70 @@ function BioPage({ s }: { s: PassportStudent }) {
   );
 }
 
+/* ── Written round performance bands ────────────────────────── */
+
+type QGrade = 'Beginner' | 'Progressing' | 'Proficient';
+
+function questionGrade(pct: number): QGrade {
+  if (pct >= 70) return 'Proficient';
+  if (pct >= 40) return 'Progressing';
+  return 'Beginner';
+}
+
+const Q_GRADE_STYLE: Record<QGrade, { color: string; bg: string; border: string }> = {
+  Proficient:  { color: '#0E9F6E', bg: '#EAF7F1', border: '#B3E4D0' },
+  Progressing: { color: '#2563EB', bg: '#EDF2FE', border: '#BCD0F7' },
+  Beginner:    { color: '#D9950C', bg: '#FCF5E6', border: '#F1DCA8' },
+};
+
+const QUESTIONS_PER_PAGE = 9;
+
+function WrittenRoundPage({ s, questions, part, totalParts, pageNo }: {
+  s: PassportStudent; questions: PassportExamQuestion[]; part: number; totalParts: number; pageNo: number;
+}) {
+  return (
+    <PageFrame footerLeft="WRITTEN<ROUND" footerRight={`PART ${part}/${totalParts}`} art={<FloatingArt accent="#2563EB" />}>
+      <Rise delay={40}>
+        <p className="text-[9px] font-black tracking-[0.3em] uppercase text-[#2563EB]">Written Round</p>
+        <h3 className="text-xl font-black text-gray-900 leading-tight">Performance Overview</h3>
+        <p className="text-[10px] font-semibold text-gray-400 mt-0.5">Part {part} of {totalParts}</p>
+      </Rise>
+
+      <div className="mt-3 space-y-1.5 overflow-y-auto min-h-0 flex-1">
+        {questions.map((q, i) => {
+          const grade = questionGrade(q.percentage);
+          const style = Q_GRADE_STYLE[grade];
+          return (
+            <Rise key={q.questionNumber} delay={120 + i * 60}>
+              <div className="flex items-center justify-between gap-2 bg-white/70 border border-gray-200 rounded-lg px-3 py-2 backdrop-blur-[1px]">
+                <span className="text-[10.5px] font-bold text-gray-700 flex-1 min-w-0">
+                  <span className="text-gray-400">Q{q.questionNumber}.</span> {q.score}/{q.maxMarks} marks
+                </span>
+                <span
+                  className="text-[9px] font-black uppercase tracking-wide px-2 py-1 rounded-full border flex-shrink-0"
+                  style={{ color: style.color, background: style.bg, borderColor: style.border }}
+                >
+                  {grade}
+                </span>
+              </div>
+            </Rise>
+          );
+        })}
+        {questions.length === 0 && (
+          <p className="text-[10px] text-gray-400 font-semibold text-center py-6">No written-round data yet.</p>
+        )}
+      </div>
+
+      <Rise delay={700} className="mt-auto">
+        <div className="pt-3 flex items-center justify-between text-[9.5px] font-bold text-gray-400 uppercase tracking-widest border-t-2 border-dashed border-gray-200">
+          <span>Exam Score</span>
+          <span className="text-gray-700">{s.examPercentage !== null ? `${s.examPercentage}%` : '—'}</span>
+        </div>
+      </Rise>
+    </PageFrame>
+  );
+}
+
 function KoshPage({ s, k, pageNo }: { s: PassportStudent; k: PassportKosh; pageNo: number }) {
   const theme = KOSH_THEME[k.kosh] || KOSH_THEME.ANNAMAYA;
   const criterion = KOSH_CRITERIA.find(c => c.kosh === (k.kosh as KoshKey));
@@ -504,11 +578,19 @@ function SummaryPage({ s }: { s: PassportStudent }) {
 /* ── The booklet ────────────────────────────────────────────── */
 
 export default function ResultPassport({ student, onClose }: { student: PassportStudent; onClose: () => void }) {
-  // Pages: cover, bio, one per kosha, summary.
+  // Pages: cover, bio, written-round parts (chunked), one per kosha, summary.
+  const writtenParts: PassportExamQuestion[][] = [];
+  for (let i = 0; i < student.examQuestions.length; i += QUESTIONS_PER_PAGE) {
+    writtenParts.push(student.examQuestions.slice(i, i + QUESTIONS_PER_PAGE));
+  }
+
   const pages: React.ReactNode[] = [
     <CoverPage key="cover" s={student} />,
     <BioPage key="bio" s={student} />,
-    ...student.koshBreakdown.map((k, i) => <KoshPage key={k.kosh} s={student} k={k} pageNo={i + 2} />),
+    ...writtenParts.map((qs, i) => (
+      <WrittenRoundPage key={`written-${i}`} s={student} questions={qs} part={i + 1} totalParts={writtenParts.length} pageNo={i + 3} />
+    )),
+    ...student.koshBreakdown.map((k, i) => <KoshPage key={k.kosh} s={student} k={k} pageNo={writtenParts.length + i + 3} />),
     <SummaryPage key="summary" s={student} />,
   ];
 

@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 
     const appUserIds = [...new Set(allVideos.filter(v => v.appUserId && !v.studentId).map(v => v.appUserId!))];
     const appUsers = appUserIds.length
-      ? await prisma.appUser.findMany({ where: { id: { in: appUserIds } }, select: { id: true, userId: true, olympiadId: true } })
+      ? await prisma.appUser.findMany({ where: { id: { in: appUserIds } }, select: { id: true, userId: true, olympiadId: true, avatarUrl: true } })
       : [];
     const appUserById = new Map(appUsers.map(u => [u.id, u]));
 
@@ -85,6 +85,7 @@ export async function GET(request: Request) {
       district: string | null;
       city: string | null;
       source: 'web' | 'app';
+      avatarUrl: string | null;
       videos: VideoEntry[];
     }>();
 
@@ -100,6 +101,7 @@ export async function GET(request: Request) {
       let district: string | null = null;
       let city: string | null = null;
       let source: 'web' | 'app' = 'web';
+      let avatarUrl: string | null = null;
 
       if (v.studentId && v.student) {
         key = v.studentId;
@@ -127,12 +129,13 @@ export async function GET(request: Request) {
         district = alloc?.school?.district || null;
         city = alloc?.school?.city || null;
         source = 'app';
+        avatarUrl = appUser.avatarUrl || null;
       } else {
         continue;
       }
 
       if (!groupMap.has(key)) {
-        groupMap.set(key, { studentKey: key, studentId, name, olympiadCode, className, schoolName, schoolId, state, district, city, source, videos: [] });
+        groupMap.set(key, { studentKey: key, studentId, name, olympiadCode, className, schoolName, schoolId, state, district, city, source, avatarUrl, videos: [] });
       }
       const group = groupMap.get(key)!;
       const slot = group.videos.length;
@@ -159,9 +162,10 @@ export async function GET(request: Request) {
       });
     }
 
-    // The scanner (exam) app only has entries for web-registered Students —
-    // app-user submissions have no exam counterpart to join against.
-    const scannerStudentIds = Array.from(groupMap.values()).filter(g => g.studentId).map(g => g.studentId!);
+    // scanner.sheets.student_id is keyed by whichever id the student actually
+    // registered/submitted under — Student.id for web-source, AppUser.id for
+    // app-source (studentKey covers both, see the grouping loop above).
+    const scannerStudentIds = Array.from(groupMap.keys());
     const examResults = await getLatestExamResults(scannerStudentIds);
 
     const result = Array.from(groupMap.values()).map(g => {
@@ -176,7 +180,7 @@ export async function GET(request: Request) {
       // uploads can't push a kosha past its /8 ceiling.
       const { scores: koshScores, scoredVideos } = koshScoresFromVideos(publishedVideos.slice(0, REQUIRED_VIDEOS).map(v => v.criteria));
 
-      const exam = g.studentId ? examResults.get(g.studentId) : undefined;
+      const exam = examResults.get(g.studentKey);
 
       const koshBreakdown = KOSH_KEYS.map(kosh => {
         const videoPct = koshPercent(koshScores[kosh], scoredVideos);
@@ -209,6 +213,7 @@ export async function GET(request: Request) {
         examPercentage: exam?.percentage ?? null,
         examTotalScore: exam?.totalScore ?? null,
         examMaxScore: exam?.maxTotalScore ?? null,
+        examQuestions: exam?.questions ?? [],
         videoScoreTotal,
         videoMaxScore: REQUIRED_VIDEOS * VIDEO_MAX_SCORE,
         koshBreakdown,
