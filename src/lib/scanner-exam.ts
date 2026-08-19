@@ -1,33 +1,83 @@
 import { prisma } from '@/lib/prisma';
 import { normalizeKoshKey, type AnyKoshKey } from '@/lib/kosh';
 
+export interface ExamQuestionResult {
+  questionNumber: number;
+  pageNumber: number;
+  questionText: string | null;
+  questionType: string | null;
+  maxMarks: number;
+  aiMarks: number | null;
+  aiConfidence: number | null;
+  manualMarks: number | null;
+  manualMarksDisplay: string | null;
+  reviewedBy: string | null;
+  // "Effective" score: manual marks when a human has reviewed this question,
+  // otherwise the AI's — mirrors how the scanner's own audit view treats it.
+  score: number | null;
+  percentage: number | null;
+  koshas: { kosha: string; earned: number; weight: number }[];
+}
+
 export interface ExamResult {
   studentId: string;
   totalScore: number;
   maxTotalScore: number;
   percentage: number;
   koshPercents: Partial<Record<AnyKoshKey, number>>;
+  questions: ExamQuestionResult[];
 }
 
 interface SheetResultRow {
   student_id: string;
+  sheet_id: string;
+  sheet_uuid: string;
   total_score: number;
   max_total_score: number;
   percentage: number;
-  score_breakdown: { per_kosha?: Record<string, { earned: number; possible: number; percentage: number }> } | null;
+  score_breakdown: {
+    per_kosha?: Record<string, { earned: number; possible: number; percentage: number }>;
+  } | null;
+}
+
+interface AiMarksRow {
+  sheet_uuid: string;
+  question_number: number;
+  page_number: number;
+  question_text: string | null;
+  question_type: string | null;
+  max_marks: number;
+  ai_marks: number | null;
+  ai_confidence: number | null;
+  ai_panchakosha: { kosha: string; earned: number; weight: number }[] | null;
+}
+
+interface ManualMarksRow {
+  sheet_uuid: string;
+  question_number: number;
+  manual_marks: number | null;
+  manual_marks_display: string | null;
+  reviewed_by: string | null;
 }
 
 // The scanner app (a separate Python/Celery service) shares this Postgres
 // instance and writes exam results to the `scanner` schema, which isn't
-// modeled in Prisma — its student_id is assumed to equal this app's
-// Student.id (unconfirmed; if the two don't actually align, this simply
-// returns no match rather than throwing).
+// modeled in Prisma. Its `sheets.student_id` is NOT this app's Student.id —
+// in practice every sheet's student_id is actually an AppUser.id (students
+// currently only reach the scanner via the app-registration flow, which has
+// no Student row at all). So callers must pass the id each group is really
+// keyed by — Student.id for web-source groups, AppUser.id for app-source —
+// and this just matches sheets.student_id against whatever it's given.
 export async function getLatestExamResults(studentIds: string[]): Promise<Map<string, ExamResult>> {
   if (studentIds.length === 0) return new Map();
 
-  const rows = await prisma.$queryRaw<SheetResultRow[]>`
+  // Overall totals and per-kosha % still come from sheet_results — it's the
+  // one place the scanner pre-aggregates a sheet's full score.
+  const sheetRows = await prisma.$queryRaw<SheetResultRow[]>`
     SELECT DISTINCT ON (sh.student_id)
       sh.student_id,
+      sh.id AS sheet_id,
+      sh.sheet_uuid,
       sr.total_score,
       sr.max_total_score,
       sr.percentage,
@@ -37,21 +87,71 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
     WHERE sh.student_id = ANY(${studentIds})
     ORDER BY sh.student_id, sr.generated_at DESC NULLS LAST
   `;
+  if (sheetRows.length === 0) return new Map();
+
+  // ai_marks/manual_marks are keyed by scanner.sheets.sheet_uuid — a
+  // different column from sheets.id despite the similar name — so join on
+  // that, not on the sheet's own primary key.
+  const sheetUuids = sheetRows.map(r => r.sheet_uuid);
+
+  // Per-question detail — instruction text, AI marks/confidence/kosha weights
+  // — comes straight from the scanner's own ai_marks view.
+  const aiRows = await prisma.$queryRaw<AiMarksRow[]>`
+    SELECT sheet_uuid, question_number, page_number, question_text, question_type,
+           max_marks, ai_marks, ai_confidence, ai_panchakosha
+    FROM scanner.ai_marks
+    WHERE sheet_uuid = ANY(${sheetUuids}::uuid[])
+  `;
+
+  // Manual (human-reviewed) marks, when a reviewer has been through this
+  // question — most rows will have manual_marks = null until reviewed.
+  const manualRows = await prisma.$queryRaw<ManualMarksRow[]>`
+    SELECT sheet_uuid, question_number, manual_marks, manual_marks_display, reviewed_by
+    FROM scanner.manual_marks
+    WHERE sheet_uuid = ANY(${sheetUuids}::uuid[])
+  `;
+  const manualByKey = new Map(manualRows.map(m => [`${m.sheet_uuid}:${m.question_number}`, m]));
+
+  const questionsBySheet = new Map<string, ExamQuestionResult[]>();
+  for (const q of aiRows) {
+    const manual = manualByKey.get(`${q.sheet_uuid}:${q.question_number}`);
+    const effectiveScore = manual?.manual_marks ?? q.ai_marks;
+    const entry: ExamQuestionResult = {
+      questionNumber: q.question_number,
+      pageNumber: q.page_number,
+      questionText: q.question_text,
+      questionType: q.question_type,
+      maxMarks: q.max_marks,
+      aiMarks: q.ai_marks,
+      aiConfidence: q.ai_confidence,
+      manualMarks: manual?.manual_marks ?? null,
+      manualMarksDisplay: manual?.manual_marks_display ?? null,
+      reviewedBy: manual?.reviewed_by ?? null,
+      score: effectiveScore,
+      percentage: effectiveScore !== null && q.max_marks ? Math.round((effectiveScore / q.max_marks) * 1000) / 10 : null,
+      koshas: (q.ai_panchakosha || []).map(k => ({ kosha: k.kosha, earned: k.earned, weight: k.weight })),
+    };
+    const list = questionsBySheet.get(q.sheet_uuid) ?? [];
+    list.push(entry);
+    questionsBySheet.set(q.sheet_uuid, list);
+  }
 
   const result = new Map<string, ExamResult>();
-  for (const row of rows) {
+  for (const row of sheetRows) {
     const koshPercents: Partial<Record<AnyKoshKey, number>> = {};
     const perKosha = row.score_breakdown?.per_kosha || {};
     for (const [rawKey, val] of Object.entries(perKosha)) {
       const key = normalizeKoshKey(rawKey);
       if (key) koshPercents[key] = val.percentage;
     }
+    const questions = (questionsBySheet.get(row.sheet_uuid) || []).sort((a, b) => a.questionNumber - b.questionNumber);
     result.set(row.student_id, {
       studentId: row.student_id,
       totalScore: row.total_score,
       maxTotalScore: row.max_total_score,
       percentage: row.percentage,
       koshPercents,
+      questions,
     });
   }
   return result;

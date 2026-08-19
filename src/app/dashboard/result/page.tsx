@@ -5,10 +5,10 @@ import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import {
   Award, Loader2, Search, Download, ChevronDown, ChevronUp,
-  Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock, BookOpen,
+  Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock, BookOpen, Star,
 } from 'lucide-react';
-import ResultPassport, { type PassportStudent } from '@/components/ResultPassport';
-import type { CriterionKey } from '@/lib/kosh';
+import ResultPassportV2, { type PassportV2Student } from '@/components/ResultPassportV2';
+import { KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, criterionLabel, type CriterionKey } from '@/lib/kosh';
 
 interface VideoResultEntry {
   id: string;
@@ -21,6 +21,22 @@ interface VideoResultEntry {
   isPublished: boolean;
   videoPercent: number | null;
   evaluatorName: string | null;
+}
+
+interface ExamQuestionEntry {
+  questionNumber: number;
+  pageNumber: number;
+  questionText: string | null;
+  questionType: string | null;
+  maxMarks: number;
+  aiMarks: number | null;
+  aiConfidence: number | null;
+  manualMarks: number | null;
+  manualMarksDisplay: string | null;
+  reviewedBy: string | null;
+  score: number | null;
+  percentage: number | null;
+  koshas: { kosha: string; earned: number; weight: number }[];
 }
 
 interface KoshBreakdownEntry {
@@ -45,10 +61,12 @@ interface StudentResult {
   district: string | null;
   city: string | null;
   source: 'web' | 'app';
+  avatarUrl: string | null;
   videos: VideoResultEntry[];
   examPercentage: number | null;
   examTotalScore: number | null;
   examMaxScore: number | null;
+  examQuestions: ExamQuestionEntry[];
   videoScoreTotal: number;
   videoMaxScore: number;
   koshBreakdown: KoshBreakdownEntry[];
@@ -72,6 +90,43 @@ function percentBandClass(pct: number) {
   if (pct >= 55) return 'text-[#004f9f]';
   if (pct >= 30) return 'text-amber-700';
   return 'text-red-600';
+}
+
+// A fieldset/legend-style section: the title sits as a pill straddling the
+// top border of a bordered container, like a native <fieldset><legend>.
+function LegendSection({ title, right, children }: { title: string; right?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="relative border border-gray-200 rounded-2xl bg-white/60 pt-3.5 pb-4 px-4">
+      <div className="absolute -top-3 left-3 flex items-center gap-2 bg-amber-50/30 px-2">
+        <span className="px-2.5 py-1 rounded-full bg-white border border-gray-200 shadow-sm text-[11px] font-bold text-gray-600 uppercase tracking-wide">
+          {title}
+        </span>
+      </div>
+      {right && <div className="absolute -top-3 right-3 bg-amber-50/30 px-2">{right}</div>}
+      <div className="mt-1.5">{children}</div>
+    </div>
+  );
+}
+
+// 5-star rating where each star is worth 20% — fractional stars (e.g. 90% =
+// 4.5 stars) render as a partial fill via clip-path, not rounded to a whole star.
+function StarRating({ percent }: { percent: number }) {
+  const starsExact = (Math.max(0, Math.min(100, percent)) / 100) * 5;
+  return (
+    <div className="flex items-center gap-0.5" aria-label={`${percent}% — ${(Math.round(starsExact * 2) / 2).toFixed(1)} of 5 stars`}>
+      {Array.from({ length: 5 }).map((_, i) => {
+        const fill = Math.max(0, Math.min(1, starsExact - i)); // 0..1 fill for this star
+        return (
+          <span key={i} className="relative inline-block w-3.5 h-3.5">
+            <Star size={14} className="absolute inset-0 text-gray-200" fill="currentColor" />
+            <span className="absolute inset-0 overflow-hidden" style={{ width: `${fill * 100}%` }}>
+              <Star size={14} className="text-amber-400" fill="currentColor" />
+            </span>
+          </span>
+        );
+      })}
+    </div>
+  );
 }
 
 function gradeBadgeClass(grade: string) {
@@ -242,7 +297,7 @@ export default function ResultPage() {
                 <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student</th>
                 <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Olympiad Code</th>
                 <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">School</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Exam %</th>
+                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Exam</th>
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Videos /40</th>
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Holistic %</th>
                 <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
@@ -274,8 +329,22 @@ export default function ResultPage() {
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-gray-600 font-semibold">{row.olympiadCode}</td>
                       <td className="py-3 px-4 text-gray-600 text-xs max-w-[200px] truncate" title={row.schoolName || '-'}>{row.schoolName || '-'}</td>
-                      <td className="py-3 px-4 text-center font-bold text-gray-700">{row.examPercentage !== null ? `${row.examPercentage}%` : '-'}</td>
-                      <td className="py-3 px-4 text-center font-bold text-gray-700">{row.videoScoreTotal}/{row.videoMaxScore}</td>
+                      <td className="py-3 px-4 text-center font-bold text-gray-700">
+                        {row.examTotalScore !== null ? (
+                          <>
+                            {row.examTotalScore}<span className="text-gray-400 font-semibold">/{row.examMaxScore}</span>
+                            {row.examPercentage !== null && <span className="ml-1.5 text-xs text-gray-400 font-semibold">({row.examPercentage}%)</span>}
+                          </>
+                        ) : '-'}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold text-gray-700">
+                        {row.videoScoreTotal}<span className="text-gray-400 font-semibold">/{row.videoMaxScore}</span>
+                        {row.videoMaxScore > 0 && (
+                          <span className="ml-1.5 text-xs text-gray-400 font-semibold">
+                            ({Math.round((row.videoScoreTotal / row.videoMaxScore) * 1000) / 10}%)
+                          </span>
+                        )}
+                      </td>
                       <td className="py-3 px-4 text-center">
                         {row.holisticPercent !== null ? (
                           <span className={`text-lg font-black ${percentBandClass(row.holisticPercent)}`}>{row.holisticPercent}%</span>
@@ -298,77 +367,187 @@ export default function ResultPage() {
                     {isExpanded && (
                       <tr>
                         <td colSpan={10} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
-                          <div className="space-y-4">
-                            <div>
-                              <p className="text-xs font-bold text-gray-600 uppercase tracking-wide mb-2">Kosh Breakdown</p>
+                          <div className="space-y-5">
+                            <LegendSection
+                              title={`Olympiad Checker (Scanned Exam Sheet) — ${row.examQuestions.length} Questions`}
+                              right={
+                                <span className="px-2.5 py-1 rounded-full bg-white border border-gray-200 shadow-sm text-[11px] font-bold text-gray-700">
+                                  {row.examTotalScore !== null ? row.examTotalScore : '—'}
+                                  <span className="text-gray-400 font-semibold">/{row.examMaxScore ?? '—'}</span>
+                                  {row.examPercentage !== null && <span className="ml-1.5 text-gray-400 font-semibold">{row.examPercentage}%</span>}
+                                </span>
+                              }
+                            >
+                              {row.examQuestions.length > 0 ? (
+                                <div className="overflow-x-auto -mx-1">
+                                  <table className="w-full text-xs border-collapse min-w-[720px]">
+                                    <thead>
+                                      <tr className="border-b border-gray-200">
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-8">#</th>
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Question</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-14">Max</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">AI Marks</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">Manual Marks</th>
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Kosh</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {row.examQuestions.map(q => (
+                                        <tr key={q.questionNumber} className="border-b border-gray-100 align-top hover:bg-gray-50/60">
+                                          <td className="py-2.5 px-2 text-gray-400 font-semibold">{q.questionNumber}</td>
+                                          <td className="py-2.5 px-2">
+                                            <p className="font-semibold text-gray-800">{q.questionText || `Question ${q.questionNumber}`}</p>
+                                            {q.questionType && <p className="text-[10px] text-gray-400 font-mono mt-0.5">{q.questionType}</p>}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-center font-bold text-gray-700">{q.maxMarks}</td>
+                                          <td className="py-2.5 px-2 text-center">
+                                            {q.aiMarks !== null ? (
+                                              <>
+                                                <span className={`font-black ${percentBandClass(q.maxMarks ? (q.aiMarks / q.maxMarks) * 100 : 0)}`}>
+                                                  {Number.isInteger(q.aiMarks) ? q.aiMarks : q.aiMarks.toFixed(2)}
+                                                </span>
+                                                {q.aiConfidence !== null && (
+                                                  <p className="text-[9px] text-gray-400 mt-0.5">{Math.round(q.aiConfidence * 100)}% conf.</p>
+                                                )}
+                                              </>
+                                            ) : <span className="text-gray-300">—</span>}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-center">
+                                            {q.manualMarks !== null ? (
+                                              <span className="font-black text-gray-800">{q.manualMarksDisplay ?? q.manualMarks}</span>
+                                            ) : <span className="text-gray-300">—</span>}
+                                          </td>
+                                          <td className="py-2.5 px-2">
+                                            <div className="flex flex-wrap gap-1">
+                                              {q.koshas.map(k => (
+                                                <span key={k.kosha} className="inline-flex flex-col items-start px-2 py-1 rounded-lg border border-amber-200 bg-amber-50/70">
+                                                  <span className="text-[10px] font-bold text-amber-800">{k.kosha}</span>
+                                                  <span className="text-[9px] text-amber-600 font-semibold">{k.earned}/{k.weight} marks · {k.weight ? Math.round((k.earned / k.weight) * 100) : 0}%</span>
+                                                </span>
+                                              ))}
+                                              {q.koshas.length === 0 && <span className="text-[10px] text-gray-300">—</span>}
+                                            </div>
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <p className="text-xs text-gray-400">No written-round data yet — pending exam scan.</p>
+                              )}
+                            </LegendSection>
+
+                            <LegendSection
+                              title="Talent Round — Video Evaluation"
+                              right={
+                                <span className="px-2.5 py-1 rounded-full bg-white border border-gray-200 shadow-sm text-[11px] font-bold text-gray-700">
+                                  {row.videoScoreTotal}<span className="text-gray-400 font-semibold">/{row.videoMaxScore}</span>
+                                </span>
+                              }
+                            >
+                              <div className="grid gap-3">
+                              {row.videos.map((vid, vi) => (
+                                <div key={vid.id} className={`bg-white rounded-xl border p-4 ${
+                                  vid.isPublished ? 'border-emerald-200' : vid.isEvaluated ? 'border-amber-200' : 'border-gray-200'
+                                }`}>
+                                  <div className="flex items-center justify-between gap-4">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <span className="text-xs font-bold text-gray-700">Video {vi + 1}</span>
+                                        {vid.category && <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{vid.category}</span>}
+                                        {vid.subCategory && <span className="text-[10px] font-semibold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{vid.subCategory}</span>}
+                                      </div>
+                                      <p className="text-[10px] text-gray-400">
+                                        {vid.evaluatorName ? `Evaluated by ${vid.evaluatorName}` : 'Not yet evaluated'}
+                                      </p>
+                                    </div>
+                                    <div className="flex items-center gap-3 flex-shrink-0">
+                                      {vid.isEvaluated && (
+                                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                                          vid.isPublished ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'
+                                        }`}>
+                                          {vid.isPublished ? <Lock size={10} /> : <Unlock size={10} />}
+                                          {vid.isPublished ? 'Published' : 'Draft'}
+                                        </span>
+                                      )}
+                                      <div className="flex flex-col items-center min-w-[60px]">
+                                        <span className="text-xl font-black text-gray-900">{vid.videoPercent !== null ? `${vid.videoPercent}%` : '-'}</span>
+                                        {vid.totalScore !== null && (
+                                          <span className="text-[10px] font-bold text-gray-500">{vid.totalScore}<span className="text-gray-400">/{VIDEO_MAX_SCORE}</span></span>
+                                        )}
+                                        <span className="text-[9px] text-gray-400 font-bold uppercase">video score</span>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Per-criterion marks, each mapped to its kosha — mirrors the exam side's per-question/per-kosha detail */}
+                                  {vid.criteria && (
+                                    <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                      {KOSH_CRITERIA.map(c => {
+                                        const score = vid.criteria![c.key];
+                                        const pct = Math.round((score / MAX_PER_CRITERION) * 100);
+                                        return (
+                                          <div key={c.key} className="flex items-center justify-between gap-2 bg-gray-50/70 rounded-lg px-2.5 py-1.5">
+                                            <div className="min-w-0">
+                                              <p className="text-[10.5px] font-bold text-gray-700 truncate">{criterionLabel(c.key, vid.slot)}</p>
+                                              <p className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide flex items-center gap-1">
+                                                <span>{c.kosh.charAt(0) + c.kosh.slice(1).toLowerCase()} Kosh</span>
+                                                <span className={percentBandClass(pct)}>→</span>
+                                                <span className={`font-bold ${percentBandClass(pct)}`}>{pct}%</span>
+                                              </p>
+                                            </div>
+                                            <span className={`text-xs font-black flex-shrink-0 ${percentBandClass(pct)}`}>{score}<span className="text-gray-400 font-bold">/{MAX_PER_CRITERION}</span></span>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
+                              </div>
+                            </LegendSection>
+
+                            <LegendSection title="Kosh Breakdown">
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                                 {row.koshBreakdown.map(k => (
-                                  <div key={k.kosh} className="bg-white rounded-xl border border-gray-200 p-3">
-                                    <div className="flex items-center justify-between mb-2">
+                                  <div key={k.kosh} className="bg-white rounded-xl border border-gray-200 p-3.5">
+                                    <div className="flex items-center justify-between mb-2.5">
                                       <span className="text-xs font-bold text-gray-700">{k.label}</span>
                                       {k.grade && (
                                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border ${gradeBadgeClass(k.grade)}`}>{k.grade}</span>
                                       )}
                                     </div>
-                                    {/* Marks + overall % — the two headline numbers per kosha */}
-                                    <div className="flex items-end justify-between mb-2">
-                                      <div className="flex flex-col">
-                                        <span className="text-lg font-black text-gray-900 leading-none">
-                                          {k.videoScore !== null ? <>{k.videoScore}<span className="text-xs font-bold text-gray-400">/{k.videoMaxScore}</span></> : '—'}
-                                        </span>
-                                        <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Marks</span>
-                                      </div>
-                                      <div className="flex flex-col items-end">
-                                        <span className={`text-lg font-black leading-none ${k.combinedPercent !== null ? percentBandClass(k.combinedPercent) : 'text-gray-400'}`}>
-                                          {k.combinedPercent !== null ? `${k.combinedPercent}%` : '—'}
-                                        </span>
-                                        <span className="text-[9px] text-gray-400 font-bold uppercase mt-0.5">Overall %</span>
-                                      </div>
+                                    {/* Overall % — the combined exam + video weightage for this kosha */}
+                                    <div className="bg-gray-50/70 rounded-lg px-3 py-2.5 mb-2.5">
+                                      <span className={`block text-2xl font-black leading-none ${k.combinedPercent !== null ? percentBandClass(k.combinedPercent) : 'text-gray-400'}`}>
+                                        {k.combinedPercent !== null ? `${k.combinedPercent}%` : '—'}
+                                      </span>
+                                      <span className="text-[9px] text-gray-400 font-bold uppercase mt-1 block">Overall Weightage</span>
+                                      {k.combinedPercent !== null && (
+                                        <div className="mt-1.5"><StarRating percent={k.combinedPercent} /></div>
+                                      )}
                                     </div>
-                                    <div className="flex items-center justify-between text-[10px] text-gray-400 font-semibold border-t border-gray-100 pt-1.5">
-                                      <span>Exam: {k.examPercent !== null ? `${k.examPercent}%` : '—'}</span>
-                                      <span>Videos: {k.videoPercent !== null ? `${k.videoPercent}%` : '—'}</span>
+                                    <div className="flex items-center justify-between text-[10px] text-gray-500 font-semibold border-t border-gray-100 pt-2">
+                                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-[#004f9f]" />Exam: {k.examPercent !== null ? `${k.examPercent}%` : '—'}</span>
+                                      <span className="flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500" />Videos: {k.videoPercent !== null ? `${k.videoPercent}%` : '—'}</span>
                                     </div>
                                   </div>
                                 ))}
                                 {row.koshBreakdown.length === 0 && (
                                   <p className="text-xs text-gray-400 col-span-full">No kosh data yet — pending exam scan and/or video evaluation.</p>
                                 )}
+                                {row.koshBreakdown.length === 5 && (
+                                  <div className="hidden lg:flex items-end justify-center">
+                                    {/* mix-blend-mode blends the image's own white backdrop into the
+                                        card's near-white ground, so it reads as a cutout, not a tile. */}
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img src="/Binku & Binki (2).png" alt="Binku and Binki mascots" className="h-40 w-auto object-contain [mix-blend-mode:multiply]" />
+                                  </div>
+                                )}
                               </div>
-                            </div>
+                            </LegendSection>
 
-                            <div className="grid gap-3">
-                              {row.videos.map((vid, vi) => (
-                                <div key={vid.id} className={`bg-white rounded-xl border p-4 flex items-center justify-between gap-4 ${
-                                  vid.isPublished ? 'border-emerald-200' : vid.isEvaluated ? 'border-amber-200' : 'border-gray-200'
-                                }`}>
-                                  <div className="min-w-0">
-                                    <div className="flex items-center gap-2 mb-1">
-                                      <span className="text-xs font-bold text-gray-700">Video {vi + 1}</span>
-                                      {vid.category && <span className="text-[10px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{vid.category}</span>}
-                                      {vid.subCategory && <span className="text-[10px] font-semibold bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">{vid.subCategory}</span>}
-                                    </div>
-                                    <p className="text-[10px] text-gray-400">
-                                      {vid.evaluatorName ? `Evaluated by ${vid.evaluatorName}` : 'Not yet evaluated'}
-                                    </p>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    {vid.isEvaluated && (
-                                      <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
-                                        vid.isPublished ? 'bg-green-50 text-green-700 border-green-200' : 'bg-gray-50 text-gray-500 border-gray-200'
-                                      }`}>
-                                        {vid.isPublished ? <Lock size={10} /> : <Unlock size={10} />}
-                                        {vid.isPublished ? 'Published' : 'Draft'}
-                                      </span>
-                                    )}
-                                    <div className="flex flex-col items-center min-w-[50px]">
-                                      <span className="text-xl font-black text-gray-900">{vid.videoPercent !== null ? `${vid.videoPercent}%` : '-'}</span>
-                                      <span className="text-[10px] text-gray-400 font-bold uppercase">video score</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
                             <div className="flex items-center justify-end gap-4 pt-2 border-t border-amber-100 text-xs font-semibold text-gray-600">
                               <span>Exam: {row.examPercentage !== null ? `${row.examPercentage}%` : 'Not scanned'}</span>
                               <span>Videos: {row.videoScoreTotal}/{row.videoMaxScore}</span>
@@ -391,7 +570,7 @@ export default function ResultPage() {
 
       {/* Result Passport booklet */}
       {passportFor && (
-        <ResultPassport student={passportFor as PassportStudent} onClose={() => setPassportFor(null)} />
+        <ResultPassportV2 student={passportFor as PassportV2Student} onClose={() => setPassportFor(null)} />
       )}
     </div>
   );
