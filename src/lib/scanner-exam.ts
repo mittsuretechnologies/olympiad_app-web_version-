@@ -16,16 +16,55 @@ export interface ExamQuestionResult {
   // otherwise the AI's — mirrors how the scanner's own audit view treats it.
   score: number | null;
   percentage: number | null;
-  koshas: { kosha: string; earned: number; weight: number }[];
+  // AI and manual kosha breakdowns are independent — a reviewer can re-weight
+  // a question's koshas, not just its marks — so both are kept separate
+  // rather than one "effective" set.
+  aiKoshas: { kosha: string; earned: number; weight: number }[];
+  manualKoshas: { kosha: string; earned: number; weight: number }[];
 }
 
 export interface ExamResult {
   studentId: string;
+  // Effective total — manual marks where reviewed, AI marks otherwise; matches
+  // scanner.sheet_results.total_score, which is what the scanner itself reports.
   totalScore: number;
   maxTotalScore: number;
   percentage: number;
-  koshPercents: Partial<Record<AnyKoshKey, number>>;
+  // Pure AI-only and pure-manual-only totals, each summed across just the
+  // questions that actually have that kind of mark (manual is often partial).
+  aiTotalScore: number;
+  aiMaxScore: number;
+  manualTotalScore: number | null;
+  manualMaxScore: number;
+  manualQuestionCount: number;
+  // Per-kosha % computed purely from AI marks, and purely from manual marks
+  // (each aggregated across all questions carrying that kind of mark) — lets
+  // callers pick which one drives the holistic score, independent of which
+  // one the scanner itself currently prefers as "effective".
+  aiKoshPercents: Partial<Record<AnyKoshKey, number>>;
+  manualKoshPercents: Partial<Record<AnyKoshKey, number>>;
   questions: ExamQuestionResult[];
+}
+
+// Sums earned/weight per kosha across a set of {kosha, earned, weight}
+// entries (e.g. every question's aiKoshas), then converts each to a %.
+function aggregateKoshPercents(
+  entries: { kosha: string; earned: number; weight: number }[]
+): Partial<Record<AnyKoshKey, number>> {
+  const totals = new Map<AnyKoshKey, { earned: number; weight: number }>();
+  for (const e of entries) {
+    const key = normalizeKoshKey(e.kosha);
+    if (!key) continue;
+    const t = totals.get(key) ?? { earned: 0, weight: 0 };
+    t.earned += e.earned;
+    t.weight += e.weight;
+    totals.set(key, t);
+  }
+  const percents: Partial<Record<AnyKoshKey, number>> = {};
+  for (const [key, t] of totals) {
+    percents[key] = t.weight ? Math.round((t.earned / t.weight) * 1000) / 10 : 0;
+  }
+  return percents;
 }
 
 interface SheetResultRow {
@@ -58,6 +97,7 @@ interface ManualMarksRow {
   manual_marks: number | null;
   manual_marks_display: string | null;
   reviewed_by: string | null;
+  manual_panchakosha: { kosha: string; earned: number; weight: number }[] | null;
 }
 
 // The scanner app (a separate Python/Celery service) shares this Postgres
@@ -106,7 +146,7 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
   // Manual (human-reviewed) marks, when a reviewer has been through this
   // question — most rows will have manual_marks = null until reviewed.
   const manualRows = await prisma.$queryRaw<ManualMarksRow[]>`
-    SELECT sheet_uuid, question_number, manual_marks, manual_marks_display, reviewed_by
+    SELECT sheet_uuid, question_number, manual_marks, manual_marks_display, reviewed_by, manual_panchakosha
     FROM scanner.manual_marks
     WHERE sheet_uuid = ANY(${sheetUuids}::uuid[])
   `;
@@ -129,7 +169,8 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
       reviewedBy: manual?.reviewed_by ?? null,
       score: effectiveScore,
       percentage: effectiveScore !== null && q.max_marks ? Math.round((effectiveScore / q.max_marks) * 1000) / 10 : null,
-      koshas: (q.ai_panchakosha || []).map(k => ({ kosha: k.kosha, earned: k.earned, weight: k.weight })),
+      aiKoshas: (q.ai_panchakosha || []).map(k => ({ kosha: k.kosha, earned: k.earned, weight: k.weight })),
+      manualKoshas: (manual?.manual_panchakosha || []).map(k => ({ kosha: k.kosha, earned: k.earned, weight: k.weight })),
     };
     const list = questionsBySheet.get(q.sheet_uuid) ?? [];
     list.push(entry);
@@ -138,19 +179,31 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
 
   const result = new Map<string, ExamResult>();
   for (const row of sheetRows) {
-    const koshPercents: Partial<Record<AnyKoshKey, number>> = {};
-    const perKosha = row.score_breakdown?.per_kosha || {};
-    for (const [rawKey, val] of Object.entries(perKosha)) {
-      const key = normalizeKoshKey(rawKey);
-      if (key) koshPercents[key] = val.percentage;
-    }
     const questions = (questionsBySheet.get(row.sheet_uuid) || []).sort((a, b) => a.questionNumber - b.questionNumber);
+
+    const aiTotalScore = Math.round(questions.reduce((sum, q) => sum + (q.aiMarks ?? 0), 0) * 100) / 100;
+    const aiMaxScore = Math.round(questions.reduce((sum, q) => sum + q.maxMarks, 0) * 100) / 100;
+    const manuallyMarked = questions.filter(q => q.manualMarks !== null);
+    const manualTotalScore = manuallyMarked.length
+      ? Math.round(manuallyMarked.reduce((sum, q) => sum + (q.manualMarks ?? 0), 0) * 100) / 100
+      : null;
+    const manualMaxScore = Math.round(manuallyMarked.reduce((sum, q) => sum + q.maxMarks, 0) * 100) / 100;
+
+    const aiKoshPercents = aggregateKoshPercents(questions.flatMap(q => q.aiKoshas));
+    const manualKoshPercents = aggregateKoshPercents(questions.flatMap(q => q.manualKoshas));
+
     result.set(row.student_id, {
       studentId: row.student_id,
       totalScore: row.total_score,
       maxTotalScore: row.max_total_score,
       percentage: row.percentage,
-      koshPercents,
+      aiTotalScore,
+      aiMaxScore,
+      manualTotalScore,
+      manualMaxScore,
+      manualQuestionCount: manuallyMarked.length,
+      aiKoshPercents,
+      manualKoshPercents,
       questions,
     });
   }

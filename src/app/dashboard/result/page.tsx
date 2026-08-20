@@ -36,7 +36,8 @@ interface ExamQuestionEntry {
   reviewedBy: string | null;
   score: number | null;
   percentage: number | null;
-  koshas: { kosha: string; earned: number; weight: number }[];
+  aiKoshas: { kosha: string; earned: number; weight: number }[];
+  manualKoshas: { kosha: string; earned: number; weight: number }[];
 }
 
 interface KoshBreakdownEntry {
@@ -63,9 +64,15 @@ interface StudentResult {
   source: 'web' | 'app';
   avatarUrl: string | null;
   videos: VideoResultEntry[];
+  examSource: 'ai' | 'manual';
   examPercentage: number | null;
   examTotalScore: number | null;
   examMaxScore: number | null;
+  examAiTotalScore: number | null;
+  examAiMaxScore: number | null;
+  examManualTotalScore: number | null;
+  examManualMaxScore: number;
+  examManualQuestionCount: number;
   examQuestions: ExamQuestionEntry[];
   videoScoreTotal: number;
   videoMaxScore: number;
@@ -136,7 +143,11 @@ function gradeBadgeClass(grade: string) {
 }
 
 export default function ResultPage() {
-  const { data, isLoading: loading } = useSWR<StudentResult[]>('/api/result/overview', fetcher);
+  // Which set of exam marks drives Holistic %, Kosh Breakdown, and the Exam
+  // column — AI's own grading, or the human reviewer's. Manual matches what
+  // the scanner itself currently reports as the "official" score.
+  const [examSource, setExamSource] = useState<'ai' | 'manual'>('manual');
+  const { data, isLoading: loading } = useSWR<StudentResult[]>(`/api/result/overview?examSource=${examSource}`, fetcher);
   const rows: StudentResult[] = Array.isArray(data) ? data : [];
 
   const [search, setSearch] = useState('');
@@ -232,10 +243,26 @@ export default function ResultPage() {
             <p className="text-sm text-gray-400">Each kosh's % = average of exam performance and video evaluation, where both exist</p>
           </div>
         </div>
-        <button onClick={downloadCSV}
-          className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md active:scale-95">
-          <Download size={16} /> Export CSV
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm p-1">
+            <span className="pl-2 pr-1 text-xs font-bold text-gray-400 uppercase tracking-wide">Exam Score:</span>
+            {(['manual', 'ai'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setExamSource(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  examSource === s ? 'bg-[#06013E] text-[#F5E9C8] shadow-sm' : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {s === 'manual' ? 'Manual' : 'AI'}
+              </button>
+            ))}
+          </div>
+          <button onClick={downloadCSV}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md active:scale-95">
+            <Download size={16} /> Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
@@ -292,21 +319,22 @@ export default function ResultPage() {
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
-                <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-8"></th>
-                <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
-                <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student</th>
-                <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Olympiad Code</th>
-                <th className="py-3 px-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">School</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Exam</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Videos /40</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Holistic %</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="py-3 px-4 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Passport</th>
+                <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-8"></th>
+                <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
+                <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student</th>
+                <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Code</th>
+                <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">School</th>
+                <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Exam (AI)</th>
+                <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Exam (Manual)</th>
+                <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Videos</th>
+                <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Holistic</th>
+                <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Passport</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan={10} className="py-16 text-center text-gray-400 font-medium">No students found.</td></tr>
+                <tr><td colSpan={11} className="py-16 text-center text-gray-400 font-medium">No students found.</td></tr>
               )}
               {filtered.map((row, idx) => {
                 const isExpanded = expandedRow === row.studentKey;
@@ -315,48 +343,59 @@ export default function ResultPage() {
                     <tr
                       onClick={() => setExpandedRow(isExpanded ? null : row.studentKey)}
                       className={`border-b border-gray-100 cursor-pointer transition-colors ${isExpanded ? 'bg-amber-50/60' : 'hover:bg-gray-50'}`}>
-                      <td className="py-3 px-4">
+                      <td className="py-3 px-2">
                         {isExpanded ? <ChevronUp size={16} className="text-amber-500" /> : <ChevronDown size={16} className="text-gray-400" />}
                       </td>
-                      <td className="py-3 px-4 text-gray-400 font-medium">{idx + 1}</td>
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2.5">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[11px] font-black flex items-center justify-center flex-shrink-0">
+                      <td className="py-3 px-2 text-gray-400 font-medium">{idx + 1}</td>
+                      <td className="py-3 px-2">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 text-white text-[10px] font-black flex items-center justify-center flex-shrink-0">
                             {row.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
                           </div>
-                          <p className="font-bold text-gray-900 text-[13px]">{row.name}</p>
+                          <p className="font-bold text-gray-900 text-[13px] truncate max-w-[120px]">{row.name}</p>
                         </div>
                       </td>
-                      <td className="py-3 px-4 font-mono text-xs text-gray-600 font-semibold">{row.olympiadCode}</td>
-                      <td className="py-3 px-4 text-gray-600 text-xs max-w-[200px] truncate" title={row.schoolName || '-'}>{row.schoolName || '-'}</td>
-                      <td className="py-3 px-4 text-center font-bold text-gray-700">
-                        {row.examTotalScore !== null ? (
+                      <td className="py-3 px-2 font-mono text-xs text-gray-600 font-semibold">{row.olympiadCode}</td>
+                      <td className="py-3 px-2 text-gray-600 text-xs max-w-[110px] truncate" title={row.schoolName || '-'}>{row.schoolName || '-'}</td>
+                      <td className="py-3 px-2 text-center font-bold text-gray-700 text-xs whitespace-nowrap">
+                        {row.examAiTotalScore !== null ? (
                           <>
-                            {row.examTotalScore}<span className="text-gray-400 font-semibold">/{row.examMaxScore}</span>
-                            {row.examPercentage !== null && <span className="ml-1.5 text-xs text-gray-400 font-semibold">({row.examPercentage}%)</span>}
+                            {row.examAiTotalScore}<span className="text-gray-400 font-semibold">/{row.examAiMaxScore}</span>
+                            {row.examAiMaxScore ? <span className="block text-[10px] text-gray-400 font-semibold">{Math.round((row.examAiTotalScore / row.examAiMaxScore) * 1000) / 10}%</span> : null}
                           </>
                         ) : '-'}
                       </td>
-                      <td className="py-3 px-4 text-center font-bold text-gray-700">
+                      <td className="py-3 px-2 text-center font-bold text-gray-700 text-xs whitespace-nowrap">
+                        {row.examManualTotalScore !== null ? (
+                          <>
+                            {row.examManualTotalScore}<span className="text-gray-400 font-semibold">/{row.examManualMaxScore}</span>
+                            {row.examManualMaxScore ? <span className="block text-[10px] text-gray-400 font-semibold">{Math.round((row.examManualTotalScore / row.examManualMaxScore) * 1000) / 10}%</span> : null}
+                            {row.examManualQuestionCount < row.examQuestions.length && (
+                              <span className="block text-[9px] text-amber-500 font-semibold">{row.examManualQuestionCount}/{row.examQuestions.length} reviewed</span>
+                            )}
+                          </>
+                        ) : <span className="text-gray-300 font-semibold text-[11px]">Not reviewed</span>}
+                      </td>
+                      <td className="py-3 px-2 text-center font-bold text-gray-700 text-xs whitespace-nowrap">
                         {row.videoScoreTotal}<span className="text-gray-400 font-semibold">/{row.videoMaxScore}</span>
                         {row.videoMaxScore > 0 && (
-                          <span className="ml-1.5 text-xs text-gray-400 font-semibold">
-                            ({Math.round((row.videoScoreTotal / row.videoMaxScore) * 1000) / 10}%)
+                          <span className="block text-[10px] text-gray-400 font-semibold">
+                            {Math.round((row.videoScoreTotal / row.videoMaxScore) * 1000) / 10}%
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-2 text-center">
                         {row.holisticPercent !== null ? (
-                          <span className={`text-lg font-black ${percentBandClass(row.holisticPercent)}`}>{row.holisticPercent}%</span>
+                          <span className={`text-base font-black ${percentBandClass(row.holisticPercent)}`}>{row.holisticPercent}%</span>
                         ) : (
                           <span className="text-sm text-gray-400 font-semibold">—</span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-center"><StatusBadge status={row.status} /></td>
-                      <td className="py-3 px-4 text-center">
+                      <td className="py-3 px-2 text-center"><StatusBadge status={row.status} /></td>
+                      <td className="py-3 px-2 text-center">
                         <button
                           onClick={e => { e.stopPropagation(); setPassportFor(row); }}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-[#06013E] text-[#F5E9C8] hover:bg-[#0a0258] transition-colors cursor-pointer shadow-sm"
+                          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-full text-[11px] font-bold bg-[#06013E] text-[#F5E9C8] hover:bg-[#0a0258] transition-colors cursor-pointer shadow-sm whitespace-nowrap"
                           aria-label={`Open result passport for ${row.name}`}
                         >
                           <BookOpen size={12} /> Open
@@ -366,7 +405,7 @@ export default function ResultPage() {
 
                     {isExpanded && (
                       <tr>
-                        <td colSpan={10} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
+                        <td colSpan={11} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
                           <div className="space-y-5">
                             <LegendSection
                               title={`Olympiad Checker (Scanned Exam Sheet) — ${row.examQuestions.length} Questions`}
@@ -380,7 +419,7 @@ export default function ResultPage() {
                             >
                               {row.examQuestions.length > 0 ? (
                                 <div className="overflow-x-auto -mx-1">
-                                  <table className="w-full text-xs border-collapse min-w-[720px]">
+                                  <table className="w-full text-xs border-collapse min-w-[920px]">
                                     <thead>
                                       <tr className="border-b border-gray-200">
                                         <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-8">#</th>
@@ -388,7 +427,8 @@ export default function ResultPage() {
                                         <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-14">Max</th>
                                         <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">AI Marks</th>
                                         <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">Manual Marks</th>
-                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Kosh</th>
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Kosh (AI)</th>
+                                        <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Kosh (Manual)</th>
                                       </tr>
                                     </thead>
                                     <tbody>
@@ -419,13 +459,24 @@ export default function ResultPage() {
                                           </td>
                                           <td className="py-2.5 px-2">
                                             <div className="flex flex-wrap gap-1">
-                                              {q.koshas.map(k => (
+                                              {q.aiKoshas.map(k => (
                                                 <span key={k.kosha} className="inline-flex flex-col items-start px-2 py-1 rounded-lg border border-amber-200 bg-amber-50/70">
                                                   <span className="text-[10px] font-bold text-amber-800">{k.kosha}</span>
                                                   <span className="text-[9px] text-amber-600 font-semibold">{k.earned}/{k.weight} marks · {k.weight ? Math.round((k.earned / k.weight) * 100) : 0}%</span>
                                                 </span>
                                               ))}
-                                              {q.koshas.length === 0 && <span className="text-[10px] text-gray-300">—</span>}
+                                              {q.aiKoshas.length === 0 && <span className="text-[10px] text-gray-300">—</span>}
+                                            </div>
+                                          </td>
+                                          <td className="py-2.5 px-2">
+                                            <div className="flex flex-wrap gap-1">
+                                              {q.manualKoshas.map(k => (
+                                                <span key={k.kosha} className="inline-flex flex-col items-start px-2 py-1 rounded-lg border border-blue-200 bg-blue-50/70">
+                                                  <span className="text-[10px] font-bold text-[#004f9f]">{k.kosha}</span>
+                                                  <span className="text-[9px] text-[#0a6bc4] font-semibold">{k.earned}/{k.weight} marks · {k.weight ? Math.round((k.earned / k.weight) * 100) : 0}%</span>
+                                                </span>
+                                              ))}
+                                              {q.manualKoshas.length === 0 && <span className="text-[10px] text-gray-300">—</span>}
                                             </div>
                                           </td>
                                         </tr>
