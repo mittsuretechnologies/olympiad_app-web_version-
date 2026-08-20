@@ -22,7 +22,8 @@ interface PassportExamQuestion {
   maxMarks: number;
   score: number | null;
   percentage: number | null;
-  koshas: { kosha: string; earned: number; weight: number }[];
+  aiKoshas: { kosha: string; earned: number; weight: number }[];
+  manualKoshas: { kosha: string; earned: number; weight: number }[];
 }
 
 interface PassportVideo {
