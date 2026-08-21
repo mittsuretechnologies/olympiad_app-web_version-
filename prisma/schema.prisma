@@ -43,6 +43,7 @@ model School {
   stateCode     String?
   isActive      Boolean                @default(true)
   olympiadIds   OlympiadIdAllocation[]
+  linkRequests  SchoolLinkRequest[]
 
   @@schema("public")
 }
@@ -306,6 +307,10 @@ model AppUser {
   isPrivate              Boolean         @default(false)
   olympiadCatAApproved   Boolean         @default(false)
   olympiadCatBApproved   Boolean         @default(false)
+  // Free-text school name typed by a user whose school is not registered on
+  // Mittmee. Purely a profile label: it builds no linkage and never surfaces a
+  // video on any school portal — SchoolLinkRequest is the only real link.
+  unlistedSchoolName     String?
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   followers              Follow[]        @relation("UserFollowers")
@@ -317,6 +322,7 @@ model AppUser {
   reportsSubmitted       VideoReport[]
   supportTickets         SupportTicket[]
   notifications          Notification[]
+  schoolLinkRequests     SchoolLinkRequest[]
 
   @@index([email])
   @@index([mobile])
@@ -483,5 +489,30 @@ model Notification {
   @@index([userId])
   @@index([userId, isRead])
   @@index([userId, videoId, type, isRead])
+  @@schema("public")
+}
+
+// Links an app user to a registered school WITHOUT an Olympiad ID.
+// A student who never sat the Olympiad has no OlympiadIdAllocation, so the
+// School -> allocation -> AppUser.olympiadId chain can never reach them. This
+// model is the second, request-based path: the user asks, the school approves,
+// and from then on their videos appear on that school portal and on the school
+// page in the app. It grants nothing else — no Olympiad entry, no permissions.
+model SchoolLinkRequest {
+  id         String    @id @default(uuid())
+  appUserId  String
+  schoolId   String
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  decidedAt  DateTime?
+  appUser    AppUser   @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  school     School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // One row per (user, school) so a rejected user can re-request the same
+  // school by flipping this row back to PENDING rather than stacking history.
+  @@unique([appUserId, schoolId])
+  @@index([appUserId, status])
+  @@index([schoolId, status])
   @@schema("public")
 }

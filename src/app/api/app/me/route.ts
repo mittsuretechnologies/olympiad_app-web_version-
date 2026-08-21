@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getLinkedSchoolForUser } from '@/lib/schoolMembers';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -36,6 +37,7 @@ export async function GET(request: Request) {
         isVerified:   true,
         isPrivate:    true,
         termsAccepted: true,
+        unlistedSchoolName: true,
         createdAt:    true,
       },
     });
@@ -47,6 +49,10 @@ export async function GET(request: Request) {
     // If user has an olympiadId, resolve the linked school and student name
     // Prefer Student.name, fall back to allocation.assignedName (set by school admin)
     let school: { id: string; name: string | null; state: string | null; district: string | null; schoolId: string } | null = null;
+    // OLYMPIAD when the school comes from an Olympiad ID allocation, LINKED when
+    // it comes from a request the school approved, UNLISTED when the user only
+    // typed a name for a school that is not on Mittmee, NONE when unset.
+    let schoolLinkType: 'OLYMPIAD' | 'LINKED' | 'UNLISTED' | 'NONE' = 'NONE';
     let studentName: string | null = null;
     let classCode:   string | null = null;
     let className:   string | null = null;
@@ -61,13 +67,27 @@ export async function GET(request: Request) {
           student: { select: { name: true } },
         },
       });
-      if (allocation?.school) school = allocation.school;
+      if (allocation?.school) {
+        school = allocation.school;
+        schoolLinkType = 'OLYMPIAD';
+      }
       studentName = allocation?.student?.name ?? allocation?.assignedName ?? null;
       classCode   = allocation?.classCode ?? null;
       className   = allocation?.className ?? null;
     }
 
-    return NextResponse.json({ user, school, studentName, classCode, className });
+    // No Olympiad ID: fall back to a school that approved this user's request.
+    if (!school) {
+      const linked = await getLinkedSchoolForUser(user.id);
+      if (linked) {
+        school = { id: linked.id, name: linked.name, state: linked.state, district: linked.district, schoolId: linked.schoolId };
+        schoolLinkType = 'LINKED';
+      } else if (user.unlistedSchoolName) {
+        schoolLinkType = 'UNLISTED';
+      }
+    }
+
+    return NextResponse.json({ user, school, schoolLinkType, studentName, classCode, className });
   } catch (error: any) {
     console.error('app/me error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
