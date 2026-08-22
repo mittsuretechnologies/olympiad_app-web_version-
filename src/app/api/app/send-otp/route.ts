@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { sendOtpEmail } from '@/lib/mailer';
+import { sendOtpSms } from '@/lib/sms';
+import { checkOtpResendAllowed, recordOtpSend } from '@/lib/otpRateLimit';
 
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -40,9 +42,17 @@ export async function POST(request: Request) {
     // don't block OTP delivery based on existing AppUser rows — the OTP only
     // proves contact ownership; account resolution happens after verification.
 
+    // Checked before the OTP is generated: every send past this point is billed,
+    // so an unthrottled endpoint would let a loop drain the SMS account.
+    const rateLimit = await checkOtpResendAllowed(lookupId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json({ message: rateLimit.message }, { status: 429 });
+    }
+
     const otp = generateOtp();
     const otpHash = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+    await recordOtpSend(lookupId);
 
     await prisma.appOtp.upsert({
       where: { identifier: lookupId },
@@ -67,15 +77,19 @@ export async function POST(request: Request) {
       }
     }
 
-    // TODO: mobile OTP needs an SMS provider (e.g. MSG91/Twilio); until then
-    // the OTP is only available in dev mode.
-    console.log(`[DEV] OTP for ${lookupId}: ${otp}`);
-
-    return NextResponse.json({
-      message: 'OTP sent successfully',
-      type,
-      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
-    });
+    try {
+      await sendOtpSms(mobile!, otp, 'signup');
+      return NextResponse.json({ message: 'OTP sent to your mobile', type });
+    } catch (smsErr) {
+      console.error(`OTP SMS to ${lookupId} failed:`, smsErr);
+      if (process.env.NODE_ENV !== 'production') {
+        return NextResponse.json({ message: 'OTP sent (dev fallback)', type, devOtp: otp });
+      }
+      return NextResponse.json(
+        { message: 'Could not send the OTP SMS. Please try again.' },
+        { status: 502 }
+      );
+    }
   } catch (error) {
     console.error('send-otp error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

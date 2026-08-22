@@ -100,32 +100,32 @@ model Student {
 }
 
 model Video {
-  id              String           @id @default(uuid())
-  studentId       String?
-  appUserId       String?
-  uploaderType    String           @default("STUDENT")
-  videoUrl        String
-  thumbnailUrl    String?
-  caption         String?
-  category        String?
-  subCategory     String?
-  tags            String?
-  status          String           @default("PENDING")
-  rejectionReason String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  isEvaluation    Boolean          @default(false)
-  isPublic        Boolean          @default(true)
-  olympiadVisibility String?       // "public" | "private" — only meaningful when isEvaluation = true
-  likesCount      Int              @default(0)
-  viewsCount      Int              @default(0)
-  deletedAt       DateTime?
-  student         Student?         @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  likes           Like[]
-  views           VideoView[]
-  reelShares      ReelShare[]
-  evaluations     VideoEvaluation[]
-  reports         VideoReport[]
+  id                 String            @id @default(uuid())
+  studentId          String?
+  appUserId          String?
+  uploaderType       String            @default("STUDENT")
+  videoUrl           String
+  thumbnailUrl       String?
+  caption            String?
+  category           String?
+  subCategory        String?
+  tags               String?
+  status             String            @default("PENDING")
+  rejectionReason    String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  isEvaluation       Boolean           @default(false)
+  isPublic           Boolean           @default(true)
+  olympiadVisibility String? // "public" | "private" — only meaningful when isEvaluation = true
+  likesCount         Int               @default(0)
+  viewsCount         Int               @default(0)
+  deletedAt          DateTime?
+  student            Student?          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  likes              Like[]
+  views              VideoView[]
+  reelShares         ReelShare[]
+  evaluations        VideoEvaluation[]
+  reports            VideoReport[]
 
   @@index([studentId])
   @@index([appUserId])
@@ -334,6 +334,21 @@ model AppOtp {
   @@schema("public")
 }
 
+/// Throttling state for OTP sends, deliberately kept out of AppOtp: those rows
+/// are deleted on successful verification, which would reset the daily counter
+/// and let anyone bypass the cap by verifying between requests.
+model OtpSendLimit {
+  id            String   @id @default(uuid())
+  identifier    String   @unique
+  lastSentAt    DateTime @default(now())
+  // Daily count keyed by YYYY-MM-DD, so it rolls over by date instead of
+  // needing a scheduled reset job.
+  sendsToday    Int      @default(0)
+  sendCountDate String   @default("")
+
+  @@schema("public")
+}
+
 model PasswordResetOtp {
   id         String   @id @default(uuid())
   identifier String   @unique
@@ -398,7 +413,7 @@ model VideoReport {
   videoId      String
   reporterId   String
   ownerId      String?
-  category     String   // ABUSIVE_CONTENT | SPAM | HARASSMENT | HATE_SPEECH | VIOLENCE | SEXUAL_CONTENT | MISINFORMATION | COPYRIGHT | OTHER
+  category     String // ABUSIVE_CONTENT | SPAM | HARASSMENT | HATE_SPEECH | VIOLENCE | SEXUAL_CONTENT | MISINFORMATION | COPYRIGHT | OTHER
   customReason String?
   resolved     Boolean  @default(false)
   createdAt    DateTime @default(now())
@@ -420,20 +435,20 @@ model AppSetting {
 }
 
 model SupportTicket {
-  id             String   @id @default(uuid())
+  id             String    @id @default(uuid())
   userId         String
-  type           String   @default("TECHNICAL") // TECHNICAL | REMARK
-  category       String?  // App Crash | Video Upload Issue | Login/Account Access | Video Playback Issue | Other Technical (TECHNICAL only)
+  type           String    @default("TECHNICAL") // TECHNICAL | REMARK
+  category       String? // App Crash | Video Upload Issue | Login/Account Access | Video Playback Issue | Other Technical (TECHNICAL only)
   message        String
-  screenshotUrls String?  // comma-separated URLs, up to 3
-  status         String   @default("OPEN") // OPEN | RESOLVED
+  screenshotUrls String? // comma-separated URLs, up to 3
+  status         String    @default("OPEN") // OPEN | RESOLVED
   resolvedAt     DateTime?
-  adminResponse  String?   // reply written by SuperAdmin
+  adminResponse  String? // reply written by SuperAdmin
   respondedAt    DateTime?
-  isReadByUser   Boolean  @default(true) // flips to false when adminResponse is set, until the user opens the notifications modal
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isReadByUser   Boolean   @default(true) // flips to false when adminResponse is set, until the user opens the notifications modal
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  user           AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -445,17 +460,17 @@ model SupportTicket {
 // unlike the mutable status fields on Video/VideoEvaluation/VideoReport, rows
 // here are never updated or deleted.
 model AuditLog {
-  id           String   @id @default(uuid())
-  actorId      String
-  actorRole    String   // SUPERADMIN | EVALUATOR | SCHOOL | REVIEWER
-  actorName    String?  // denormalised at write time so the log stays readable if the actor is later removed
-  action       String   // e.g. VIDEO_APPROVED, VIDEO_REJECTED, VIDEO_DELETED, VISIBILITY_CHANGED, REPORT_IGNORED, REPORT_VIDEO_REMOVED, EVALUATION_SUBMITTED, EVALUATION_PUBLISHED, EVALUATION_UNPUBLISHED
-  entityType   String   // e.g. Video, VideoEvaluation, VideoReport
-  entityId     String
+  id            String   @id @default(uuid())
+  actorId       String
+  actorRole     String // SUPERADMIN | EVALUATOR | SCHOOL | REVIEWER
+  actorName     String? // denormalised at write time so the log stays readable if the actor is later removed
+  action        String // e.g. VIDEO_APPROVED, VIDEO_REJECTED, VIDEO_DELETED, VISIBILITY_CHANGED, REPORT_IGNORED, REPORT_VIDEO_REMOVED, EVALUATION_SUBMITTED, EVALUATION_PUBLISHED, EVALUATION_UNPUBLISHED
+  entityType    String // e.g. Video, VideoEvaluation, VideoReport
+  entityId      String
   previousValue String? // JSON snapshot of relevant fields before the change
-  newValue     String?  // JSON snapshot of relevant fields after the change
-  reason       String?  // e.g. rejection reason, report resolution note
-  createdAt    DateTime @default(now())
+  newValue      String? // JSON snapshot of relevant fields after the change
+  reason        String? // e.g. rejection reason, report resolution note
+  createdAt     DateTime @default(now())
 
   @@index([entityType, entityId])
   @@index([actorId])
@@ -469,15 +484,15 @@ model AuditLog {
 model Notification {
   id             String   @id @default(uuid())
   userId         String
-  type           String   // "VIDEO_REMOVED" | "VIDEO_APPROVED" | "VIDEO_REJECTED" | "VIDEO_LIKED" | "FOLLOW" | "FOLLOW_REQUEST"
+  type           String // "VIDEO_REMOVED" | "VIDEO_APPROVED" | "VIDEO_REJECTED" | "VIDEO_LIKED" | "FOLLOW" | "FOLLOW_REQUEST"
   title          String
   message        String
   isRead         Boolean  @default(false)
   createdAt      DateTime @default(now())
-  videoId        String?  // links back to the video, e.g. for VIDEO_LIKED aggregation
-  actorId        String?  // AppUser.id of whoever triggered this (FOLLOW / FOLLOW_REQUEST)
-  count          Int      @default(1)      // how many actors this row represents (VIDEO_LIKED)
-  recentActorIds String[] @default([])     // most recent likers' userIds, for "X and N others"
+  videoId        String? // links back to the video, e.g. for VIDEO_LIKED aggregation
+  actorId        String? // AppUser.id of whoever triggered this (FOLLOW / FOLLOW_REQUEST)
+  count          Int      @default(1) // how many actors this row represents (VIDEO_LIKED)
+  recentActorIds String[] @default([]) // most recent likers' userIds, for "X and N others"
   user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
