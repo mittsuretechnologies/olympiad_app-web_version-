@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { sendOtpEmail } from '@/lib/mailer';
+import { sendOtpSms } from '@/lib/sms';
+import { checkOtpResendAllowed, recordOtpSend } from '@/lib/otpRateLimit';
 
 function generateOtp(): string {
   return String(Math.floor(100000 + Math.random() * 900000));
@@ -48,15 +50,28 @@ export async function POST(request: Request) {
       return NextResponse.json(genericResponse);
     }
 
+    // "reset:" prefix keeps password-reset OTPs separate from signup OTPs.
+    const otpKey = `reset:${lookupId}`;
+
+    // Checked before the OTP is generated: every send past this point is billed,
+    // so an unthrottled endpoint would let a loop drain the SMS account.
+    // Throttled requests return the same generic 200 as an unknown contact: a
+    // 429 here would only ever fire for accounts that exist, which would undo
+    // the enumeration protection above.
+    const rateLimit = await checkOtpResendAllowed(otpKey);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(genericResponse);
+    }
+
     const otp = generateOtp();
     const otpHash = await bcrypt.hash(otp, 10);
     const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min
+    await recordOtpSend(otpKey);
 
-    // "reset:" prefix keeps password-reset OTPs separate from signup OTPs.
     await prisma.appOtp.upsert({
-      where: { identifier: `reset:${lookupId}` },
+      where: { identifier: otpKey },
       update: { otpHash, expiresAt, attempts: 0 },
-      create: { identifier: `reset:${lookupId}`, otpHash, expiresAt },
+      create: { identifier: otpKey, otpHash, expiresAt },
     });
 
     if (type === 'email') {
@@ -75,12 +90,20 @@ export async function POST(request: Request) {
       }
     }
 
-    // TODO: mobile OTP needs an SMS provider; dev-only for now.
-    console.log(`[DEV] Reset OTP for ${lookupId}: ${otp}`);
-    return NextResponse.json({
-      ...genericResponse,
-      devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
-    });
+    try {
+      await sendOtpSms(mobile!, otp, 'reset');
+      return NextResponse.json({ ...genericResponse, devOtp: undefined });
+    } catch (smsErr) {
+      console.error(`Reset OTP SMS to ${lookupId} failed:`, smsErr);
+      // In dev, fall back to returning the OTP so testing isn't blocked.
+      if (process.env.NODE_ENV !== 'production') {
+        return NextResponse.json({ ...genericResponse, devOtp: otp });
+      }
+      return NextResponse.json(
+        { message: 'Could not send the OTP SMS. Please try again.' },
+        { status: 502 }
+      );
+    }
   } catch (error) {
     console.error('forgot-password/request error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
