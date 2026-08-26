@@ -55,6 +55,31 @@ foreach ($stmt in @(
     "GRANT ALL ON ALL SEQUENCES IN SCHEMA public, scanner TO $SrcUser;")) {
     & "$Bin\psql.exe" -h 127.0.0.1 -p $DstPort -U $DstUser -d $DstDb -q -c $stmt
 }
+
+# GRANT alone isn't enough: `--no-owner` left every restored table/sequence/view
+# owned by $DstUser (postgres), and Postgres requires *ownership* -- not just
+# privileges -- to run ALTER TABLE/DDL. Without this, `prisma migrate deploy`
+# fails on the very first schema-changing migration with
+# "must be owner of table ...". Transfer ownership of everything in `public`
+# to the app role so migrations can run against this clone.
+$reownSql = @"
+DO `$`$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN SELECT tablename AS name, 'TABLE' AS kind FROM pg_tables WHERE schemaname = 'public'
+           UNION ALL
+           SELECT sequencename, 'SEQUENCE' FROM pg_sequences WHERE schemaname = 'public'
+           UNION ALL
+           SELECT viewname, 'VIEW' FROM pg_views WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER %s public.%I OWNER TO $SrcUser', r.kind, r.name);
+  END LOOP;
+END
+`$`$;
+"@
+& "$Bin\psql.exe" -h 127.0.0.1 -p $DstPort -U $DstUser -d $DstDb -q -v ON_ERROR_STOP=1 -c $reownSql
+Write-Host '    ownership of public schema objects transferred to' $SrcUser -ForegroundColor Green
+
 $env:PGPASSWORD = $null
 
 Write-Host ''

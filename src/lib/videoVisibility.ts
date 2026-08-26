@@ -34,15 +34,29 @@ export async function visibilityWhere(viewerId: string | null): Promise<object> 
     },
   };
 
-  // Get all private-account user IDs
-  const privateUsers = await prisma.appUser.findMany({
-    where:  { isPrivate: true },
-    select: { id: true },
-  });
+  // Get all private-account user IDs, plus every account currently pending
+  // deletion — a viewer mid-way through their 30-day grace window, or a
+  // student whose deletion request hasn't been decided yet, must vanish from
+  // every feed/search/profile immediately (the account itself isn't gone
+  // yet, only hidden — see AppUser.deletionRequestedAt). Blocked
+  // unconditionally, unlike private accounts: there's no "owner" exception
+  // because the owner is logged out the moment deletion is requested.
+  const [privateUsers, pendingDeletionUsers] = await Promise.all([
+    prisma.appUser.findMany({ where: { isPrivate: true }, select: { id: true } }),
+    prisma.appUser.findMany({ where: { deletionRequestedAt: { not: null } }, select: { id: true } }),
+  ]);
+  const pendingDeletionIds = pendingDeletionUsers.map(u => u.id);
 
   if (privateUsers.length === 0) {
-    // No private accounts exist — only the Olympiad-privacy clause applies
-    return { ...base, ...olympiadPrivacyClause };
+    if (pendingDeletionIds.length === 0) {
+      // No private accounts and nobody pending deletion — only the
+      // Olympiad-privacy clause applies
+      return { ...base, ...olympiadPrivacyClause };
+    }
+    return {
+      ...base,
+      AND: [{ NOT: { appUserId: { in: pendingDeletionIds } } }, olympiadPrivacyClause],
+    };
   }
 
   const allPrivateIds = privateUsers.map(u => u.id);
@@ -59,8 +73,12 @@ export async function visibilityWhere(viewerId: string | null): Promise<object> 
     allowedPrivateIds.add(viewerId);
   }
 
-  // IDs of private accounts whose videos must be hidden from this viewer
-  const blockedIds = allPrivateIds.filter(id => !allowedPrivateIds.has(id));
+  // IDs of private accounts whose videos must be hidden from this viewer,
+  // plus every pending-deletion account (hidden from absolutely everyone)
+  const blockedIds = [
+    ...allPrivateIds.filter(id => !allowedPrivateIds.has(id)),
+    ...pendingDeletionIds,
+  ];
 
   if (blockedIds.length === 0) return { ...base, ...olympiadPrivacyClause };
 

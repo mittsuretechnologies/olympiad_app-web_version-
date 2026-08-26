@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { readFile } from 'fs/promises';
 import { createWriteStream } from 'fs';
@@ -74,6 +74,29 @@ export async function getPresignedUploadUrl(key: string, contentType: string, ex
 // the bytes straight to S3 (e.g. video too long) — otherwise they'd sit in the bucket forever.
 export async function deleteFromS3(key: string): Promise<void> {
   await getClient().send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
+}
+
+// Account deletion needs to wipe every object a user ever uploaded — avatars
+// and videos/thumbnails alike all live under `uploads/app-{avatars,videos}/{appUserId}/`,
+// so a prefix listing + batch delete clears all of it without tracking individual
+// keys anywhere. Paginates in case a prolific uploader ever crosses 1000 objects
+// (S3's per-request cap on both List and DeleteObjects).
+export async function deleteS3Prefix(prefix: string): Promise<void> {
+  const client = getClient();
+  let continuationToken: string | undefined;
+  do {
+    const listed = await client.send(new ListObjectsV2Command({
+      Bucket: bucket, Prefix: prefix, ContinuationToken: continuationToken,
+    }));
+    const keys = (listed.Contents ?? []).map(o => o.Key).filter((k): k is string => !!k);
+    if (keys.length > 0) {
+      await client.send(new DeleteObjectsCommand({
+        Bucket: bucket,
+        Delete: { Objects: keys.map(Key => ({ Key })), Quiet: true },
+      }));
+    }
+    continuationToken = listed.IsTruncated ? listed.NextContinuationToken : undefined;
+  } while (continuationToken);
 }
 
 // ffmpeg-static's Linux binary segfaults when given an https:// URL as -i input

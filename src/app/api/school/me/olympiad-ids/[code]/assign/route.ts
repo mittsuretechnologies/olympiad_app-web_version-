@@ -88,8 +88,24 @@ export async function DELETE(
     if (allocation.schoolId !== payload.id) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     if (allocation.student) return NextResponse.json({ message: 'Cannot unassign — student already registered' }, { status: 409 });
 
-    // If an app account was created via Allot Student, remove it too so the ID becomes available again
-    await prisma.appUser.deleteMany({ where: { olympiadId: code } });
+    // If an app account was created via Allot Student, downgrade it to a plain
+    // Viewer account (clear olympiadId) instead of deleting it — this frees the
+    // ID for reassignment while keeping the account, its login, and its videos
+    // intact. Their videos also stop being Olympiad/evaluation content: without
+    // this, they'd keep showing the Olympiad badge and score forever, while
+    // silently dropping out of this school's completion reports and any
+    // region-scoped evaluator's queue (both are resolved via olympiadId).
+    const freedAppUsers = await prisma.appUser.findMany({ where: { olympiadId: code }, select: { id: true } });
+    const freedAppUserIds = freedAppUsers.map(u => u.id);
+
+    if (freedAppUserIds.length > 0) {
+      await prisma.video.updateMany({
+        where: { appUserId: { in: freedAppUserIds }, isEvaluation: true },
+        data: { isEvaluation: false, olympiadVisibility: null },
+      });
+    }
+
+    await prisma.appUser.updateMany({ where: { olympiadId: code }, data: { olympiadId: null } });
 
     await prisma.olympiadIdAllocation.update({
       where: { code },
