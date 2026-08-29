@@ -42,8 +42,165 @@ model School {
   districtCode  String?
   stateCode     String?
   isActive      Boolean                @default(true)
+  examDate      DateTime?
+  // Set once the school clicks "Confirm & Send" on the attendance page — freezes
+  // that exam's attendance (see Attendance model) and surfaces the report to SuperAdmin.
+  attendanceSubmittedAt DateTime?
   olympiadIds   OlympiadIdAllocation[]
+  attendance    Attendance[]
+  paperDispatches PaperDispatch[]
+  answerSheetDispatches AnswerSheetDispatch[]
 
+  @@schema("public")
+}
+
+// SuperAdmin's record of a question-paper shipment sent to a school. One row
+// per dispatch event; per-class quantities live in PaperDispatchClassCount so
+// new classes/fields can be added without a schema change to this table.
+// The school's own confirmation of what actually arrived is a separate
+// PaperReceipt — dispatched vs received are deliberately kept apart so a
+// shortage/damage discrepancy is visible rather than overwritten.
+model PaperDispatch {
+  id          String                    @id @default(uuid())
+  schoolId    String
+  sentAt      DateTime
+  mode        String? // e.g. "Courier", "Hand Delivery", "Speed Post"
+  trackingNo  String?
+  notes       String?
+  createdBy   String? // SuperAdmin.id who logged this entry
+  createdAt   DateTime                  @default(now())
+  updatedAt   DateTime                  @updatedAt
+  school      School                    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classCounts PaperDispatchClassCount[]
+  receipt     PaperReceipt?
+
+  @@index([schoolId])
+  @@schema("public")
+}
+
+model PaperDispatchClassCount {
+  id           String        @id @default(uuid())
+  dispatchId   String
+  className    String
+  count        Int
+  dispatch     PaperDispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+
+  @@unique([dispatchId, className])
+  @@schema("public")
+}
+
+// The school's confirmation of what it actually received against one
+// PaperDispatch — one receipt per dispatch (a school logs everything that
+// arrived from that shipment in a single entry, discrepancies included via
+// the note field rather than partial/multiple receipts).
+model PaperReceipt {
+  id           String                   @id @default(uuid())
+  dispatchId   String                   @unique
+  schoolId     String
+  receivedAt   DateTime
+  discrepancyNote String?
+  createdAt    DateTime                 @default(now())
+  updatedAt    DateTime                 @updatedAt
+  dispatch     PaperDispatch            @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  classCounts  PaperReceiptClassCount[]
+
+  @@index([schoolId])
+  @@schema("public")
+}
+
+model PaperReceiptClassCount {
+  id         String       @id @default(uuid())
+  receiptId  String
+  className  String
+  count      Int
+  receipt    PaperReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@unique([receiptId, className])
+  @@schema("public")
+}
+
+// Mirror image of PaperDispatch/PaperReceipt for the return leg: the school
+// logs sending answer sheets back after conducting the exam, SuperAdmin
+// confirms what arrived. Deliberately independent of PaperDispatch — a
+// school may return several classes/exams in one shipment rather than one
+// per question-paper batch received.
+model AnswerSheetDispatch {
+  id          String                          @id @default(uuid())
+  schoolId    String
+  sentAt      DateTime
+  mode        String? // e.g. "Courier", "Hand Delivery", "Speed Post"
+  trackingNo  String?
+  notes       String?
+  createdAt   DateTime                        @default(now())
+  updatedAt   DateTime                        @updatedAt
+  school      School                          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classCounts AnswerSheetDispatchClassCount[]
+  receipt     AnswerSheetReceipt?
+
+  @@index([schoolId])
+  @@schema("public")
+}
+
+model AnswerSheetDispatchClassCount {
+  id         String              @id @default(uuid())
+  dispatchId String
+  className  String
+  count      Int
+  dispatch   AnswerSheetDispatch @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+
+  @@unique([dispatchId, className])
+  @@schema("public")
+}
+
+// SuperAdmin's confirmation of what actually arrived against one
+// AnswerSheetDispatch — one receipt per dispatch, discrepancies noted rather
+// than tracked as partial/multiple receipts.
+model AnswerSheetReceipt {
+  id              String                        @id @default(uuid())
+  dispatchId      String                        @unique
+  schoolId        String
+  receivedAt      DateTime
+  discrepancyNote String?
+  createdBy       String? // SuperAdmin.id who logged this confirmation
+  createdAt       DateTime                      @default(now())
+  updatedAt       DateTime                      @updatedAt
+  dispatch        AnswerSheetDispatch           @relation(fields: [dispatchId], references: [id], onDelete: Cascade)
+  classCounts     AnswerSheetReceiptClassCount[]
+
+  @@index([schoolId])
+  @@schema("public")
+}
+
+model AnswerSheetReceiptClassCount {
+  id        String             @id @default(uuid())
+  receiptId String
+  className String
+  count     Int
+  receipt   AnswerSheetReceipt @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+
+  @@unique([receiptId, className])
+  @@schema("public")
+}
+
+// One row per registered student (web Student or app AppUser) per school,
+// marked present/absent on the school's exam day. studentId/appUserId are
+// mutually exclusive depending on where the student registered — mirrors the
+// web/app split already used for registered-students and evaluation videos.
+model Attendance {
+  id           String    @id @default(uuid())
+  schoolId     String
+  olympiadCode String
+  studentId    String?
+  appUserId    String?
+  status       String // PRESENT | ABSENT
+  markedAt     DateTime  @default(now())
+  markedBy     String? // schoolId of whoever marked it, denormalised for audit
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([schoolId, olympiadCode])
+  @@index([schoolId])
   @@schema("public")
 }
 

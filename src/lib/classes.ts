@@ -9,7 +9,6 @@ export interface ClassDef {
 }
 
 export const CLASSES: ClassDef[] = [
-  { name: 'PG', code: 'P' },
   { name: 'Nursery', code: 'N' },
   { name: 'LKG', code: 'L' },
   { name: 'UKG', code: 'U' },

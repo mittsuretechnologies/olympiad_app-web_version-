@@ -23,6 +23,7 @@ export default function RegisterSchoolPage() {
     state: '',
     stateCode: '',
     pincode: '',
+    examDate: '',
   });
 
   // Per-class student counts, keyed by class name (e.g. "Class 5": "30").
@@ -127,6 +128,7 @@ export default function RegisterSchoolPage() {
           state: formData.state,
           stateCode: formData.stateCode,
           pincode: formData.pincode,
+          examDate: formData.examDate || null,
           classes: classesPayload,
         }),
       });
@@ -150,7 +152,7 @@ export default function RegisterSchoolPage() {
         });
         setFormData({
           schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-          address: '', city: '', district: '', districtCode: '', state: '', stateCode: '', pincode: '',
+          address: '', city: '', district: '', districtCode: '', state: '', stateCode: '', pincode: '', examDate: '',
         });
         setClassCounts({});
       }
@@ -272,6 +274,16 @@ export default function RegisterSchoolPage() {
 
           {/* Contact & Location Details */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+            <div>
+              <label className={labelCls}>Exam Date</label>
+              <input
+                type="date"
+                name="examDate"
+                value={formData.examDate}
+                onChange={handleChange}
+                className={inputCls}
+              />
+            </div>
             <div>
               <label className={labelCls}>Principal / Contact Person</label>
               <input
@@ -403,7 +415,7 @@ export default function RegisterSchoolPage() {
               onClick={() => {
                 setFormData({
                   schoolName: '', olympiadId: '', principalName: '', email: '', phone: '',
-                  address: '', city: '', district: '', districtCode: '', state: '', stateCode: '', pincode: '',
+                  address: '', city: '', district: '', districtCode: '', state: '', stateCode: '', pincode: '', examDate: '',
                 });
                 setClassCounts({});
               }}

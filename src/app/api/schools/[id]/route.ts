@@ -24,6 +24,7 @@ export async function PUT(
       state,
       stateCode,
       pincode,
+      examDate,
     } = body;
 
     if (!name || !olympiadId || !state || !district) {
@@ -48,6 +49,7 @@ export async function PUT(
         state,
         stateCode,
         pincode,
+        examDate: examDate ? new Date(examDate) : null,
       },
     });
 
