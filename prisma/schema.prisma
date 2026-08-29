@@ -508,3 +508,23 @@ model Notification {
   @@index([userId, videoId, type, isRead])
   @@schema("public")
 }
+
+// Landing page hero carousel, managed from the super-admin panel.
+// desktopImage and mobileImage are separate uploads because the public
+// landing page's carousel crops each to a different aspect ratio
+// (desktop: 1920x600 wide banner; mobile: 1920x1000 taller crop).
+model BannerSlide {
+  id           String   @id @default(uuid())
+  desktopImage String
+  mobileImage  String?
+  alt          String   @default("")
+  title        String   @default("")
+  tag          String   @default("")
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([isActive, order])
+  @@schema("public")
+}
