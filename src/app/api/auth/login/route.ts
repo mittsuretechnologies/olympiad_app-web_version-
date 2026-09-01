@@ -27,7 +27,7 @@ export async function POST(request: Request) {
           return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
         }
         const token = jwt.sign(
-          { id: admin.id, email: admin.email, role: 'SUPERADMIN' },
+          { id: admin.id, email: admin.email, name: admin.name, role: 'SUPERADMIN' },
           process.env.JWT_SECRET || 'fallback_secret',
           { expiresIn: '1d' }
         );
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
       }
       const token = jwt.sign(
-        { id: school.id, schoolId: school.schoolId, role: 'SCHOOL' },
+        { id: school.id, schoolId: school.schoolId, name: school.name, role: 'SCHOOL' },
         process.env.JWT_SECRET || 'fallback_secret',
         { expiresIn: '1d' }
       );
@@ -78,7 +78,7 @@ export async function POST(request: Request) {
       if (!ok) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
       if (!reviewer.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
       const token = jwt.sign(
-        { id: reviewer.id, reviewerId: reviewer.reviewerId, role: 'REVIEWER' },
+        { id: reviewer.id, reviewerId: reviewer.reviewerId, name: reviewer.name, email: reviewer.email, role: 'REVIEWER' },
         process.env.JWT_SECRET || 'fallback_secret',
         { expiresIn: '7d' }
       );
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       if (!ok) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
       if (!evaluator.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
       const token = jwt.sign(
-        { id: evaluator.id, evaluatorId: evaluator.evaluatorId, role: 'EVALUATOR' },
+        { id: evaluator.id, evaluatorId: evaluator.evaluatorId, name: evaluator.name, email: evaluator.email, role: 'EVALUATOR' },
         process.env.JWT_SECRET || 'fallback_secret',
         { expiresIn: '7d' }
       );
@@ -122,7 +122,7 @@ export async function POST(request: Request) {
       if (!ok) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
       if (!moderator.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
       const token = jwt.sign(
-        { id: moderator.id, moderatorId: moderator.moderatorId, role: 'MODERATOR' },
+        { id: moderator.id, moderatorId: moderator.moderatorId, name: moderator.name, email: moderator.email, role: 'MODERATOR' },
         process.env.JWT_SECRET || 'fallback_secret',
         { expiresIn: '7d' }
       );

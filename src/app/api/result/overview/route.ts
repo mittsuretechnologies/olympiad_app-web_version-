@@ -48,23 +48,34 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'asc' },
     });
 
-    const appUserIds = [...new Set(allVideos.filter(v => v.appUserId && !v.studentId).map(v => v.appUserId!))];
-    const appUsers = appUserIds.length
-      ? await prisma.appUser.findMany({ where: { id: { in: appUserIds } }, select: { id: true, userId: true, olympiadId: true, avatarUrl: true } })
-      : [];
-    const appUserById = new Map(appUsers.map(u => [u.id, u]));
-
-    const appOlympiadCodes = appUsers.map(u => u.olympiadId).filter(Boolean) as string[];
-    const appAllocations = appOlympiadCodes.length
-      ? await prisma.olympiadIdAllocation.findMany({
-          where: { code: { in: appOlympiadCodes } },
-          select: {
-            code: true, classCode: true, className: true, assignedName: true,
-            school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true } },
+    // Every AppUser assigned an olympiad code — not just the ones with a
+    // video — so students who only scanned an exam (or haven't done either
+    // round yet) still show up in the table, not just video-submitters.
+    const [allAppUsers, allAllocations, allWebStudents] = await Promise.all([
+      prisma.appUser.findMany({
+        where: { olympiadId: { not: null } },
+        select: { id: true, userId: true, olympiadId: true, avatarUrl: true },
+      }),
+      prisma.olympiadIdAllocation.findMany({
+        where: { assignedAt: { not: null } },
+        select: {
+          code: true, classCode: true, className: true, assignedName: true,
+          school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true } },
+        },
+      }),
+      prisma.student.findMany({
+        select: {
+          id: true, name: true, olympiadCode: true,
+          allocation: {
+            select: {
+              classCode: true, className: true, assignedName: true,
+              school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true } },
+            },
           },
-        })
-      : [];
-    const allocByCode = new Map(appAllocations.map(a => [a.code, a]));
+        },
+      }),
+    ]);
+    const allocByCode = new Map(allAllocations.map(a => [a.code, a]));
 
     type VideoEntry = {
       id: string;
@@ -95,55 +106,51 @@ export async function GET(request: Request) {
       videos: VideoEntry[];
     }>();
 
+    // Seed every olympiad-registered student first — web-source (Student) and
+    // app-source (AppUser, resolved through its olympiadId allocation) —
+    // so students with an exam scan but no video still get a row, not just
+    // video-submitters.
+    for (const s of allWebStudents) {
+      groupMap.set(s.id, {
+        studentKey: s.id,
+        studentId: s.id,
+        name: s.allocation?.assignedName || s.name,
+        olympiadCode: s.olympiadCode,
+        className: s.allocation?.className || s.allocation?.classCode || null,
+        schoolName: s.allocation?.school?.name || null,
+        schoolId: s.allocation?.school?.schoolId || null,
+        state: s.allocation?.school?.state || null,
+        district: s.allocation?.school?.district || null,
+        city: s.allocation?.school?.city || null,
+        source: 'web',
+        avatarUrl: null,
+        videos: [],
+      });
+    }
+    for (const u of allAppUsers) {
+      const alloc = u.olympiadId ? allocByCode.get(u.olympiadId) : null;
+      groupMap.set(u.id, {
+        studentKey: u.id,
+        studentId: null,
+        name: alloc?.assignedName || u.userId,
+        olympiadCode: u.olympiadId || '-',
+        className: alloc?.className || alloc?.classCode || null,
+        schoolName: alloc?.school?.name || null,
+        schoolId: alloc?.school?.schoolId || null,
+        state: alloc?.school?.state || null,
+        district: alloc?.school?.district || null,
+        city: alloc?.school?.city || null,
+        source: 'app',
+        avatarUrl: u.avatarUrl || null,
+        videos: [],
+      });
+    }
+
     for (const v of allVideos) {
-      let key: string;
-      let studentId: string | null = null;
-      let name: string;
-      let olympiadCode: string;
-      let className: string | null = null;
-      let schoolName: string | null = null;
-      let schoolId: string | null = null;
-      let state: string | null = null;
-      let district: string | null = null;
-      let city: string | null = null;
-      let source: 'web' | 'app' = 'web';
-      let avatarUrl: string | null = null;
-
-      if (v.studentId && v.student) {
-        key = v.studentId;
-        studentId = v.studentId;
-        name = v.student.allocation?.assignedName || v.student.name;
-        olympiadCode = v.student.olympiadCode;
-        className = v.student.allocation?.className || v.student.allocation?.classCode || null;
-        schoolName = v.student.allocation?.school?.name || null;
-        schoolId = v.student.allocation?.school?.schoolId || null;
-        state = v.student.allocation?.school?.state || null;
-        district = v.student.allocation?.school?.district || null;
-        city = v.student.allocation?.school?.city || null;
-        source = 'web';
-      } else if (v.appUserId) {
-        key = v.appUserId;
-        const appUser = appUserById.get(v.appUserId);
-        if (!appUser) continue;
-        const alloc = appUser.olympiadId ? allocByCode.get(appUser.olympiadId) : null;
-        name = alloc?.assignedName || appUser.userId;
-        olympiadCode = appUser.olympiadId || '-';
-        className = alloc?.className || alloc?.classCode || null;
-        schoolName = alloc?.school?.name || null;
-        schoolId = alloc?.school?.schoolId || null;
-        state = alloc?.school?.state || null;
-        district = alloc?.school?.district || null;
-        city = alloc?.school?.city || null;
-        source = 'app';
-        avatarUrl = appUser.avatarUrl || null;
-      } else {
-        continue;
-      }
-
-      if (!groupMap.has(key)) {
-        groupMap.set(key, { studentKey: key, studentId, name, olympiadCode, className, schoolName, schoolId, state, district, city, source, avatarUrl, videos: [] });
-      }
-      const group = groupMap.get(key)!;
+      const key = v.studentId && v.student ? v.studentId : v.appUserId;
+      if (!key) continue;
+      const group = groupMap.get(key);
+      if (!group) continue; // video belongs to a student not in either seed set — skip
       const slot = group.videos.length;
       const evaluation = v.evaluations[0] || null;
       const criteria: CriterionScores | null = evaluation ? {

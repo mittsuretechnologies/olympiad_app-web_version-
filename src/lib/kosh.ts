@@ -201,12 +201,12 @@ export function normalizeKoshKey(raw: string): KoshKey | null {
 
 // Holistic Progress Passport: each kosh's final % is the average of its
 // exam-side % (from the scanner) and its video-side % (from this app's
-// evaluators), when both exist. If only one side has a number for a given
-// kosh (e.g. a video hasn't been scored yet), that side's number is used
-// as-is rather than treated as 0.
+// evaluators). A round the student hasn't done yet counts as 0 in that
+// average, not as "not applicable" — otherwise a student who only sat one
+// round would outscore one who did both but scored moderately on each,
+// which rewards skipping a round rather than doing it. Only when NEITHER
+// round exists yet is there truly nothing to score.
 export function combineKoshPercent(examPct: number | null, videoPct: number | null): number | null {
   if (examPct === null && videoPct === null) return null;
-  if (examPct === null) return Math.round(videoPct! * 10) / 10;
-  if (videoPct === null) return Math.round(examPct * 10) / 10;
-  return Math.round(((examPct + videoPct) / 2) * 10) / 10;
+  return Math.round((((examPct ?? 0) + (videoPct ?? 0)) / 2) * 10) / 10;
 }

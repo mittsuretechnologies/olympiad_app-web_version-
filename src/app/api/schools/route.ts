@@ -72,6 +72,7 @@ export async function POST(request: Request) {
       state,
       stateCode,
       pincode,
+      examDate,
       classes, // [{ className: string, count: number }, ...]
     } = body;
 
@@ -136,6 +137,7 @@ export async function POST(request: Request) {
             state,
             stateCode: stateCode || stateNameToCode(state),
             pincode,
+            examDate: examDate ? new Date(examDate) : null,
             username: generateUsername(name, schoolId),
             password: hashedPassword,
             plainPassword: plainPassword,

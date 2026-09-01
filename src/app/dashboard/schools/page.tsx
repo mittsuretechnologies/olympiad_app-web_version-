@@ -50,6 +50,7 @@ interface School {
   phone?: string;
   contactPerson?: string;
   isActive?: boolean;
+  examDate?: string | null;
 }
 
 function authHeaders(): Record<string, string> {
@@ -130,6 +131,7 @@ export default function SchoolsPage() {
     state: '',
     stateCode: '',
     pincode: '',
+    examDate: '',
   });
 
   const editDistrictOptions = getDistrictsForState(editFormData.stateCode);
@@ -201,6 +203,7 @@ export default function SchoolsPage() {
       state: school.state || '',
       stateCode,
       pincode: school.pincode || '',
+      examDate: school.examDate ? String(school.examDate).slice(0, 10) : '',
     });
     setIsEditModalOpen(true);
   };
@@ -570,6 +573,9 @@ export default function SchoolsPage() {
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">
                 Phone
               </th>
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider border-r border-gray-300">
+                Exam Date
+              </th>
               <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-36">
                 Action
               </th>
@@ -578,14 +584,14 @@ export default function SchoolsPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={9} className="py-16 text-center">
+                <td colSpan={10} className="py-16 text-center">
                   <Loader2 className="w-6 h-6 animate-spin mx-auto text-[#004f9f] mb-2" />
                   <p className="text-gray-600 text-sm">Loading records...</p>
                 </td>
               </tr>
             ) : filteredSchools.length === 0 ? (
               <tr>
-                <td colSpan={9} className="py-16 text-center">
+                <td colSpan={10} className="py-16 text-center">
                   <p className="text-gray-500 text-sm">No records found.</p>
                 </td>
               </tr>
@@ -633,6 +639,9 @@ export default function SchoolsPage() {
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700">
                     {school.phone || '-'}
+                  </td>
+                  <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700">
+                    {school.examDate ? new Date(school.examDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '-'}
                   </td>
                   <td className="px-4 py-2.5 text-center">
                     <div className="inline-flex gap-1">
@@ -835,8 +844,8 @@ export default function SchoolsPage() {
 
       {/* Edit Modal */}
       <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-        <DialogContent className="p-0 border border-gray-300 rounded-none sm:!max-w-3xl !left-[calc(50%+9rem)] w-[min(90vw,48rem)]">
-          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000]">
+        <DialogContent className="p-0 border border-gray-300 rounded-none sm:!max-w-3xl !left-[calc(50%+9rem)] w-[min(90vw,48rem)] max-h-[85vh] overflow-y-auto">
+          <div className="bg-[#009846] text-white px-6 py-3 border-b-4 border-[#FF9000] sticky top-0 z-10">
             <DialogHeader>
               <DialogTitle className="text-base font-bold uppercase tracking-wider">
                 Edit School {editingSchool?.schoolId ? `(${editingSchool.schoolId})` : ''}
@@ -952,6 +961,17 @@ export default function SchoolsPage() {
                 className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                 value={editFormData.pincode}
                 onChange={(e) => setEditFormData({ ...editFormData, pincode: e.target.value })}
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-[#004f9f] mb-1.5 uppercase">
+                Exam Date
+              </label>
+              <Input
+                type="date"
+                className="h-10 rounded-none border-gray-300 focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                value={editFormData.examDate}
+                onChange={(e) => setEditFormData({ ...editFormData, examDate: e.target.value })}
               />
             </div>
             <div className="col-span-2">
@@ -1148,6 +1168,10 @@ export default function SchoolsPage() {
                     .join(', ')}
                 />
                 <InfoRow label="Address" value={viewSchool.address} />
+                <InfoRow
+                  label="Exam Date"
+                  value={viewSchool.examDate ? new Date(viewSchool.examDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : undefined}
+                />
               </div>
 
               {/* Allocation header */}
@@ -1235,6 +1259,7 @@ export default function SchoolsPage() {
                         max={6}
                         value={allocPadding}
                         onChange={(e) => setAllocPadding(parseInt(e.target.value || '4', 10))}
+                        onWheel={(e) => e.currentTarget.blur()}
                         className="w-full h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                       />
                     </div>
@@ -1295,6 +1320,7 @@ export default function SchoolsPage() {
                                 prev.map((r, i) => (i === idx ? { ...r, count: v } : r))
                               );
                             }}
+                            onWheel={(e) => e.currentTarget.blur()}
                             placeholder="Count"
                             className="col-span-3 h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                             required

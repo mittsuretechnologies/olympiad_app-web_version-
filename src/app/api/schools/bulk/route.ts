@@ -68,6 +68,7 @@ export async function POST(request: Request) {
               state: school.state || null,
               stateCode: stateNameToCode(school.state),
               pincode: school.pincode || null,
+              examDate: school.examDate ? new Date(school.examDate) : null,
               username: generateUsername(school.name, schoolId),
               password: hashedPassword,
             },

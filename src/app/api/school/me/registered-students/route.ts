@@ -59,6 +59,16 @@ export async function GET(request: Request) {
     const codes = allocations.map(a => a.code);
     const allocationByCode = new Map(allocations.map(a => [a.code, a]));
 
+    const school = await prisma.school.findUnique({
+      where: { id: payload.id },
+      select: { examDate: true, attendanceSubmittedAt: true },
+    });
+    const attendanceRecords = await prisma.attendance.findMany({
+      where: { schoolId: payload.id },
+      select: { olympiadCode: true, status: true },
+    });
+    const attendanceByCode = new Map(attendanceRecords.map(a => [a.olympiadCode, a.status]));
+
     // Web-registered students (Student table)
     const webStudents = await prisma.student.findMany({
       where: { allocation: { schoolId: payload.id }, isVerified: true },
@@ -126,6 +136,7 @@ export async function GET(request: Request) {
           password: null as string | null,
           slotA: slots.slotA,
           slotB: slots.slotB,
+          attendance: attendanceByCode.get(s.olympiadCode) ?? null,
         };
       }),
       ...appUsers
@@ -149,11 +160,16 @@ export async function GET(request: Request) {
             password: u.plainPassword,
             slotA: slots.slotA,
             slotB: slots.slotB,
+            attendance: attendanceByCode.get(u.olympiadId!) ?? null,
           };
         }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return NextResponse.json(result);
+    return NextResponse.json({
+      examDate: school?.examDate ?? null,
+      attendanceSubmittedAt: school?.attendanceSubmittedAt ?? null,
+      students: result,
+    });
   } catch (error) {
     console.error('GET school registered-students failed:', error);
     return NextResponse.json({ message: 'Failed to fetch students' }, { status: 500 });

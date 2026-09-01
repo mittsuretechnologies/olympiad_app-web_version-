@@ -22,6 +22,7 @@ interface ParsedRow {
   phone?: string;
   email?: string;
   pincode?: string;
+  examDate?: string;
   classes: string; // raw string like "Class 1:30,Class 2:25"
   _rowIndex: number;
   _errors: string[];
@@ -45,15 +46,11 @@ interface UploadResult {
 
 // â”€â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const VALID_CLASSES = ['PG', 'Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8'];
+const VALID_CLASSES = ['Nursery', 'LKG', 'UKG', 'Class 1', 'Class 2', 'Class 3', 'Class 4', 'Class 5', 'Class 6', 'Class 7', 'Class 8'];
 
 // Spellings schools actually type for the pre-primary classes, mapped to the
 // canonical name stored in VALID_CLASSES. Keys are compared upper-cased.
 const PRE_PRIMARY_ALIASES: Record<string, string> = {
-  PG: 'PG',
-  PREP: 'PG',
-  PLAYGROUP: 'PG',
-  'PLAY GROUP': 'PG',
   NUR: 'Nursery',
   NURSERY: 'Nursery',
   LKG: 'LKG',
@@ -61,7 +58,21 @@ const PRE_PRIMARY_ALIASES: Record<string, string> = {
 };
 
 const REQUIRED_COLS = ['School Name', 'CRM ID', 'State', 'District'];
-const OPTIONAL_COLS = ['City', 'Address', 'Contact Person', 'Phone', 'Email', 'Pincode', 'Classes'];
+const OPTIONAL_COLS = ['City', 'Address', 'Contact Person', 'Phone', 'Email', 'Pincode', 'Exam Date', 'Classes'];
+
+// Accepts DD-MM-YYYY, DD/MM/YYYY, or YYYY-MM-DD; returns an ISO date string (YYYY-MM-DD) or null if unparseable.
+function parseExamDate(raw: string): string | null {
+  const s = raw.trim();
+  if (!s) return null;
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+  if (iso) return s;
+  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(s);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+  }
+  return null;
+}
 
 // Deliberately permissive: one @, no whitespace, a dot-suffixed domain. The credential
 // mail is the real test of an address — this only catches typos worth blocking upfront.
@@ -102,7 +113,8 @@ function downloadTemplate() {
     '9876543210',
     'sunrise@school.com',
     '411001',
-    'PG:15,Nur:20,LKG:25,UKG:25',
+    '15-03-2026',
+    'Nur:20,LKG:25,UKG:25',
   ];
   const ws = XLSX.utils.aoa_to_sheet([headers, sample]);
   ws['!cols'] = headers.map(() => ({ wch: 22 }));
@@ -162,6 +174,7 @@ function parseExcel(file: File): Promise<ParsedRow[]> {
           const rawPhone = get('Phone');
           const rawPincode = get('Pincode');
           const rawClasses = col('Classes') !== -1 ? get('Classes') : '';
+          const rawExamDate = col('Exam Date') !== -1 ? get('Exam Date') : '';
 
           if (rawEmail && !EMAIL_RE.test(rawEmail)) errs.push(`Invalid email: ${rawEmail}`);
 
@@ -171,6 +184,9 @@ function parseExcel(file: File): Promise<ParsedRow[]> {
           if (rawPincode && !PINCODE_RE.test(rawPincode)) errs.push(`Invalid pincode: ${rawPincode}`);
 
           if (rawClasses && !parseClasses(rawClasses)) errs.push(`Invalid classes: ${rawClasses}`);
+
+          const examDate = rawExamDate ? parseExamDate(rawExamDate) : null;
+          if (rawExamDate && !examDate) errs.push(`Invalid exam date: ${rawExamDate}`);
 
           parsed.push({
             name,
@@ -183,6 +199,7 @@ function parseExcel(file: File): Promise<ParsedRow[]> {
             phone: phone || undefined,
             email: rawEmail || undefined,
             pincode: rawPincode || undefined,
+            examDate: examDate || undefined,
             classes: rawClasses,
             _rowIndex: i + 1,
             _errors: errs,
@@ -199,17 +216,17 @@ function parseExcel(file: File): Promise<ParsedRow[]> {
   });
 }
 
-// Normalize "Class PG" â†’ "PG", "Class LKG" â†’ "LKG", "Class UKG" â†’ "UKG", "Class Nursery" â†’ "Nursery"
+// Normalize "Class LKG" â†’ "LKG", "Class UKG" â†’ "UKG", "Class Nursery" â†’ "Nursery"
 function normalizeClassName(raw: string): string {
   const s = raw.trim();
-  // Strip "Class " prefix for non-numeric classes (PG, Nursery, LKG, UKG)
+  // Strip "Class " prefix for non-numeric classes (Nursery, LKG, UKG)
   const stripped = s.replace(/^Class\s+/i, '');
   const canonical = PRE_PRIMARY_ALIASES[stripped.toUpperCase()];
   if (canonical) return canonical;
   return s; // keep as-is for "Class 1", "Class 2" etc.
 }
 
-// Parse "Class 1:30,Class 2:25,PG:15" â†’ [{ className, count }]
+// Parse "Class 1:30,Class 2:25,Nur:15" â†’ [{ className, count }]
 function parseClasses(raw: string): { className: string; count: number }[] | null {
   if (!raw.trim()) return null;
   const parts = raw.split(',').map((s) => s.trim()).filter(Boolean);
@@ -313,6 +330,7 @@ export default function BulkUploadPage() {
         phone: r.phone,
         email: r.email,
         pincode: r.pincode,
+        examDate: r.examDate,
         ...(classesPayload ? { classes: classesPayload } : {}),
       };
     });
@@ -375,10 +393,11 @@ export default function BulkUploadPage() {
             <p className="text-xs font-bold uppercase tracking-wide text-black">Step 1 — Download Template</p>
             <p className="text-xs text-gray-500 mt-0.5">
               Fill in: <span className="font-semibold text-[#009846]">School Name, CRM ID, State, District</span> (required) +
-              City, Address, Contact Person, Phone, Email, Pincode, Classes (optional)
+              City, Address, Contact Person, Phone, Email, Pincode, Exam Date, Classes (optional)
             </p>
             <p className="text-xs text-gray-400 mt-0.5">
-              Classes format: <span className="font-mono bg-gray-100 px-1">PG:15,Nur:20,LKG:25,UKG:25</span>
+              Classes format: <span className="font-mono bg-gray-100 px-1">Nur:20,LKG:25,UKG:25</span>
+              {' · '}Exam Date format: <span className="font-mono bg-gray-100 px-1">DD-MM-YYYY</span>
             </p>
           </div>
           <button
@@ -469,6 +488,7 @@ export default function BulkUploadPage() {
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">CRM ID</th>
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">State</th>
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">District</th>
+                    <th className="text-left px-3 py-2 font-bold border-r border-gray-200">Exam Date</th>
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">Classes</th>
                     <th className="text-left px-3 py-2 font-bold">Status</th>
                   </tr>
@@ -484,6 +504,7 @@ export default function BulkUploadPage() {
                       <td className="px-3 py-2 font-mono text-[#009846] border-r border-gray-100">{row.olympiadId || '—'}</td>
                       <td className="px-3 py-2 border-r border-gray-100">{row.state || '—'}</td>
                       <td className="px-3 py-2 border-r border-gray-100">{row.district || '—'}</td>
+                      <td className="px-3 py-2 border-r border-gray-100">{row.examDate || <span className="text-gray-300 italic">—</span>}</td>
                       <td className="px-3 py-2 border-r border-gray-100 text-gray-500 max-w-[160px] truncate">
                         {row.classes || <span className="text-gray-300 italic">—</span>}
                       </td>

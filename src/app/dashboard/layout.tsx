@@ -29,6 +29,8 @@ import {
   Star,
   Settings,
   ClipboardCheck,
+  PackageCheck,
+  FileCheck2,
   Award,
   Flag,
   LifeBuoy,
@@ -210,6 +212,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Register School', href: '/dashboard/schools/register', icon: PlusCircle },
     { name: 'Bulk Upload', href: '/dashboard/schools/bulk', icon: FileSpreadsheet },
     { name: 'View / Edit Schools', href: '/dashboard/schools', icon: Eye },
+    { name: 'Attendance Reports', href: '/dashboard/schools/attendance', icon: ClipboardCheck },
+    { name: 'Paper Dispatch', href: '/dashboard/schools/paper-dispatch', icon: PackageCheck },
+    { name: 'Answer Sheet Received', href: '/dashboard/schools/answer-sheet-dispatch', icon: FileCheck2 },
   ];
 
   const uploaderSubItems = [
@@ -339,7 +344,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {schoolSubItems.filter((_, i) => canSeeSubItem(['schools.register','schools.bulk','schools.view'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {schoolSubItems.filter((_, i) => canSeeSubItem(['schools.register','schools.bulk','schools.view','schools.attendance','schools.paperDispatch','schools.answerSheetDispatch'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
