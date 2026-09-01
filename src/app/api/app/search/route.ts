@@ -21,6 +21,7 @@ async function searchUsers(q: string, appUserId: string) {
     where: {
       userId:     { contains: q, mode: 'insensitive' },
       isVerified: true,
+      deletionRequestedAt: null,
       NOT:        { id: appUserId },
     },
     select: { id: true, userId: true, avatarUrl: true, olympiadId: true, isPrivate: true },

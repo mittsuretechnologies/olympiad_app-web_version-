@@ -100,6 +100,27 @@ interface ManualMarksRow {
   manual_panchakosha: { kosha: string; earned: number; weight: number }[] | null;
 }
 
+// scanner.ai_marks only exposes question_text on scanner deployments new
+// enough to have the column — production has it, older/staging copies of the
+// schema don't, and selecting it there fails the whole query with a 42703
+// rather than just returning null. Probe once per process and fall back to
+// omitting the column, so pointing DATABASE_URL at an older scanner schema
+// degrades to "Question N" instead of 500ing the results page.
+let questionTextSupported: Promise<boolean> | null = null;
+function hasQuestionTextColumn(): Promise<boolean> {
+  questionTextSupported ??= prisma
+    .$queryRaw<{ n: number }[]>`
+      SELECT count(*)::int AS n
+      FROM information_schema.columns
+      WHERE table_schema = 'scanner'
+        AND table_name = 'ai_marks'
+        AND column_name = 'question_text'
+    `
+    .then(rows => (rows[0]?.n ?? 0) > 0)
+    .catch(() => false);
+  return questionTextSupported;
+}
+
 // The scanner app (a separate Python/Celery service) shares this Postgres
 // instance and writes exam results to the `scanner` schema, which isn't
 // modeled in Prisma. Its `sheets.student_id` is NOT this app's Student.id —
@@ -134,14 +155,16 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
   // that, not on the sheet's own primary key.
   const sheetUuids = sheetRows.map(r => r.sheet_uuid);
 
-  // Per-question detail — instruction text, AI marks/confidence/kosha weights
-  // — comes straight from the scanner's own ai_marks view.
-  const aiRows = await prisma.$queryRaw<AiMarksRow[]>`
-    SELECT sheet_uuid, question_number, page_number, question_text, question_type,
-           max_marks, ai_marks, ai_confidence, ai_panchakosha
-    FROM scanner.ai_marks
-    WHERE sheet_uuid = ANY(${sheetUuids}::uuid[])
-  `;
+  // Per-question detail — question text, AI marks/confidence/kosha weights —
+  // comes straight from the scanner's own ai_marks view.
+  const questionText = (await hasQuestionTextColumn()) ? 'question_text' : 'NULL::text AS question_text';
+  const aiRows = await prisma.$queryRawUnsafe<AiMarksRow[]>(
+    `SELECT sheet_uuid, question_number, page_number, ${questionText}, question_type,
+            max_marks, ai_marks, ai_confidence, ai_panchakosha
+     FROM scanner.ai_marks
+     WHERE sheet_uuid = ANY($1::uuid[])`,
+    sheetUuids,
+  );
 
   // Manual (human-reviewed) marks, when a reviewer has been through this
   // question — most rows will have manual_marks = null until reviewed.

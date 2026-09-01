@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   Video, Clapperboard, Star, Eye, Heart, BookOpen, Search, Filter, Calendar, Tag,
-  Loader2, Share2, Check, Lock, Globe, ShieldCheck, AlertCircle, ChevronRight,
+  Loader2, Share2, Check, Lock, Globe, ShieldCheck, AlertCircle, ChevronRight, UserCheck,
 } from 'lucide-react';
 import { getCategoryDisplayLabel } from '@/lib/olympiad-categories';
 import { CARD, STACK, INPUT, LABEL, FOCUS, BTN_PRIMARY, BTN_SECONDARY, TABLE, TH, TD, TR, avatarTint } from '../ui';
@@ -34,6 +34,9 @@ interface VideoItem {
   classCode: string | null;
   className: string | null;
   source: 'web' | 'app';
+  // OLYMPIAD = reached through an Olympiad ID; LINKED = a student with no
+  // Olympiad ID whose request this school approved.
+  linkType?: 'OLYMPIAD' | 'LINKED';
 }
 
 const STEP_UP_STORAGE_KEY = 'schoolVisibilityStepUp';
@@ -125,13 +128,13 @@ export default function StudentVideosPage() {
   const studentGroups = useMemo(() => {
     const map = new Map<string, {
       key: string; studentName: string; username: string | null; olympiadCode: string;
-      className: string | null; videos: VideoItem[];
+      className: string | null; linkType: 'OLYMPIAD' | 'LINKED'; videos: VideoItem[];
     }>();
     for (const v of filtered) {
       const key = v.studentId || v.olympiadCode || v.studentName;
       let g = map.get(key);
       if (!g) {
-        g = { key, studentName: v.studentName, username: v.username, olympiadCode: v.olympiadCode, className: v.className, videos: [] };
+        g = { key, studentName: v.studentName, username: v.username, olympiadCode: v.olympiadCode, className: v.className, linkType: v.linkType ?? 'OLYMPIAD', videos: [] };
         map.set(key, g);
       }
       g.videos.push(v);
@@ -320,7 +323,18 @@ export default function StudentVideosPage() {
                           <span className="text-[#9CA3AF]">—</span>
                         )}
                       </TD_CELL>
-                      <TD_CELL className="!py-2 font-mono text-[12px] text-[#1559C7]">{g.olympiadCode}</TD_CELL>
+                      <TD_CELL className="!py-2">
+                        {g.linkType === 'LINKED' ? (
+                          // No Olympiad ID exists for these students - showing an
+                          // empty code column would read as missing data rather
+                          // than as the other, equally valid way in.
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[#EDF4FD] px-1.5 py-0.5 text-[11px] font-medium text-[#1559C7]">
+                            <UserCheck className="h-2.5 w-2.5" />Linked
+                          </span>
+                        ) : (
+                          <span className="font-mono text-[12px] text-[#1559C7]">{g.olympiadCode}</span>
+                        )}
+                      </TD_CELL>
                       <TD_CELL className="!py-2 text-center font-semibold text-[#111827]">{g.videos.length}</TD_CELL>
                       <TD_CELL className="!py-2 text-center">
                         {oCount > 0 ? <StatusBadge tone="info" icon={Star}>{oCount}</StatusBadge> : <span className="text-[#9CA3AF]">—</span>}

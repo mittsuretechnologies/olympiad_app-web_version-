@@ -33,10 +33,17 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         olympiadId: true,
         isPrivate:  true,
         createdAt:  true,
+        deletionRequestedAt: true,
       },
     });
 
-    if (!target) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    // Pending deletion (either a viewer's 30-day grace window or an
+    // unreviewed student request) — treat exactly like the account doesn't
+    // exist. The owner is logged out the moment this is set, so this can
+    // only ever be someone else looking.
+    if (!target || target.deletionRequestedAt) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
 
     const isOwnProfile = appUser.id === target.id;
 

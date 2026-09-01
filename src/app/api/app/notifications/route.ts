@@ -58,9 +58,27 @@ export async function GET(request: Request) {
       ? await prisma.video.findMany({ where: { id: { in: videoIds } }, select: { id: true, thumbnailUrl: true } })
       : [];
     const thumbByVideoId = new Map(videos.map(v => [v.id, v.thumbnailUrl]));
+
+    // FOLLOW/FOLLOW_REQUEST notifications carry an actorId — tapping one
+    // normally opens that person's profile. actorId isn't a real foreign key
+    // (Notification survives independently of who triggered it), so an actor
+    // who's since deleted their account, or is mid-way through their 30-day
+    // grace window, resolves to nothing/a hidden account and the old
+    // "navigate to their profile" tap would 404. Flag it here so the app can
+    // show "account no longer active" instead of a dead link.
+    const actorIds = [...new Set(notifications.map(n => n.actorId).filter((id): id is string => !!id))];
+    const liveActors = actorIds.length > 0
+      ? await prisma.appUser.findMany({
+          where:  { id: { in: actorIds }, deletionRequestedAt: null },
+          select: { id: true },
+        })
+      : [];
+    const liveActorIds = new Set(liveActors.map(a => a.id));
+
     const notificationsWithThumb = notifications.map(n => ({
       ...n,
       thumbnailUrl: n.videoId ? (thumbByVideoId.get(n.videoId) ?? null) : null,
+      actorInactive: n.actorId ? !liveActorIds.has(n.actorId) : false,
     }));
 
     return NextResponse.json({ notifications: notificationsWithThumb, nextCursor, hasMore });

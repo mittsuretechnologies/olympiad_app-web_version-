@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
+  // Pin the Turbopack project root to this folder. Without it, Next walks up
+  // and infers the parent directory as the workspace root (a stray, empty
+  // package-lock.json sits there with no matching package.json), which
+  // breaks next/font/google module resolution under Turbopack.
+  turbopack: {
+    root: path.resolve(__dirname),
+  },
+
   serverExternalPackages: ['ffmpeg-static', 'ffprobe-static'],
 
   experimental: {

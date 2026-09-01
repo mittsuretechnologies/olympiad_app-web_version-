@@ -1,18 +1,31 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Inter, Poppins } from "next/font/google";
+import localFont from "next/font/local";
 import { cn } from "@/lib/utils";
 
-const inter = Inter({
-  subsets: ['latin'],
+// Self-hosted via @fontsource (static files, no network fetch at build time).
+// next/font/google requires downloading from fonts.gstatic.com during the
+// build, which fails on networks where TLS is intercepted by a proxy whose
+// root CA Node doesn't trust.
+const inter = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-700-normal.woff2", weight: "700", style: "normal" },
+    { path: "../../node_modules/@fontsource/inter/files/inter-latin-800-normal.woff2", weight: "800", style: "normal" },
+  ],
   variable: '--font-inter',
-  weight: ['400', '500', '600', '700', '800'],
 });
 
-const poppins = Poppins({
-  subsets: ['latin'],
+const poppins = localFont({
+  src: [
+    { path: "../../node_modules/@fontsource/poppins/files/poppins-latin-400-normal.woff2", weight: "400", style: "normal" },
+    { path: "../../node_modules/@fontsource/poppins/files/poppins-latin-500-normal.woff2", weight: "500", style: "normal" },
+    { path: "../../node_modules/@fontsource/poppins/files/poppins-latin-600-normal.woff2", weight: "600", style: "normal" },
+    { path: "../../node_modules/@fontsource/poppins/files/poppins-latin-700-normal.woff2", weight: "700", style: "normal" },
+  ],
   variable: '--font-poppins',
-  weight: ['400', '500', '600', '700'],
 });
 
 export const metadata: Metadata = {

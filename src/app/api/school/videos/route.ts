@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
+import { getSchoolMembers } from '@/lib/schoolMembers';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -16,9 +17,11 @@ function getViewerIdFromToken(request: NextRequest): string | null {
 }
 
 // GET /api/school/videos?schoolId=<school.id>
-// Returns all approved public videos from a school, resolved via:
-// School.id → OlympiadIdAllocation.schoolId → AppUser.olympiadId → Video.appUserId
-// Also covers Student.allocation.schoolId → Video.studentId
+// Returns all approved public videos from a school. Membership is resolved by
+// getSchoolMembers(), which covers both the Olympiad-ID path and the approved
+// link-request path (students with no Olympiad ID whom the school confirmed).
+// Visibility is unchanged by that: this feed still applies the same
+// visibilityWhere() + isPublic filter it always has.
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const schoolId  = searchParams.get('schoolId')?.trim();
@@ -31,32 +34,23 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Find all allocation codes for this school
-    const allocations = await prisma.olympiadIdAllocation.findMany({
-      where: { schoolId },
-      select: { code: true },
-    });
-    const codes = allocations.map(a => a.code);
+    // Members of this school by either path - Olympiad ID or approved link
+    const { appUserIds, studentIds } = await getSchoolMembers(schoolId);
 
-    // AppUsers whose olympiadId matches one of those codes
-    const appUsers = codes.length > 0
+    const appUsers = appUserIds.length > 0
       ? await prisma.appUser.findMany({
-          where: { olympiadId: { in: codes } },
+          where: { id: { in: appUserIds } },
           select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
         })
       : [];
-    const appUserIds = appUsers.map(u => u.id);
     const appUserMap = new Map(appUsers.map(u => [u.id, u]));
-    const allocMap   = new Map(appUsers.map(u => [u.id, u.olympiadId]));
 
-    // Students whose allocation points to this school
-    const students = codes.length > 0
+    const students = studentIds.length > 0
       ? await prisma.student.findMany({
-          where: { allocation: { code: { in: codes } } },
+          where: { id: { in: studentIds } },
           select: { id: true, name: true },
         })
       : [];
-    const studentIds = students.map(s => s.id);
     const studentMap = new Map(students.map(s => [s.id, s]));
 
     // If no members found for this school, return empty
