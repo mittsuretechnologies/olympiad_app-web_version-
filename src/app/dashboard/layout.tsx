@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { isTokenExpired } from '@/lib/session-token';
 import { DASHBOARD_TOKEN_KEYS, clearDashboardSession } from '@/lib/swr';
+import TermsAcceptanceModal from '@/components/TermsAcceptanceModal';
 import {
   School,
   LogOut,
@@ -35,6 +36,7 @@ import {
   UserX,
   Menu,
   X,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -47,6 +49,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [role, setRole] = useState<Role>('SUPERADMIN');
   const [allowedModules, setAllowedModules] = useState<string[] | null>(null); // null = superadmin (all)
   const [currentUser, setCurrentUser] = useState<any>(null);
+  // Moderator/Evaluator only: first-login Terms & Conditions gate.
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsToken, setTermsToken] = useState<string | null>(null);
 
   useEffect(() => {
     // Drop any expired token before reading it: a stale-but-present token used
@@ -95,6 +100,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       } catch { /* ignore */ }
 
       const permToken = token || reviewerToken || evaluatorToken || moderatorToken;
+
+      // Moderator/Evaluator must accept the T&C popup once before they can
+      // use the dashboard.
+      if ((detectedRole === 'MODERATOR' || detectedRole === 'EVALUATOR') && permToken) {
+        setTermsToken(permToken);
+        fetch('/api/staff/terms', { headers: { Authorization: `Bearer ${permToken}` } })
+          .then(r => (r.ok ? r.json() : { termsAccepted: true }))
+          .then((data: { termsAccepted: boolean }) => setShowTermsModal(!data.termsAccepted))
+          .catch(() => { /* fail open: don't block the dashboard on a network hiccup */ });
+      }
+
       fetch('/api/settings/role-permissions', { headers: permToken ? { Authorization: `Bearer ${permToken}` } : {} })
         .then(r => r.json())
         .then((data: { global: { role: string; allowedModules: string[] }[]; individual: { memberId: string; allowedModules: string[] }[] } | { message: string }) => {
@@ -173,6 +189,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const handleLogout = () => {
     clearDashboardSession();
     router.push('/login');
+  };
+
+  const handleAcceptTerms = async () => {
+    const res = await fetch('/api/staff/terms', {
+      method: 'POST',
+      headers: termsToken ? { Authorization: `Bearer ${termsToken}` } : {},
+    });
+    if (!res.ok) throw new Error('Failed to save acceptance');
+    setShowTermsModal(false);
   };
 
   const moderationSubItems = [
@@ -454,6 +479,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
+            {/* Banners — only superadmin */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/banners"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/banners') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <ImageIcon size={20} />
+                <span className="text-sm font-semibold">Banners</span>
+              </Link>
+            )}
+
             {/* Activity Log — only superadmin */}
             {role === 'SUPERADMIN' && (
               <Link href="/dashboard/activity-log"
@@ -534,6 +568,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="px-4 py-5 sm:px-6 sm:py-6 lg:px-8 lg:py-8">{children}</div>
         </div>
       </main>
+
+      {showTermsModal && (
+        <TermsAcceptanceModal onAccept={handleAcceptTerms} onLogout={handleLogout} />
+      )}
     </div>
   );
 }

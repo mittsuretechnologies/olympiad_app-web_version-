@@ -14,6 +14,12 @@ export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
+    // Which set of exam marks drives the kosha %/holistic score — AI's own
+    // grading, or the human reviewer's (default, matching what the scanner
+    // itself currently prefers when a question has been reviewed).
+    const url = new URL(request.url);
+    const examSource = url.searchParams.get('examSource') === 'ai' ? 'ai' : 'manual';
+
     const allVideos = await prisma.video.findMany({
       where: { isEvaluation: true, status: 'APPROVED', deletedAt: null },
       include: {
@@ -184,7 +190,7 @@ export async function GET(request: Request) {
 
       const koshBreakdown = KOSH_KEYS.map(kosh => {
         const videoPct = koshPercent(koshScores[kosh], scoredVideos);
-        const examPct = exam?.koshPercents[kosh] ?? null;
+        const examPct = (examSource === 'ai' ? exam?.aiKoshPercents[kosh] : exam?.manualKoshPercents[kosh]) ?? null;
         return {
           kosh,
           label: KOSH_LABELS[kosh],
@@ -208,11 +214,23 @@ export async function GET(request: Request) {
         publishedVideos.reduce((sum, v) => sum + (v.totalScore ?? 0), 0) * 10
       ) / 10;
 
+      const examPercentage = exam
+        ? (examSource === 'ai'
+            ? (exam.aiMaxScore ? Math.round((exam.aiTotalScore / exam.aiMaxScore) * 1000) / 10 : null)
+            : (exam.manualTotalScore !== null && exam.manualMaxScore ? Math.round((exam.manualTotalScore / exam.manualMaxScore) * 1000) / 10 : null))
+        : null;
+
       return {
         ...g,
-        examPercentage: exam?.percentage ?? null,
+        examSource,
+        examPercentage,
         examTotalScore: exam?.totalScore ?? null,
         examMaxScore: exam?.maxTotalScore ?? null,
+        examAiTotalScore: exam?.aiTotalScore ?? null,
+        examAiMaxScore: exam?.aiMaxScore ?? null,
+        examManualTotalScore: exam?.manualTotalScore ?? null,
+        examManualMaxScore: exam?.manualMaxScore ?? null,
+        examManualQuestionCount: exam?.manualQuestionCount ?? 0,
         examQuestions: exam?.questions ?? [],
         videoScoreTotal,
         videoMaxScore: REQUIRED_VIDEOS * VIDEO_MAX_SCORE,

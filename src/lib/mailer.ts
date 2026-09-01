@@ -147,6 +147,9 @@ function credentialRow(label: string, value: string, last = false): string {
   </tr>`;
 }
 
+/** Where the "Login Now" button in the school credentials email points to. */
+const ADMIN_LOGIN_URL = 'https://admin.mittmee.com/login';
+
 export interface SchoolCredentialsMail {
   to: string;
   schoolName: string;
@@ -185,6 +188,19 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
         ${credentialRow('Password', data.password, true)}
       </table>
 
+      <!-- Bulletproof button: background colour + padding on the <td>, not the
+           <a>, so Outlook's Word engine (which ignores padding/border-radius on
+           inline elements) still renders a solid, clickable block. -->
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px;">
+        <tr><td style="background:#1552B6;border-radius:8px;">
+          <a href="${ADMIN_LOGIN_URL}" target="_blank"
+             style="display:inline-block;padding:12px 28px;font-family:Arial,Helvetica,sans-serif;
+                    font-size:14px;font-weight:bold;color:#ffffff;text-decoration:none;border-radius:8px;">
+            Login Now &rarr;
+          </a>
+        </td></tr>
+      </table>
+
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
              style="background:#FDF0F0;border-left:3px solid #C0392B;border-radius:6px;margin:0 0 16px;">
         <tr><td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#8C2A20;line-height:1.5;">
@@ -205,6 +221,7 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
     text:
       `${greeting}\n\n${data.schoolName} has been registered on Mittmee.\n\n` +
       `School ID: ${data.schoolId}\nUsername: ${data.username}\nPassword: ${data.password}\n\n` +
+      `Login here: ${ADMIN_LOGIN_URL}\n\n` +
       `Please keep these credentials safe.\n\nRegards,\nTeam Mittsure`,
   });
 }
