@@ -33,6 +33,15 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Incorrect password. Please try again.' }, { status: 401 });
     }
 
+    // Logging in cancels a viewer's pending 30-day deletion — "everything
+    // should work normally as it was before" is exactly this: clear the flag
+    // and the account/videos are visible again immediately (visibilityWhere
+    // only hides accounts where this is still set).
+    await prisma.appUser.update({
+      where: { id: user.id },
+      data:  { lastLoginAt: new Date(), deletionRequestedAt: null },
+    });
+
     const token = jwt.sign(
       { id: user.id, userId: user.userId, role: 'APP_USER' },
       process.env.JWT_SECRET || 'fallback_secret',

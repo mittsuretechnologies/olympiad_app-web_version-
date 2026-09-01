@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getSchoolMembers } from '@/lib/schoolMembers';
 
 export async function GET(request: Request) {
   try {
@@ -24,8 +25,13 @@ export async function GET(request: Request) {
       where: { schoolId: payload.id, sentAt: { not: null } },
       select: { code: true, classCode: true, className: true, assignedName: true },
     });
-    const codes = allocations.map((a: any) => a.code);
     const allocByCode = new Map(allocations.map((a: any) => [a.code, a]));
+
+    // Members of this school by either path. Students the school approved
+    // through a link request have no Olympiad ID, so the allocation lookup
+    // above can never reach them - getSchoolMembers covers both.
+    const { appUserIds, linkedAppUserIds } = await getSchoolMembers(payload.id);
+    const linkedIdSet = new Set(linkedAppUserIds);
 
     // 1. Videos from web-registered Students
     const studentVideos = await prisma.video.findMany({
@@ -45,16 +51,16 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
     });
 
-    // 2. Videos from app-registered AppUsers (linked via olympiadId)
+    // 2. Videos from app-registered AppUsers - via Olympiad ID or approved link
     const appUsers = await prisma.appUser.findMany({
-      where: { olympiadId: { in: codes }, isVerified: true },
+      where: { id: { in: appUserIds }, isVerified: true },
       select: { id: true, userId: true, olympiadId: true },
     });
     const appUserById = new Map(appUsers.map((u: any) => [u.id, u]));
-    const appUserIds = appUsers.map((u: any) => u.id);
+    const verifiedAppUserIds = appUsers.map((u: any) => u.id);
 
     const appVideos = await prisma.video.findMany({
-      where: { appUserId: { in: appUserIds }, status: 'APPROVED', deletedAt: null },
+      where: { appUserId: { in: verifiedAppUserIds }, status: 'APPROVED', deletedAt: null },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -83,6 +89,7 @@ export async function GET(request: Request) {
         classCode: v.student?.allocation?.classCode || null,
         className: v.student?.allocation?.className || null,
         source: 'web',
+        linkType: 'OLYMPIAD',
       })),
       ...appVideos.map((v: any) => {
         const u = appUserById.get(v.appUserId);
@@ -110,6 +117,9 @@ export async function GET(request: Request) {
           classCode: alloc?.classCode || null,
           className: alloc?.className || null,
           source: 'app',
+          // How this student reaches the school: an Olympiad ID they were
+          // issued, or a link request the school approved.
+          linkType: u && linkedIdSet.has(u.id) && !u.olympiadId ? 'LINKED' : 'OLYMPIAD',
         };
       }),
     ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

@@ -469,8 +469,23 @@ model AppUser {
   isVerified             Boolean         @default(false)
   olympiadId             String?
   isPrivate              Boolean         @default(false)
+  // Account deletion — see AccountDeletionRequest for the student-side
+  // (admin-approved) path. This field only ever gets set for a viewer
+  // (no olympiadId): tapping "Delete Account" stamps it immediately, which
+  // hides the account/videos everywhere (see visibilityWhere) and logs them
+  // out. Logging back in before the 30-day sweep clears it — see login route.
+  // The sweep (api/cron/sweep-deleted-accounts) hard-deletes anyone still set
+  // 30+ days later.
+  deletionRequestedAt    DateTime?
+  // Stamped on every successful login — the only signal the 30-day sweep and
+  // the login route need to tell "came back in time" from "still gone".
+  lastLoginAt            DateTime?
   olympiadCatAApproved   Boolean         @default(false)
   olympiadCatBApproved   Boolean         @default(false)
+  // Free-text school name typed by a user whose school is not registered on
+  // Mittmee. Purely a profile label: it builds no linkage and never surfaces a
+  // video on any school portal — SchoolLinkRequest is the only real link.
+  unlistedSchoolName     String?
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   followers              Follow[]        @relation("UserFollowers")
@@ -482,9 +497,12 @@ model AppUser {
   reportsSubmitted       VideoReport[]
   supportTickets         SupportTicket[]
   notifications          Notification[]
+  schoolLinkRequests     SchoolLinkRequest[]
+  deletionRequests       AccountDeletionRequest[]
 
   @@index([email])
   @@index([mobile])
+  @@index([deletionRequestedAt])
   @@schema("public")
 }
 
@@ -663,5 +681,51 @@ model Notification {
   @@index([userId])
   @@index([userId, isRead])
   @@index([userId, videoId, type, isRead])
+  @@schema("public")
+}
+
+// Links an app user to a registered school WITHOUT an Olympiad ID.
+// A student who never sat the Olympiad has no OlympiadIdAllocation, so the
+// School -> allocation -> AppUser.olympiadId chain can never reach them. This
+// model is the second, request-based path: the user asks, the school approves,
+// and from then on their videos appear on that school portal and on the school
+// page in the app. It grants nothing else — no Olympiad entry, no permissions.
+model SchoolLinkRequest {
+  id         String    @id @default(uuid())
+  appUserId  String
+  schoolId   String
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  decidedAt  DateTime?
+  appUser    AppUser   @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  school     School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // One row per (user, school) so a rejected user can re-request the same
+  // school by flipping this row back to PENDING rather than stacking history.
+  @@unique([appUserId, schoolId])
+  @@index([appUserId, status])
+  @@index([schoolId, status])
+  @@schema("public")
+}
+
+// Student/Olympiad-user side of account deletion (viewers instead go through
+// AppUser.deletionRequestedAt + the 30-day sweep — no admin step needed since
+// there's no institutional data at stake). A student has real Olympiad
+// history, so a SuperAdmin has to approve before anything is wiped. Approving
+// hard-deletes the AppUser (and everything under it, videos included) via
+// lib/accountDeletion.ts, which takes this row down with it — nothing to
+// clean up here after an approval. A rejected request leaves this row as
+// history and the user is free to submit a new one any time.
+model AccountDeletionRequest {
+  id         String    @id @default(uuid())
+  appUserId  String
+  status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  createdAt  DateTime  @default(now())
+  decidedAt  DateTime?
+  appUser    AppUser   @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@index([appUserId, status])
+  @@index([status])
   @@schema("public")
 }

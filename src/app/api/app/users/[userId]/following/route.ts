@@ -66,10 +66,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
 
     const followingIds = follows.map(f => f.followingId);
 
-    // Fetch the actual user records
+    // Fetch the actual user records — pending-deletion accounts are NOT
+    // excluded here (unlike search/feeds): the Follow row is real and still
+    // counts toward followingCount, so silently dropping them from the list
+    // would make the list shorter than the count it's paired with. Instead
+    // they're kept and anonymized below (see the map()).
     const users = await prisma.appUser.findMany({
       where: { id: { in: followingIds } },
-      select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
+      select: { id: true, userId: true, avatarUrl: true, olympiadId: true, deletionRequestedAt: true },
     });
 
     // Count how many followers each of these users has — one batched query
@@ -94,6 +98,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
       .map(f => {
         const u = userMap.get(f.followingId);
         if (!u) return null;
+        if (u.deletionRequestedAt) {
+          // Pending deletion — occupy the slot (count and list stay in sync)
+          // but expose nothing real: no handle, no avatar, no tap-through.
+          return {
+            id: u.id, userId: 'Inactive User', avatarUrl: null, olympiadId: null,
+            followersCount: 0, isFollowing: false, isOwnProfile: false, isInactive: true,
+          };
+        }
         return {
           id:             u.id,
           userId:         u.userId,

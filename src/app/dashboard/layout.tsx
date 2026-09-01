@@ -35,8 +35,10 @@ import {
   Flag,
   LifeBuoy,
   History,
+  UserX,
   Menu,
   X,
+  Image as ImageIcon,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -482,12 +484,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
+            {/* Banners — only superadmin */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/banners"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/banners') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <ImageIcon size={20} />
+                <span className="text-sm font-semibold">Banners</span>
+              </Link>
+            )}
+
             {/* Activity Log — only superadmin */}
             {role === 'SUPERADMIN' && (
               <Link href="/dashboard/activity-log"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/activity-log') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <History size={20} />
                 <span className="text-sm font-semibold">Activity Log</span>
+              </Link>
+            )}
+
+            {/* Account Deletion Requests — only superadmin, only they can approve wiping a student's account */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/account-deletion-requests"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/account-deletion-requests') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <UserX size={20} />
+                <span className="text-sm font-semibold">Deletion Requests</span>
               </Link>
             )}
 
