@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, KeyRound, Menu, X, ClipboardList, PackageCheck, FileCheck2 } from 'lucide-react';
+import { LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, KeyRound, Menu, X, ClipboardList, PackageCheck, FileCheck2, UserCheck } from 'lucide-react';
 import Image from 'next/image';
 import { isTokenExpired, clearSchoolSession } from '@/lib/session-token';
 import { initialsOf } from './ui';
@@ -60,6 +60,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     { name: 'Dashboard',          href: '/school',                     icon: LayoutDashboard },
     { name: 'Olympiad IDs',       href: '/school/olympiad-ids',        icon: Contact },
     { name: 'My Students',        href: '/school/registered-students', icon: Users },
+    { name: 'Student Requests',   href: '/school/student-requests',    icon: UserCheck },
     { name: 'Question Papers',    href: '/school/paper-dispatch',      icon: PackageCheck },
     { name: 'Answer Sheets',      href: '/school/answer-sheet-dispatch', icon: FileCheck2 },
     { name: 'Student Videos',     href: '/school/student-videos',      icon: Clapperboard },
