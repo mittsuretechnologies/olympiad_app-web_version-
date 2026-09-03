@@ -47,23 +47,73 @@ function getAppUserFromToken(request: Request) {
   }
 }
 
-function extractThumbnail(videoPath: string, thumbPath: string): Promise<void> {
+function runFfmpeg(args: string[]): Promise<void> {
   return new Promise((resolve, reject) => {
-    const proc = spawn(ffmpegPath, [
-      '-ss', '00:00:01',
-      '-i', videoPath,
-      '-frames:v', '1',
-      '-vf', 'scale=640:-1',
-      '-q:v', '3',
-      '-y',
-      thumbPath,
-    ]);
+    const proc = spawn(ffmpegPath, args);
+    let stderr = '';
+    proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
     proc.on('close', (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`ffmpeg exited with code ${code}`));
+      else reject(new Error(`ffmpeg exited with code ${code}: ${stderr.slice(-500)}`));
     });
     proc.on('error', reject);
   });
+}
+
+function extractThumbnailPlain(videoPath: string, thumbPath: string): Promise<void> {
+  return runFfmpeg([
+    '-ss', '00:00:01',
+    '-i', videoPath,
+    '-frames:v', '1',
+    '-vf', 'scale=640:-1',
+    '-q:v', '3',
+    '-y',
+    thumbPath,
+  ]);
+}
+
+// Some phones/camera apps write an H.264 color_range value ffmpeg's own
+// filter graph refuses to negotiate ("Invalid color range"), which fails
+// EVERY frame extraction from that file — confirmed reproducible against a
+// real uploaded video, not a rare flake. The stream data itself is fine
+// (stream-copy works); only decode-time color negotiation chokes on the tag.
+//
+// Fix: rewrite just the container's color metadata via the h264_metadata
+// bitstream filter (a fast, lossless remux — no re-encoding of the actual
+// video) to standard values, then extract the frame from THAT file. This
+// can't be done in a single ffmpeg invocation: the bsf rewrites metadata at
+// the packet level, but the decoder still reads the original stream's
+// (uncorrected) container-level tag at filter-graph init time on the same
+// pass — the metadata has to actually be persisted to a new container first.
+async function extractThumbnailWithColorRangeFix(videoPath: string, thumbPath: string): Promise<void> {
+  const remuxedPath = `${videoPath}.range-fixed.mp4`;
+  try {
+    await runFfmpeg([
+      '-i', videoPath,
+      '-bsf:v', 'h264_metadata=video_full_range_flag=0:colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1',
+      '-c', 'copy',
+      '-y',
+      remuxedPath,
+    ]);
+    await extractThumbnailPlain(remuxedPath, thumbPath);
+  } finally {
+    await unlink(remuxedPath).catch(() => {});
+  }
+}
+
+async function extractThumbnail(videoPath: string, thumbPath: string): Promise<void> {
+  try {
+    await extractThumbnailPlain(videoPath, thumbPath);
+  } catch (err) {
+    // Only worth retrying for the specific known failure mode — anything
+    // else (corrupt file, unsupported codec entirely) will fail the same
+    // way again and shouldn't cost a second ffmpeg pass.
+    if (err instanceof Error && err.message.includes('Invalid color range')) {
+      await extractThumbnailWithColorRangeFix(videoPath, thumbPath);
+    } else {
+      throw err;
+    }
+  }
 }
 
 export async function POST(request: Request) {
