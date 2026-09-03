@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
-type Section = 'schools' | 'uploaders' | 'credentials' | 'moderation' | 'reports' | 'reviewer' | 'evaluator' | 'result' | 'settings' | null;
+type Section = 'schools' | 'credentials' | 'moderation' | 'reports' | 'evaluator' | 'result' | 'settings' | null;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -145,7 +145,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const sectionForPath = (p: string): Section => {
     if (p.startsWith('/dashboard/schools')) return 'schools';
-    if (p.startsWith('/dashboard/uploaders')) return 'uploaders';
+    if (p.startsWith('/dashboard/uploaders')) return 'credentials';
     if (p.startsWith('/dashboard/credentials/registered')) return 'reports';
     if (p.startsWith('/dashboard/credentials')) return 'credentials';
     if (p.startsWith('/dashboard/videos')) return 'moderation';
@@ -153,7 +153,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (p.startsWith('/dashboard/moderation')) return 'moderation';
     if (p.startsWith('/dashboard/reports')) return 'reports';
     if (p.startsWith('/dashboard/app-users')) return 'reports';
-    if (p.startsWith('/dashboard/reviewer')) return 'reviewer';
     if (p.startsWith('/dashboard/evaluator')) return 'evaluator';
     if (p.startsWith('/dashboard/result')) return 'result';
     if (p.startsWith('/dashboard/settings')) return 'settings';
@@ -179,11 +178,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const schoolsOpen = openSection === 'schools';
-  const uploadersOpen = openSection === 'uploaders';
   const credentialsOpen = openSection === 'credentials';
   const moderationOpen = openSection === 'moderation';
   const reportsOpen = openSection === 'reports';
-  const reviewerOpen = openSection === 'reviewer';
   const evaluatorOpen = openSection === 'evaluator';
   const resultOpen = openSection === 'result';
   const settingsOpen = openSection === 'settings';
@@ -213,26 +210,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Bulk Upload', href: '/dashboard/schools/bulk', icon: FileSpreadsheet },
     { name: 'View / Edit Schools', href: '/dashboard/schools', icon: Eye },
     { name: 'Attendance Reports', href: '/dashboard/schools/attendance', icon: ClipboardCheck },
-    { name: 'Paper Dispatch', href: '/dashboard/schools/paper-dispatch', icon: PackageCheck },
-    { name: 'Answer Sheet Received', href: '/dashboard/schools/answer-sheet-dispatch', icon: FileCheck2 },
-  ];
-
-  const uploaderSubItems = [
-    { name: 'Register Uploader', href: '/dashboard/uploaders/register', icon: UserPlus },
-    { name: 'View / Manage Uploaders', href: '/dashboard/uploaders', icon: Eye },
+    // { name: 'Paper Dispatch', href: '/dashboard/schools/paper-dispatch', icon: PackageCheck },
+    // { name: 'Answer Sheet Received', href: '/dashboard/schools/answer-sheet-dispatch', icon: FileCheck2 },
   ];
 
   const credentialsSubItems = [
     { name: 'Manage School Credentials',    href: '/dashboard/credentials/schools',    icon: Users },
-    { name: 'Manage Uploader Credentials',  href: '/dashboard/credentials/uploaders',  icon: UploadCloud },
     { name: 'Manage Student Credentials',   href: '/dashboard/credentials/students',   icon: KeyRound },
+    { name: 'Manage Uploader Credentials',  href: '/dashboard/credentials/uploaders',  icon: UploadCloud },
     { name: 'Reviewer Credentials',         href: '/dashboard/credentials/reviewers',  icon: UserCheck },
+    { name: 'Master Reviewer Credentials',  href: '/dashboard/credentials/master-reviewers', icon: UserCheck },
     { name: 'Evaluator Credentials',        href: '/dashboard/credentials/evaluators', icon: Star },
-  ];
-
-  const reviewerSubItems = [
-    { name: 'Manage Reviewers',  href: '/dashboard/reviewer/manage',         icon: UserCheck },
-    { name: 'Review Content',    href: '/dashboard/reviewer/review-content',  icon: Play },
   ];
 
   const evaluatorSubItems = [
@@ -351,25 +339,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </div>
             )}
 
-            {/* Uploaders */}
-            {canSee('uploaders') && (
-              <div>
-                <button onClick={() => toggleSection('uploaders')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/uploaders'))}>
-                  <div className="flex items-center gap-3"><UploadCloud size={20} /><span className="text-sm font-semibold">Uploaders</span></div>
-                  <ChevronDown size={16} className={`transition-transform duration-200 ${uploadersOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${uploadersOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
-                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {uploaderSubItems.filter((_, i) => canSeeSubItem(['uploaders.register','uploaders.view'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
-                  </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {/* Credentials */}
             {canSee('credentials') && (
               <div>
@@ -382,7 +351,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {credentialsSubItems.filter((_, i) => canSeeSubItem(['credentials.schools','credentials.uploaders','credentials.students','credentials.reviewers','credentials.evaluators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {credentialsSubItems.filter((_, i) => canSeeSubItem(['credentials.schools','credentials.students','credentials.uploaders','credentials.reviewers','credentials.masterReviewers','credentials.evaluators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
@@ -402,25 +371,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported', 'moderation.moderators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
-                  </div>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Reviewer */}
-            {canSee('reviewer') && (
-              <div>
-                <button onClick={() => toggleSection('reviewer')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/reviewer'))}>
-                  <div className="flex items-center gap-3"><UserCheck size={20} /><span className="text-sm font-semibold">Reviewer</span></div>
-                  <ChevronDown size={16} className={`transition-transform duration-200 ${reviewerOpen ? 'rotate-180' : ''}`} />
-                </button>
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${reviewerOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
-                  <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {reviewerSubItems.filter((_, i) => canSeeSubItem(['reviewer.manage','reviewer.content'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>

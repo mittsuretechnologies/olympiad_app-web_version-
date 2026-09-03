@@ -31,6 +31,8 @@ interface ExamQuestionEntry {
   maxMarks: number;
   aiMarks: number | null;
   aiConfidence: number | null;
+  performanceLevel: string | null;
+  manualPerformanceLevel: string | null;
   manualMarks: number | null;
   manualMarksDisplay: string | null;
   reviewedBy: string | null;
@@ -97,6 +99,17 @@ function percentBandClass(pct: number) {
   if (pct >= 55) return 'text-[#004f9f]';
   if (pct >= 30) return 'text-amber-700';
   return 'text-red-600';
+}
+
+// Colors for the scanner's own per-question performance_level label — set by
+// the scanner team, independent of the raw marks percentage shown alongside it.
+function performanceLevelClass(level: string) {
+  const key = level.trim().toLowerCase();
+  if (key === 'proficient') return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+  if (key === 'progressing') return 'bg-[#EBF3FC] text-[#004f9f] border-[#BFD8F5]';
+  if (key === 'beginner') return 'bg-amber-50 text-amber-700 border-amber-200';
+  if (key === 'did not attempt') return 'bg-gray-100 text-gray-500 border-gray-200';
+  return 'bg-gray-50 text-gray-600 border-gray-200';
 }
 
 // A fieldset/legend-style section: the title sits as a pill straddling the
@@ -426,7 +439,9 @@ export default function ResultPage() {
                                         <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Question</th>
                                         <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-14">Max</th>
                                         <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">AI Marks</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-28">AI Level</th>
                                         <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-24">Manual Marks</th>
+                                        <th className="text-center font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2 w-28">Manual Level</th>
                                         <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Kosh (AI)</th>
                                         <th className="text-left font-bold text-gray-400 uppercase tracking-wide text-[10px] py-2 px-2">Kosh (Manual)</th>
                                       </tr>
@@ -453,8 +468,22 @@ export default function ResultPage() {
                                             ) : <span className="text-gray-300">—</span>}
                                           </td>
                                           <td className="py-2.5 px-2 text-center">
+                                            {q.performanceLevel ? (
+                                              <span className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold ${performanceLevelClass(q.performanceLevel)}`}>
+                                                {q.performanceLevel}
+                                              </span>
+                                            ) : <span className="text-gray-300">—</span>}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-center">
                                             {q.manualMarks !== null ? (
                                               <span className="font-black text-gray-800">{q.manualMarksDisplay ?? q.manualMarks}</span>
+                                            ) : <span className="text-gray-300">—</span>}
+                                          </td>
+                                          <td className="py-2.5 px-2 text-center">
+                                            {q.manualPerformanceLevel ? (
+                                              <span className={`inline-block px-2 py-0.5 rounded-full border text-[10px] font-bold ${performanceLevelClass(q.manualPerformanceLevel)}`}>
+                                                {q.manualPerformanceLevel}
+                                              </span>
                                             ) : <span className="text-gray-300">—</span>}
                                           </td>
                                           <td className="py-2.5 px-2">

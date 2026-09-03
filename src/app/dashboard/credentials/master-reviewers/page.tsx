@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, UserCheck, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, KeyRound, RotateCw, CheckCircle, Mail } from 'lucide-react';
+import { Search, Loader2, UserCheck, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, KeyRound, RotateCw, CheckCircle, Edit, Mail } from 'lucide-react';
 import { authFetch } from '@/lib/swr';
 
-interface ReviewerCred {
+interface MasterReviewer {
   id: string;
-  reviewerId: string;
+  masterReviewerId: string;
   name: string;
   email: string;
   plainPassword: string | null;
@@ -14,8 +14,8 @@ interface ReviewerCred {
   createdAt: string;
 }
 
-export default function ReviewerCredentialsPage() {
-  const [rows, setRows] = useState<ReviewerCred[]>([]);
+export default function MasterReviewersPage() {
+  const [rows, setRows] = useState<MasterReviewer[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
@@ -30,15 +30,22 @@ export default function ReviewerCredentialsPage() {
   const [formError, setFormError] = useState('');
 
   // Reset modal
-  const [resetTarget, setResetTarget] = useState<ReviewerCred | null>(null);
+  const [resetTarget, setResetTarget] = useState<MasterReviewer | null>(null);
   const [customPassword, setCustomPassword] = useState('');
   const [showNewPass, setShowNewPass] = useState(false);
   const [resetBusy, setResetBusy] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Edit modal
+  const [editTarget, setEditTarget] = useState<MasterReviewer | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState('');
   const [sendingId, setSendingId] = useState<string | null>(null);
 
   useEffect(() => {
-    authFetch('/api/credentials/reviewers')
+    authFetch('/api/credentials/master-reviewers')
       .then(r => r.ok ? r.json() : [])
       .then(d => setRows(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false));
@@ -50,7 +57,7 @@ export default function ReviewerCredentialsPage() {
     return rows.filter(r =>
       r.name.toLowerCase().includes(q) ||
       r.email.toLowerCase().includes(q) ||
-      r.reviewerId.toLowerCase().includes(q)
+      r.masterReviewerId.toLowerCase().includes(q)
     );
   }, [rows, search]);
 
@@ -71,13 +78,13 @@ export default function ReviewerCredentialsPage() {
     if (!name.trim() || !email.trim() || !password.trim()) { setFormError('All fields required'); return; }
     setSubmitting(true); setFormError('');
     try {
-      const res = await authFetch('/api/credentials/reviewers', {
+      const res = await authFetch('/api/credentials/master-reviewers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || 'Failed to create reviewer');
+      if (!res.ok) throw new Error(data.message || 'Failed to create master reviewer');
       setRows(prev => [{ ...data, plainPassword: password, isActive: true, createdAt: new Date().toISOString() }, ...prev]);
       setShowForm(false); setName(''); setEmail(''); setPassword('');
     } catch (e: any) {
@@ -89,36 +96,65 @@ export default function ReviewerCredentialsPage() {
 
   // Both mutations below update the table optimistically, so a failed request
   // has to roll the row back — otherwise the UI shows a change the server rejected.
-  const toggleActive = async (r: ReviewerCred) => {
+  const toggleActive = async (r: MasterReviewer) => {
     const updated = { ...r, isActive: !r.isActive };
     setRows(prev => prev.map(x => x.id === r.id ? updated : x));
-    const res = await authFetch(`/api/credentials/reviewers/${r.id}`, {
+    const res = await authFetch(`/api/credentials/master-reviewers/${r.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ isActive: !r.isActive }),
     });
     if (!res.ok) {
       setRows(prev => prev.map(x => x.id === r.id ? r : x));
-      alert('Could not update this reviewer. Please try again.');
+      alert('Could not update this master reviewer. Please try again.');
     }
   };
 
-  const handleDelete = async (r: ReviewerCred) => {
-    if (!confirm(`Delete reviewer ${r.name}? This cannot be undone.`)) return;
+  const handleDelete = async (r: MasterReviewer) => {
+    if (!confirm(`Delete master reviewer ${r.name}? This cannot be undone.`)) return;
     const prevRows = rows;
     setRows(prev => prev.filter(x => x.id !== r.id));
-    const res = await authFetch(`/api/credentials/reviewers/${r.id}`, { method: 'DELETE' });
+    const res = await authFetch(`/api/credentials/master-reviewers/${r.id}`, { method: 'DELETE' });
     if (!res.ok) {
       setRows(prevRows);
-      alert('Could not delete this reviewer. Please try again.');
+      alert('Could not delete this master reviewer. Please try again.');
     }
   };
 
-  const handleSendEmail = async (r: ReviewerCred) => {
+  const openEdit = (r: MasterReviewer) => {
+    setEditTarget(r);
+    setEditName(r.name);
+    setEditEmail(r.email);
+    setEditError('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    if (!editName.trim() || !editEmail.trim()) { setEditError('Name and email are required'); return; }
+    setEditBusy(true); setEditError('');
+    try {
+      const res = await authFetch(`/api/credentials/master-reviewers/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: editName.trim(), email: editEmail.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to update master reviewer');
+      setRows(prev => prev.map(r => r.id === editTarget.id ? { ...r, name: data.name, email: data.email } : r));
+      showToast(`Updated ${data.name}`);
+      setEditTarget(null);
+    } catch (e: any) {
+      setEditError(e.message);
+    } finally {
+      setEditBusy(false);
+    }
+  };
+
+  const handleSendEmail = async (r: MasterReviewer) => {
     if (!r.plainPassword) { alert('Reset the password before sending credentials.'); return; }
     setSendingId(r.id);
     try {
-      const res = await authFetch(`/api/credentials/reviewers/${r.id}/send`, { method: 'POST' });
+      const res = await authFetch(`/api/credentials/master-reviewers/${r.id}/send`, { method: 'POST' });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.message || 'Failed to send email');
       showToast(`Credentials emailed to ${r.name}`);
@@ -133,7 +169,7 @@ export default function ReviewerCredentialsPage() {
     if (!resetTarget) return;
     setResetBusy(true);
     try {
-      const res = await authFetch(`/api/credentials/reviewers/${resetTarget.id}/reset`, {
+      const res = await authFetch(`/api/credentials/master-reviewers/${resetTarget.id}/reset`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: customPassword || undefined }),
@@ -158,12 +194,17 @@ export default function ReviewerCredentialsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-medium text-[#004f9f]">Reviewer Credentials</h1>
+        <div>
+          <h1 className="text-2xl font-medium text-[#004f9f]">Master Reviewer Credentials</h1>
+          <p className="text-xs text-gray-400 mt-0.5">
+            These credentials are used on the separate Olympiad Checker portal — generate and manage them here only.
+          </p>
+        </div>
         <button
           onClick={() => { setShowForm(true); setFormError(''); }}
           className="inline-flex items-center gap-2 bg-[#004f9f] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003d7a] transition-colors shrink-0"
         >
-          <Plus size={15} /> Add Reviewer
+          <Plus size={15} /> Add Master Reviewer
         </button>
       </div>
 
@@ -175,7 +216,7 @@ export default function ReviewerCredentialsPage() {
           </div>
           <div>
             <p className="text-2xl font-black text-[#004f9f]">{stats.total}</p>
-            <p className="text-xs text-gray-400">Total Reviewers</p>
+            <p className="text-xs text-gray-400">Total Master Reviewers</p>
           </div>
         </div>
         <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm flex items-center gap-3">
@@ -206,14 +247,14 @@ export default function ReviewerCredentialsPage() {
           <div className="py-20 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>
         ) : filtered.length === 0 ? (
           <div className="py-20 text-center text-gray-400 text-sm">
-            {rows.length === 0 ? 'No reviewers yet. Add one to get started.' : 'No results match your search.'}
+            {rows.length === 0 ? 'No master reviewers yet. Add one to get started.' : 'No results match your search.'}
           </div>
         ) : (
           <div className="overflow-x-auto"><table className="w-full text-sm min-w-[760px]">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50 text-gray-400">
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">#</th>
-                <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Reviewer ID</th>
+                <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Master Reviewer ID</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Name</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Email</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Password</th>
@@ -227,7 +268,7 @@ export default function ReviewerCredentialsPage() {
                 return (
                   <tr key={r.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
                     <td className="px-5 py-3 text-gray-400 text-xs">{i + 1}</td>
-                    <td className="px-5 py-3 font-mono font-bold text-[#004f9f] text-xs">{r.reviewerId}</td>
+                    <td className="px-5 py-3 font-mono font-bold text-[#004f9f] text-xs">{r.masterReviewerId}</td>
                     <td className="px-5 py-3 font-semibold text-gray-800">{r.name}</td>
                     <td className="px-5 py-3 text-gray-500 text-xs">{r.email}</td>
                     <td className="px-5 py-3">
@@ -254,6 +295,11 @@ export default function ReviewerCredentialsPage() {
                     </td>
                     <td className="px-5 py-3">
                       <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => openEdit(r)}
+                          title="Edit"
+                          className="p-1.5 rounded-lg text-[#004f9f] bg-blue-50 hover:bg-blue-100 transition-colors">
+                          <Edit size={13} />
+                        </button>
                         <button onClick={() => { setResetTarget(r); setCustomPassword(''); setShowNewPass(false); }}
                           title="Reset password"
                           className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold rounded-lg hover:bg-amber-100 transition-colors">
@@ -281,26 +327,26 @@ export default function ReviewerCredentialsPage() {
         )}
       </div>
 
-      {/* Add Reviewer Modal */}
+      {/* Add Master Reviewer Modal */}
       {showForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
             <div className="bg-[#004f9f] px-5 py-4 flex items-center justify-between">
               <div>
-                <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">New Reviewer</p>
-                <p className="text-white font-bold text-sm mt-0.5">Create Reviewer Account</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">New Master Reviewer</p>
+                <p className="text-white font-bold text-sm mt-0.5">Create Master Reviewer Account</p>
               </div>
               <button onClick={() => setShowForm(false)} className="text-white/50 hover:text-white"><X size={18} /></button>
             </div>
             <div className="p-5 space-y-4">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Full Name</label>
-                <input type="text" placeholder="Reviewer full name" value={name} onChange={e => setName(e.target.value)} autoFocus
+                <input type="text" placeholder="Master reviewer full name" value={name} onChange={e => setName(e.target.value)} autoFocus
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f] focus:ring-1 focus:ring-[#004f9f]" />
               </div>
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email</label>
-                <input type="email" placeholder="reviewer@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="off"
+                <input type="email" placeholder="masterreviewer@example.com" value={email} onChange={e => setEmail(e.target.value)} autoComplete="off"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f] focus:ring-1 focus:ring-[#004f9f]" />
               </div>
               <div>
@@ -336,7 +382,51 @@ export default function ReviewerCredentialsPage() {
         </div>
       )}
 
-      {/* Reset Modal */}
+      {/* Edit Modal */}
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="bg-[#004f9f] px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Edit Master Reviewer</p>
+                <p className="text-white font-bold text-sm mt-0.5">{editTarget.masterReviewerId}</p>
+              </div>
+              <button onClick={() => setEditTarget(null)} className="text-white/50 hover:text-white"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Full Name</label>
+                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f] focus:ring-1 focus:ring-[#004f9f]" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email</label>
+                <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} autoComplete="off"
+                  onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f] focus:ring-1 focus:ring-[#004f9f]" />
+              </div>
+              {editError && (
+                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  <AlertCircle size={13} /> {editError}
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setEditTarget(null)}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button onClick={handleSaveEdit} disabled={editBusy}
+                  className="flex-1 py-2.5 bg-[#004f9f] text-white text-sm font-bold rounded-lg hover:bg-[#003d7a] disabled:opacity-50 flex items-center justify-center gap-2">
+                  {editBusy ? <Loader2 size={14} className="animate-spin" /> : <Edit size={14} />}
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Password Modal */}
       {resetTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">

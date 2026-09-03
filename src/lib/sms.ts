@@ -60,6 +60,29 @@ function renderTemplate(purpose: OtpPurpose, otp: string): { id: string; text: s
 }
 
 /**
+ * Separate DLT template for sending School Panel login credentials — takes
+ * {schoolName}, {username} and {password} placeholders instead of {otp}.
+ */
+function renderCredentialsTemplate(vars: { schoolName: string; username: string; password: string }): { id: string; text: string } {
+  const id = process.env.SMS_TEMPLATE_CREDENTIALS;
+  const body = process.env.SMS_TEMPLATE_CREDENTIALS_BODY;
+
+  if (!id) throw new Error('Missing DLT template id for credentials SMS (set SMS_TEMPLATE_CREDENTIALS in .env)');
+  if (!body) throw new Error('Missing DLT template body for credentials SMS (set SMS_TEMPLATE_CREDENTIALS_BODY in .env)');
+  for (const key of ['schoolName', 'username', 'password'] as const) {
+    if (!body.includes(`{${key}}`)) {
+      throw new Error(`DLT template body for credentials SMS has no {${key}} placeholder`);
+    }
+  }
+
+  const text = body
+    .replaceAll('{schoolName}', vars.schoolName)
+    .replaceAll('{username}', vars.username)
+    .replaceAll('{password}', vars.password);
+  return { id, text };
+}
+
+/**
  * The gateway accepts either an auth key or a username/password pair; the key
  * is preferred when both are present.
  */
@@ -136,10 +159,10 @@ function assertGatewayAccepted(body: string): void {
 }
 
 /**
- * Sends an OTP over SMS. Throws when the gateway is unconfigured, unreachable,
- * or rejects the message, so callers can fall back the way they do for email.
+ * Shared send path: build the payload, POST to the gateway, and assert it was
+ * accepted. Every template (OTP or credentials) funnels through this.
  */
-export async function sendOtpSms(mobile: string, otp: string, purpose: OtpPurpose): Promise<void> {
+async function dispatch(mobile: string, id: string, text: string): Promise<void> {
   if (!isSmsConfigured()) {
     throw new Error(
       'SMS is not configured (set SMS_API_URL, SMS_SENDER_ID and SMS_AUTH_KEY — ' +
@@ -147,7 +170,6 @@ export async function sendOtpSms(mobile: string, otp: string, purpose: OtpPurpos
     );
   }
 
-  const { id, text } = renderTemplate(purpose, otp);
   const to = normaliseMobile(mobile);
   const payload = buildPayload(to, text, id);
 
@@ -173,4 +195,22 @@ export async function sendOtpSms(mobile: string, otp: string, purpose: OtpPurpos
 
   const body = (await response.text()).trim();
   assertGatewayAccepted(body);
+}
+
+/**
+ * Sends an OTP over SMS. Throws when the gateway is unconfigured, unreachable,
+ * or rejects the message, so callers can fall back the way they do for email.
+ */
+export async function sendOtpSms(mobile: string, otp: string, purpose: OtpPurpose): Promise<void> {
+  const { id, text } = renderTemplate(purpose, otp);
+  await dispatch(mobile, id, text);
+}
+
+/**
+ * Sends School Panel login credentials (username + password) over SMS using
+ * the separate DLT-approved credentials template.
+ */
+export async function sendCredentialsSms(mobile: string, vars: { schoolName: string; username: string; password: string }): Promise<void> {
+  const { id, text } = renderCredentialsTemplate(vars);
+  await dispatch(mobile, id, text);
 }

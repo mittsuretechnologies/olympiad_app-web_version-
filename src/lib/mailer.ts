@@ -393,6 +393,182 @@ export function renderStudentCredentialsHtml(data: StudentCredentialsMail): stri
   });
 }
 
+export interface UploaderCredentialsMail {
+  to: string;
+  uploaderName: string;
+  uploaderId: string;
+  username: string;
+  password: string;
+}
+
+export async function sendUploaderCredentialsEmail(data: UploaderCredentialsMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(
+      `[MAILER not configured] Credentials for ${data.uploaderName} (${data.to}): ` +
+        `username=${data.username} password=${data.password}`
+    );
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const html = renderEmailShell({
+    title: `Uploader Account — ${data.uploaderName}`,
+    body: `
+      <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">Uploader Account Created</p>
+      <p style="margin:0 0 14px;font-size:14px;">Dear <b>${escapeHtml(data.uploaderName)}</b>,</p>
+      <p style="margin:0 0 16px;">
+        An uploader account has been created for you on the Mittmee platform.
+        Use the credentials below to log in and start uploading answer sheets.
+      </p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 16px;">
+        ${credentialRow('Uploader ID', data.uploaderId)}
+        ${credentialRow('Username', data.username)}
+        ${credentialRow('Password', data.password, true)}
+      </table>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="background:#FDF0F0;border-left:3px solid #C0392B;border-radius:6px;margin:0 0 16px;">
+        <tr><td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#8C2A20;line-height:1.5;">
+          <b>Keep these credentials safe.</b> Do not share them with anyone.
+        </td></tr>
+      </table>
+
+      <p style="margin:0;font-size:13.5px;color:#5A6B80;">Regards,<br><b style="color:#0B2A5C;">Team Mittsure</b></p>
+    `,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'Your Mittmee Uploader Login Credentials',
+    html,
+    attachments: emailAttachments(),
+    text:
+      `Dear ${data.uploaderName},\n\nAn uploader account has been created for you on Mittmee.\n\n` +
+      `Uploader ID: ${data.uploaderId}\nUsername: ${data.username}\nPassword: ${data.password}\n\n` +
+      `Please keep these credentials safe.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
+export interface ReviewerCredentialsMail {
+  to: string;
+  reviewerName: string;
+  reviewerId: string;
+  password: string;
+}
+
+export async function sendReviewerCredentialsEmail(data: ReviewerCredentialsMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(
+      `[MAILER not configured] Credentials for ${data.reviewerName} (${data.to}): ` +
+        `reviewerId=${data.reviewerId} password=${data.password}`
+    );
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const html = renderEmailShell({
+    title: `Reviewer Account — ${data.reviewerName}`,
+    body: `
+      <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">Reviewer Account Created</p>
+      <p style="margin:0 0 14px;font-size:14px;">Dear <b>${escapeHtml(data.reviewerName)}</b>,</p>
+      <p style="margin:0 0 16px;">
+        A reviewer account has been created for you on the Mittmee platform.
+        Use the credentials below to log in and start reviewing content.
+      </p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 16px;">
+        ${credentialRow('Reviewer ID', data.reviewerId)}
+        ${credentialRow('Password', data.password, true)}
+      </table>
+
+      <p style="margin:0 0 16px;">Log in with your <b>Reviewer ID</b> and the password above — not your email address.</p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="background:#FDF0F0;border-left:3px solid #C0392B;border-radius:6px;margin:0 0 16px;">
+        <tr><td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#8C2A20;line-height:1.5;">
+          <b>Keep these credentials safe.</b> Do not share them with anyone.
+        </td></tr>
+      </table>
+
+      <p style="margin:0;font-size:13.5px;color:#5A6B80;">Regards,<br><b style="color:#0B2A5C;">Team Mittsure</b></p>
+    `,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'Your Mittmee Reviewer Login Credentials',
+    html,
+    attachments: emailAttachments(),
+    text:
+      `Dear ${data.reviewerName},\n\nA reviewer account has been created for you on Mittmee.\n\n` +
+      `Reviewer ID: ${data.reviewerId}\nPassword: ${data.password}\n\n` +
+      `Log in with your Reviewer ID and the password above — not your email address.\n\n` +
+      `Please keep these credentials safe.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
+export interface MasterReviewerCredentialsMail {
+  to: string;
+  masterReviewerName: string;
+  masterReviewerId: string;
+  password: string;
+}
+
+export async function sendMasterReviewerCredentialsEmail(data: MasterReviewerCredentialsMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(
+      `[MAILER not configured] Credentials for ${data.masterReviewerName} (${data.to}): ` +
+        `masterReviewerId=${data.masterReviewerId} password=${data.password}`
+    );
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const html = renderEmailShell({
+    title: `Master Reviewer Account — ${data.masterReviewerName}`,
+    body: `
+      <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">Master Reviewer Account Created</p>
+      <p style="margin:0 0 14px;font-size:14px;">Dear <b>${escapeHtml(data.masterReviewerName)}</b>,</p>
+      <p style="margin:0 0 16px;">
+        A Master Reviewer account has been created for you. Use the credentials below to log in
+        to the Olympiad Checker portal.
+      </p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 16px;">
+        ${credentialRow('Master Reviewer ID', data.masterReviewerId)}
+        ${credentialRow('Password', data.password, true)}
+      </table>
+
+      <p style="margin:0 0 16px;">Log in with your <b>Master Reviewer ID</b> and the password above — not your email address.</p>
+
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="background:#FDF0F0;border-left:3px solid #C0392B;border-radius:6px;margin:0 0 16px;">
+        <tr><td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#8C2A20;line-height:1.5;">
+          <b>Keep these credentials safe.</b> Do not share them with anyone.
+        </td></tr>
+      </table>
+
+      <p style="margin:0;font-size:13.5px;color:#5A6B80;">Regards,<br><b style="color:#0B2A5C;">Team Mittsure</b></p>
+    `,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'Your Mittmee Master Reviewer Login Credentials',
+    html,
+    attachments: emailAttachments(),
+    text:
+      `Dear ${data.masterReviewerName},\n\nA Master Reviewer account has been created for you.\n\n` +
+      `Master Reviewer ID: ${data.masterReviewerId}\nPassword: ${data.password}\n\n` +
+      `Log in with your Master Reviewer ID and the password above — not your email address.\n\n` +
+      `Please keep these credentials safe.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
 export async function sendStudentCredentialsEmail(data: StudentCredentialsMail): Promise<void> {
   if (!isMailerConfigured()) {
     console.log(

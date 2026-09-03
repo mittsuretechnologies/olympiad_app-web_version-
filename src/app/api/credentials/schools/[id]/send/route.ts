@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
+import { sendCredentialsSms } from '@/lib/sms';
 import { requireRole } from '@/lib/auth-guard';
 
 // POST /api/credentials/schools/:id/send — body: { method: 'sms' | 'email' }
 // Sends the school's current username + password via SMS or email.
-// Email goes out over real SMTP (see src/lib/mailer.ts). SMS still needs a
-// gateway (e.g. MSG91/Twilio) wired up — no provider is configured yet.
+// Email goes out over real SMTP (see src/lib/mailer.ts). SMS goes via the
+// DLT-approved credentials template (see src/lib/sms.ts).
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -53,9 +54,16 @@ export async function POST(
         return NextResponse.json({ message: mailErr?.message || 'Failed to send email' }, { status: 502 });
       }
     } else {
-      // SMS gateway not configured — log for now instead of a silent no-op.
-      console.log(`[credentials-send:sms] to ${school.phone} — username=${school.username} (no SMS gateway configured)`);
-      return NextResponse.json({ message: 'SMS sending is not configured yet' }, { status: 501 });
+      try {
+        await sendCredentialsSms(school.phone!, {
+          schoolName: school.name,
+          username: school.username,
+          password: school.plainPassword,
+        });
+      } catch (smsErr: any) {
+        console.error(`Credentials SMS to ${school.phone} failed:`, smsErr);
+        return NextResponse.json({ message: smsErr?.message || 'Failed to send SMS' }, { status: 502 });
+      }
     }
 
     return NextResponse.json({

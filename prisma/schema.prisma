@@ -362,6 +362,25 @@ model Reviewer {
   @@schema("public")
 }
 
+// Credentials-only role for the separate Olympiad Checker portal. SuperAdmin
+// generates/manages these accounts here; the checker portal itself owns
+// login and all downstream review workflow — it just fetches with these
+// credentials. No login route, module permissions, or dashboard section of
+// ours is wired to this model on purpose (unlike Reviewer/Evaluator/Moderator).
+model MasterReviewer {
+  id             String   @id @default(uuid())
+  masterReviewerId String @unique
+  name           String
+  email          String   @unique
+  password       String
+  plainPassword  String?
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@schema("public")
+}
+
 model Moderator {
   id                   String                 @id @default(uuid())
   moderatorId          String                 @unique

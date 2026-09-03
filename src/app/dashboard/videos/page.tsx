@@ -100,6 +100,7 @@ export default function VideoModerationPage() {
 
   // Ã¢ââ¬Ã¢ââ¬ Modals Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
+  const [editedSubCat, setEditedSubCat] = useState<string>('');
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
   const [deleteModal,  setDeleteModal]  = useState<{ ids: string[] } | null>(null);
@@ -157,19 +158,26 @@ export default function VideoModerationPage() {
     setSelected(allSelected ? new Set() : new Set(videos.map(v => v.id)));
 
   // Ã¢ââ¬Ã¢ââ¬ Single approve / reject Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
-  const approve = async (video: Video) => {
+  const approve = async (video: Video, subCategoryOverride?: string) => {
     setProcessingId(video.id);
     try {
       const res = await fetch('/api/dashboard/videos', {
         method: 'POST',
         headers: authHeaders(),
-        body: JSON.stringify({ videoId: video.id, status: 'APPROVED' }),
+        body: JSON.stringify({
+          videoId: video.id,
+          status: 'APPROVED',
+          ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
+        }),
       });
       if (res.ok) {
         mutate(cur => cur ? { ...cur, videos: cur.videos.filter(v => v.id !== video.id) } : cur, { revalidate: false });
         setSelected(prev => { const n = new Set(prev); n.delete(video.id); return n; });
         if (previewVideo?.id === video.id) setPreviewVideo(null);
-      } else alert('Failed to approve');
+      } else {
+        const body = await res.json().catch(() => null);
+        alert(body?.message || 'Failed to approve');
+      }
     } finally { setProcessingId(null); }
   };
 
@@ -493,7 +501,7 @@ export default function VideoModerationPage() {
                   {/* Thumbnail */}
                   <div
                     className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden"
-                    onClick={() => setPreviewVideo(video)}
+                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }}
                   >
                     {video.thumbnailUrl ? (
                       <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -658,14 +666,14 @@ export default function VideoModerationPage() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             <XCircle size={11} /> Reject
                           </button>
-                          <button onClick={() => setPreviewVideo(video)} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }} disabled={busy}
                             className="px-2.5 py-2 rounded-xl border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40">
                             <Eye size={13} />
                           </button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => setPreviewVideo(video)} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }} disabled={busy}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>
@@ -701,12 +709,32 @@ export default function VideoModerationPage() {
               {/* Category + date row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[11px] font-black text-blue-300 bg-white/10 px-2.5 py-1 rounded-full">
-                    {previewVideo.subCategory || previewVideo.category}
-                  </span>
-                  {(() => { const b = getCategoryLabel(previewVideo.subCategory); return b ? (
+                  {filter === 'PENDING' && previewVideo.isEvaluation ? (
+                    <select
+                      value={editedSubCat}
+                      onChange={e => setEditedSubCat(e.target.value)}
+                      className="text-[11px] font-black text-blue-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300"
+                    >
+                      <optgroup label={OLYMPIAD_CAT_A_LABEL}>
+                        {OLYMPIAD_CAT_A_SUBS.map(s => <option key={s} value={s} className="text-black">{s}</option>)}
+                      </optgroup>
+                      <optgroup label={OLYMPIAD_CAT_B_LABEL}>
+                        {OLYMPIAD_CAT_B_SUBS.map(s => <option key={s} value={s} className="text-black">{s}</option>)}
+                      </optgroup>
+                    </select>
+                  ) : (
+                    <span className="text-[11px] font-black text-blue-300 bg-white/10 px-2.5 py-1 rounded-full">
+                      {previewVideo.subCategory || previewVideo.category}
+                    </span>
+                  )}
+                  {(() => { const b = getCategoryLabel(editedSubCat || previewVideo.subCategory); return b ? (
                     <span className="text-[10px] font-black px-2 py-1 rounded-full bg-white/10 text-white/70">{b.label}</span>
                   ) : null; })()}
+                  {filter === 'PENDING' && previewVideo.isEvaluation && editedSubCat && editedSubCat !== previewVideo.subCategory && (
+                    <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-400/20 text-amber-300">
+                      Recategorized
+                    </span>
+                  )}
                   {previewVideo.isEvaluation && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
                       <Award size={10} /> Jury
@@ -801,7 +829,7 @@ export default function VideoModerationPage() {
               <div className="flex gap-2 pt-1">
                 {filter === 'PENDING' && (
                   <>
-                    <button onClick={() => approve(previewVideo)} disabled={processingId === previewVideo.id}
+                    <button onClick={() => approve(previewVideo, editedSubCat)} disabled={processingId === previewVideo.id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
                       <CheckCircle size={14} /> Approve
                     </button>

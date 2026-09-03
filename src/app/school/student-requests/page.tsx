@@ -203,10 +203,9 @@ export default function SchoolStudentRequestsPage() {
       <div className="flex items-start gap-2.5 rounded-lg border border-[#BFD8F5] bg-[#EDF4FD] p-3 text-[12.5px] text-[#1F3B63]">
         <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-[#1559C7]" />
         <p>
-          These are Mittmee app users who say they study at your school but hold no Olympiad ID.
-          Approving one only links them to your school: their videos start appearing under your
-          Student Videos and on your school page in the app. It grants no Olympiad ID and no
-          Olympiad entry, and changes nothing about the videos themselves.
+          Mittmee app users without an Olympiad ID, requesting to be linked to your school.
+          Approving only shows their videos on your Student Videos and school page — it does
+          not grant an Olympiad ID or entry.
         </p>
       </div>
 
