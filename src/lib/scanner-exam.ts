@@ -9,6 +9,13 @@ export interface ExamQuestionResult {
   maxMarks: number;
   aiMarks: number | null;
   aiConfidence: number | null;
+  // Scanner-computed band (e.g. "Proficient", "Beginner", "Did not attempt")
+  // for this question's AI marks — null on older scanner deployments that
+  // predate the column, same fallback pattern as questionText.
+  performanceLevel: string | null;
+  // Same band, computed off the manual/reviewed marks instead — independent
+  // of performanceLevel above, since a reviewer's score can differ from the AI's.
+  manualPerformanceLevel: string | null;
   manualMarks: number | null;
   manualMarksDisplay: string | null;
   reviewedBy: string | null;
@@ -88,6 +95,7 @@ interface AiMarksRow {
   max_marks: number;
   ai_marks: number | null;
   ai_confidence: number | null;
+  performance_level: string | null;
   ai_panchakosha: { kosha: string; earned: number; weight: number }[] | null;
 }
 
@@ -97,28 +105,35 @@ interface ManualMarksRow {
   manual_marks: number | null;
   manual_marks_display: string | null;
   reviewed_by: string | null;
+  performance_level: string | null;
   manual_panchakosha: { kosha: string; earned: number; weight: number }[] | null;
 }
 
-// scanner.ai_marks only exposes question_text on scanner deployments new
-// enough to have the column — production has it, older/staging copies of the
-// schema don't, and selecting it there fails the whole query with a 42703
+// scanner.ai_marks / scanner.manual_marks only expose some columns
+// (question_text, performance_level) on scanner deployments new enough to
+// have them — production has them, older/staging copies of the schema may
+// not, and selecting a missing column fails the whole query with a 42703
 // rather than just returning null. Probe once per process and fall back to
 // omitting the column, so pointing DATABASE_URL at an older scanner schema
-// degrades to "Question N" instead of 500ing the results page.
-let questionTextSupported: Promise<boolean> | null = null;
-function hasQuestionTextColumn(): Promise<boolean> {
-  questionTextSupported ??= prisma
-    .$queryRaw<{ n: number }[]>`
-      SELECT count(*)::int AS n
-      FROM information_schema.columns
-      WHERE table_schema = 'scanner'
-        AND table_name = 'ai_marks'
-        AND column_name = 'question_text'
-    `
-    .then(rows => (rows[0]?.n ?? 0) > 0)
-    .catch(() => false);
-  return questionTextSupported;
+// degrades gracefully instead of 500ing the results page.
+const columnSupportCache = new Map<string, Promise<boolean>>();
+function hasScannerColumn(table: string, column: string): Promise<boolean> {
+  const cacheKey = `${table}.${column}`;
+  let cached = columnSupportCache.get(cacheKey);
+  if (!cached) {
+    cached = prisma
+      .$queryRaw<{ n: number }[]>`
+        SELECT count(*)::int AS n
+        FROM information_schema.columns
+        WHERE table_schema = 'scanner'
+          AND table_name = ${table}
+          AND column_name = ${column}
+      `
+      .then(rows => (rows[0]?.n ?? 0) > 0)
+      .catch(() => false);
+    columnSupportCache.set(cacheKey, cached);
+  }
+  return cached;
 }
 
 // The scanner app (a separate Python/Celery service) shares this Postgres
@@ -155,24 +170,35 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
   // that, not on the sheet's own primary key.
   const sheetUuids = sheetRows.map(r => r.sheet_uuid);
 
-  // Per-question detail — question text, AI marks/confidence/kosha weights —
-  // comes straight from the scanner's own ai_marks view.
-  const questionText = (await hasQuestionTextColumn()) ? 'question_text' : 'NULL::text AS question_text';
+  // Per-question detail — question text, AI marks/confidence/performance level/
+  // kosha weights — comes straight from the scanner's own ai_marks view.
+  const [hasAiQuestionText, hasAiPerformanceLevel, hasManualPerformanceLevel] = await Promise.all([
+    hasScannerColumn('ai_marks', 'question_text'),
+    hasScannerColumn('ai_marks', 'performance_level'),
+    hasScannerColumn('manual_marks', 'performance_level'),
+  ]);
+  const questionText = hasAiQuestionText ? 'question_text' : 'NULL::text AS question_text';
+  const aiPerformanceLevel = hasAiPerformanceLevel ? 'performance_level' : 'NULL::text AS performance_level';
   const aiRows = await prisma.$queryRawUnsafe<AiMarksRow[]>(
     `SELECT sheet_uuid, question_number, page_number, ${questionText}, question_type,
-            max_marks, ai_marks, ai_confidence, ai_panchakosha
+            max_marks, ai_marks, ai_confidence, ${aiPerformanceLevel}, ai_panchakosha
      FROM scanner.ai_marks
      WHERE sheet_uuid = ANY($1::uuid[])`,
     sheetUuids,
   );
 
   // Manual (human-reviewed) marks, when a reviewer has been through this
-  // question — most rows will have manual_marks = null until reviewed.
-  const manualRows = await prisma.$queryRaw<ManualMarksRow[]>`
-    SELECT sheet_uuid, question_number, manual_marks, manual_marks_display, reviewed_by, manual_panchakosha
-    FROM scanner.manual_marks
-    WHERE sheet_uuid = ANY(${sheetUuids}::uuid[])
-  `;
+  // question — most rows will have manual_marks = null until reviewed. Its
+  // performance_level is the scanner's band for the manual/reviewed score,
+  // independent of the AI one on the same question.
+  const manualPerformanceLevel = hasManualPerformanceLevel ? 'performance_level' : 'NULL::text AS performance_level';
+  const manualRows = await prisma.$queryRawUnsafe<ManualMarksRow[]>(
+    `SELECT sheet_uuid, question_number, manual_marks, manual_marks_display, reviewed_by,
+            ${manualPerformanceLevel}, manual_panchakosha
+     FROM scanner.manual_marks
+     WHERE sheet_uuid = ANY($1::uuid[])`,
+    sheetUuids,
+  );
   const manualByKey = new Map(manualRows.map(m => [`${m.sheet_uuid}:${m.question_number}`, m]));
 
   const questionsBySheet = new Map<string, ExamQuestionResult[]>();
@@ -187,6 +213,8 @@ export async function getLatestExamResults(studentIds: string[]): Promise<Map<st
       maxMarks: q.max_marks,
       aiMarks: q.ai_marks,
       aiConfidence: q.ai_confidence,
+      performanceLevel: q.performance_level,
+      manualPerformanceLevel: manual?.performance_level ?? null,
       manualMarks: manual?.manual_marks ?? null,
       manualMarksDisplay: manual?.manual_marks_display ?? null,
       reviewedBy: manual?.reviewed_by ?? null,

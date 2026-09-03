@@ -488,6 +488,8 @@ export default function BulkUploadPage() {
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">CRM ID</th>
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">State</th>
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">District</th>
+                    <th className="text-left px-3 py-2 font-bold border-r border-gray-200">Email</th>
+                    <th className="text-left px-3 py-2 font-bold border-r border-gray-200">Phone</th>
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">Exam Date</th>
                     <th className="text-left px-3 py-2 font-bold border-r border-gray-200">Classes</th>
                     <th className="text-left px-3 py-2 font-bold">Status</th>
@@ -504,13 +506,15 @@ export default function BulkUploadPage() {
                       <td className="px-3 py-2 font-mono text-[#009846] border-r border-gray-100">{row.olympiadId || '—'}</td>
                       <td className="px-3 py-2 border-r border-gray-100">{row.state || '—'}</td>
                       <td className="px-3 py-2 border-r border-gray-100">{row.district || '—'}</td>
+                      <td className="px-3 py-2 border-r border-gray-100 max-w-[160px] truncate">{row.email || <span className="text-gray-300 italic">—</span>}</td>
+                      <td className="px-3 py-2 border-r border-gray-100 font-mono">{row.phone || <span className="text-gray-300 italic">—</span>}</td>
                       <td className="px-3 py-2 border-r border-gray-100">{row.examDate || <span className="text-gray-300 italic">—</span>}</td>
                       <td className="px-3 py-2 border-r border-gray-100 text-gray-500 max-w-[160px] truncate">
                         {row.classes || <span className="text-gray-300 italic">—</span>}
                       </td>
                       <td className="px-3 py-2">
                         {row._errors.length === 0 ? (
-                          <span className="text-green-600 font-semibold">âœ“ OK</span>
+                          <span className="text-green-600 font-semibold">✓ OK</span>
                         ) : (
                           <span className="text-red-600" title={row._errors.join(', ')}>
                             ✗ {row._errors[0]}{row._errors.length > 1 ? ` +${row._errors.length - 1}` : ''}

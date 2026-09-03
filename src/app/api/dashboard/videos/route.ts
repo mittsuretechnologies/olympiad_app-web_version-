@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 import { createNotification } from '@/lib/notifications';
+import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -197,6 +198,12 @@ export async function DELETE(request: Request) {
   }
 }
 
+function resolveSlot(category: string | null | undefined, subCategory: string | null | undefined) {
+  if (category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(subCategory ?? '')) return 'A';
+  if (category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(subCategory ?? '')) return 'B';
+  return null;
+}
+
 export async function POST(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
   if (error) return error;
@@ -205,7 +212,7 @@ export async function POST(request: Request) {
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
-    const { videoId, videoIds, status, rejectionReason } = await request.json();
+    const { videoId, videoIds, status, rejectionReason, subCategory: newSubCategory } = await request.json();
 
     if (!['APPROVED', 'REJECTED'].includes(status)) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
@@ -259,16 +266,48 @@ export async function POST(request: Request) {
     const before = await prisma.video.findUnique({
       where: { id: videoId },
       select: {
-        status: true, rejectionReason: true,
-        appUserId: true, caption: true, category: true, subCategory: true,
+        status: true, rejectionReason: true, isEvaluation: true, appUserId: true,
+        caption: true, category: true, subCategory: true,
       },
     });
+
+    // Moderator is recategorizing an olympiad (jury) video before approving — re-run
+    // the same 1-per-category slot check the student's upload does, so approving into
+    // a corrected category can't create a second video occupying that same A/B slot.
+    if (status === 'APPROVED' && before?.isEvaluation && typeof newSubCategory === 'string' && newSubCategory !== before.subCategory) {
+      const targetSlot = resolveSlot(before.category, newSubCategory);
+      if (targetSlot && before.appUserId) {
+        const siblings = await prisma.video.findMany({
+          where: { appUserId: before.appUserId, isEvaluation: true, id: { not: videoId } },
+          select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
+        });
+        const slotTaken = siblings.some(v =>
+          resolveSlot(v.category, v.subCategory) === targetSlot &&
+          (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
+        );
+        if (slotTaken) {
+          return NextResponse.json(
+            { message: 'This student already has a video in that category slot. Reject this one instead.' },
+            { status: 409 },
+          );
+        }
+      }
+    }
+
+    const recategorizing = status === 'APPROVED' && typeof newSubCategory === 'string' && newSubCategory !== before?.subCategory;
+    const newSlot = recategorizing ? resolveSlot(null, newSubCategory) : null;
 
     const video = await prisma.video.update({
       where: { id: videoId },
       data: {
         status,
         rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
+        ...(recategorizing
+          ? {
+              subCategory: newSubCategory,
+              category: newSlot === 'A' ? OLYMPIAD_CAT_A_LABEL : newSlot === 'B' ? OLYMPIAD_CAT_B_LABEL : before?.category,
+            }
+          : {}),
       },
     });
 
@@ -278,7 +317,7 @@ export async function POST(request: Request) {
       entityType: 'Video',
       entityId: videoId,
       previousValue: before,
-      newValue: { status: video.status, rejectionReason: video.rejectionReason },
+      newValue: { status: video.status, rejectionReason: video.rejectionReason, category: video.category, subCategory: video.subCategory },
       reason: status === 'REJECTED' ? (rejectionReason || null) : null,
     });
 
