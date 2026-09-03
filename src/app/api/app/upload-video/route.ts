@@ -53,8 +53,18 @@ function runFfmpeg(args: string[]): Promise<void> {
     let stderr = '';
     proc.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
     proc.on('close', (code) => {
-      if (code === 0) resolve();
-      else reject(new Error(`ffmpeg exited with code ${code}: ${stderr.slice(-500)}`));
+      if (code === 0) {
+        resolve();
+      } else {
+        // Keep the FULL stderr for the failure-mode check below — the
+        // "Invalid color range" line ffmpeg prints appears near the START of
+        // its output, not the end. An earlier version of this only kept the
+        // last 500 chars, which silently discarded that line and meant the
+        // color-range retry below could never actually trigger — every
+        // affected video failed thumbnail extraction permanently instead of
+        // being caught by the fallback that exists specifically for this.
+        reject(new Error(`ffmpeg exited with code ${code}: ${stderr}`));
+      }
     });
     proc.on('error', reject);
   });
