@@ -106,6 +106,12 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
         id: true, appUserId: true, videoUrl: true, thumbnailUrl: true,
         caption: true, category: true, subCategory: true, tags: true,
         likesCount: true, viewsCount: true, createdAt: true,
+        student: {
+          select: {
+            id: true, name: true,
+            allocation: { select: { school: { select: { id: true, name: true, state: true, city: true } } } },
+          },
+        },
       },
       orderBy: { createdAt: 'desc' },
       take:    limit + 1,
@@ -123,10 +129,22 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
   const uploaders = appUserIds.length
     ? await prisma.appUser.findMany({
         where:  { id: { in: appUserIds } },
-        select: { id: true, userId: true, avatarUrl: true },
+        select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
       })
     : [];
   const uploaderMap = new Map(uploaders.map(u => [u.id, u]));
+
+  // School can come from either side, same as /api/reels: a Student's own
+  // allocation.school, or (for app-registered users) their olympiadId
+  // resolved through OlympiadIdAllocation.
+  const olympiadCodes = [...new Set(uploaders.map(u => u.olympiadId).filter(Boolean))] as string[];
+  const allocationsRaw = olympiadCodes.length > 0
+    ? await prisma.olympiadIdAllocation.findMany({
+        where:  { code: { in: olympiadCodes } },
+        select: { code: true, school: { select: { id: true, name: true, state: true, city: true } } },
+      })
+    : [];
+  const allocationMap = new Map(allocationsRaw.map(a => [a.code, a.school]));
 
   // This response previously had no isLiked field, so every video from search
   // results always rendered as unliked regardless of the real Like row.
@@ -139,11 +157,33 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
     likedIds = new Set(userLikes.map(l => l.videoId));
   }
 
-  const videos = items.map(v => ({
-    ...v,
-    isLiked:  likedIds.has(v.id),
-    uploader: v.appUserId ? uploaderMap.get(v.appUserId) ?? null : null,
-  }));
+  const videos = items.map(v => {
+    const uploaderRaw    = v.appUserId ? uploaderMap.get(v.appUserId) : undefined;
+    const studentSchool  = v.student?.allocation?.school ?? null;
+    const appUserSchool  = uploaderRaw?.olympiadId ? (allocationMap.get(uploaderRaw.olympiadId) ?? null) : null;
+    const school         = studentSchool ?? appUserSchool;
+
+    return {
+      ...v,
+      isLiked:  likedIds.has(v.id),
+      uploader: uploaderRaw ?? null,
+      student: v.student ? {
+        id:         v.student.id,
+        name:       v.student.name,
+        schoolId:   school?.id   ?? null,
+        schoolName: school?.name ?? null,
+        state:      school?.state ?? null,
+        city:       school?.city  ?? null,
+      } : school ? {
+        id:         null,
+        name:       uploaderRaw?.userId ?? null,
+        schoolId:   school.id,
+        schoolName: school.name,
+        state:      school.state ?? null,
+        city:       school.city  ?? null,
+      } : null,
+    };
+  });
 
   return { videos, nextCursor, hasMore, totalCount };
 }
