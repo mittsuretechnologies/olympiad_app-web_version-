@@ -25,6 +25,7 @@ interface Video {
   olympiadVisibility: string | null;
   status: string;
   rejectionReason: string | null;
+  quality: string | null;
   createdAt: string;
   deletedAt: string | null;
   uploaderType: string | null;
@@ -58,6 +59,12 @@ const REJECTION_TEMPLATES = [
 ];
 
 const ALL_SUBCATEGORIES = [...OLYMPIAD_CAT_A_SUBS, ...OLYMPIAD_CAT_B_SUBS];
+
+const QUALITY_OPTIONS: { value: 'HIGH' | 'MEDIUM' | 'LOW'; label: string; hint: string }[] = [
+  { value: 'HIGH',   label: 'High',   hint: 'Clear footage, good lighting and audio' },
+  { value: 'MEDIUM', label: 'Medium', hint: 'Watchable, but with some issues' },
+  { value: 'LOW',    label: 'Low',    hint: 'Blurry, dark, or hard to follow' },
+];
 
 const TAB_CFG = {
   PENDING:  { label: 'Pending',  activeClass: 'bg-amber-500 text-white shadow-sm',  dot: 'bg-amber-400' },
@@ -115,6 +122,12 @@ export default function VideoModerationPage() {
   const [editedSubCat, setEditedSubCat] = useState<string>('');
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
+  // Approval is gated behind picking a quality — see QUALITY_OPTIONS. Always
+  // single-video: bulk-approve doesn't exist, since quality is necessarily a
+  // per-video judgment call (see the API route, which also rejects a bulk
+  // APPROVED call as defense in depth).
+  const [approveModal,  setApproveModal]  = useState<{ video: Video; subCategoryOverride?: string } | null>(null);
+  const [approveQuality, setApproveQuality] = useState<'HIGH' | 'MEDIUM' | 'LOW' | null>(null);
   const [deleteModal,  setDeleteModal]  = useState<{ ids: string[] } | null>(null);
 
   // ── Processing ────────────────────────────────────────────────────────────
@@ -175,8 +188,7 @@ export default function VideoModerationPage() {
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(videos.map(v => v.id)));
 
-  // ── Single approve / reject ───────────────────────────────────────────────
-  const approve = async (video: Video, subCategoryOverride?: string, categoryOverride?: string) => {
+  const approve = async (video: Video, quality: 'HIGH' | 'MEDIUM' | 'LOW', subCategoryOverride?: string) => {
     setProcessingId(video.id);
     try {
       const res = await fetch('/api/dashboard/videos', {
@@ -185,6 +197,7 @@ export default function VideoModerationPage() {
         body: JSON.stringify({
           videoId: video.id,
           status: 'APPROVED',
+          quality,
           ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
           ...(categoryOverride && categoryOverride !== video.category ? { category: categoryOverride } : {}),
         }),
@@ -477,24 +490,18 @@ export default function VideoModerationPage() {
             >
               Deselect
             </button>
+            {/* Bulk approve is intentionally not offered — quality is a
+                per-video judgment call (see openApproveModal/approve), so
+                every approval goes through the single-video modal below,
+                even one reached by selecting just one video in the grid. */}
             {filter === 'PENDING' && (
-              <>
-                <button
-                  onClick={bulkApprove}
-                  disabled={bulkWorking}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white bg-green-600 hover:bg-green-700 rounded-xl transition-colors disabled:opacity-50"
-                >
-                  {bulkWorking ? <Clock size={11} className="animate-spin" /> : <CheckCircle size={11} />}
-                  Approve {selectedIds.length}
-                </button>
-                <button
-                  onClick={openBulkRejectModal}
-                  disabled={bulkWorking}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-50"
-                >
-                  <XCircle size={11} /> Reject {selectedIds.length}
-                </button>
-              </>
+              <button
+                onClick={openBulkRejectModal}
+                disabled={bulkWorking}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white bg-red-500 hover:bg-red-600 rounded-xl transition-colors disabled:opacity-50"
+              >
+                <XCircle size={11} /> Reject {selectedIds.length}
+              </button>
             )}
             <button
               onClick={() => openDeleteModal(selectedIds)}
@@ -645,6 +652,17 @@ export default function VideoModerationPage() {
                       </p>
                     )}
 
+                    {/* Quality — set by the moderator at approval time */}
+                    {video.status === 'APPROVED' && video.quality && (
+                      <span className={`inline-block w-fit text-[10px] font-black rounded-lg px-2 py-1 ${
+                        video.quality === 'HIGH'   ? 'text-green-600 bg-green-50' :
+                        video.quality === 'MEDIUM' ? 'text-amber-600 bg-amber-50' :
+                                                      'text-red-500 bg-red-50'
+                      }`}>
+                        {video.quality === 'HIGH' ? 'High' : video.quality === 'MEDIUM' ? 'Medium' : 'Low'} quality
+                      </span>
+                    )}
+
                     {/* Deleted-by-user notice */}
                     {video.deletedAt && (
                       <p className="text-[10px] text-red-500 bg-red-50 border border-red-100 rounded-lg px-2 py-1">
@@ -715,7 +733,8 @@ export default function VideoModerationPage() {
                     <div className={`flex gap-1.5 pt-1 ${filter === 'PENDING' ? '' : 'justify-between'}`}>
                       {filter === 'PENDING' ? (
                         <>
-                          <button onClick={() => approve(video)} disabled={busy}
+                          {/* No subcategory editor on the card grid, so no override — just quality. */}
+                          <button onClick={() => openApproveModal(video)} disabled={busy}
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             {busy ? <Clock size={11} className="animate-spin" /> : <CheckCircle size={11} />} Approve
                           </button>
@@ -836,6 +855,20 @@ export default function VideoModerationPage() {
                 <div className="bg-red-500/20 border border-red-500/30 rounded-xl px-3 py-2">
                   <p className="text-[10px] font-black text-red-400 uppercase tracking-wide mb-0.5">Rejected</p>
                   <p className="text-[12px] text-red-300">{previewVideo.rejectionReason}</p>
+                </div>
+              )}
+
+              {/* Quality — set by the moderator at approval time */}
+              {previewVideo.status === 'APPROVED' && previewVideo.quality && (
+                <div className={`border rounded-xl px-3 py-2 ${
+                  previewVideo.quality === 'HIGH'   ? 'bg-green-500/20 border-green-500/30' :
+                  previewVideo.quality === 'MEDIUM' ? 'bg-amber-500/20 border-amber-500/30' :
+                                                       'bg-red-500/20 border-red-500/30'
+                }`}>
+                  <p className="text-[10px] font-black uppercase tracking-wide mb-0.5 text-white/70">Quality</p>
+                  <p className="text-[12px] text-white/90">
+                    {previewVideo.quality === 'HIGH' ? 'High' : previewVideo.quality === 'MEDIUM' ? 'Medium' : 'Low'}
+                  </p>
                 </div>
               )}
 
@@ -986,7 +1019,50 @@ export default function VideoModerationPage() {
         </div>
       )}
 
-      {/* ── Delete confirmation modal ────────────────────────────────────────── */}
+      {/* Approve modal — quality is mandatory, so Confirm stays disabled
+          until one of the three options is picked. */}
+      {approveModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
+            <h2 className="text-sm font-black text-[#004f9f] mb-0.5">Approve Video</h2>
+            <p className="text-[11px] text-gray-400 mb-3">
+              Rate the video&apos;s quality before approving. This is required.
+            </p>
+
+            <div className="flex flex-col gap-2">
+              {QUALITY_OPTIONS.map(opt => (
+                <button
+                  key={opt.value}
+                  onClick={() => setApproveQuality(opt.value)}
+                  className={`text-left px-3 py-2.5 rounded-xl border transition-colors ${
+                    approveQuality === opt.value
+                      ? 'bg-green-600 border-green-600 text-white'
+                      : 'border-gray-200 text-gray-600 hover:border-green-300'
+                  }`}
+                >
+                  <span className="block text-xs font-black">{opt.label}</span>
+                  <span className={`block text-[11px] mt-0.5 ${approveQuality === opt.value ? 'text-white/80' : 'text-gray-400'}`}>
+                    {opt.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex gap-2 mt-3">
+              <button onClick={() => setApproveModal(null)}
+                className="flex-1 py-2.5 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors">
+                Cancel
+              </button>
+              <button onClick={confirmApprove} disabled={!approveQuality}
+                className="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-black transition-colors disabled:opacity-40 disabled:hover:bg-green-600">
+                Confirm Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Ã¢ââ¬Ã¢ââ¬ Delete confirmation modal Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
       {deleteModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl">

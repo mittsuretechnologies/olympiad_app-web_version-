@@ -153,6 +153,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (p.startsWith('/dashboard/moderation')) return 'moderation';
     if (p.startsWith('/dashboard/reports')) return 'reports';
     if (p.startsWith('/dashboard/app-users')) return 'reports';
+    if (p.startsWith('/dashboard/student-activity')) return 'reports';
     if (p.startsWith('/dashboard/evaluator')) return 'evaluator';
     if (p.startsWith('/dashboard/result')) return 'result';
     if (p.startsWith('/dashboard/settings')) return 'settings';
@@ -235,6 +236,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Evaluation Progress',    href: '/dashboard/reports/evaluation-progress',        icon: ClipboardCheck },
     { name: 'School Report',          href: '/dashboard/reports/schools',                    icon: Building2 },
     { name: 'App Users',              href: '/dashboard/app-users',                          icon: Smartphone },
+    { name: 'Student Activity',       href: '/dashboard/student-activity',                   icon: Clock },
   ];
 
   const resultSubItems = [
@@ -419,7 +421,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {canSee('reports') && (
               <div>
                 <button onClick={() => toggleSection('reports')}
-                  className={sectionBtnClass(pathname.startsWith('/dashboard/reports') || pathname.startsWith('/dashboard/credentials/registered') || pathname.startsWith('/dashboard/app-users'))}>
+                  className={sectionBtnClass(pathname.startsWith('/dashboard/reports') || pathname.startsWith('/dashboard/credentials/registered') || pathname.startsWith('/dashboard/app-users') || pathname.startsWith('/dashboard/student-activity'))}>
                   <div className="flex items-center gap-3"><BarChart2 size={20} /><span className="text-sm font-semibold">Reports</span></div>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${reportsOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -427,7 +429,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.evaluation-progress','reports.schools','reports.appusers'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.evaluation-progress','reports.schools','reports.appusers','reports.student-activity'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>

@@ -216,14 +216,20 @@ export async function POST(request: Request) {
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
-    const {
-      videoId, videoIds, status, rejectionReason,
-      subCategory: newSubCategory,
-      category: newCategory,
-    } = await request.json();
+    const { videoId, videoIds, status, rejectionReason, subCategory: newSubCategory, quality } = await request.json();
 
     if (!['APPROVED', 'REJECTED'].includes(status)) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
+    }
+    // A moderator's call on source-footage quality is mandatory for approval,
+    // and necessarily per-video — enforced here, not just by the dashboard
+    // hiding its bulk-approve button, so this can't be bypassed by calling
+    // the API directly.
+    if (status === 'APPROVED' && !['HIGH', 'MEDIUM', 'LOW'].includes(quality)) {
+      return NextResponse.json({ message: 'A video quality (High/Medium/Low) is required to approve.' }, { status: 400 });
+    }
+    if (status === 'APPROVED' && Array.isArray(videoIds) && videoIds.length > 0) {
+      return NextResponse.json({ message: 'Bulk approve is not supported — quality must be set per video.' }, { status: 400 });
     }
 
     const actor = {
@@ -233,7 +239,8 @@ export async function POST(request: Request) {
     };
     const action = status === 'APPROVED' ? 'VIDEO_APPROVED' : 'VIDEO_REJECTED';
 
-    // ── Bulk action: videoIds array ───────────────────────────────────────────
+    // ── Bulk action: videoIds array ─────────────────────────────────────────
+    // REJECTED only at this point — APPROVED bulk was rejected above.
     if (Array.isArray(videoIds) && videoIds.length > 0) {
       const existing = await prisma.video.findMany({
         where: { id: { in: videoIds } },
@@ -274,7 +281,7 @@ export async function POST(request: Request) {
     const before = await prisma.video.findUnique({
       where: { id: videoId },
       select: {
-        status: true, rejectionReason: true, isEvaluation: true, appUserId: true,
+        status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true,
         caption: true, category: true, subCategory: true,
       },
     });
@@ -328,6 +335,7 @@ export async function POST(request: Request) {
       data: {
         status,
         rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
+        quality: status === 'APPROVED' ? quality : null,
         ...(recategorizing
           ? {
               ...(subCategoryChanged ? { subCategory: newSubCategory } : {}),
@@ -343,7 +351,7 @@ export async function POST(request: Request) {
       entityType: 'Video',
       entityId: videoId,
       previousValue: before,
-      newValue: { status: video.status, rejectionReason: video.rejectionReason, category: video.category, subCategory: video.subCategory },
+      newValue: { status: video.status, rejectionReason: video.rejectionReason, quality: video.quality, category: video.category, subCategory: video.subCategory },
       reason: status === 'REJECTED' ? (rejectionReason || null) : null,
     });
 

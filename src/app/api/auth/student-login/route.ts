@@ -37,6 +37,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
     }
 
+    await prisma.student.update({
+      where: { id: student.id },
+      data:  { lastLoginAt: new Date() },
+    });
+
     const token = jwt.sign(
       { id: student.id, olympiadCode: student.olympiadCode, role: 'STUDENT' },
       process.env.JWT_SECRET || 'fallback_secret',

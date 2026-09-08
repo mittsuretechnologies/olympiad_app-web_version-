@@ -75,6 +75,7 @@ export async function POST(request: Request) {
         avatarUrl:  user.avatarUrl,
         olympiadId: user.olympiadId,
         isPrivate:  user.isPrivate,
+        termsAccepted: user.termsAccepted,
         studentName,
         school,
       },

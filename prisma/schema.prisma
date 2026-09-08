@@ -251,6 +251,10 @@ model Student {
   createdAt     DateTime             @default(now())
   updatedAt     DateTime             @updatedAt
   plainPassword String?
+  // Stamped on every successful student-login (see api/auth/student-login) —
+  // mirrors AppUser.lastLoginAt, which is the only other place "last active"
+  // is tracked in this schema.
+  lastLoginAt   DateTime?
   allocation    OlympiadIdAllocation @relation(fields: [olympiadCode], references: [code], onDelete: Cascade)
   videos        Video[]
 
@@ -270,6 +274,11 @@ model Video {
   tags               String?
   status             String            @default("PENDING")
   rejectionReason    String?
+  // Moderator's call on the source footage — "HIGH" | "MEDIUM" | "LOW". Null
+  // until approved: the dashboard requires picking one at the moment of
+  // approval (see /api/dashboard/videos POST), so every APPROVED video has
+  // this set, but PENDING/REJECTED ones don't.
+  quality            String?
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   isEvaluation       Boolean           @default(false)
@@ -484,6 +493,7 @@ model AppUser {
   password               String
   plainPassword          String?
   termsAccepted          Boolean         @default(false)
+  termsAcceptedAt        DateTime?
   otpHash                String?
   otpExpiresAt           DateTime?
   isVerified             Boolean         @default(false)

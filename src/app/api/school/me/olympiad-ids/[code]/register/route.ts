@@ -88,7 +88,10 @@ export async function POST(
         password: passwordHash,
         plainPassword: finalPassword,
         isVerified: true,
-        termsAccepted: true,
+        // Not accepted yet — this form collects name/contact details, not
+        // Terms agreement. The app gates the student behind a one-time Terms
+        // screen on first login instead (see /api/app/terms).
+        termsAccepted: false,
         olympiadId: code,
       },
     });
