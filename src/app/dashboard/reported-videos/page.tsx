@@ -234,7 +234,7 @@ export default function ReportedVideosPage() {
                   </span>
                   {v.isEvaluation && (
                     <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-700 bg-amber-400 px-2 py-0.5 rounded-full shadow">
-                      <Award size={9} /> Jury
+                      <Award size={9} /> Olympiad
                     </span>
                   )}
                 </div>
@@ -333,7 +333,7 @@ export default function ReportedVideosPage() {
                       )}
                       {detail.video.isEvaluation && (
                         <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
-                          <Award size={10} /> Jury
+                          <Award size={10} /> Olympiad
                         </span>
                       )}
                     </div>

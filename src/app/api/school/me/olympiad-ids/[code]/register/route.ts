@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
 import { sendStudentCredentialsEmail } from '@/lib/mailer';
+import { sendStudentCredentialsSms } from '@/lib/sms';
 
 /** Mirrors the generator used by the bulk allot route so both paths produce
  *  the same shape of password. Excludes look-alike characters (l/1/o/0). */
@@ -28,7 +29,13 @@ export async function POST(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
     const { code } = await params;
-    const { name, phone, password, email } = await request.json();
+    const { name, phone, password, email, sendEmail, sendSms } = await request.json();
+
+    // Which channels the school ticked in the allot dialog. Older callers that
+    // don't send the flags keep the previous behaviour: email whenever an
+    // address was given, never SMS.
+    const wantEmail = sendEmail === undefined ? true : Boolean(sendEmail);
+    const wantSms = Boolean(sendSms);
 
     if (!name?.trim()) return NextResponse.json({ message: 'Student name is required' }, { status: 400 });
     if (!phone?.trim() || phone.trim().length < 10) return NextResponse.json({ message: 'Valid phone number is required' }, { status: 400 });
@@ -95,11 +102,12 @@ export async function POST(
       },
     });
 
-    // Email the credentials to the student (best-effort — a mail failure
-    // must not roll back a successful registration).
+    // Deliver the credentials on whichever channels the school ticked. Both are
+    // best-effort: the account already exists, so a mail or gateway failure is
+    // reported back rather than rolling the registration back.
     let emailSent = false;
     let emailError: string | null = null;
-    if (emailNormalized) {
+    if (wantEmail && emailNormalized) {
       try {
         await sendStudentCredentialsEmail({
           to: emailNormalized,
@@ -116,6 +124,23 @@ export async function POST(
       }
     }
 
+    let smsSent = false;
+    let smsError: string | null = null;
+    if (wantSms) {
+      try {
+        await sendStudentCredentialsSms(mobileNormalized, {
+          studentName: name.trim(),
+          olympiadId: code,
+          username: appUser.userId,
+          password: finalPassword,
+        });
+        smsSent = true;
+      } catch (smsErr: any) {
+        smsError = smsErr?.message || 'Failed to send SMS';
+        console.error(`Student credential SMS to ${mobileNormalized} failed:`, smsErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       userId: appUser.userId,
@@ -125,6 +150,8 @@ export async function POST(
       message: 'Student registered successfully',
       emailSent,
       emailError,
+      smsSent,
+      smsError,
     }, { status: 201 });
   } catch (error: any) {
     if (error.code === 'P2002') return NextResponse.json({ message: 'Olympiad ID already in use' }, { status: 409 });

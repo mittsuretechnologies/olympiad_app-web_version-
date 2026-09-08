@@ -47,7 +47,7 @@ export async function POST(
       await recordAuditLog({
         actorId: admin.id,
         actorRole: admin.role,
-        actorName: admin.email || admin.name || null,
+        actorName: admin.name || admin.email || null,
         action: 'REPORT_IGNORED',
         entityType: 'VideoReport',
         entityId: videoId,
@@ -66,7 +66,7 @@ export async function POST(
       await recordAuditLog({
         actorId: admin.id,
         actorRole: admin.role,
-        actorName: admin.email || admin.name || null,
+        actorName: admin.name || admin.email || null,
         action: 'REPORT_VIDEO_REMOVED',
         entityType: 'Video',
         entityId: videoId,

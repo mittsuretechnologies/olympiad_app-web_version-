@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
 
-// Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ Types Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Video {
   id: string;
@@ -45,7 +45,7 @@ interface ApiResponse {
 
 type StatusFilter = 'PENDING' | 'APPROVED' | 'REJECTED';
 
-// Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ Constants Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const REJECTION_TEMPLATES = [
   'Video quality is too low.',
@@ -65,7 +65,7 @@ const TAB_CFG = {
   REJECTED: { label: 'Rejected', activeClass: 'bg-red-600   text-white shadow-sm',  dot: 'bg-red-400'   },
 };
 
-// Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ Helper Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+// ─── Helper ───────────────────────────────────────────────────────────────────
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -77,6 +77,17 @@ function getCategoryLabel(cat: string) {
   return null;
 }
 
+// Seeds the main-category dropdown. Older rows store the raw 'Cat A' / 'Cat B'
+// values instead of the display labels, and some have no usable category at all
+// — fall back to deriving it from the subcategory so the select is never blank.
+function normalizeCat(video: { category: string | null; subCategory: string | null }): string {
+  const c = video.category;
+  if (c === OLYMPIAD_CAT_A_LABEL || c === 'Cat A') return OLYMPIAD_CAT_A_LABEL;
+  if (c === OLYMPIAD_CAT_B_LABEL || c === 'Cat B') return OLYMPIAD_CAT_B_LABEL;
+  if (OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '')) return OLYMPIAD_CAT_B_LABEL;
+  return OLYMPIAD_CAT_A_LABEL;
+}
+
 // Must check every role's token key (token / reviewerToken / evaluatorToken /
 // moderatorToken), same as the GET requests on this page already do via
 // fetcher() — a moderator's token lives under moderatorToken, not token.
@@ -85,31 +96,33 @@ function authHeaders(): Record<string, string> {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
-// Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ Component Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export default function VideoModerationPage() {
-  // Ã¢ââ¬Ã¢ââ¬ Tab & Filters Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Tab & Filters ─────────────────────────────────────────────────────────
   const [filter,       setFilter]       = useState<StatusFilter>('PENDING');
   const [search,       setSearch]       = useState('');
   const [catFilter,    setCatFilter]    = useState('');
   const [typeFilter,   setTypeFilter]   = useState('');
   const [filterOpen,   setFilterOpen]   = useState(false);
 
-  // Ã¢ââ¬Ã¢ââ¬ Selection Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Selection ─────────────────────────────────────────────────────────────
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
 
-  // Ã¢ââ¬Ã¢ââ¬ Modals Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Modals ────────────────────────────────────────────────────────────────
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
+  const [editedCat,    setEditedCat]    = useState<string>('');
   const [editedSubCat, setEditedSubCat] = useState<string>('');
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
   const [deleteModal,  setDeleteModal]  = useState<{ ids: string[] } | null>(null);
 
-  // Ã¢ââ¬Ã¢ââ¬ Processing Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Processing ────────────────────────────────────────────────────────────
   const [processingId, setProcessingId] = useState<string | null>(null);
   const [bulkWorking,  setBulkWorking]  = useState(false);
   const [deleting,     setDeleting]     = useState(false);
   const [copiedId,     setCopiedId]     = useState<string | null>(null);
+  const [refreshing,   setRefreshing]   = useState(false);
 
   const copyVideoId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -117,7 +130,7 @@ export default function VideoModerationPage() {
     setTimeout(() => setCopiedId(cur => (cur === id ? null : cur)), 1500);
   };
 
-  // Ã¢ââ¬Ã¢ââ¬ SWR Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── SWR ───────────────────────────────────────────────────────────────────
   const params = new URLSearchParams();
   params.set('status', filter);
   if (catFilter) params.set('category', catFilter);
@@ -127,7 +140,7 @@ export default function VideoModerationPage() {
 
   const counts = data?.counts ?? { PENDING: 0, APPROVED: 0, REJECTED: 0 };
 
-  // Ã¢ââ¬Ã¢ââ¬ Client-side search Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Client-side search ────────────────────────────────────────────────────
   const videos = useMemo(() => {
     const allVideos: Video[] = Array.isArray(data?.videos) ? data!.videos : [];
     if (!search.trim()) return allVideos;
@@ -140,13 +153,18 @@ export default function VideoModerationPage() {
       v.appUser?.userId?.toLowerCase().includes(q) ||
       v.appUser?.olympiadId?.toLowerCase().includes(q) ||
       v.appUser?.school?.name?.toLowerCase().includes(q) ||
-      v.subCategory?.toLowerCase().includes(q)
+      v.subCategory?.toLowerCase().includes(q) ||
+      v.tags?.toLowerCase().includes(q)
     );
   }, [data, search]);
 
-  const fetchVideos = () => { mutate(); setSelected(new Set()); };
+  const fetchVideos = async () => {
+    setRefreshing(true);
+    try { await mutate(); } finally { setRefreshing(false); }
+    setSelected(new Set());
+  };
 
-  // Ã¢ââ¬Ã¢ââ¬ Selection helpers Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Selection helpers ─────────────────────────────────────────────────────
   const allSelected  = videos.length > 0 && videos.every(v => selected.has(v.id));
   const someSelected = videos.some(v => selected.has(v.id));
   const selectedIds  = [...selected].filter(id => videos.some(v => v.id === id));
@@ -157,8 +175,8 @@ export default function VideoModerationPage() {
   const toggleAll = () =>
     setSelected(allSelected ? new Set() : new Set(videos.map(v => v.id)));
 
-  // Ã¢ââ¬Ã¢ââ¬ Single approve / reject Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
-  const approve = async (video: Video, subCategoryOverride?: string) => {
+  // ── Single approve / reject ───────────────────────────────────────────────
+  const approve = async (video: Video, subCategoryOverride?: string, categoryOverride?: string) => {
     setProcessingId(video.id);
     try {
       const res = await fetch('/api/dashboard/videos', {
@@ -168,6 +186,7 @@ export default function VideoModerationPage() {
           videoId: video.id,
           status: 'APPROVED',
           ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
+          ...(categoryOverride && categoryOverride !== video.category ? { category: categoryOverride } : {}),
         }),
       });
       if (res.ok) {
@@ -177,6 +196,36 @@ export default function VideoModerationPage() {
       } else {
         const body = await res.json().catch(() => null);
         alert(body?.message || 'Failed to approve');
+      }
+    } finally { setProcessingId(null); }
+  };
+
+  // Re-saves an already-approved video's category without touching its status.
+  // Reuses the approve endpoint (it always requires status), but — unlike a
+  // fresh approve — the video must stay in the Approved list, updated in place,
+  // rather than being removed from it.
+  const saveRecategorization = async (video: Video, subCategoryOverride: string, categoryOverride: string) => {
+    setProcessingId(video.id);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          videoId: video.id,
+          status: 'APPROVED',
+          ...(subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
+          ...(categoryOverride !== video.category ? { category: categoryOverride } : {}),
+        }),
+      });
+      if (res.ok) {
+        mutate(cur => cur ? {
+          ...cur,
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, category: categoryOverride, subCategory: subCategoryOverride } : v),
+        } : cur, { revalidate: false });
+        setPreviewVideo(null);
+      } else {
+        const body = await res.json().catch(() => null);
+        alert(body?.message || 'Failed to update category');
       }
     } finally { setProcessingId(null); }
   };
@@ -230,7 +279,7 @@ export default function VideoModerationPage() {
     }
   };
 
-  // Ã¢ââ¬Ã¢ââ¬ Bulk approve Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Bulk approve ──────────────────────────────────────────────────────────
   const bulkApprove = async () => {
     if (!selectedIds.length) return;
     setBulkWorking(true);
@@ -248,7 +297,7 @@ export default function VideoModerationPage() {
     } finally { setBulkWorking(false); }
   };
 
-  // Ã¢ââ¬Ã¢ââ¬ Delete Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // ── Delete ────────────────────────────────────────────────────────────────
   const openDeleteModal = (ids: string[]) => setDeleteModal({ ids });
 
   const confirmDelete = async () => {
@@ -271,24 +320,32 @@ export default function VideoModerationPage() {
 
   const activeFilters = [catFilter, typeFilter].filter(Boolean).length;
 
-  // Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬
+  // Category is editable on pending jury videos (bundled into the approve
+  // action) and, separately, on already-approved jury videos (saved on its own
+  // via saveRecategorization) — but not on rejected ones, where the category
+  // no longer matters, and not on soft-deleted ones.
+  const canEditCategory = !!previewVideo && previewVideo.isEvaluation && !previewVideo.deletedAt &&
+    (filter === 'PENDING' || filter === 'APPROVED');
+
+  // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Header Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-medium text-[#004f9f]">Video Moderation</h1>
         </div>
         <button
           onClick={fetchVideos}
-          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors shadow-sm"
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 active:bg-gray-100 transition-all duration-150 shadow-sm disabled:cursor-not-allowed"
         >
-          <RefreshCw size={13} /> Refresh
+          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> Refresh
         </button>
       </div>
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Stats bar Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Stats bar ───────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-3">
         {(Object.keys(TAB_CFG) as StatusFilter[]).map(s => (
           <button
@@ -323,7 +380,7 @@ export default function VideoModerationPage() {
         ))}
       </div>
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Search + Filter bar Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Search + Filter bar ─────────────────────────────────────────────── */}
       <div className="flex gap-2">
         {/* Search */}
         <div className="flex-1 relative">
@@ -332,7 +389,7 @@ export default function VideoModerationPage() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, school, olympiad code, captionâ¦"
+            placeholder="Search by name, school, olympiad code, caption, tags…"
             className="w-full pl-9 pr-4 h-9 border border-gray-200 rounded-xl text-xs text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#014584]/20 focus:border-[#014584]/40 bg-white"
           />
           {search && (
@@ -407,7 +464,7 @@ export default function VideoModerationPage() {
         </div>
       </div>
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Bulk action bar Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Bulk action bar ─────────────────────────────────────────────────── */}
       {someSelected && (
         <div className="flex items-center justify-between bg-[#014584]/5 border border-[#014584]/20 rounded-2xl px-4 py-2.5">
           <span className="text-xs font-black text-[#014584]">
@@ -450,11 +507,11 @@ export default function VideoModerationPage() {
         </div>
       )}
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Content Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Content ─────────────────────────────────────────────────────────── */}
       {loading ? (
         <div className="flex items-center justify-center py-24 gap-3">
           <Clock size={26} className="animate-spin text-gray-300" />
-          <span className="text-gray-400 text-sm font-bold">Loadingâ¦</span>
+          <span className="text-gray-400 text-sm font-bold">Loading…</span>
         </div>
       ) : videos.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-24 bg-white border border-dashed border-gray-200 rounded-2xl">
@@ -501,7 +558,7 @@ export default function VideoModerationPage() {
                   {/* Thumbnail */}
                   <div
                     className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden"
-                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }}
+                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }}
                   >
                     {video.thumbnailUrl ? (
                       <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -530,7 +587,7 @@ export default function VideoModerationPage() {
                       )}
                       {video.isEvaluation && (
                         <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-700 bg-amber-400 px-2 py-0.5 rounded-full shadow">
-                          <Award size={9} /> Jury
+                          <Award size={9} /> Olympiad
                         </span>
                       )}
                     </div>
@@ -666,14 +723,14 @@ export default function VideoModerationPage() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             <XCircle size={11} /> Reject
                           </button>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }} disabled={busy}
                             className="px-2.5 py-2 rounded-xl border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40">
                             <Eye size={13} />
                           </button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }} disabled={busy}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>
@@ -692,7 +749,7 @@ export default function VideoModerationPage() {
         </>
       )}
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Preview modal Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Preview modal ────────────────────────────────────────────────────── */}
       {previewVideo && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewVideo(null)}>
           <div className="bg-[#0f0f0f] rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
@@ -709,35 +766,53 @@ export default function VideoModerationPage() {
               {/* Category + date row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {filter === 'PENDING' && previewVideo.isEvaluation ? (
-                    <select
-                      value={editedSubCat}
-                      onChange={e => setEditedSubCat(e.target.value)}
-                      className="text-[11px] font-black text-blue-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300"
-                    >
-                      <optgroup label={OLYMPIAD_CAT_A_LABEL}>
-                        {OLYMPIAD_CAT_A_SUBS.map(s => <option key={s} value={s} className="text-black">{s}</option>)}
-                      </optgroup>
-                      <optgroup label={OLYMPIAD_CAT_B_LABEL}>
-                        {OLYMPIAD_CAT_B_SUBS.map(s => <option key={s} value={s} className="text-black">{s}</option>)}
-                      </optgroup>
-                    </select>
+                  {canEditCategory ? (
+                    <>
+                      {/* Main category — switching it also moves the subcategory
+                          into that category's list, so the two can't disagree. */}
+                      <select
+                        value={editedCat}
+                        onChange={e => {
+                          const cat = e.target.value;
+                          setEditedCat(cat);
+                          const subs = cat === OLYMPIAD_CAT_A_LABEL ? OLYMPIAD_CAT_A_SUBS : OLYMPIAD_CAT_B_SUBS;
+                          if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0]);
+                        }}
+                        className="text-[11px] font-black text-amber-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-300"
+                      >
+                        <option value={OLYMPIAD_CAT_A_LABEL} className="text-black">{OLYMPIAD_CAT_A_LABEL}</option>
+                        <option value={OLYMPIAD_CAT_B_LABEL} className="text-black">{OLYMPIAD_CAT_B_LABEL}</option>
+                      </select>
+                      <select
+                        value={editedSubCat}
+                        onChange={e => setEditedSubCat(e.target.value)}
+                        className="text-[11px] font-black text-blue-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      >
+                        {(editedCat === OLYMPIAD_CAT_B_LABEL ? OLYMPIAD_CAT_B_SUBS : OLYMPIAD_CAT_A_SUBS)
+                          .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
+                      </select>
+                    </>
                   ) : (
                     <span className="text-[11px] font-black text-blue-300 bg-white/10 px-2.5 py-1 rounded-full">
                       {previewVideo.subCategory || previewVideo.category}
                     </span>
                   )}
-                  {(() => { const b = getCategoryLabel(editedSubCat || previewVideo.subCategory); return b ? (
-                    <span className="text-[10px] font-black px-2 py-1 rounded-full bg-white/10 text-white/70">{b.label}</span>
-                  ) : null; })()}
-                  {filter === 'PENDING' && previewVideo.isEvaluation && editedSubCat && editedSubCat !== previewVideo.subCategory && (
+                  {/* Only a read-only view needs this derived badge — while editing,
+                      the main-category select above already shows it. */}
+                  {!canEditCategory &&
+                    (() => { const b = getCategoryLabel(previewVideo.subCategory); return b ? (
+                      <span className="text-[10px] font-black px-2 py-1 rounded-full bg-white/10 text-white/70">{b.label}</span>
+                    ) : null; })()}
+                  {canEditCategory &&
+                   ((editedSubCat && editedSubCat !== previewVideo.subCategory) ||
+                    (editedCat && editedCat !== normalizeCat(previewVideo))) && (
                     <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-400/20 text-amber-300">
                       Recategorized
                     </span>
                   )}
                   {previewVideo.isEvaluation && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
-                      <Award size={10} /> Jury
+                      <Award size={10} /> Olympiad
                     </span>
                   )}
                   {previewVideo.deletedAt && (
@@ -776,7 +851,7 @@ export default function VideoModerationPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5 mb-0.5">
                     <p className="text-sm font-black text-white truncate">
-                      {previewVideo.student?.name ?? previewVideo.appUser?.userId ?? 'â'}
+                      {previewVideo.student?.name ?? previewVideo.appUser?.userId ?? '—'}
                     </p>
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
                       (previewVideo.uploaderType === 'STUDENT' || previewVideo.student)
@@ -805,7 +880,7 @@ export default function VideoModerationPage() {
                     </div>
                   ) : previewVideo.appUser ? (
                     <div className="space-y-0.5">
-                      <p className="text-[11px] text-white/40 truncate">{previewVideo.appUser.email || previewVideo.appUser.mobile || 'â'}</p>
+                      <p className="text-[11px] text-white/40 truncate">{previewVideo.appUser.email || previewVideo.appUser.mobile || '—'}</p>
                       {previewVideo.appUser.olympiadId && (
                         <p className="text-[11px] text-amber-400 font-mono">{previewVideo.appUser.olympiadId}</p>
                       )}
@@ -829,7 +904,7 @@ export default function VideoModerationPage() {
               <div className="flex gap-2 pt-1">
                 {filter === 'PENDING' && (
                   <>
-                    <button onClick={() => approve(previewVideo, editedSubCat)} disabled={processingId === previewVideo.id}
+                    <button onClick={() => approve(previewVideo, editedSubCat, editedCat)} disabled={processingId === previewVideo.id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
                       <CheckCircle size={14} /> Approve
                     </button>
@@ -838,6 +913,14 @@ export default function VideoModerationPage() {
                       <XCircle size={14} /> Reject
                     </button>
                   </>
+                )}
+                {filter === 'APPROVED' && canEditCategory && (
+                  <button
+                    onClick={() => saveRecategorization(previewVideo, editedSubCat, editedCat)}
+                    disabled={processingId === previewVideo.id || (editedSubCat === previewVideo.subCategory && editedCat === normalizeCat(previewVideo))}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
+                    <CheckCircle size={14} /> Save Category
+                  </button>
                 )}
                 <button onClick={() => { setPreviewVideo(null); openDeleteModal([previewVideo.id]); }} disabled={processingId === previewVideo.id}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-red-400 rounded-xl font-black text-sm transition-colors disabled:opacity-40">
@@ -849,7 +932,7 @@ export default function VideoModerationPage() {
         </div>
       )}
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Reject modal (single + bulk) Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Reject modal (single + bulk) ─────────────────────────────────────── */}
       {(rejectModal.video || rejectModal.bulk) && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl">
@@ -884,7 +967,7 @@ export default function VideoModerationPage() {
 
             <textarea
               className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-xs text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-red-200 focus:border-red-400 min-h-[70px] mt-2"
-              placeholder="Or type a custom reasonâ¦"
+              placeholder="Or type a custom reason…"
               value={rejectReason}
               onChange={e => setRejectReason(e.target.value)}
             />
@@ -903,7 +986,7 @@ export default function VideoModerationPage() {
         </div>
       )}
 
-      {/* Ã¢ââ¬Ã¢ââ¬ Delete confirmation modal Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬Ã¢ââ¬ */}
+      {/* ── Delete confirmation modal ────────────────────────────────────────── */}
       {deleteModal && (
         <div className="fixed inset-0 z-50 bg-black/60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl p-5 max-w-sm w-full shadow-2xl">
@@ -926,7 +1009,7 @@ export default function VideoModerationPage() {
               <button onClick={confirmDelete} disabled={deleting}
                 className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black transition-colors disabled:opacity-40">
                 {deleting ? <Clock size={13} className="animate-spin" /> : <Trash2 size={13} />}
-                {deleting ? 'Deletingâ¦' : 'Delete'}
+                {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
           </div>

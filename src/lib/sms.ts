@@ -214,3 +214,45 @@ export async function sendCredentialsSms(mobile: string, vars: { schoolName: str
   const { id, text } = renderCredentialsTemplate(vars);
   await dispatch(mobile, id, text);
 }
+
+/**
+ * Separate DLT template for sending a student their Olympiad login details
+ * after a school allots them an ID. Distinct from the School Panel credentials
+ * template above: the student's message carries the Olympiad ID as well, and
+ * the two are approved separately on the DLT panel.
+ */
+function renderStudentCredentialsTemplate(vars: {
+  studentName: string; olympiadId: string; username: string; password: string;
+}): { id: string; text: string } {
+  const id = process.env.SMS_TEMPLATE_STUDENT_CREDENTIALS;
+  const body = process.env.SMS_TEMPLATE_STUDENT_CREDENTIALS_BODY;
+
+  if (!id) throw new Error('Missing DLT template id for student credentials SMS (set SMS_TEMPLATE_STUDENT_CREDENTIALS in .env)');
+  if (!body) throw new Error('Missing DLT template body for student credentials SMS (set SMS_TEMPLATE_STUDENT_CREDENTIALS_BODY in .env)');
+  for (const key of ['studentName', 'olympiadId', 'username', 'password'] as const) {
+    if (!body.includes(`{${key}}`)) {
+      throw new Error(`DLT template body for student credentials SMS has no {${key}} placeholder`);
+    }
+  }
+
+  const text = body
+    .replaceAll('{studentName}', vars.studentName)
+    .replaceAll('{olympiadId}', vars.olympiadId)
+    .replaceAll('{username}', vars.username)
+    .replaceAll('{password}', vars.password);
+  return { id, text };
+}
+
+/**
+ * Sends a student their Olympiad ID and app login (userId + password) over SMS
+ * using the DLT-approved student credentials template. Throws on an unconfigured
+ * gateway or a rejected message so callers can report the failure the way they
+ * do for email.
+ */
+export async function sendStudentCredentialsSms(
+  mobile: string,
+  vars: { studentName: string; olympiadId: string; username: string; password: string }
+): Promise<void> {
+  const { id, text } = renderStudentCredentialsTemplate(vars);
+  await dispatch(mobile, id, text);
+}
