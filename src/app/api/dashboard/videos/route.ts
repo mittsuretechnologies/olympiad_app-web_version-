@@ -126,7 +126,8 @@ export async function GET(request: Request) {
         v.appUser?.userId?.toLowerCase().includes(q) ||
         (v.appUser as any)?.school?.name?.toLowerCase().includes(q) ||
         v.subCategory?.toLowerCase().includes(q) ||
-        v.category?.toLowerCase().includes(q)
+        v.category?.toLowerCase().includes(q) ||
+        v.tags?.toLowerCase().includes(q)
       );
     }
 
@@ -166,7 +167,7 @@ export async function DELETE(request: Request) {
     await Promise.all(existing.map(v => recordAuditLog({
       actorId: payload!.id,
       actorRole: payload!.role,
-      actorName: payload!.email || payload!.name || null,
+      actorName: payload!.name || payload!.email || null,
       action: 'VIDEO_DELETED',
       entityType: 'Video',
       entityId: v.id,
@@ -198,9 +199,12 @@ export async function DELETE(request: Request) {
   }
 }
 
+// Older records store the raw 'Cat A' / 'Cat B' values rather than the current
+// display labels, so both forms have to be recognised here — same as
+// school/me/student-slots and school/me/reports already do.
 function resolveSlot(category: string | null | undefined, subCategory: string | null | undefined) {
-  if (category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(subCategory ?? '')) return 'A';
-  if (category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(subCategory ?? '')) return 'B';
+  if (category === OLYMPIAD_CAT_A_LABEL || category === 'Cat A' || OLYMPIAD_CAT_A_SUBS.includes(subCategory ?? '')) return 'A';
+  if (category === OLYMPIAD_CAT_B_LABEL || category === 'Cat B' || OLYMPIAD_CAT_B_SUBS.includes(subCategory ?? '')) return 'B';
   return null;
 }
 
@@ -231,7 +235,7 @@ export async function POST(request: Request) {
     const actor = {
       actorId: payload!.id,
       actorRole: payload!.role,
-      actorName: payload!.email || payload!.name || null,
+      actorName: payload!.name || payload!.email || null,
     };
     const action = status === 'APPROVED' ? 'VIDEO_APPROVED' : 'VIDEO_REJECTED';
 
@@ -285,8 +289,16 @@ export async function POST(request: Request) {
     // Moderator is recategorizing an olympiad (jury) video before approving — re-run
     // the same 1-per-category slot check the student's upload does, so approving into
     // a corrected category can't create a second video occupying that same A/B slot.
-    if (status === 'APPROVED' && before?.isEvaluation && typeof newSubCategory === 'string' && newSubCategory !== before.subCategory) {
-      const targetSlot = resolveSlot(before.category, newSubCategory);
+    const subCategoryChanged = typeof newSubCategory === 'string' && newSubCategory !== before?.subCategory;
+    const categoryChanged    = typeof newCategory === 'string' && newCategory !== before?.category;
+
+    if (status === 'APPROVED' && before?.isEvaluation && (subCategoryChanged || categoryChanged)) {
+      // An explicit main category from the moderator is authoritative; only fall
+      // back to the video's existing one when they didn't change it.
+      const targetSlot = resolveSlot(
+        categoryChanged ? newCategory : before.category,
+        subCategoryChanged ? newSubCategory : before.subCategory,
+      );
       if (targetSlot && before.appUserId) {
         const siblings = await prisma.video.findMany({
           where: { appUserId: before.appUserId, isEvaluation: true, id: { not: videoId } },
@@ -305,8 +317,18 @@ export async function POST(request: Request) {
       }
     }
 
-    const recategorizing = status === 'APPROVED' && typeof newSubCategory === 'string' && newSubCategory !== before?.subCategory;
-    const newSlot = recategorizing ? resolveSlot(null, newSubCategory) : null;
+    const recategorizing = status === 'APPROVED' && (subCategoryChanged || categoryChanged);
+
+    // Derive the main category from the new subcategory only as a fallback. A
+    // custom subcategory ("Any Other Special Talent", a typed-in rhyme name) is
+    // in neither subs list, so resolveSlot returns null for it — previously that
+    // silently kept the old main category while the subcategory changed.
+    const derivedSlot = recategorizing
+      ? resolveSlot(categoryChanged ? newCategory : null, subCategoryChanged ? newSubCategory : before?.subCategory)
+      : null;
+    const derivedCategory =
+      derivedSlot === 'A' ? OLYMPIAD_CAT_A_LABEL :
+      derivedSlot === 'B' ? OLYMPIAD_CAT_B_LABEL : null;
 
     const video = await prisma.video.update({
       where: { id: videoId },
@@ -316,8 +338,8 @@ export async function POST(request: Request) {
         quality: status === 'APPROVED' ? quality : null,
         ...(recategorizing
           ? {
-              subCategory: newSubCategory,
-              category: newSlot === 'A' ? OLYMPIAD_CAT_A_LABEL : newSlot === 'B' ? OLYMPIAD_CAT_B_LABEL : before?.category,
+              ...(subCategoryChanged ? { subCategory: newSubCategory } : {}),
+              category: categoryChanged ? newCategory : (derivedCategory ?? before?.category),
             }
           : {}),
       },
@@ -332,6 +354,21 @@ export async function POST(request: Request) {
       newValue: { status: video.status, rejectionReason: video.rejectionReason, quality: video.quality, category: video.category, subCategory: video.subCategory },
       reason: status === 'REJECTED' ? (rejectionReason || null) : null,
     });
+
+    // A recategorization rides along with an approve, so it would otherwise be
+    // buried under a VIDEO_APPROVED row. Log it separately as well, so the
+    // activity log can answer "who moved this video's category" on its own.
+    if (recategorizing && (video.category !== before?.category || video.subCategory !== before?.subCategory)) {
+      await recordAuditLog({
+        ...actor,
+        action: 'VIDEO_RECATEGORIZED',
+        entityType: 'Video',
+        entityId: videoId,
+        previousValue: { category: before?.category ?? null, subCategory: before?.subCategory ?? null },
+        newValue: { category: video.category, subCategory: video.subCategory },
+        reason: null,
+      });
+    }
 
     if (before?.appUserId) {
       await createNotification(buildVideoStatusNotification(

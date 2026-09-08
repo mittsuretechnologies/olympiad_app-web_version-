@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, Star, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, MapPin, Mail, CheckCircle } from 'lucide-react';
+import { Search, Loader2, Star, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, MapPin, Mail, CheckCircle, Edit } from 'lucide-react';
 import { INDIAN_STATE_CODES } from '@/lib/indianStateCodes';
 
 interface Evaluator {
@@ -44,6 +44,12 @@ export default function ManageEvaluatorsPage() {
   const [regionInput, setRegionInput] = useState('');
   const [regionInputError, setRegionInputError] = useState('');
   const [regionSaving, setRegionSaving] = useState(false);
+
+  const [editTarget, setEditTarget] = useState<Evaluator | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState('');
 
   useEffect(() => {
     fetch('/api/credentials/evaluators', { headers: authHeaders() })
@@ -113,6 +119,36 @@ export default function ManageEvaluatorsPage() {
       alert(e.message || 'Failed to save region assignment');
     } finally {
       setRegionSaving(false);
+    }
+  };
+
+  const openEdit = (r: Evaluator) => {
+    setEditTarget(r);
+    setEditName(r.name);
+    setEditEmail(r.email);
+    setEditError('');
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editTarget) return;
+    if (!editName.trim() || !editEmail.trim()) { setEditError('Name and email are required'); return; }
+    setEditBusy(true); setEditError('');
+    try {
+      const res = await fetch(`/api/credentials/evaluators/${editTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ name: editName.trim(), email: editEmail.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to update evaluator');
+      setRows(prev => prev.map(r => r.id === editTarget.id ? { ...r, name: data.name, email: data.email } : r));
+      setToast(`Updated ${data.name}`);
+      setTimeout(() => setToast(null), 3000);
+      setEditTarget(null);
+    } catch (e: any) {
+      setEditError(e.message);
+    } finally {
+      setEditBusy(false);
     }
   };
 
@@ -253,6 +289,10 @@ export default function ManageEvaluatorsPage() {
                   </td>
                   <td className="px-5 py-3">
                     <div className="flex items-center justify-center gap-2">
+                      <button onClick={() => openEdit(r)} title="Edit"
+                        className="p-1.5 rounded-lg bg-blue-50 text-[#004f9f] hover:bg-blue-100 transition-colors">
+                        <Edit size={14} />
+                      </button>
                       <button onClick={() => setSendTarget(r)} title="Email credentials"
                         className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">
                         <Mail size={14} />
@@ -338,6 +378,49 @@ export default function ManageEvaluatorsPage() {
       {toast && (
         <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2 bg-[#009846] text-white px-4 py-3 rounded-xl shadow-lg text-sm font-semibold">
           <CheckCircle size={16} /> {toast}
+        </div>
+      )}
+
+      {editTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 overflow-hidden">
+            <div className="bg-[#004f9f] px-5 py-4 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">Edit Evaluator</p>
+                <p className="text-white font-bold text-sm mt-0.5">{editTarget.evaluatorId}</p>
+              </div>
+              <button onClick={() => setEditTarget(null)} className="text-white/50 hover:text-white"><X size={18} /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Full Name</label>
+                <input type="text" value={editName} onChange={e => setEditName(e.target.value)} autoFocus
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f] focus:ring-1 focus:ring-[#004f9f]" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Email</label>
+                <input type="email" value={editEmail} onChange={e => setEditEmail(e.target.value)} autoComplete="off"
+                  onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f] focus:ring-1 focus:ring-[#004f9f]" />
+              </div>
+              {editError && (
+                <div className="flex items-center gap-2 text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                  <AlertCircle size={13} /> {editError}
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
+                <button onClick={() => setEditTarget(null)}
+                  className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-lg hover:bg-gray-50">
+                  Cancel
+                </button>
+                <button onClick={handleSaveEdit} disabled={editBusy}
+                  className="flex-1 py-2.5 bg-[#004f9f] text-white text-sm font-bold rounded-lg hover:bg-[#003d7a] disabled:opacity-50 flex items-center justify-center gap-2">
+                  {editBusy ? <Loader2 size={14} className="animate-spin" /> : <Edit size={14} />}
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

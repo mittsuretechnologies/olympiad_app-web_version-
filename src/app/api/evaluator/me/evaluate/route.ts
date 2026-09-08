@@ -106,7 +106,7 @@ export async function POST(request: Request) {
     await recordAuditLog({
       actorId: payload.id,
       actorRole: payload.role,
-      actorName: payload.email || payload.name || null,
+      actorName: payload.name || payload.email || null,
       action: existing ? 'EVALUATION_EDITED' : 'EVALUATION_SUBMITTED',
       entityType: 'VideoEvaluation',
       entityId: videoId,
