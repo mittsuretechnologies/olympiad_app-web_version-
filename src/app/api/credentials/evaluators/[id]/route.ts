@@ -15,14 +15,23 @@ export async function PATCH(
     if ('isActive' in body) data.isActive = Boolean(body.isActive);
     if ('assignedStates' in body) data.assignedStates = Array.isArray(body.assignedStates) ? body.assignedStates.filter(Boolean) : [];
     if ('assignedDistricts' in body) data.assignedDistricts = Array.isArray(body.assignedDistricts) ? body.assignedDistricts.filter(Boolean) : [];
+    if ('name' in body) {
+      if (!String(body.name).trim()) return NextResponse.json({ message: 'Name cannot be empty' }, { status: 400 });
+      data.name = String(body.name).trim();
+    }
+    if ('email' in body) {
+      if (!String(body.email).trim()) return NextResponse.json({ message: 'Email cannot be empty' }, { status: 400 });
+      data.email = String(body.email).trim().toLowerCase();
+    }
 
     const updated = await prisma.talentEvaluator.update({
       where: { id },
       data,
-      select: { id: true, isActive: true, assignedStates: true, assignedDistricts: true },
+      select: { id: true, name: true, email: true, isActive: true, assignedStates: true, assignedDistricts: true },
     });
     return NextResponse.json(updated);
   } catch (e: any) {
+    if (e.code === 'P2002') return NextResponse.json({ message: 'Email already registered' }, { status: 409 });
     return NextResponse.json({ message: e.message }, { status: 500 });
   }
 }

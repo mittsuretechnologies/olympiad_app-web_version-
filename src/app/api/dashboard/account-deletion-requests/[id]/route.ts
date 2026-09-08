@@ -34,7 +34,7 @@ export async function PATCH(
         where: { id }, data: { status: 'REJECTED', decidedAt: new Date() },
       });
       await recordAuditLog({
-        actorId: payload.id, actorRole: payload.role, actorName: payload.email || null,
+        actorId: payload.id, actorRole: payload.role, actorName: payload.name || payload.email || null,
         action: 'ACCOUNT_DELETION_REJECTED', entityType: 'AccountDeletionRequest', entityId: id,
         newValue: { status: 'REJECTED', appUserId: reqRow.appUserId, userId: reqRow.appUser.userId },
       });
@@ -44,7 +44,7 @@ export async function PATCH(
     // Approve — true permanent wipe. Record the audit entry first since the
     // AppUser row (and this request row, via cascade) won't exist afterward.
     await recordAuditLog({
-      actorId: payload.id, actorRole: payload.role, actorName: payload.email || null,
+      actorId: payload.id, actorRole: payload.role, actorName: payload.name || payload.email || null,
       action: 'ACCOUNT_DELETED', entityType: 'AppUser', entityId: reqRow.appUserId,
       newValue: { userId: reqRow.appUser.userId },
       reason: 'Approved account deletion request',

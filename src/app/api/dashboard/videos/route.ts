@@ -166,7 +166,7 @@ export async function DELETE(request: Request) {
     await Promise.all(existing.map(v => recordAuditLog({
       actorId: payload!.id,
       actorRole: payload!.role,
-      actorName: payload!.email || payload!.name || null,
+      actorName: payload!.name || payload!.email || null,
       action: 'VIDEO_DELETED',
       entityType: 'Video',
       entityId: v.id,
@@ -221,7 +221,7 @@ export async function POST(request: Request) {
     const actor = {
       actorId: payload!.id,
       actorRole: payload!.role,
-      actorName: payload!.email || payload!.name || null,
+      actorName: payload!.name || payload!.email || null,
     };
     const action = status === 'APPROVED' ? 'VIDEO_APPROVED' : 'VIDEO_REJECTED';
 

@@ -50,9 +50,20 @@ export default function SchoolOlympiadIdsPage() {
   const [allotEmail, setAllotEmail] = useState('');
   const [allotting, setAllotting] = useState(false);
   const [allotError, setAllotError] = useState('');
+  /**
+   * Delivery step. Pressing Allot on the details form doesn't register anyone —
+   * it moves the modal to this step, where the school picks which channels the
+   * credentials go out on. SMS is the default because every student has a phone
+   * number on this form while email is optional.
+   */
+  const [allotStep, setAllotStep] = useState<'details' | 'deliver'>('details');
+  const [sendEmail, setSendEmail] = useState(false);
+  const [sendSms, setSendSms] = useState(true);
   const [allotSuccess, setAllotSuccess] = useState<{
     code: string; userId: string; password: string;
-    email: string; emailSent: boolean; emailError: string | null;
+    email: string; phone: string;
+    emailSent: boolean; emailError: string | null;
+    smsSent: boolean; smsError: string | null;
   } | null>(null);
 
   // Edit app account modal (for ALLOTTED rows — name + phone)
@@ -86,19 +97,32 @@ export default function SchoolOlympiadIdsPage() {
     setAllotEmail('');
     setAllotError('');
     setAllotSuccess(null);
+    setAllotStep('details');
+    setSendEmail(false);
+    setSendSms(true);
   };
   const closeAllotModal = () => {
     setAllotRow(null); setAllotName(''); setAllotPhone(''); setAllotEmail('');
-    setAllotError(''); setAllotSuccess(null);
+    setAllotError(''); setAllotSuccess(null); setAllotStep('details');
+    setSendEmail(false); setSendSms(true);
   };
 
-  const handleAllot = async () => {
-    if (!allotRow) return;
+  /** Validates the details form, then hands over to the delivery step. Email is
+   *  pre-ticked only when an address was actually filled in. */
+  const goToDeliveryStep = () => {
     if (!allotName.trim()) { setAllotError('Student name is required'); return; }
     if (!allotPhone.trim() || allotPhone.trim().length < 10) { setAllotError('Valid phone number is required'); return; }
     if (allotEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) {
       setAllotError('Enter a valid email address'); return;
     }
+    setAllotError('');
+    setSendEmail(!!allotEmail.trim());
+    setAllotStep('deliver');
+  };
+
+  const handleAllot = async () => {
+    if (!allotRow) return;
+    if (!sendEmail && !sendSms) { setAllotError('Pick at least one way to send the credentials'); return; }
     setAllotting(true); setAllotError('');
     try {
       // Registers against this exact code. The password is generated server-side
@@ -110,6 +134,8 @@ export default function SchoolOlympiadIdsPage() {
           name: allotName.trim(),
           phone: allotPhone.trim(),
           email: allotEmail.trim() || null,
+          sendEmail,
+          sendSms,
         }),
       });
       const data = await res.json();
@@ -124,8 +150,11 @@ export default function SchoolOlympiadIdsPage() {
         userId: data.userId,
         password: data.password,
         email: allotEmail.trim(),
+        phone: allotPhone.trim(),
         emailSent: !!data.emailSent,
         emailError: data.emailError || null,
+        smsSent: !!data.smsSent,
+        smsError: data.smsError || null,
       });
     } catch (e: any) {
       setAllotError(e.message);
@@ -467,22 +496,101 @@ export default function SchoolOlympiadIdsPage() {
                   </div>
                 ))}
               </dl>
-              {allotSuccess.emailSent ? (
-                <p className="flex items-start gap-1.5 rounded-lg bg-[#047857]/10 px-3 py-2 text-left text-[12px] text-[#047857]">
-                  <CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" />
-                  Credentials emailed to {allotSuccess.email}.
-                </p>
-              ) : allotSuccess.email ? (
-                <p className="flex items-start gap-1.5 rounded-lg bg-[#B91C1C]/10 px-3 py-2 text-left text-[12px] text-[#B91C1C]">
-                  <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
-                  Could not email credentials ({allotSuccess.emailError || 'mail error'}) — note them down and share manually.
-                </p>
-              ) : (
-                <p className="rounded-lg bg-[#F6F7F9] px-3 py-2 text-left text-[12px] text-[#4B5563]">
-                  No email was given — note these details down before closing.
+              {/* One line per channel that was attempted, so a partial
+                  delivery (SMS through, email bounced) reads as exactly that
+                  instead of a single verdict for both. */}
+              <div className="space-y-1.5">
+                {(allotSuccess.smsSent || allotSuccess.smsError) && (
+                  allotSuccess.smsSent ? (
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#047857]/10 px-3 py-2 text-left text-[12px] text-[#047857]">
+                      <CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" />
+                      Credentials sent by SMS to {allotSuccess.phone}.
+                    </p>
+                  ) : (
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#B91C1C]/10 px-3 py-2 text-left text-[12px] text-[#B91C1C]">
+                      <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+                      Could not send SMS ({allotSuccess.smsError || 'gateway error'}).
+                    </p>
+                  )
+                )}
+                {(allotSuccess.emailSent || allotSuccess.emailError) && (
+                  allotSuccess.emailSent ? (
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#047857]/10 px-3 py-2 text-left text-[12px] text-[#047857]">
+                      <CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" />
+                      Credentials emailed to {allotSuccess.email}.
+                    </p>
+                  ) : (
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#B91C1C]/10 px-3 py-2 text-left text-[12px] text-[#B91C1C]">
+                      <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
+                      Could not email credentials ({allotSuccess.emailError || 'mail error'}).
+                    </p>
+                  )
+                )}
+                {!allotSuccess.smsSent && !allotSuccess.emailSent && (
+                  <p className="rounded-lg bg-[#F6F7F9] px-3 py-2 text-left text-[12px] text-[#4B5563]">
+                    Nothing reached the student — note these details down and share them manually.
+                  </p>
+                )}
+              </div>
+              <button onClick={closeAllotModal} className={`cursor-pointer ${BTN_PRIMARY} w-full`}>Done</button>
+            </div>
+          ) : allotStep === 'deliver' ? (
+            <div className="space-y-3 p-5">
+              <p className="text-[12.5px] leading-snug text-[#4B5563]">
+                Choose how {allotName.trim() || 'the student'} receives their login details.
+                They are also shown here once the ID is allotted.
+              </p>
+              <div className="space-y-2">
+                <label className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${sendSms ? 'border-[#1559C7] bg-[#1559C7]/[0.05]' : 'border-[#E4E8EE] bg-white'}`}>
+                  <input
+                    type="checkbox" checked={sendSms}
+                    onChange={e => { setSendSms(e.target.checked); setAllotError(''); }}
+                    className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[#1559C7]"
+                  />
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#111827]">
+                      <Phone size={13} className="text-[#6B7280]" /> Send by SMS
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11.5px] text-[#6B7280]">{allotPhone.trim()}</span>
+                  </span>
+                </label>
+                {/* Email is only offerable when an address was filled in on the
+                    previous step, so the disabled state explains itself rather
+                    than looking like a permission problem. */}
+                <label className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${!allotEmail.trim() ? 'cursor-not-allowed border-[#E4E8EE] bg-[#F6F7F9] opacity-70' : sendEmail ? 'cursor-pointer border-[#1559C7] bg-[#1559C7]/[0.05]' : 'cursor-pointer border-[#E4E8EE] bg-white'}`}>
+                  <input
+                    type="checkbox" checked={sendEmail} disabled={!allotEmail.trim()}
+                    onChange={e => { setSendEmail(e.target.checked); setAllotError(''); }}
+                    className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[#1559C7] disabled:cursor-not-allowed"
+                  />
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#111827]">
+                      <Mail size={13} className="text-[#6B7280]" /> Send by email
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11.5px] text-[#6B7280]">
+                      {allotEmail.trim() || 'No email address given'}
+                    </span>
+                  </span>
+                </label>
+              </div>
+              {allotError && (
+                <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
+                  <AlertCircle size={12} /> {allotError}
                 </p>
               )}
-              <button onClick={closeAllotModal} className={`cursor-pointer ${BTN_PRIMARY} w-full`}>Done</button>
+              <div className="flex gap-2 pt-1">
+                <button
+                  onClick={() => { setAllotStep('details'); setAllotError(''); }}
+                  disabled={allotting}
+                  className={`cursor-pointer ${BTN_SECONDARY} flex-1`}
+                >
+                  Back
+                </button>
+                <button onClick={handleAllot} disabled={allotting} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+                  {allotting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                  Send &amp; Allot
+                </button>
+              </div>
             </div>
           ) : (
             <div className="space-y-3 p-5">
@@ -500,7 +608,7 @@ export default function SchoolOlympiadIdsPage() {
                   <input
                     id="allot-phone" type="tel" placeholder="10-digit mobile" value={allotPhone}
                     onChange={e => setAllotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                    onKeyDown={e => e.key === 'Enter' && handleAllot()}
+                    onKeyDown={e => e.key === 'Enter' && goToDeliveryStep()}
                     className={`${INPUT} pl-8`}
                   />
                 </div>
@@ -512,11 +620,11 @@ export default function SchoolOlympiadIdsPage() {
                   <input
                     id="allot-email" type="email" placeholder="student@example.com" value={allotEmail}
                     onChange={e => setAllotEmail(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleAllot()}
+                    onKeyDown={e => e.key === 'Enter' && goToDeliveryStep()}
                     className={`${INPUT} pl-8`}
                   />
                 </div>
-                <p className="mt-1 text-[11.5px] text-[#6B7280]">Optional — credentials are emailed here if given.</p>
+                <p className="mt-1 text-[11.5px] text-[#6B7280]">Optional — needed only if you want to email the credentials too.</p>
               </div>
               {allotError && (
                 <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
@@ -533,8 +641,8 @@ export default function SchoolOlympiadIdsPage() {
               </p>
               <div className="flex gap-2 pt-1">
                 <button onClick={closeAllotModal} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
-                <button onClick={handleAllot} disabled={allotting} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
-                  {allotting ? <Loader2 size={14} className="animate-spin" /> : <UserPlus size={14} />}
+                <button onClick={goToDeliveryStep} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+                  <UserPlus size={14} />
                   Allot
                 </button>
               </div>

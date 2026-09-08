@@ -108,3 +108,55 @@ export async function downloadFromS3(key: string, localPath: string): Promise<vo
   const { Body } = await getClient().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   await pipeline(Body as Readable, createWriteStream(localPath));
 }
+
+// The bucket is private, so a stored media URL (built by s3PublicUrl at upload
+// time) answers 403 when a browser loads it directly. Panels that need to show
+// a thumbnail or play a clip exchange that URL for a short-lived signed one.
+//
+// Only objects in this bucket can be signed: a URL pointing anywhere else is
+// returned untouched, so local-disk uploads (the no-S3 fallback) keep working.
+export function s3KeyFromUrl(url: string): string | null {
+  if (!url || !bucket) return null;
+
+  const bases = [
+    process.env.S3_PUBLIC_URL,
+    `https://${bucket}.s3.${region}.amazonaws.com`,
+    `https://${bucket}.s3.amazonaws.com`,
+    `https://s3.${region}.amazonaws.com/${bucket}`,
+  ].filter(Boolean) as string[];
+
+  for (const base of bases) {
+    const prefix = base.endsWith('/') ? base : `${base}/`;
+    if (url.startsWith(prefix)) {
+      // A key can legitimately contain encoded characters, so decode once
+      // rather than handing S3 a double-encoded key it won't find.
+      return decodeURIComponent(url.slice(prefix.length).split('?')[0]);
+    }
+  }
+  return null;
+}
+
+/**
+ * Signs a stored media URL for reading. Returns the input unchanged when it
+ * isn't an object in our bucket (a local /uploads path, or an external URL),
+ * so callers can pass every URL through without branching.
+ *
+ * The default hour is comfortably longer than a page session but short enough
+ * that a leaked link stops working the same day.
+ */
+export async function getSignedMediaUrl(url: string | null, expiresInSeconds = 3600): Promise<string | null> {
+  if (!url || !s3Enabled()) return url;
+
+  const key = s3KeyFromUrl(url);
+  if (!key) return url;
+
+  try {
+    const command = new GetObjectCommand({ Bucket: bucket, Key: key });
+    return await getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
+  } catch (err) {
+    // A signing failure must not blank the whole page — the caller still gets
+    // a URL, it just won't load, which is the behaviour they had before.
+    console.error(`Failed to sign media URL for key ${key}:`, err);
+    return url;
+  }
+}

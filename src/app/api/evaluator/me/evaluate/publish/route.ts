@@ -38,7 +38,7 @@ export async function POST(request: Request) {
     await recordAuditLog({
       actorId: payload!.id,
       actorRole: payload!.role,
-      actorName: payload!.email || payload!.name || null,
+      actorName: payload!.name || payload!.email || null,
       action: publish ? 'EVALUATION_PUBLISHED' : 'EVALUATION_UNPUBLISHED',
       entityType: 'VideoEvaluation',
       entityId: videoId,
