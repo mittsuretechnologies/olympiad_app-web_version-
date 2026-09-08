@@ -37,6 +37,7 @@ export async function GET(request: Request) {
         isVerified:   true,
         isPrivate:    true,
         termsAccepted: true,
+        termsAcceptedAt: true,
         unlistedSchoolName: true,
         createdAt:    true,
       },

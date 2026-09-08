@@ -70,7 +70,10 @@ export async function POST(request: Request) {
         password: passwordHash,
         plainPassword,
         isVerified: true,
-        termsAccepted: true,
+        // Not accepted yet — the school is provisioning this account, not the
+        // student. The app gates them behind a one-time Terms screen on first
+        // login instead (see /api/app/terms).
+        termsAccepted: false,
         olympiadId: available.code,
       },
     });
