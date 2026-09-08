@@ -77,6 +77,17 @@ function getCategoryLabel(cat: string) {
   return null;
 }
 
+// Seeds the main-category dropdown. Older rows store the raw 'Cat A' / 'Cat B'
+// values instead of the display labels, and some have no usable category at all
+// — fall back to deriving it from the subcategory so the select is never blank.
+function normalizeCat(video: { category: string | null; subCategory: string | null }): string {
+  const c = video.category;
+  if (c === OLYMPIAD_CAT_A_LABEL || c === 'Cat A') return OLYMPIAD_CAT_A_LABEL;
+  if (c === OLYMPIAD_CAT_B_LABEL || c === 'Cat B') return OLYMPIAD_CAT_B_LABEL;
+  if (OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '')) return OLYMPIAD_CAT_B_LABEL;
+  return OLYMPIAD_CAT_A_LABEL;
+}
+
 // Must check every role's token key (token / reviewerToken / evaluatorToken /
 // moderatorToken), same as the GET requests on this page already do via
 // fetcher() — a moderator's token lives under moderatorToken, not token.
@@ -100,6 +111,7 @@ export default function VideoModerationPage() {
 
   // ── Modals ────────────────────────────────────────────────────────────────
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
+  const [editedCat,    setEditedCat]    = useState<string>('');
   const [editedSubCat, setEditedSubCat] = useState<string>('');
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
@@ -110,6 +122,7 @@ export default function VideoModerationPage() {
   const [bulkWorking,  setBulkWorking]  = useState(false);
   const [deleting,     setDeleting]     = useState(false);
   const [copiedId,     setCopiedId]     = useState<string | null>(null);
+  const [refreshing,   setRefreshing]   = useState(false);
 
   const copyVideoId = (id: string) => {
     navigator.clipboard.writeText(id);
@@ -140,11 +153,16 @@ export default function VideoModerationPage() {
       v.appUser?.userId?.toLowerCase().includes(q) ||
       v.appUser?.olympiadId?.toLowerCase().includes(q) ||
       v.appUser?.school?.name?.toLowerCase().includes(q) ||
-      v.subCategory?.toLowerCase().includes(q)
+      v.subCategory?.toLowerCase().includes(q) ||
+      v.tags?.toLowerCase().includes(q)
     );
   }, [data, search]);
 
-  const fetchVideos = () => { mutate(); setSelected(new Set()); };
+  const fetchVideos = async () => {
+    setRefreshing(true);
+    try { await mutate(); } finally { setRefreshing(false); }
+    setSelected(new Set());
+  };
 
   // ── Selection helpers ─────────────────────────────────────────────────────
   const allSelected  = videos.length > 0 && videos.every(v => selected.has(v.id));
@@ -158,7 +176,7 @@ export default function VideoModerationPage() {
     setSelected(allSelected ? new Set() : new Set(videos.map(v => v.id)));
 
   // ── Single approve / reject ───────────────────────────────────────────────
-  const approve = async (video: Video, subCategoryOverride?: string) => {
+  const approve = async (video: Video, subCategoryOverride?: string, categoryOverride?: string) => {
     setProcessingId(video.id);
     try {
       const res = await fetch('/api/dashboard/videos', {
@@ -168,6 +186,7 @@ export default function VideoModerationPage() {
           videoId: video.id,
           status: 'APPROVED',
           ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
+          ...(categoryOverride && categoryOverride !== video.category ? { category: categoryOverride } : {}),
         }),
       });
       if (res.ok) {
@@ -177,6 +196,36 @@ export default function VideoModerationPage() {
       } else {
         const body = await res.json().catch(() => null);
         alert(body?.message || 'Failed to approve');
+      }
+    } finally { setProcessingId(null); }
+  };
+
+  // Re-saves an already-approved video's category without touching its status.
+  // Reuses the approve endpoint (it always requires status), but — unlike a
+  // fresh approve — the video must stay in the Approved list, updated in place,
+  // rather than being removed from it.
+  const saveRecategorization = async (video: Video, subCategoryOverride: string, categoryOverride: string) => {
+    setProcessingId(video.id);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({
+          videoId: video.id,
+          status: 'APPROVED',
+          ...(subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
+          ...(categoryOverride !== video.category ? { category: categoryOverride } : {}),
+        }),
+      });
+      if (res.ok) {
+        mutate(cur => cur ? {
+          ...cur,
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, category: categoryOverride, subCategory: subCategoryOverride } : v),
+        } : cur, { revalidate: false });
+        setPreviewVideo(null);
+      } else {
+        const body = await res.json().catch(() => null);
+        alert(body?.message || 'Failed to update category');
       }
     } finally { setProcessingId(null); }
   };
@@ -271,6 +320,13 @@ export default function VideoModerationPage() {
 
   const activeFilters = [catFilter, typeFilter].filter(Boolean).length;
 
+  // Category is editable on pending jury videos (bundled into the approve
+  // action) and, separately, on already-approved jury videos (saved on its own
+  // via saveRecategorization) — but not on rejected ones, where the category
+  // no longer matters, and not on soft-deleted ones.
+  const canEditCategory = !!previewVideo && previewVideo.isEvaluation && !previewVideo.deletedAt &&
+    (filter === 'PENDING' || filter === 'APPROVED');
+
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <div className="space-y-4">
@@ -282,9 +338,10 @@ export default function VideoModerationPage() {
         </div>
         <button
           onClick={fetchVideos}
-          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 transition-colors shadow-sm"
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-500 hover:bg-gray-50 active:scale-95 active:bg-gray-100 transition-all duration-150 shadow-sm disabled:cursor-not-allowed"
         >
-          <RefreshCw size={13} /> Refresh
+          <RefreshCw size={13} className={refreshing ? 'animate-spin' : ''} /> Refresh
         </button>
       </div>
 
@@ -332,7 +389,7 @@ export default function VideoModerationPage() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search by name, school, olympiad code, caption…"
+            placeholder="Search by name, school, olympiad code, caption, tags…"
             className="w-full pl-9 pr-4 h-9 border border-gray-200 rounded-xl text-xs text-gray-700 placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-[#014584]/20 focus:border-[#014584]/40 bg-white"
           />
           {search && (
@@ -501,7 +558,7 @@ export default function VideoModerationPage() {
                   {/* Thumbnail */}
                   <div
                     className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden"
-                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }}
+                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }}
                   >
                     {video.thumbnailUrl ? (
                       <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -530,7 +587,7 @@ export default function VideoModerationPage() {
                       )}
                       {video.isEvaluation && (
                         <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-700 bg-amber-400 px-2 py-0.5 rounded-full shadow">
-                          <Award size={9} /> Jury
+                          <Award size={9} /> Olympiad
                         </span>
                       )}
                     </div>
@@ -666,14 +723,14 @@ export default function VideoModerationPage() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             <XCircle size={11} /> Reject
                           </button>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }} disabled={busy}
                             className="px-2.5 py-2 rounded-xl border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40">
                             <Eye size={13} />
                           </button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }} disabled={busy}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>
@@ -709,35 +766,53 @@ export default function VideoModerationPage() {
               {/* Category + date row */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  {filter === 'PENDING' && previewVideo.isEvaluation ? (
-                    <select
-                      value={editedSubCat}
-                      onChange={e => setEditedSubCat(e.target.value)}
-                      className="text-[11px] font-black text-blue-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300"
-                    >
-                      <optgroup label={OLYMPIAD_CAT_A_LABEL}>
-                        {OLYMPIAD_CAT_A_SUBS.map(s => <option key={s} value={s} className="text-black">{s}</option>)}
-                      </optgroup>
-                      <optgroup label={OLYMPIAD_CAT_B_LABEL}>
-                        {OLYMPIAD_CAT_B_SUBS.map(s => <option key={s} value={s} className="text-black">{s}</option>)}
-                      </optgroup>
-                    </select>
+                  {canEditCategory ? (
+                    <>
+                      {/* Main category — switching it also moves the subcategory
+                          into that category's list, so the two can't disagree. */}
+                      <select
+                        value={editedCat}
+                        onChange={e => {
+                          const cat = e.target.value;
+                          setEditedCat(cat);
+                          const subs = cat === OLYMPIAD_CAT_A_LABEL ? OLYMPIAD_CAT_A_SUBS : OLYMPIAD_CAT_B_SUBS;
+                          if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0]);
+                        }}
+                        className="text-[11px] font-black text-amber-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-300"
+                      >
+                        <option value={OLYMPIAD_CAT_A_LABEL} className="text-black">{OLYMPIAD_CAT_A_LABEL}</option>
+                        <option value={OLYMPIAD_CAT_B_LABEL} className="text-black">{OLYMPIAD_CAT_B_LABEL}</option>
+                      </select>
+                      <select
+                        value={editedSubCat}
+                        onChange={e => setEditedSubCat(e.target.value)}
+                        className="text-[11px] font-black text-blue-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300"
+                      >
+                        {(editedCat === OLYMPIAD_CAT_B_LABEL ? OLYMPIAD_CAT_B_SUBS : OLYMPIAD_CAT_A_SUBS)
+                          .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
+                      </select>
+                    </>
                   ) : (
                     <span className="text-[11px] font-black text-blue-300 bg-white/10 px-2.5 py-1 rounded-full">
                       {previewVideo.subCategory || previewVideo.category}
                     </span>
                   )}
-                  {(() => { const b = getCategoryLabel(editedSubCat || previewVideo.subCategory); return b ? (
-                    <span className="text-[10px] font-black px-2 py-1 rounded-full bg-white/10 text-white/70">{b.label}</span>
-                  ) : null; })()}
-                  {filter === 'PENDING' && previewVideo.isEvaluation && editedSubCat && editedSubCat !== previewVideo.subCategory && (
+                  {/* Only a read-only view needs this derived badge — while editing,
+                      the main-category select above already shows it. */}
+                  {!canEditCategory &&
+                    (() => { const b = getCategoryLabel(previewVideo.subCategory); return b ? (
+                      <span className="text-[10px] font-black px-2 py-1 rounded-full bg-white/10 text-white/70">{b.label}</span>
+                    ) : null; })()}
+                  {canEditCategory &&
+                   ((editedSubCat && editedSubCat !== previewVideo.subCategory) ||
+                    (editedCat && editedCat !== normalizeCat(previewVideo))) && (
                     <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-400/20 text-amber-300">
                       Recategorized
                     </span>
                   )}
                   {previewVideo.isEvaluation && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
-                      <Award size={10} /> Jury
+                      <Award size={10} /> Olympiad
                     </span>
                   )}
                   {previewVideo.deletedAt && (
@@ -829,7 +904,7 @@ export default function VideoModerationPage() {
               <div className="flex gap-2 pt-1">
                 {filter === 'PENDING' && (
                   <>
-                    <button onClick={() => approve(previewVideo, editedSubCat)} disabled={processingId === previewVideo.id}
+                    <button onClick={() => approve(previewVideo, editedSubCat, editedCat)} disabled={processingId === previewVideo.id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
                       <CheckCircle size={14} /> Approve
                     </button>
@@ -838,6 +913,14 @@ export default function VideoModerationPage() {
                       <XCircle size={14} /> Reject
                     </button>
                   </>
+                )}
+                {filter === 'APPROVED' && canEditCategory && (
+                  <button
+                    onClick={() => saveRecategorization(previewVideo, editedSubCat, editedCat)}
+                    disabled={processingId === previewVideo.id || (editedSubCat === previewVideo.subCategory && editedCat === normalizeCat(previewVideo))}
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
+                    <CheckCircle size={14} /> Save Category
+                  </button>
                 )}
                 <button onClick={() => { setPreviewVideo(null); openDeleteModal([previewVideo.id]); }} disabled={processingId === previewVideo.id}
                   className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-red-400 rounded-xl font-black text-sm transition-colors disabled:opacity-40">
