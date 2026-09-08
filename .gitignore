@@ -27,6 +27,12 @@
 # database dumps (may contain real production data)
 *.dump
 
+# local-only DB switch scripts — never pushed, but git should also never
+# delete/reset them since they're untracked (git clean, reset --hard, etc.)
+/tunnel-to-prod-db.ps1
+/use-server-db.ps1
+/use-local-db.ps1
+
 # debug
 npm-debug.log*
 yarn-debug.log*
