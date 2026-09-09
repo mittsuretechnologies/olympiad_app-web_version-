@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const [trendingViews, newReleases, categories] = await Promise.all([
+    const [trendingViews, newReleases, categories, mittfest] = await Promise.all([
       // Most-viewed videos based on VideoView rows recorded in the last 7 days.
       prisma.videoView.groupBy({
         by: ['videoId'],
@@ -162,6 +162,14 @@ export async function GET(request: NextRequest) {
         where: { ...baseWhere, category: { not: null } },
         select: { category: true },
         distinct: ['category'],
+      }),
+      // MittFest — videos whose uploader ticked the MittFest checkbox. Shown
+      // to every user (Olympiad or not), directly under the hero carousel.
+      prisma.video.findMany({
+        take: ROW_LIMIT,
+        where: { ...baseWhere, isMittfest: true },
+        orderBy: { createdAt: 'desc' },
+        select: VIDEO_SELECT,
       }),
     ]);
 
@@ -200,13 +208,18 @@ export async function GET(request: NextRequest) {
     );
 
     const effectiveUserId = viewerId ?? userId;
-    const [trending, releases, ...categoryRows] = await Promise.all([
+    const [trending, releases, mittfestVideos, ...categoryRows] = await Promise.all([
       hydrate(trendingRaw, effectiveUserId),
       hydrate(newReleases, effectiveUserId),
+      hydrate(mittfest, effectiveUserId),
       ...categoryRowsRaw.map(rows => hydrate(rows, effectiveUserId)),
     ]);
 
+    // MittFest sits first: the client builds its hero carousel from the
+    // 'trending' row (by key, not position) and renders these rows beneath it,
+    // so being first here puts MittFest directly under the carousel.
     const rows = [
+      { key: 'mittfest', title: 'MittFest', videos: mittfestVideos },
       { key: 'trending', title: 'Most Watched This Week', videos: trending },
       { key: 'new', title: 'New Releases', videos: releases },
       ...categoryNames.map((name, i) => ({ key: `cat_${i}`, title: name, videos: categoryRows[i] })),

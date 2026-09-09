@@ -282,6 +282,12 @@ model Video {
   createdAt          DateTime          @default(now())
   updatedAt          DateTime          @updatedAt
   isEvaluation       Boolean           @default(false)
+  // Whether the uploader ticked "Is this video for MittFest?" — independent of
+  // isEvaluation, since an Olympiad student's video can be for jury scoring,
+  // MittFest, or both. Existing rows default to false: the checkbox was
+  // UI-only before this column existed (the answer was never sent), so there
+  // is no historical value to backfill from.
+  isMittfest         Boolean           @default(false)
   isPublic           Boolean           @default(true)
   olympiadVisibility String? // "public" | "private" — only meaningful when isEvaluation = true
   likesCount         Int               @default(0)
@@ -299,6 +305,7 @@ model Video {
   @@index([status])
   @@index([status, isPublic])
   @@index([deletedAt])
+  @@index([isMittfest])
   @@schema("public")
 }
 

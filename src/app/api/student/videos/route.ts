@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
+import { hasMittfestTag } from '@/lib/mittfest';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -70,6 +71,8 @@ export async function POST(request: Request) {
         tags: mergedTags,
         isPublic:    isPublic    !== undefined ? Boolean(isPublic)    : true,
         isEvaluation: isEvaluation !== undefined ? Boolean(isEvaluation) : false,
+        // This form has no MittFest checkbox, so the hashtag is the only way in.
+        isMittfest: hasMittfestTag(userTags),
         status: 'PENDING',
       },
     });
