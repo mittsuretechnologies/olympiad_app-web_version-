@@ -199,7 +199,6 @@ export default function VideoModerationPage() {
           status: 'APPROVED',
           quality,
           ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
-          ...(categoryOverride && categoryOverride !== video.category ? { category: categoryOverride } : {}),
         }),
       });
       if (res.ok) {
@@ -251,6 +250,18 @@ export default function VideoModerationPage() {
   const openBulkRejectModal = () => {
     setRejectReason('');
     setRejectModal({ video: null, bulk: true });
+  };
+
+  const openApproveModal = (video: Video, subCategoryOverride?: string) => {
+    setApproveQuality(null);
+    setApproveModal({ video, subCategoryOverride });
+  };
+
+  const confirmApprove = async () => {
+    if (!approveModal || !approveQuality) return;
+    await approve(approveModal.video, approveQuality, approveModal.subCategoryOverride);
+    setApproveModal(null);
+    setApproveQuality(null);
   };
 
   const confirmReject = async () => {
@@ -937,7 +948,7 @@ export default function VideoModerationPage() {
               <div className="flex gap-2 pt-1">
                 {filter === 'PENDING' && (
                   <>
-                    <button onClick={() => approve(previewVideo, editedSubCat, editedCat)} disabled={processingId === previewVideo.id}
+                    <button onClick={() => openApproveModal(previewVideo, editedSubCat !== previewVideo.subCategory ? editedSubCat : undefined)} disabled={processingId === previewVideo.id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
                       <CheckCircle size={14} /> Approve
                     </button>
