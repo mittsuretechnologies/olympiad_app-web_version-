@@ -103,9 +103,22 @@ function authHeaders(): Record<string, string> {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
+// Same role-detection pattern as dashboard/layout.tsx: whichever token key is
+// populated tells us the signed-in role. Permanent delete is SUPERADMIN-only
+// (the DELETE endpoint already enforces this — requireRole(['SUPERADMIN']) —
+// this just keeps the button from being shown to roles that can't use it).
+function isSuperAdmin(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!sessionStorage.getItem('token');
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function VideoModerationPage() {
+  // Computed once on mount from sessionStorage — the signed-in role doesn't
+  // change during the page's lifetime, so this doesn't need to be reactive.
+  const [canDelete] = useState(isSuperAdmin);
+
   // ── Tab & Filters ─────────────────────────────────────────────────────────
   const [filter,       setFilter]       = useState<StatusFilter>('PENDING');
   const [search,       setSearch]       = useState('');
@@ -120,6 +133,9 @@ export default function VideoModerationPage() {
   const [previewVideo, setPreviewVideo] = useState<Video | null>(null);
   const [editedCat,    setEditedCat]    = useState<string>('');
   const [editedSubCat, setEditedSubCat] = useState<string>('');
+  // Backfilling quality on approved videos that predate the quality feature
+  // (their quality is null since there was nothing to set at approval time).
+  const [editedQuality, setEditedQuality] = useState<'HIGH' | 'MEDIUM' | 'LOW' | null>(null);
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
   // Approval is gated behind picking a quality — see QUALITY_OPTIONS. Always
@@ -212,11 +228,18 @@ export default function VideoModerationPage() {
     } finally { setProcessingId(null); }
   };
 
-  // Re-saves an already-approved video's category without touching its status.
-  // Reuses the approve endpoint (it always requires status), but — unlike a
-  // fresh approve — the video must stay in the Approved list, updated in place,
-  // rather than being removed from it.
-  const saveRecategorization = async (video: Video, subCategoryOverride: string, categoryOverride: string) => {
+  // Re-saves an already-approved video's category and/or quality without
+  // touching its status. Reuses the approve endpoint (it always requires
+  // status + quality), but — unlike a fresh approve — the video must stay in
+  // the Approved list, updated in place, rather than being removed from it.
+  // qualityOverride backfills quality on videos approved before that field
+  // existed (their quality is null, and the endpoint requires a value).
+  const saveRecategorization = async (
+    video: Video,
+    subCategoryOverride: string,
+    categoryOverride: string,
+    qualityOverride: 'HIGH' | 'MEDIUM' | 'LOW' | null,
+  ) => {
     setProcessingId(video.id);
     try {
       const res = await fetch('/api/dashboard/videos', {
@@ -225,6 +248,7 @@ export default function VideoModerationPage() {
         body: JSON.stringify({
           videoId: video.id,
           status: 'APPROVED',
+          quality: qualityOverride ?? video.quality,
           ...(subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
           ...(categoryOverride !== video.category ? { category: categoryOverride } : {}),
         }),
@@ -232,7 +256,7 @@ export default function VideoModerationPage() {
       if (res.ok) {
         mutate(cur => cur ? {
           ...cur,
-          videos: cur.videos.map(v => v.id === video.id ? { ...v, category: categoryOverride, subCategory: subCategoryOverride } : v),
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, category: categoryOverride, subCategory: subCategoryOverride, quality: qualityOverride ?? v.quality } : v),
         } : cur, { revalidate: false });
         setPreviewVideo(null);
       } else {
@@ -344,11 +368,13 @@ export default function VideoModerationPage() {
 
   const activeFilters = [catFilter, typeFilter].filter(Boolean).length;
 
-  // Category is editable on pending jury videos (bundled into the approve
-  // action) and, separately, on already-approved jury videos (saved on its own
-  // via saveRecategorization) — but not on rejected ones, where the category
-  // no longer matters, and not on soft-deleted ones.
-  const canEditCategory = !!previewVideo && previewVideo.isEvaluation && !previewVideo.deletedAt &&
+  // Category is editable on pending videos (bundled into the approve action)
+  // and, separately, on already-approved videos (saved on its own via
+  // saveRecategorization) — but not on rejected ones, where the category no
+  // longer matters, and not on soft-deleted ones. Jury (isEvaluation) videos
+  // additionally get a slot-conflict check server-side; non-evaluation videos
+  // don't occupy an A/B slot so there's nothing to conflict with.
+  const canEditCategory = !!previewVideo && !previewVideo.deletedAt &&
     (filter === 'PENDING' || filter === 'APPROVED');
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -514,13 +540,15 @@ export default function VideoModerationPage() {
                 <XCircle size={11} /> Reject {selectedIds.length}
               </button>
             )}
-            <button
-              onClick={() => openDeleteModal(selectedIds)}
-              disabled={bulkWorking}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white bg-red-700 hover:bg-red-800 rounded-xl transition-colors disabled:opacity-50"
-            >
-              <Trash2 size={11} /> Delete {selectedIds.length}
-            </button>
+            {canDelete && (
+              <button
+                onClick={() => openDeleteModal(selectedIds)}
+                disabled={bulkWorking}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-[11px] font-black text-white bg-red-700 hover:bg-red-800 rounded-xl transition-colors disabled:opacity-50"
+              >
+                <Trash2 size={11} /> Delete {selectedIds.length}
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -576,7 +604,7 @@ export default function VideoModerationPage() {
                   {/* Thumbnail */}
                   <div
                     className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden"
-                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }}
+                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); }}
                   >
                     {video.thumbnailUrl ? (
                       <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -664,7 +692,7 @@ export default function VideoModerationPage() {
                     )}
 
                     {/* Quality — set by the moderator at approval time */}
-                    {video.status === 'APPROVED' && video.quality && (
+                    {video.status === 'APPROVED' && (video.quality ? (
                       <span className={`inline-block w-fit text-[10px] font-black rounded-lg px-2 py-1 ${
                         video.quality === 'HIGH'   ? 'text-green-600 bg-green-50' :
                         video.quality === 'MEDIUM' ? 'text-amber-600 bg-amber-50' :
@@ -672,7 +700,11 @@ export default function VideoModerationPage() {
                       }`}>
                         {video.quality === 'HIGH' ? 'High' : video.quality === 'MEDIUM' ? 'Medium' : 'Low'} quality
                       </span>
-                    )}
+                    ) : (
+                      <span className="inline-block w-fit text-[10px] font-black rounded-lg px-2 py-1 text-orange-600 bg-orange-50">
+                        Quality not set
+                      </span>
+                    ))}
 
                     {/* Deleted-by-user notice */}
                     {video.deletedAt && (
@@ -753,21 +785,23 @@ export default function VideoModerationPage() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             <XCircle size={11} /> Reject
                           </button>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); }} disabled={busy}
                             className="px-2.5 py-2 rounded-xl border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40">
                             <Eye size={13} />
                           </button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); }} disabled={busy}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>
-                          <button onClick={() => openDeleteModal([video.id])} disabled={busy}
-                            className="px-3 py-2 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 transition-colors disabled:opacity-40">
-                            <Trash2 size={13} />
-                          </button>
+                          {canDelete && (
+                            <button onClick={() => openDeleteModal([video.id])} disabled={busy}
+                              className="px-3 py-2 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 transition-colors disabled:opacity-40">
+                              <Trash2 size={13} />
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -869,8 +903,30 @@ export default function VideoModerationPage() {
                 </div>
               )}
 
-              {/* Quality — set by the moderator at approval time */}
-              {previewVideo.status === 'APPROVED' && previewVideo.quality && (
+              {/* Quality — set by the moderator at approval time. Editable here too,
+                  mainly to backfill videos approved before this field existed
+                  (quality is null on those — the badge above never showed). */}
+              {previewVideo.status === 'APPROVED' && canEditCategory ? (
+                <div className="border border-white/20 bg-white/5 rounded-xl px-3 py-2 space-y-1.5">
+                  <p className="text-[10px] font-black uppercase tracking-wide text-white/70">Quality</p>
+                  <div className="flex gap-1.5">
+                    {QUALITY_OPTIONS.map(opt => (
+                      <button key={opt.value} type="button" onClick={() => setEditedQuality(opt.value)}
+                        title={opt.hint}
+                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-black transition-colors ${
+                          editedQuality === opt.value
+                            ? (opt.value === 'HIGH' ? 'bg-green-500 text-white' : opt.value === 'MEDIUM' ? 'bg-amber-500 text-white' : 'bg-red-500 text-white')
+                            : 'bg-white/10 text-white/60 hover:bg-white/15'
+                        }`}>
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {!previewVideo.quality && !editedQuality && (
+                    <p className="text-[10px] text-amber-300">Not set — this video predates the quality feature.</p>
+                  )}
+                </div>
+              ) : previewVideo.status === 'APPROVED' && previewVideo.quality && (
                 <div className={`border rounded-xl px-3 py-2 ${
                   previewVideo.quality === 'HIGH'   ? 'bg-green-500/20 border-green-500/30' :
                   previewVideo.quality === 'MEDIUM' ? 'bg-amber-500/20 border-amber-500/30' :
@@ -960,16 +1016,21 @@ export default function VideoModerationPage() {
                 )}
                 {filter === 'APPROVED' && canEditCategory && (
                   <button
-                    onClick={() => saveRecategorization(previewVideo, editedSubCat, editedCat)}
-                    disabled={processingId === previewVideo.id || (editedSubCat === previewVideo.subCategory && editedCat === normalizeCat(previewVideo))}
+                    onClick={() => saveRecategorization(previewVideo, editedSubCat, editedCat, editedQuality)}
+                    disabled={
+                      processingId === previewVideo.id || !editedQuality ||
+                      (editedSubCat === previewVideo.subCategory && editedCat === normalizeCat(previewVideo) && editedQuality === previewVideo.quality)
+                    }
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                    <CheckCircle size={14} /> Save Category
+                    <CheckCircle size={14} /> {previewVideo.quality ? 'Save Category' : 'Set Quality & Save'}
                   </button>
                 )}
-                <button onClick={() => { setPreviewVideo(null); openDeleteModal([previewVideo.id]); }} disabled={processingId === previewVideo.id}
-                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-red-400 rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                  <Trash2 size={14} />
-                </button>
+                {canDelete && (
+                  <button onClick={() => { setPreviewVideo(null); openDeleteModal([previewVideo.id]); }} disabled={processingId === previewVideo.id}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-red-400 rounded-xl font-black text-sm transition-colors disabled:opacity-40">
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           </div>

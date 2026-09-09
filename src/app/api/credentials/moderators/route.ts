@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   try {
     const moderators = await prisma.moderator.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, moderatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true },
+      select: { id: true, moderatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true, termsAccepted: true, termsAcceptedAt: true },
     });
     return NextResponse.json(moderators);
   } catch (e: any) {
