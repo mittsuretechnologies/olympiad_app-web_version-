@@ -173,6 +173,17 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
+    // Admin-managed carousel slides for the app home screen. Fetched
+    // separately from the video rows because they're independent of
+    // visibility/approval rules — they're artwork, not user content. An empty
+    // result is normal and means the app keeps its original behaviour of
+    // building the carousel purely from the most-watched videos.
+    const appBanners = await prisma.appBannerSlide.findMany({
+      where: { isActive: true },
+      orderBy: { order: 'asc' },
+      select: { id: true, image: true, alt: true, title: true, tag: true, linkUrl: true },
+    });
+
     const trendingIds = trendingViews.map(t => t.videoId);
     const trendingVideosRaw = trendingIds.length > 0
       ? await prisma.video.findMany({
@@ -225,7 +236,10 @@ export async function GET(request: NextRequest) {
       ...categoryNames.map((name, i) => ({ key: `cat_${i}`, title: name, videos: categoryRows[i] })),
     ].filter(row => row.videos.length > 0);
 
-    return NextResponse.json({ rows });
+    // `banners` is additive: older app builds that only read `rows` are
+    // unaffected, and a build that does read it treats an empty array as
+    // "no admin slides, use videos only".
+    return NextResponse.json({ rows, banners: appBanners });
   } catch (error) {
     console.error('GET /api/reels/home failed:', error);
     return NextResponse.json({ message: 'Failed to fetch home feed' }, { status: 500 });

@@ -786,3 +786,31 @@ model BannerSlide {
   @@index([isActive, order])
   @@schema("public")
 }
+
+// Mobile app home-screen carousel, managed from the super-admin panel.
+// Deliberately separate from BannerSlide (the landing page's carousel): the
+// two surfaces have different aspect ratios and different audiences, and
+// nobody wants a marketing banner for the public site appearing inside the
+// app. Only ONE image per slide — the app renders a single card size.
+//
+// These slides are shown BEFORE the auto-generated most-watched video cards.
+// When no active slides exist the app falls back to exactly the previous
+// behaviour (video cards only), so an empty table is a valid, working state
+// and not something the app has to special-case.
+model AppBannerSlide {
+  id        String   @id @default(uuid())
+  image     String
+  alt       String   @default("")
+  title     String   @default("")
+  tag       String   @default("")
+  // Optional deep link followed when the slide is tapped. Empty = inert
+  // slide (no navigation), which is the right default for pure artwork.
+  linkUrl   String   @default("")
+  order     Int      @default(0)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([isActive, order])
+  @@schema("public")
+}
