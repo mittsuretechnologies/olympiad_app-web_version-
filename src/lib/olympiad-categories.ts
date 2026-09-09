@@ -14,6 +14,12 @@ export const OLYMPIAD_CAT_A_SUBS = [
   'Mimic',
   'Skipping',
   'Hula Hoop',
+  'Other',
+  // Retired label — the app's "Any Other Special Talent" option was renamed to
+  // "Other" (and its free-text field removed). Kept in this list so videos
+  // uploaded before that change still resolve to Cat A: this array is what
+  // decides a video's A/B slot (resolveSlot) and its category badge, so
+  // dropping the old value would strand those existing records.
   'Any Other Special Talent',
 ];
 

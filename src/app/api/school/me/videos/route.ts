@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
+import { hasMittfestTag } from '@/lib/mittfest';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -70,6 +71,8 @@ export async function POST(request: Request) {
           tags: mergedTags,
           isPublic: wantsPublic,
           isEvaluation,
+          // No MittFest checkbox on this form — the hashtag is the only way in.
+          isMittfest: hasMittfestTag(tags),
           olympiadVisibility: isEvaluation ? (wantsPublic ? 'public' : 'private') : null,
           uploaderType: 'SCHOOL',
           status: 'PENDING',
@@ -117,6 +120,8 @@ export async function POST(request: Request) {
         tags: mergedTags,
         isPublic: wantsPublic,
         isEvaluation,
+        // No MittFest checkbox on this form — the hashtag is the only way in.
+        isMittfest: hasMittfestTag(tags),
         olympiadVisibility: isEvaluation ? (wantsPublic ? 'public' : 'private') : null,
         uploaderType: 'SCHOOL',
         status: 'PENDING',

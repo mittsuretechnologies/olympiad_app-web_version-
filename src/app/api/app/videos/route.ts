@@ -7,6 +7,7 @@ import {
   OLYMPIAD_CAT_A_LABEL,
   OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
+import { hasMittfestTag } from '@/lib/mittfest';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
 
@@ -33,7 +34,7 @@ export async function POST(request: Request) {
     const {
       videoUrl, thumbnailUrl, caption, category, subCategory,
       tags, isPublic, isEvaluation, olympiadId: bodyOlympiadId,
-      isOlympiadUpload, olympiadVisibility,
+      isOlympiadUpload, olympiadVisibility, isMittfest,
     } = await request.json();
 
     if (!videoUrl || !category || !subCategory) {
@@ -138,6 +139,11 @@ export async function POST(request: Request) {
       : [];
     const mergedTags = [...new Set([...schoolAutoTags, ...userTags])].join(',');
 
+    // A "#mittfest" hashtag counts as an entry too, exactly like ticking the
+    // MittFest checkbox — see src/lib/mittfest.ts.
+    const finalIsMittfest =
+      (isMittfest !== undefined ? Boolean(isMittfest) : false) || hasMittfestTag(userTags);
+
     const newVideo = await prisma.video.create({
       data: {
         studentId:    studentId ?? undefined,
@@ -151,6 +157,7 @@ export async function POST(request: Request) {
         tags:         mergedTags,
         isPublic:     isPublic     !== undefined ? Boolean(isPublic)     : true,
         isEvaluation: finalIsEvaluation,
+        isMittfest:   finalIsMittfest,
         olympiadVisibility: finalIsEvaluation
           ? (olympiadVisibility === 'private' ? 'private' : 'public')
           : null,
