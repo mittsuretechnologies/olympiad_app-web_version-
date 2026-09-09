@@ -41,14 +41,18 @@ export async function GET(request: Request) {
     const search    = searchParams.get('search')?.trim() || undefined;
 
     // ── Counts for all three statuses (always returned) ──────────────────────
+    // User-deleted videos are excluded — they're retained in the DB for
+    // SuperAdmin/audit visibility (see /api/app/videos/[id] DELETE) but
+    // shouldn't clutter the moderation queue, which only cares about videos
+    // still awaiting/holding a moderation decision.
     const [pendingCount, approvedCount, rejectedCount] = await Promise.all([
-      prisma.video.count({ where: { status: 'PENDING' } }),
-      prisma.video.count({ where: { status: 'APPROVED' } }),
-      prisma.video.count({ where: { status: 'REJECTED' } }),
+      prisma.video.count({ where: { status: 'PENDING', deletedAt: null } }),
+      prisma.video.count({ where: { status: 'APPROVED', deletedAt: null } }),
+      prisma.video.count({ where: { status: 'REJECTED', deletedAt: null } }),
     ]);
 
     // ── Build where clause ────────────────────────────────────────────────────
-    const where: Record<string, any> = {};
+    const where: Record<string, any> = { deletedAt: null };
     if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) where.status = status;
     if (category) where.subCategory = category;
     if (uploaderT && ['STUDENT', 'VIEWER'].includes(uploaderT)) where.uploaderType = uploaderT;

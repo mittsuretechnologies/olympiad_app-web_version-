@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { Search, Loader2, ShieldCheck, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Loader2, ShieldCheck, Plus, X, Eye, EyeOff, ToggleLeft, ToggleRight, Trash2, AlertCircle, RefreshCw, FileWarning } from 'lucide-react';
 
 interface Moderator {
   id: string;
@@ -11,6 +11,8 @@ interface Moderator {
   isActive: boolean;
   plainPassword: string | null;
   createdAt: string;
+  termsAccepted: boolean;
+  termsAcceptedAt: string | null;
 }
 
 function authHeaders(): Record<string, string> {
@@ -75,7 +77,7 @@ export default function ManageModeratorsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      setRows(prev => [{ ...data, isActive: true, plainPassword: password, createdAt: new Date().toISOString() }, ...prev]);
+      setRows(prev => [{ ...data, isActive: true, plainPassword: password, createdAt: new Date().toISOString(), termsAccepted: false, termsAcceptedAt: null }, ...prev]);
       setShowForm(false); setName(''); setEmail(''); setPassword('');
     } catch (e: any) {
       setFormError(e.message);
@@ -90,6 +92,18 @@ export default function ManageModeratorsPage() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ isActive: !r.isActive }),
+    });
+  };
+
+  // Forces the T&C modal to reappear on this moderator's next login by
+  // clearing termsAccepted (see /api/staff/terms, checked in dashboard/layout.tsx).
+  const requestTermsReaccept = async (r: Moderator) => {
+    if (!confirm(`${r.name} will be asked to accept Terms & Conditions again on their next login. Continue?`)) return;
+    setRows(prev => prev.map(x => x.id === r.id ? { ...x, termsAccepted: false, termsAcceptedAt: null } : x));
+    await fetch(`/api/credentials/moderators/${r.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ termsAccepted: false }),
     });
   };
 
@@ -187,6 +201,7 @@ export default function ManageModeratorsPage() {
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Name</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Email</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Status</th>
+                <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">T&C</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Password</th>
                 <th className="px-5 py-3 text-left text-[10px] font-bold uppercase">Added</th>
                 <th className="px-5 py-3 text-center text-[10px] font-bold uppercase">Actions</th>
@@ -205,6 +220,12 @@ export default function ManageModeratorsPage() {
                       {r.isActive
                         ? <span className="px-2 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded-full">Active</span>
                         : <span className="px-2 py-0.5 text-[10px] font-bold bg-red-50 text-red-600 border border-red-200 rounded-full">Inactive</span>}
+                    </td>
+                    <td className="px-5 py-3">
+                      {r.termsAccepted
+                        ? <span title={r.termsAcceptedAt ? `Accepted ${new Date(r.termsAcceptedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : undefined}
+                            className="px-2 py-0.5 text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 rounded-full">Accepted</span>
+                        : <span className="px-2 py-0.5 text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 rounded-full">Pending</span>}
                     </td>
                     <td className="px-5 py-3">
                       {r.plainPassword ? (
@@ -230,6 +251,12 @@ export default function ManageModeratorsPage() {
                           className="p-1.5 rounded-lg bg-[#004f9f]/5 text-[#004f9f] hover:bg-[#004f9f]/10 transition-colors">
                           <RefreshCw size={13} />
                         </button>
+                        {r.termsAccepted && (
+                          <button onClick={() => requestTermsReaccept(r)} title="Ask to re-accept Terms & Conditions on next login"
+                            className="p-1.5 rounded-lg bg-amber-50 text-amber-600 hover:bg-amber-100 transition-colors">
+                            <FileWarning size={13} />
+                          </button>
+                        )}
                         <button onClick={() => toggleActive(r)} title={r.isActive ? 'Deactivate' : 'Activate'}
                           className={`p-1.5 rounded-lg transition-colors ${r.isActive ? 'bg-green-50 text-green-600 hover:bg-green-100' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}>
                           {r.isActive ? <ToggleRight size={14} /> : <ToggleLeft size={14} />}
