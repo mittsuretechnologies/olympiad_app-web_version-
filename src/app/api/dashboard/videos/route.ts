@@ -388,3 +388,56 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
+
+// Tags-only edit — independent of status/approve-reject, so a moderator can
+// add/fix hashtags on a video regardless of which tab (Pending/Approved/
+// Rejected) it's currently sitting in, without that edit accidentally
+// changing its moderation status.
+export async function PATCH(request: Request) {
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  if (error) return error;
+
+  const moduleCheck = await requireModule(payload, 'moderation.pending');
+  if (moduleCheck.error) return moduleCheck.error;
+
+  try {
+    const { videoId, tags } = await request.json();
+    if (!videoId) return NextResponse.json({ message: 'videoId required' }, { status: 400 });
+    if (typeof tags !== 'string') return NextResponse.json({ message: 'tags must be a string' }, { status: 400 });
+
+    // Normalize: dedupe, strip empties/# prefixes and surrounding whitespace,
+    // same comma-separated shape the rest of the app already stores in tags.
+    const normalizedTags = [...new Set(
+      tags.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean)
+    )].join(',');
+
+    const before = await prisma.video.findUnique({
+      where: { id: videoId },
+      select: { tags: true },
+    });
+    if (!before) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+
+    const video = await prisma.video.update({
+      where: { id: videoId },
+      data: { tags: normalizedTags || null },
+      select: { id: true, tags: true },
+    });
+
+    await recordAuditLog({
+      actorId: payload!.id,
+      actorRole: payload!.role,
+      actorName: payload!.name || payload!.email || null,
+      action: 'VIDEO_TAGS_UPDATED',
+      entityType: 'Video',
+      entityId: videoId,
+      previousValue: { tags: before.tags },
+      newValue: { tags: video.tags },
+      reason: null,
+    });
+
+    return NextResponse.json({ message: 'Tags updated', video });
+  } catch (error) {
+    console.error('Update video tags error:', error);
+    return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
+  }
+}

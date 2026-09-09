@@ -136,6 +136,10 @@ export default function VideoModerationPage() {
   // Backfilling quality on approved videos that predate the quality feature
   // (their quality is null since there was nothing to set at approval time).
   const [editedQuality, setEditedQuality] = useState<'HIGH' | 'MEDIUM' | 'LOW' | null>(null);
+  // Hashtag chip editor state for the preview modal.
+  const [editedTags,   setEditedTags]   = useState<string[]>([]);
+  const [tagInput,     setTagInput]     = useState('');
+  const [savingTags,   setSavingTags]   = useState(false);
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
   // Approval is gated behind picking a quality — see QUALITY_OPTIONS. Always
@@ -265,6 +269,41 @@ export default function VideoModerationPage() {
       }
     } finally { setProcessingId(null); }
   };
+
+  // Tags-only save — works regardless of status (Pending/Approved/Rejected),
+  // via the dedicated PATCH endpoint so it never touches moderation status.
+  const saveTags = async (video: Video, tags: string[]) => {
+    setSavingTags(true);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ videoId: video.id, tags: tags.join(',') }),
+      });
+      if (res.ok) {
+        const body = await res.json();
+        const newTags: string = body.video?.tags || '';
+        mutate(cur => cur ? {
+          ...cur,
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, tags: newTags } : v),
+        } : cur, { revalidate: false });
+        setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, tags: newTags } : cur);
+        setEditedTags(newTags ? newTags.split(',').map(t => t.trim()).filter(Boolean) : []);
+      } else {
+        const body = await res.json().catch(() => null);
+        alert(body?.message || 'Failed to update tags');
+      }
+    } finally { setSavingTags(false); }
+  };
+
+  const addTagFromInput = () => {
+    const cleaned = tagInput.trim().replace(/^#/, '').replace(/,/g, '');
+    if (!cleaned) return;
+    setEditedTags(prev => prev.some(t => t.toLowerCase() === cleaned.toLowerCase()) ? prev : [...prev, cleaned]);
+    setTagInput('');
+  };
+
+  const removeTag = (tag: string) => setEditedTags(prev => prev.filter(t => t !== tag));
 
   const openRejectModal = (video: Video) => {
     setRejectReason('');
@@ -604,7 +643,7 @@ export default function VideoModerationPage() {
                   {/* Thumbnail */}
                   <div
                     className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden"
-                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); }}
+                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(video.tags ? video.tags.split(',').map(t => t.trim()).filter(Boolean) : []); setTagInput(''); }}
                   >
                     {video.thumbnailUrl ? (
                       <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -785,14 +824,14 @@ export default function VideoModerationPage() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             <XCircle size={11} /> Reject
                           </button>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(video.tags ? video.tags.split(',').map(t => t.trim()).filter(Boolean) : []); setTagInput(''); }} disabled={busy}
                             className="px-2.5 py-2 rounded-xl border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40">
                             <Eye size={13} />
                           </button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(video.tags ? video.tags.split(',').map(t => t.trim()).filter(Boolean) : []); setTagInput(''); }} disabled={busy}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>
@@ -895,14 +934,48 @@ export default function VideoModerationPage() {
                 </p>
               )}
 
-              {/* Hashtags */}
-              {previewVideo.tags && previewVideo.tags.split(',').filter(Boolean).length > 0 && (
-                <div className="flex flex-wrap gap-1.5">
-                  {previewVideo.tags.split(',').filter(Boolean).map((tag, i) => (
-                    <span key={i} className="text-[11px] font-bold text-indigo-300 bg-indigo-500/15 border border-indigo-400/20 px-2 py-1 rounded-lg">
-                      #{tag.trim()}
-                    </span>
-                  ))}
+              {/* Hashtags — editable regardless of status/tab, via the tags-only
+                  PATCH endpoint, so fixing/adding a tag never touches the
+                  video's moderation status. */}
+              {!previewVideo.deletedAt && (
+                <div className="space-y-1.5">
+                  <div className="flex flex-wrap gap-1.5">
+                    {editedTags.map((tag, i) => (
+                      <span key={i} className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-indigo-500/15 border border-indigo-400/20 px-2 py-1 rounded-lg">
+                        #{tag}
+                        <button type="button" onClick={() => removeTag(tag)} className="text-indigo-300/60 hover:text-white">
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                    {editedTags.length === 0 && (
+                      <span className="text-[11px] text-white/30 italic">No hashtags</span>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5">
+                    <input
+                      type="text"
+                      value={tagInput}
+                      onChange={e => setTagInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTagFromInput(); } }}
+                      placeholder="Add hashtag…"
+                      className="flex-1 min-w-0 text-[11px] bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                    />
+                    <button type="button" onClick={addTagFromInput} disabled={!tagInput.trim()}
+                      className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[11px] font-bold hover:bg-white/15 disabled:opacity-30 transition-colors">
+                      Add
+                    </button>
+                    {(() => {
+                      const currentTags = previewVideo.tags ? previewVideo.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+                      const changed = currentTags.length !== editedTags.length || currentTags.some(t => !editedTags.includes(t));
+                      return changed && (
+                        <button type="button" onClick={() => saveTags(previewVideo, editedTags)} disabled={savingTags}
+                          className="px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white text-[11px] font-bold hover:bg-indigo-600 disabled:opacity-40 transition-colors whitespace-nowrap">
+                          {savingTags ? 'Saving…' : 'Save Tags'}
+                        </button>
+                      );
+                    })()}
+                  </div>
                 </div>
               )}
 

@@ -102,15 +102,7 @@ export default function HashtagCampaignPage() {
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center shadow-lg shadow-pink-200">
-            <Hash className="text-white" size={22} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Hashtag Campaign Report</h1>
-            <p className="text-sm text-gray-400">Videos and uploaders for a campaign hashtag, e.g. #mittfest</p>
-          </div>
-        </div>
+        <h1 className="text-2xl font-medium text-[#004f9f]">Hashtag Campaign Report</h1>
         <button onClick={downloadCSV} disabled={filtered.length === 0}
           className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md active:scale-95 disabled:opacity-40">
           <Download size={16} /> Export CSV
