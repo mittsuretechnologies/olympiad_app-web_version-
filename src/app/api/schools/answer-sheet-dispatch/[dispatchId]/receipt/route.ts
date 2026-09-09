@@ -1,4 +1,12 @@
 import { NextResponse } from 'next/server';
+
+// Answer Sheet Dispatch feature is disabled — no longer part of the product.
+// Original implementation kept below (commented) in case it needs reviving.
+export async function POST() {
+  return NextResponse.json({ message: 'This feature is no longer available' }, { status: 410 });
+}
+
+/*
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 
@@ -62,3 +70,4 @@ export async function POST(
     return NextResponse.json({ message: 'Failed to log receipt' }, { status: 500 });
   }
 }
+*/

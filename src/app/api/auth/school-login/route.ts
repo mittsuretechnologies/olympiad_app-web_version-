@@ -27,6 +27,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
     }
 
+    if (!school.isActive) {
+      return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
+    }
+
     const token = jwt.sign(
       { id: school.id, schoolId: school.schoolId, role: 'SCHOOL' },
       process.env.JWT_SECRET || 'fallback_secret',

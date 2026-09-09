@@ -39,6 +39,7 @@ import {
   Menu,
   X,
   Image as ImageIcon,
+  Hash,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -237,6 +238,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'School Report',          href: '/dashboard/reports/schools',                    icon: Building2 },
     { name: 'App Users',              href: '/dashboard/app-users',                          icon: Smartphone },
     { name: 'Student Activity',       href: '/dashboard/student-activity',                   icon: Clock },
+    { name: 'Hashtag Campaign',       href: '/dashboard/reports/hashtag-campaign',           icon: Hash },
   ];
 
   const resultSubItems = [
@@ -429,7 +431,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.evaluation-progress','reports.schools','reports.appusers','reports.student-activity'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.evaluation-progress','reports.schools','reports.appusers','reports.student-activity','reports.hashtag'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>

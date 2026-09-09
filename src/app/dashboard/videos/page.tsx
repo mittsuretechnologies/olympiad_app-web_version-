@@ -895,6 +895,17 @@ export default function VideoModerationPage() {
                 </p>
               )}
 
+              {/* Hashtags */}
+              {previewVideo.tags && previewVideo.tags.split(',').filter(Boolean).length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {previewVideo.tags.split(',').filter(Boolean).map((tag, i) => (
+                    <span key={i} className="text-[11px] font-bold text-indigo-300 bg-indigo-500/15 border border-indigo-400/20 px-2 py-1 rounded-lg">
+                      #{tag.trim()}
+                    </span>
+                  ))}
+                </div>
+              )}
+
               {/* Rejection reason */}
               {previewVideo.status === 'REJECTED' && previewVideo.rejectionReason && (
                 <div className="bg-red-500/20 border border-red-500/30 rounded-xl px-3 py-2">
