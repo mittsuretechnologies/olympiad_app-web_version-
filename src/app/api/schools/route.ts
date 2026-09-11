@@ -5,6 +5,7 @@ import { CLASS_CODE_BY_NAME } from '@/lib/classes';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 import { stateNameToCode } from '@/lib/indianStateCodes';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
 
 export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
@@ -13,7 +14,9 @@ export async function GET(request: Request) {
     const schools = await prisma.school.findMany({
       orderBy: { createdAt: 'desc' },
     });
-    return NextResponse.json(schools);
+    return NextResponse.json(
+      schools.map(({ password, ...s }) => ({ ...s, plainPassword: decryptPassword(s.plainPassword) }))
+    );
   } catch (error) {
     return NextResponse.json({ message: 'Failed to fetch schools' }, { status: 500 });
   }
@@ -140,7 +143,7 @@ export async function POST(request: Request) {
             examDate: examDate ? new Date(examDate) : null,
             username: generateUsername(name, schoolId),
             password: hashedPassword,
-            plainPassword: plainPassword,
+            plainPassword: encryptPassword(plainPassword),
           },
         });
 
@@ -203,8 +206,9 @@ export async function POST(request: Request) {
           }
         }
 
+        const { password: _schoolHash, plainPassword: _schoolEnc, ...schoolPublic } = school;
         return NextResponse.json({
-          ...school,
+          ...schoolPublic,
           olympiadIdsGenerated: totalCount,
           olympiadIdPrefix: classRows.length > 0 ? prefix : null,
           firstCode: olympiadIds[0]?.code ?? null,

@@ -220,7 +220,7 @@ export async function POST(request: Request) {
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
-    const { videoId, videoIds, status, rejectionReason, subCategory: newSubCategory, quality } = await request.json();
+    const { videoId, videoIds, status, rejectionReason, category: newCategory, subCategory: newSubCategory, quality } = await request.json();
 
     if (!['APPROVED', 'REJECTED'].includes(status)) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 });

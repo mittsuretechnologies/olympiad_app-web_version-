@@ -8,8 +8,9 @@ import {
   OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 
 function getAppUserFromToken(request: Request) {
   const authHeader = request.headers.get('Authorization');

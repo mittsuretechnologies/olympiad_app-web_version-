@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword } from '@/lib/password-crypto';
 
 function generatePassword(length = 10): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnpqrstuvwxyz';
@@ -62,7 +63,7 @@ export async function POST(
 
     const updated = await prisma.school.update({
       where: { id },
-      data: { password: hashedPassword, plainPassword },
+      data: { password: hashedPassword, plainPassword: encryptPassword(plainPassword) },
       select: { id: true, schoolId: true, username: true, updatedAt: true },
     });
 

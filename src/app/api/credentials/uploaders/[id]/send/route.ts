@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendUploaderCredentialsEmail } from '@/lib/mailer';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 // POST /api/credentials/uploaders/:id/send — emails the uploader's current
 // username + password. Uploader.plainPassword is only set after a reset (see
@@ -35,7 +36,7 @@ export async function POST(
         uploaderName: uploader.name,
         uploaderId: uploader.uploaderId,
         username: uploader.username,
-        password: uploader.plainPassword,
+        password: decryptPassword(uploader.plainPassword)!,
       });
     } catch (mailErr: any) {
       console.error(`Credentials email to ${uploader.email} failed:`, mailErr);

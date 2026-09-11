@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
 
 function generateModeratorId(): string {
   return `MOD${Math.floor(1000 + Math.random() * 9000)}`;
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
       select: { id: true, moderatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true, termsAccepted: true, termsAcceptedAt: true },
     });
-    return NextResponse.json(moderators);
+    return NextResponse.json(
+      moderators.map((m) => ({ ...m, plainPassword: decryptPassword(m.plainPassword) }))
+    );
   } catch (e: any) {
     return NextResponse.json({ message: e.message }, { status: 500 });
   }
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: hash,
-        plainPassword: password,
+        plainPassword: encryptPassword(password),
       },
     });
 

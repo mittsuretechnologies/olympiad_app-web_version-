@@ -4,6 +4,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
 import { sendStudentCredentialsEmail } from '@/lib/mailer';
+import { getJwtSecret } from '@/lib/jwt-secret';
+import { encryptPassword } from '@/lib/password-crypto';
 
 function generatePassword(len = 8): string {
   const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -17,7 +19,7 @@ export async function POST(request: Request) {
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     let payload: any;
-    try { payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret'); }
+    try { payload = jwt.verify(token, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
@@ -68,7 +70,7 @@ export async function POST(request: Request) {
         mobile: mobileNormalized,
         email: emailNormalized,
         password: passwordHash,
-        plainPassword,
+        plainPassword: encryptPassword(plainPassword),
         isVerified: true,
         // Not accepted yet — the school is provisioning this account, not the
         // student. The app gates them behind a one-time Terms screen on first

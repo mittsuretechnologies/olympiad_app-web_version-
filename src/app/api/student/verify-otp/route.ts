@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { otpStore, MAX_OTP_ATTEMPTS } from '@/lib/otpStore';
+import { verifyRegistrationOtp } from '@/lib/otpStore';
+import { getJwtSecret } from '@/lib/jwt-secret';
+import { encryptPassword } from '@/lib/password-crypto';
 
 export async function POST(request: Request) {
   try {
@@ -16,35 +18,21 @@ export async function POST(request: Request) {
     }
 
     const code = olympiadCode.trim();
-    const stored = otpStore.get(code);
+    const verified = await verifyRegistrationOtp(code, otp);
 
-    if (!stored) {
-      return NextResponse.json({ message: 'OTP expired or not found. Please request again.' }, { status: 400 });
-    }
-    if (Date.now() > stored.expires) {
-      otpStore.delete(code);
-      return NextResponse.json({ message: 'OTP expired. Please request again.' }, { status: 400 });
-    }
-    if (stored.attempts >= MAX_OTP_ATTEMPTS) {
-      otpStore.delete(code);
-      return NextResponse.json({ message: 'Too many incorrect attempts. Please request a new OTP.' }, { status: 429 });
-    }
-    if (stored.otp !== otp.trim()) {
-      stored.attempts += 1;
-      return NextResponse.json({ message: 'Invalid OTP' }, { status: 400 });
+    if (!verified.ok) {
+      return NextResponse.json({ message: verified.message }, { status: verified.status });
     }
 
-    // OTP valid — create student
-    otpStore.delete(code);
     const hashedPassword = await bcrypt.hash(password, 10);
 
     const student = await prisma.student.create({
       data: {
         olympiadCode: code,
-        name: stored.name,
-        phone: stored.phone,
+        name: verified.name,
+        phone: verified.phone,
         password: hashedPassword,
-        plainPassword: password,
+        plainPassword: encryptPassword(password),
         isVerified: true,
       },
     });
@@ -53,7 +41,7 @@ export async function POST(request: Request) {
 
     const token = jwt.sign(
       { id: student.id, olympiadCode: code, role: 'STUDENT' },
-      process.env.JWT_SECRET || 'fallback_secret',
+      getJwtSecret(),
       { expiresIn: '30d' }
     );
 

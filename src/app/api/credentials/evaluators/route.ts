@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
 
 function generateEvaluatorId(): string {
   return `EVL${Math.floor(1000 + Math.random() * 9000)}`;
@@ -15,7 +16,9 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
       select: { id: true, evaluatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true, assignedStates: true },
     });
-    return NextResponse.json(evaluators);
+    return NextResponse.json(
+      evaluators.map((e) => ({ ...e, plainPassword: decryptPassword(e.plainPassword) }))
+    );
   } catch (e: any) {
     return NextResponse.json({ message: e.message }, { status: 500 });
   }
@@ -45,7 +48,7 @@ export async function POST(request: Request) {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: hash,
-        plainPassword: password,
+        plainPassword: encryptPassword(password),
         assignedStates: Array.isArray(assignedStates) ? assignedStates.filter(Boolean) : [],
       },
     });

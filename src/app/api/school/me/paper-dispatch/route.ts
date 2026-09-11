@@ -9,13 +9,14 @@ export async function GET() {
 /*
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 function getSchoolPayload(request: Request) {
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
   try {
-    const payload: any = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    const payload: any = jwt.verify(token, getJwtSecret());
     if (payload?.role !== 'SCHOOL' || !payload?.id) return null;
     return payload;
   } catch {

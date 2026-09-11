@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { videoPercent, koshScoresFromVideos, koshGrade, koshPercent, KOSH_KEYS, KOSH_MAX_SCORE, REQUIRED_VIDEOS, type CriterionScores } from '@/lib/kosh';
 import { requireModule } from '@/lib/auth-guard';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 export async function GET(request: Request) {
   try {
@@ -12,7 +13,7 @@ export async function GET(request: Request) {
 
     let payload: any;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      payload = jwt.verify(token, getJwtSecret());
     } catch {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }

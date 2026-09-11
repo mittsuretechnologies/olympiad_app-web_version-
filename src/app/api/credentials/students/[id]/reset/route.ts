@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword } from '@/lib/password-crypto';
 
 function generatePassword(length = 10): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnpqrstuvwxyz';
@@ -55,7 +56,7 @@ export async function POST(
 
       const updated = await prisma.appUser.update({
         where: { id },
-        data: { password: hashedPassword, plainPassword },
+        data: { password: hashedPassword, plainPassword: encryptPassword(plainPassword) },
         select: { id: true, updatedAt: true },
       });
 
@@ -93,7 +94,7 @@ export async function POST(
 
     const updated = await prisma.student.update({
       where: { id },
-      data: { password: hashedPassword, plainPassword },
+      data: { password: hashedPassword, plainPassword: encryptPassword(plainPassword) },
       select: { id: true, olympiadCode: true, updatedAt: true },
     });
 

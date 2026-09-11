@@ -3,13 +3,14 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { recordAuditLog } from '@/lib/audit-log';
 import { requireModule } from '@/lib/auth-guard';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 function requireModerationAccess(request: Request) {
   const auth = request.headers.get('authorization') || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
   if (!token) return null;
   try {
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret') as any;
+    const payload = jwt.verify(token, getJwtSecret()) as any;
     return ['SUPERADMIN', 'MODERATOR'].includes(payload?.role) ? payload : null;
   } catch {
     return null;

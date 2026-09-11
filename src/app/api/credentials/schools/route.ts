@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
       email: s.email,
       contactPerson: s.contactPerson,
       username: s.username,
-      plainPassword: s.plainPassword,
+      plainPassword: decryptPassword(s.plainPassword),
       updatedAt: s.updatedAt,
       createdAt: s.createdAt,
     }));
@@ -25,9 +26,6 @@ export async function GET(request: Request) {
   } catch (error: any) {
     console.error('GET credentials/schools failed:', error);
     console.error('Error details:', { name: error?.name, message: error?.message, code: error?.code });
-    return NextResponse.json(
-      { message: 'Failed to fetch credentials', error: error?.message, code: error?.code },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Failed to fetch credentials' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword } from '@/lib/password-crypto';
 
 export async function POST(
   request: Request,
@@ -18,7 +19,7 @@ export async function POST(
 
     await prisma.reviewer.update({
       where: { id },
-      data: { password: hash, plainPassword: newPassword },
+      data: { password: hash, plainPassword: encryptPassword(newPassword) },
     });
 
     return NextResponse.json({ success: true, plainPassword: newPassword });

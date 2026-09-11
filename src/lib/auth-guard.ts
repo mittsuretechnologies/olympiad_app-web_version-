@@ -1,6 +1,7 @@
 import jwt from 'jsonwebtoken';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 export function requireRole(request: Request, allowedRoles: string[]) {
   const auth = request.headers.get('authorization') || '';
@@ -11,7 +12,7 @@ export function requireRole(request: Request, allowedRoles: string[]) {
 
   let payload: any;
   try {
-    payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+    payload = jwt.verify(token, getJwtSecret());
   } catch {
     return { error: NextResponse.json({ message: 'Invalid token' }, { status: 401 }) };
   }

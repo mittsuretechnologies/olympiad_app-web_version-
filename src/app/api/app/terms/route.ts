@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 // Terms & Conditions gate for AppUser accounts. Mirrors /api/staff/terms for
 // Moderator/Evaluator. General (non-Olympiad) signups already collect real
@@ -15,7 +16,7 @@ import { prisma } from '@/lib/prisma';
 // POST -> record acceptance (id captured server-side from the JWT, not the
 //         client, so it can't be spoofed).
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 
 function getAppUserFromToken(request: Request) {
   const authHeader = request.headers.get('Authorization');

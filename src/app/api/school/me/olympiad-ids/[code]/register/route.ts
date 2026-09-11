@@ -5,6 +5,8 @@ import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
 import { sendStudentCredentialsEmail } from '@/lib/mailer';
 import { sendStudentCredentialsSms } from '@/lib/sms';
+import { getJwtSecret } from '@/lib/jwt-secret';
+import { encryptPassword } from '@/lib/password-crypto';
 
 /** Mirrors the generator used by the bulk allot route so both paths produce
  *  the same shape of password. Excludes look-alike characters (l/1/o/0). */
@@ -23,7 +25,7 @@ export async function POST(
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     let payload: any;
-    try { payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret'); }
+    try { payload = jwt.verify(token, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
@@ -86,7 +88,7 @@ export async function POST(
         mobile: mobileNormalized,
         email: emailNormalized,
         password: passwordHash,
-        plainPassword: finalPassword,
+        plainPassword: encryptPassword(finalPassword),
         isVerified: true,
         // Not accepted yet — this form collects name/contact details, not
         // Terms agreement. The app gates the student behind a one-time Terms
