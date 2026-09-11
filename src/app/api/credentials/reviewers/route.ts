@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
 
 function generateReviewerId(): string {
   const num = Math.floor(1000 + Math.random() * 9000);
@@ -16,7 +17,9 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
       select: { id: true, reviewerId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true },
     });
-    return NextResponse.json(reviewers);
+    return NextResponse.json(
+      reviewers.map((r) => ({ ...r, plainPassword: decryptPassword(r.plainPassword) }))
+    );
   } catch (e: any) {
     return NextResponse.json({ message: e.message }, { status: 500 });
   }
@@ -42,7 +45,7 @@ export async function POST(request: Request) {
 
     const hash = await bcrypt.hash(password, 10);
     const reviewer = await prisma.reviewer.create({
-      data: { reviewerId, name: name.trim(), email: email.trim().toLowerCase(), password: hash, plainPassword: password },
+      data: { reviewerId, name: name.trim(), email: email.trim().toLowerCase(), password: hash, plainPassword: encryptPassword(password) },
     });
 
     return NextResponse.json({ id: reviewer.id, reviewerId: reviewer.reviewerId, name: reviewer.name, email: reviewer.email }, { status: 201 });

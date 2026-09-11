@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { otpStore } from '@/lib/otpStore';
+import { generateOtp, saveRegistrationOtp } from '@/lib/otpStore';
 
 export async function POST(request: Request) {
   try {
@@ -26,11 +26,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'This Olympiad ID is already registered' }, { status: 409 });
     }
 
-    // Generate 6-digit OTP
-    const otp = String(Math.floor(100000 + Math.random() * 900000));
-    const expires = Date.now() + 5 * 60 * 1000; // 5 min
-
-    otpStore.set(olympiadCode.trim(), { otp, expires, name: name.trim(), phone: phone.trim(), attempts: 0 });
+    const otp = generateOtp();
+    await saveRegistrationOtp(olympiadCode.trim(), otp, name.trim(), phone.trim());
 
     // TODO: Send real SMS here (Twilio/MSG91)
     console.log(`[OTP] Code: ${olympiadCode} | Name: ${name} | Phone: ${phone} | OTP: ${otp}`);

@@ -3,8 +3,9 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
 import { getSchoolMembers } from '@/lib/schoolMembers';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 
 function getViewerIdFromToken(request: NextRequest): string | null {
   const authHeader = request.headers.get('Authorization');

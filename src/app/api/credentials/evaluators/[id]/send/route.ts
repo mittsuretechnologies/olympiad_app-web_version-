@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendEvaluatorCredentialsEmail } from '@/lib/mailer';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 // POST /api/credentials/evaluators/:id/send — emails the evaluator their current
 // login credentials over SMTP (see src/lib/mailer.ts). Mirrors the school
@@ -36,7 +37,7 @@ export async function POST(
         to: evaluator.email,
         evaluatorName: evaluator.name,
         evaluatorId: evaluator.evaluatorId,
-        password: evaluator.plainPassword,
+        password: decryptPassword(evaluator.plainPassword)!,
       });
     } catch (mailErr: any) {
       console.error(`Credentials email to ${evaluator.email} failed:`, mailErr);

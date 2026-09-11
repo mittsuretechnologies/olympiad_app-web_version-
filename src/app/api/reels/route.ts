@@ -3,8 +3,9 @@ import { verify } from 'jsonwebtoken';
 import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret';
+const JWT_SECRET = getJwtSecret();
 
 function getViewerIdFromToken(request: NextRequest): string | null {
   const authHeader = request.headers.get('Authorization');
@@ -72,9 +73,10 @@ export async function GET(request: NextRequest) {
 
     if (category) where.category = { equals: category, mode: 'insensitive' };
 
-    // Resolve the viewer's own school/city/state (Olympiad accounts only —
-    // an olympiadId is what makes "their school" a meaningful concept at
-    // all). Everyone else keeps the original createdAt-desc feed untouched.
+    // Resolve the viewer's own school/city/state, when there is one (Olympiad
+    // accounts only — an olympiadId is what makes "their school" a meaningful
+    // concept at all). A viewer with no resolvable school still gets a seeded
+    // shuffle below (useSeededFeed), just with no school-based bias to it.
     let viewerSchool: { id: string; city: string | null; state: string | null } | null = null;
     if (viewerId && seed) {
       const viewer = await prisma.appUser.findUnique({
@@ -90,7 +92,12 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const useTieredFeed = !!viewerSchool && !!seed;
+    // A seed alone is now enough to get the random/tiered feed — school is
+    // only used to bias the ordering (own school -> city -> state -> rest)
+    // when it's resolvable; every other viewer (no olympiadId, or no seed on
+    // an old app build) still gets a shuffle, just with everything landing in
+    // the one TIER_OTHER bucket, i.e. pure seeded-random with no bias at all.
+    const useSeededFeed = !!seed;
 
     const baseSelect = {
       id:           true,
@@ -125,7 +132,7 @@ export async function GET(request: NextRequest) {
     let hasMore: boolean;
     let nextCursor: string | null;
 
-    if (useTieredFeed) {
+    if (useSeededFeed) {
       // Whole pool fetched once, tiered + seed-ranked in memory, then sliced
       // for this page. Videos carry their uploader's school only two ways
       // (student.allocation.school, or appUser.olympiadId -> allocation ->
@@ -162,10 +169,17 @@ export async function GET(request: NextRequest) {
         const appUserSchool = appUserOlympiadId ? (poolAllocationMap.get(appUserOlympiadId) ?? null) : null;
         const school = studentSchool ?? appUserSchool;
 
+        // No resolvable school for this viewer (non-Olympiad account, or an
+        // Olympiad account whose allocation lookup came back empty) -> every
+        // video falls into the same TIER_OTHER bucket, so the tier compare
+        // below is a no-op and the sort falls through to pure seeded-random
+        // via `rank` alone.
         let tier = TIER_OTHER;
-        if (school?.id === viewerSchool!.id) tier = TIER_SCHOOL;
-        else if (viewerSchool!.city  && school?.city  === viewerSchool!.city)  tier = TIER_CITY;
-        else if (viewerSchool!.state && school?.state === viewerSchool!.state) tier = TIER_STATE;
+        if (viewerSchool) {
+          if (school?.id === viewerSchool.id) tier = TIER_SCHOOL;
+          else if (viewerSchool.city  && school?.city  === viewerSchool.city)  tier = TIER_CITY;
+          else if (viewerSchool.state && school?.state === viewerSchool.state) tier = TIER_STATE;
+        }
 
         return { video: v, tier, rank: seededRank(seed!, v.id) };
       });

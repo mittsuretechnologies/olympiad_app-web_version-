@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendReviewerCredentialsEmail } from '@/lib/mailer';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 // POST /api/credentials/reviewers/:id/send — emails the reviewer's current
 // reviewerId + password.
@@ -30,7 +31,7 @@ export async function POST(
         to: reviewer.email,
         reviewerName: reviewer.name,
         reviewerId: reviewer.reviewerId,
-        password: reviewer.plainPassword,
+        password: decryptPassword(reviewer.plainPassword)!,
       });
     } catch (mailErr: any) {
       console.error(`Credentials email to ${reviewer.email} failed:`, mailErr);

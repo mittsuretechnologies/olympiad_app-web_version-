@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
+import { getJwtSecret } from '@/lib/jwt-secret';
+import { decryptPassword } from '@/lib/password-crypto';
 
 /** One evaluation-slot's worth of state for a student's directory row. */
 type SlotInfo = {
@@ -42,7 +44,7 @@ export async function GET(request: Request) {
 
     let payload: any;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      payload = jwt.verify(token, getJwtSecret());
     } catch {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
@@ -157,7 +159,7 @@ export async function GET(request: Request) {
             olympiadVideos: (slots.slotA.status === 'approved' ? 1 : 0) + (slots.slotB.status === 'approved' ? 1 : 0),
             email: u.email || null,
             username: u.userId,
-            password: u.plainPassword,
+            password: decryptPassword(u.plainPassword),
             slotA: slots.slotA,
             slotB: slots.slotB,
             attendance: attendanceByCode.get(u.olympiadId!) ?? null,

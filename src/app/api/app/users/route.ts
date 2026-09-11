@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
         createdAt: true,
       },
     });
-    return NextResponse.json(users);
+    return NextResponse.json(
+      users.map((u) => ({ ...u, plainPassword: decryptPassword(u.plainPassword) }))
+    );
   } catch (error) {
     console.error('app-users GET error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

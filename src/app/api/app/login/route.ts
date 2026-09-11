@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 export async function POST(request: Request) {
   try {
@@ -44,7 +45,7 @@ export async function POST(request: Request) {
 
     const token = jwt.sign(
       { id: user.id, userId: user.userId, role: 'APP_USER' },
-      process.env.JWT_SECRET || 'fallback_secret',
+      getJwtSecret(),
       { expiresIn: '30d' }
     );
 

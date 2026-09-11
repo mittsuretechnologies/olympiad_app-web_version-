@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 import { sendCredentialsSms } from '@/lib/sms';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 // POST /api/credentials/schools/:id/send — body: { method: 'sms' | 'email' }
 // Sends the school's current username + password via SMS or email.
@@ -46,7 +47,7 @@ export async function POST(
           schoolName: school.name,
           schoolId: school.schoolId,
           username: school.username,
-          password: school.plainPassword,
+          password: decryptPassword(school.plainPassword)!,
           contactPerson: school.contactPerson,
         });
       } catch (mailErr: any) {
@@ -58,7 +59,7 @@ export async function POST(
         await sendCredentialsSms(school.phone!, {
           schoolName: school.name,
           username: school.username,
-          password: school.plainPassword,
+          password: decryptPassword(school.plainPassword)!,
         });
       } catch (smsErr: any) {
         console.error(`Credentials SMS to ${school.phone} failed:`, smsErr);

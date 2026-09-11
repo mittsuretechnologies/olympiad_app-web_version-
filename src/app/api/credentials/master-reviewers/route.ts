@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
 
 function generateMasterReviewerId(): string {
   const num = Math.floor(1000 + Math.random() * 9000);
@@ -16,7 +17,9 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
       select: { id: true, masterReviewerId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true },
     });
-    return NextResponse.json(masterReviewers);
+    return NextResponse.json(
+      masterReviewers.map((m) => ({ ...m, plainPassword: decryptPassword(m.plainPassword) }))
+    );
   } catch (e: any) {
     return NextResponse.json({ message: e.message }, { status: 500 });
   }
@@ -42,7 +45,7 @@ export async function POST(request: Request) {
 
     const hash = await bcrypt.hash(password, 10);
     const masterReviewer = await prisma.masterReviewer.create({
-      data: { masterReviewerId, name: name.trim(), email: email.trim().toLowerCase(), password: hash, plainPassword: password },
+      data: { masterReviewerId, name: name.trim(), email: email.trim().toLowerCase(), password: hash, plainPassword: encryptPassword(password) },
     });
 
     return NextResponse.json({ id: masterReviewer.id, masterReviewerId: masterReviewer.masterReviewerId, name: masterReviewer.name, email: masterReviewer.email }, { status: 201 });

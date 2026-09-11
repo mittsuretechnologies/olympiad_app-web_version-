@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/jwt-secret';
+import { decryptPassword } from '@/lib/password-crypto';
 
 export async function GET(request: Request) {
   try {
@@ -9,7 +11,7 @@ export async function GET(request: Request) {
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     let payload: any;
-    try { payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret'); }
+    try { payload = jwt.verify(token, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
@@ -52,7 +54,7 @@ export async function GET(request: Request) {
             name: a.student.name,
             phone: a.student.phone,
             username: a.student.username,
-            plainPassword: a.student.plainPassword,
+            plainPassword: decryptPassword(a.student.plainPassword),
             isVerified: a.student.isVerified,
             createdAt: a.student.createdAt,
             source: 'web' as const,
@@ -73,7 +75,7 @@ export async function GET(request: Request) {
             phone: appUser.mobile || '-',
             email: appUser.email || null,
             username: appUser.userId,
-            plainPassword: appUser.plainPassword || null,
+            plainPassword: decryptPassword(appUser.plainPassword) || null,
             isVerified: appUser.isVerified,
             createdAt: appUser.createdAt,
             source: 'app' as const,

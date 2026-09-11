@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
@@ -79,7 +80,7 @@ export async function GET(request: Request) {
         phone: s.phone,
         olympiadCode: s.olympiadCode,
         username: s.username || null,
-        plainPassword: s.plainPassword,
+        plainPassword: decryptPassword(s.plainPassword),
         isVerified: s.isVerified,
         createdAt: s.createdAt,
         source: 'web',
@@ -109,9 +110,6 @@ export async function GET(request: Request) {
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('GET credentials/registered-students failed:', error);
-    return NextResponse.json(
-      { message: 'Failed to fetch registered student credentials', error: error?.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Failed to fetch registered student credentials' }, { status: 500 });
   }
 }

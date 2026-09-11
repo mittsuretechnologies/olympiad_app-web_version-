@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { decryptPassword } from '@/lib/password-crypto';
 
 export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
@@ -21,12 +22,11 @@ export async function GET(request: Request) {
         createdAt: true,
       },
     });
-    return NextResponse.json(uploaders);
+    return NextResponse.json(
+      uploaders.map((u) => ({ ...u, plainPassword: decryptPassword(u.plainPassword) }))
+    );
   } catch (error: any) {
     console.error('GET credentials/uploaders failed:', error);
-    return NextResponse.json(
-      { message: 'Failed to fetch', error: error?.message },
-      { status: 500 }
-    );
+    return NextResponse.json({ message: 'Failed to fetch' }, { status: 500 });
   }
 }

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 export async function POST(request: Request) {
   try {
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
         }
         const token = jwt.sign(
           { id: admin.id, email: admin.email, name: admin.name, role: 'SUPERADMIN' },
-          process.env.JWT_SECRET || 'fallback_secret',
+          getJwtSecret(),
           { expiresIn: '1d' }
         );
         return NextResponse.json({
@@ -55,7 +56,7 @@ export async function POST(request: Request) {
       }
       const token = jwt.sign(
         { id: school.id, schoolId: school.schoolId, name: school.name, role: 'SCHOOL' },
-        process.env.JWT_SECRET || 'fallback_secret',
+        getJwtSecret(),
         { expiresIn: '1d' }
       );
       return NextResponse.json({
@@ -82,7 +83,7 @@ export async function POST(request: Request) {
       if (!reviewer.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
       const token = jwt.sign(
         { id: reviewer.id, reviewerId: reviewer.reviewerId, name: reviewer.name, email: reviewer.email, role: 'REVIEWER' },
-        process.env.JWT_SECRET || 'fallback_secret',
+        getJwtSecret(),
         { expiresIn: '7d' }
       );
       return NextResponse.json({
@@ -104,7 +105,7 @@ export async function POST(request: Request) {
       if (!evaluator.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
       const token = jwt.sign(
         { id: evaluator.id, evaluatorId: evaluator.evaluatorId, name: evaluator.name, email: evaluator.email, role: 'EVALUATOR' },
-        process.env.JWT_SECRET || 'fallback_secret',
+        getJwtSecret(),
         { expiresIn: '7d' }
       );
       return NextResponse.json({
@@ -126,7 +127,7 @@ export async function POST(request: Request) {
       if (!moderator.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
       const token = jwt.sign(
         { id: moderator.id, moderatorId: moderator.moderatorId, name: moderator.name, email: moderator.email, role: 'MODERATOR' },
-        process.env.JWT_SECRET || 'fallback_secret',
+        getJwtSecret(),
         { expiresIn: '7d' }
       );
       return NextResponse.json({

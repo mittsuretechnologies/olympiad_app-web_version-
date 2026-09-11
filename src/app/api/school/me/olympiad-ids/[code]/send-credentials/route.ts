@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { sendStudentCredentialsEmail } from '@/lib/mailer';
+import { getJwtSecret } from '@/lib/jwt-secret';
+import { decryptPassword } from '@/lib/password-crypto';
 
 export async function POST(
   request: Request,
@@ -13,7 +15,7 @@ export async function POST(
     if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
     let payload: any;
-    try { payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret'); }
+    try { payload = jwt.verify(token, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
@@ -48,7 +50,7 @@ export async function POST(
       schoolName: school?.name,
       olympiadCode: code,
       userId: appUser.userId,
-      password: appUser.plainPassword,
+      password: decryptPassword(appUser.plainPassword)!,
     });
 
     return NextResponse.json({ success: true, email: emailNormalized });

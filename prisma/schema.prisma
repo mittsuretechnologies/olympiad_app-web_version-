@@ -581,6 +581,24 @@ model PasswordResetOtp {
   @@schema("public")
 }
 
+/// Pending student self-registrations awaiting OTP verification. Replaces the
+/// in-process Map this used to live in, which lost state whenever the register
+/// and verify calls landed on different serverless instances and kept the OTP
+/// in cleartext. Mirrors AppOtp/PasswordResetOtp: bcrypt-hashed OTP, never the
+/// raw code.
+model StudentRegistrationOtp {
+  id           String   @id @default(uuid())
+  olympiadCode String   @unique
+  otpHash      String
+  name         String
+  phone        String
+  attempts     Int      @default(0)
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@schema("public")
+}
+
 model Follow {
   id          String   @id @default(uuid())
   followerId  String

@@ -5,6 +5,7 @@ import { MAX_PER_CRITERION, CRITERION_KEYS, type CriterionKey } from '@/lib/kosh
 import { recordAuditLog } from '@/lib/audit-log';
 import { evaluatorCanAccessVideo } from '@/lib/evaluatorRegion';
 import { requireModule } from '@/lib/auth-guard';
+import { getJwtSecret } from '@/lib/jwt-secret';
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
 
     let payload: any;
     try {
-      payload = jwt.verify(token, process.env.JWT_SECRET || 'fallback_secret');
+      payload = jwt.verify(token, getJwtSecret());
     } catch {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
