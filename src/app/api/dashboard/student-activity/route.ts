@@ -2,16 +2,20 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 
-// Combined "last active" view across the two separate student concepts in
-// this schema:
+// Combined "last active" view across every account type in this schema:
 //   - Student: registered through a school's Olympiad enrollment, logs in
-//     with an olympiadCode + password (api/auth/student-login).
-//   - AppUser: mobile app account. Only counted here when it carries an
-//     olympiadId (i.e. it's a student's app account, not a plain viewer) —
-//     mirrors the Student/Viewer split already used on the App Users report.
-// They are genuinely different accounts (a school-registered Student and
-// their AppUser login are separate rows, linked only via olympiadId), so
-// both are returned as distinct entries rather than merged into one.
+//     with an olympiadCode + password (api/auth/student-login). Always an
+//     Olympiad account by definition.
+//   - AppUser: mobile app account. Carrying an olympiadId makes it an
+//     Olympiad account; without one it's a general (viewer) account.
+// A school-registered Student and their AppUser login are genuinely separate
+// rows, linked only via olympiadId, so both are returned as distinct entries
+// rather than merged into one.
+//
+// Every AppUser is returned — the olympiadId filter that used to exclude
+// general users is gone, since the report now splits on Olympiad vs General
+// rather than hiding one of them. `accountKind` carries that split to the
+// client so it doesn't have to re-derive it from identifier shape.
 export async function GET(request: Request) {
   const { error } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
@@ -33,12 +37,12 @@ export async function GET(request: Request) {
         orderBy: { createdAt: 'desc' },
       }),
       prisma.appUser.findMany({
-        where: { olympiadId: { not: null } },
         select: {
           id: true,
           userId: true,
           olympiadId: true,
           mobile: true,
+          email: true,
           lastLoginAt: true,
           createdAt: true,
         },
@@ -62,6 +66,9 @@ export async function GET(request: Request) {
       ...students.map(s => ({
         id:          s.id,
         type:        'STUDENT' as const,
+        // A Student row only exists via a school's Olympiad enrollment, so
+        // there is no general-user variant of it.
+        accountKind: 'OLYMPIAD' as const,
         name:        s.name,
         identifier:  s.olympiadCode,
         contact:     s.phone,
@@ -76,9 +83,17 @@ export async function GET(request: Request) {
         return {
           id:          u.id,
           type:        'APP_USER' as const,
+          // The olympiadId is the whole distinction: with one, this account
+          // belongs to an enrolled Olympiad student; without, it's a general
+          // app user who signed up on their own.
+          accountKind: (u.olympiadId ? 'OLYMPIAD' : 'GENERAL') as 'OLYMPIAD' | 'GENERAL',
           name:        u.userId,
-          identifier:  u.olympiadId,
-          contact:     u.mobile,
+          // General users have no Olympiad code — fall back to their own
+          // userId so the column is never blank.
+          identifier:  u.olympiadId ?? u.userId,
+          // A general user may have signed up with either a mobile or an
+          // email, so show whichever exists rather than a blank cell.
+          contact:     u.mobile ?? u.email,
           schoolName:  school?.name ?? null,
           city:        school?.city ?? null,
           state:       school?.state ?? null,
