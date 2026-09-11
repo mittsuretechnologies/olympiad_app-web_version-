@@ -11,6 +11,9 @@ import {
 interface ActivityRow {
   id: string;
   type: 'STUDENT' | 'APP_USER';
+  // Olympiad = enrolled through a school (a Student row, or an AppUser that
+  // carries an olympiadId). General = signed up on the app independently.
+  accountKind: 'OLYMPIAD' | 'GENERAL';
   name: string;
   identifier: string | null;
   contact: string | null;
@@ -40,6 +43,20 @@ function relativeTime(iso: string | null): string {
   return `${Math.floor(months / 12)}y ago`;
 }
 
+// Exact date + time, shown under the relative label. The relative form is
+// what makes the list scannable, but "5d ago" is useless for the actual
+// question this report gets used for — when precisely was this account last
+// active — so both are shown rather than one replacing the other.
+function absoluteTime(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleString('en-IN', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
+  });
+}
+
 // Active in the last 24h reads as a distinct "currently engaged" signal from
 // the rest of the list, which is otherwise sorted but visually uniform.
 function isRecentlyActive(iso: string | null): boolean {
@@ -63,8 +80,8 @@ export default function StudentActivityPage() {
 
   const filtered = useMemo(() => {
     return rows.filter(r => {
-      if (filterType === 'Student' && r.type !== 'STUDENT') return false;
-      if (filterType === 'App User' && r.type !== 'APP_USER') return false;
+      if (filterType === 'Olympiad User' && r.accountKind !== 'OLYMPIAD') return false;
+      if (filterType === 'General User'  && r.accountKind !== 'GENERAL')  return false;
       if (filterActivity === 'Active (24h)' && !isRecentlyActive(r.lastLoginAt)) return false;
       if (filterActivity === 'Never logged in' && r.lastLoginAt) return false;
       if (search) {
@@ -80,18 +97,19 @@ export default function StudentActivityPage() {
     });
   }, [rows, filterType, filterActivity, search]);
 
-  const studentCount = filtered.filter(r => r.type === 'STUDENT').length;
-  const appUserCount = filtered.filter(r => r.type === 'APP_USER').length;
+  const olympiadCount = filtered.filter(r => r.accountKind === 'OLYMPIAD').length;
+  const generalCount  = filtered.filter(r => r.accountKind === 'GENERAL').length;
   const activeNowCount = filtered.filter(r => isRecentlyActive(r.lastLoginAt)).length;
 
   const exportCSV = () => {
     if (filtered.length === 0) return;
-    const headers = ['#', 'Name', 'Type', 'Identifier', 'Contact', 'School', 'Last Active', 'Registered On'];
+    const headers = ['#', 'Name', 'Account Type', 'Source', 'Identifier', 'Contact', 'School', 'Last Active', 'Registered On'];
     const csvRows = filtered.map((r, i) => [
       i + 1, r.name,
+      r.accountKind === 'OLYMPIAD' ? 'Olympiad User' : 'General User',
       r.type === 'STUDENT' ? 'Student' : 'App User',
       r.identifier || '-', r.contact || '-', r.schoolName || '-',
-      r.lastLoginAt ? new Date(r.lastLoginAt).toLocaleString() : 'Never',
+      absoluteTime(r.lastLoginAt) ?? 'Never',
       new Date(r.createdAt).toLocaleDateString(),
     ]);
     const csv = [headers, ...csvRows].map(row => row.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
@@ -111,7 +129,7 @@ export default function StudentActivityPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-medium text-[#004f9f]">Student Activity</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Last-active time across both Student and App User accounts</p>
+          <p className="text-xs text-gray-400 mt-0.5">Last-active time across Olympiad and General user accounts</p>
         </div>
         <button onClick={exportCSV} disabled={filtered.length === 0}
           className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#09025c] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -137,7 +155,7 @@ export default function StudentActivityPage() {
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Account Type</label>
             <select value={filterType} onChange={e => setFilterType(e.target.value)} className={sel}>
-              <option>All</option><option>Student</option><option>App User</option>
+              <option>All</option><option>Olympiad User</option><option>General User</option>
             </select>
           </div>
           <div className="space-y-1">
@@ -167,13 +185,13 @@ export default function StudentActivityPage() {
         </div>
         <div className="flex items-center gap-3 px-6 py-3">
           <GraduationCap size={17} className="text-amber-600" />
-          <span className="text-2xl font-bold text-amber-700">{studentCount}</span>
-          <span className="text-sm text-gray-400">Students</span>
+          <span className="text-2xl font-bold text-amber-700">{olympiadCount}</span>
+          <span className="text-sm text-gray-400">Olympiad Users</span>
         </div>
         <div className="flex items-center gap-3 px-6 py-3">
           <Smartphone size={17} className="text-blue-600" />
-          <span className="text-2xl font-bold text-blue-700">{appUserCount}</span>
-          <span className="text-sm text-gray-400">App Users</span>
+          <span className="text-2xl font-bold text-blue-700">{generalCount}</span>
+          <span className="text-sm text-gray-400">General Users</span>
         </div>
         <div className="flex items-center gap-3 px-6 py-3">
           <Clock size={17} className="text-green-600" />
@@ -219,10 +237,17 @@ export default function StudentActivityPage() {
                   <tr key={`${r.type}-${r.id}`} className={`border-b border-gray-100 hover:bg-blue-50/30 transition-colors ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/40'}`}>
                     <td className="px-4 py-2.5 text-gray-400 text-xs">{idx + 1}</td>
                     <td className="px-4 py-2.5">
-                      {r.type === 'STUDENT'
-                        ? <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5"><GraduationCap size={10} />Student</span>
-                        : <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5"><Smartphone size={10} />App User</span>
+                      {r.accountKind === 'OLYMPIAD'
+                        ? <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5"><GraduationCap size={10} />Olympiad</span>
+                        : <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5"><Smartphone size={10} />General</span>
                       }
+                      {/* An Olympiad account exists twice over: the school's
+                          Student record and the student's own app login. The
+                          sub-label keeps those distinguishable now that the
+                          main badge shows Olympiad/General instead. */}
+                      <span className="block mt-0.5 text-[10px] text-gray-400">
+                        {r.type === 'STUDENT' ? 'Student' : 'App User'}
+                      </span>
                     </td>
                     <td className="px-4 py-2.5 font-semibold text-gray-800 text-sm">{r.name}</td>
                     <td className="px-4 py-2.5 font-mono text-xs">
@@ -241,6 +266,13 @@ export default function StudentActivityPage() {
                         {recent && <span className="w-1.5 h-1.5 rounded-full bg-green-500" />}
                         {relativeTime(r.lastLoginAt)}
                       </span>
+                      {/* Exact timestamp under the relative one — "5d ago" is
+                          good for scanning, useless for answering when. */}
+                      {r.lastLoginAt && (
+                        <span className="block mt-0.5 text-[10px] text-gray-400 font-normal">
+                          {absoluteTime(r.lastLoginAt)}
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
