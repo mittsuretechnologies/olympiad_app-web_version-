@@ -22,6 +22,7 @@ interface Video {
   tags: string;
   isPublic: boolean;
   isEvaluation: boolean;
+  isMittfest: boolean;
   olympiadVisibility: string | null;
   status: string;
   rejectionReason: string | null;
@@ -78,6 +79,17 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+// The app's isMittfest flag (set via the "Is this video for MittFest?"
+// checkbox or a #mittfest tag at upload) is the source of truth for MittFest
+// membership — see src/lib/mittfest.ts. Surface it as a #mittfest chip here
+// too, even on videos where the uploader ticked the checkbox but didn't
+// separately type the tag, so moderators always see it on the card/preview.
+function displayTags(video: { tags: string; isMittfest: boolean }): string[] {
+  const list = video.tags ? video.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+  if (video.isMittfest && !list.some(t => t.toLowerCase() === 'mittfest')) list.unshift('mittfest');
+  return list;
+}
+
 function getCategoryLabel(cat: string) {
   if (OLYMPIAD_CAT_A_SUBS.includes(cat)) return { label: 'Talent Performance', color: 'bg-violet-50 text-violet-700 border-violet-200' };
   if (OLYMPIAD_CAT_B_SUBS.includes(cat)) return { label: 'Rhymes / Speech', color: 'bg-teal-50 text-teal-700 border-teal-200' };
@@ -125,6 +137,11 @@ export default function VideoModerationPage() {
   const [catFilter,    setCatFilter]    = useState('');
   const [typeFilter,   setTypeFilter]   = useState('');
   const [filterOpen,   setFilterOpen]   = useState(false);
+  // Content-type split: MittFest (isMittfest) vs Olympiad/jury (isEvaluation)
+  // vs General (neither) — a video can't be both, since jury videos don't set
+  // isMittfest. Client-side only, like search, since it's a cheap boolean split
+  // of the already-fetched per-status page.
+  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'GENERAL'>('ALL');
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
@@ -173,9 +190,14 @@ export default function VideoModerationPage() {
 
   const counts = data?.counts ?? { PENDING: 0, APPROVED: 0, REJECTED: 0 };
 
-  // ── Client-side search ────────────────────────────────────────────────────
+  // ── Client-side search + content-type filter ──────────────────────────────
   const videos = useMemo(() => {
-    const allVideos: Video[] = Array.isArray(data?.videos) ? data!.videos : [];
+    let allVideos: Video[] = Array.isArray(data?.videos) ? data!.videos : [];
+
+    if (contentFilter === 'MITTFEST') allVideos = allVideos.filter(v => v.isMittfest);
+    else if (contentFilter === 'OLYMPIAD') allVideos = allVideos.filter(v => v.isEvaluation);
+    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation);
+
     if (!search.trim()) return allVideos;
     const q = search.toLowerCase();
     return allVideos.filter(v =>
@@ -189,7 +211,7 @@ export default function VideoModerationPage() {
       v.subCategory?.toLowerCase().includes(q) ||
       v.tags?.toLowerCase().includes(q)
     );
-  }, [data, search]);
+  }, [data, search, contentFilter]);
 
   const fetchVideos = async () => {
     setRefreshing(true);
@@ -469,6 +491,29 @@ export default function VideoModerationPage() {
         ))}
       </div>
 
+      {/* ── Content-type filter ─────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Show</span>
+        {([
+          { value: 'ALL',      label: 'All' },
+          { value: 'MITTFEST', label: 'MittFest' },
+          { value: 'OLYMPIAD', label: 'Olympiad' },
+          { value: 'GENERAL',  label: 'General' },
+        ] as const).map(opt => (
+          <button
+            key={opt.value}
+            onClick={() => setContentFilter(opt.value)}
+            className={`px-3 py-1.5 rounded-full text-[11px] font-bold border transition-colors ${
+              contentFilter === opt.value
+                ? 'bg-[#014584] text-white border-[#014584]'
+                : 'border-gray-200 text-gray-500 bg-white hover:bg-gray-50'
+            }`}
+          >
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {/* ── Search + Filter bar ─────────────────────────────────────────────── */}
       <div className="flex gap-2">
         {/* Search */}
@@ -602,9 +647,9 @@ export default function VideoModerationPage() {
         <div className="flex flex-col items-center justify-center py-24 bg-white border border-dashed border-gray-200 rounded-2xl">
           <Play size={40} className="text-gray-200 mb-3" />
           <p className="text-gray-400 font-bold text-sm">No {filter.toLowerCase()} videos found</p>
-          {(search || activeFilters > 0) && (
+          {(search || activeFilters > 0 || contentFilter !== 'ALL') && (
             <button
-              onClick={() => { setSearch(''); setCatFilter(''); setTypeFilter(''); }}
+              onClick={() => { setSearch(''); setCatFilter(''); setTypeFilter(''); setContentFilter('ALL'); }}
               className="mt-2 text-xs text-[#014584] underline"
             >
               Clear search & filters
@@ -628,7 +673,7 @@ export default function VideoModerationPage() {
             {videos.map((video) => {
               const school    = video.student?.allocation?.school;
               const busy      = processingId === video.id;
-              const tagList   = video.tags ? video.tags.split(',').filter(Boolean) : [];
+              const tagList   = displayTags(video);
               const isChecked = selected.has(video.id);
               const catBadge  = getCategoryLabel(video.subCategory);
               const isStudent = video.uploaderType === 'STUDENT' || !!video.student;
@@ -643,7 +688,7 @@ export default function VideoModerationPage() {
                   {/* Thumbnail */}
                   <div
                     className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden"
-                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(video.tags ? video.tags.split(',').map(t => t.trim()).filter(Boolean) : []); setTagInput(''); }}
+                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(displayTags(video)); setTagInput(''); }}
                   >
                     {video.thumbnailUrl ? (
                       <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -824,14 +869,14 @@ export default function VideoModerationPage() {
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             <XCircle size={11} /> Reject
                           </button>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(video.tags ? video.tags.split(',').map(t => t.trim()).filter(Boolean) : []); setTagInput(''); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(displayTags(video)); setTagInput(''); }} disabled={busy}
                             className="px-2.5 py-2 rounded-xl border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40">
                             <Eye size={13} />
                           </button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(video.tags ? video.tags.split(',').map(t => t.trim()).filter(Boolean) : []); setTagInput(''); }} disabled={busy}
+                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(displayTags(video)); setTagInput(''); }} disabled={busy}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>

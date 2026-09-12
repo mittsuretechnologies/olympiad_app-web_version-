@@ -29,6 +29,7 @@ interface UploaderGroup {
   uploaderType: string;
   name: string;
   identifier: string;
+  schoolName: string | null;
   videoCount: number;
   videos: CampaignVideo[];
 }
@@ -54,12 +55,23 @@ function statusBadge(status: string) {
 export default function HashtagCampaignPage() {
   const [tagInput, setTagInput] = useState('mittfest');
   const [activeTag, setActiveTag] = useState('mittfest');
+  // Submission-date range (inclusive), applied server-side on Video.createdAt.
+  // "Active" copies are only committed on Load Report, same as tagInput/activeTag,
+  // so changing the date pickers doesn't refetch until the user asks for it.
+  const [fromInput,  setFromInput]  = useState('');
+  const [toInput,    setToInput]    = useState('');
+  const [activeFrom, setActiveFrom] = useState('');
+  const [activeTo,   setActiveTo]   = useState('');
   const [search, setSearch] = useState('');
   const [expandedKey, setExpandedKey] = useState<string | null>(null);
   const [videoModal, setVideoModal] = useState<CampaignVideo | null>(null);
 
+  const reportParams = new URLSearchParams({ tag: activeTag });
+  if (activeFrom) reportParams.set('from', activeFrom);
+  if (activeTo)   reportParams.set('to', activeTo);
+
   const { data, isLoading: loading } = useSWR<CampaignResponse>(
-    `/api/reports/hashtag-campaign?tag=${encodeURIComponent(activeTag)}`,
+    `/api/reports/hashtag-campaign?${reportParams.toString()}`,
     fetcher
   );
 
@@ -76,15 +88,23 @@ export default function HashtagCampaignPage() {
   const runSearch = () => {
     const cleaned = tagInput.trim().replace(/^#/, '');
     if (cleaned) setActiveTag(cleaned);
+    setActiveFrom(fromInput);
+    setActiveTo(toInput);
+  };
+
+  const hasDateRange = !!(activeFrom || activeTo);
+  const clearDateRange = () => {
+    setFromInput(''); setToInput('');
+    setActiveFrom(''); setActiveTo('');
   };
 
   const downloadCSV = () => {
-    const header = ['Uploader', 'Identifier', 'Type', 'Video Count', 'Video ID', 'Status', 'Uploaded'];
+    const header = ['Uploader', 'Identifier', 'Type', 'School', 'Video Count', 'Video ID', 'Status', 'Uploaded'];
     const csvRows: (string | number)[][] = [];
     filtered.forEach(u => {
       u.videos.forEach(v => {
         csvRows.push([
-          u.name, u.identifier, u.uploaderType, u.videoCount,
+          u.name, u.identifier, u.uploaderType, u.schoolName || '', u.videoCount,
           v.id, v.status, new Date(v.createdAt).toLocaleDateString('en-IN'),
         ]);
       });
@@ -93,7 +113,8 @@ export default function HashtagCampaignPage() {
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = `hashtag-${activeTag}-${new Date().toISOString().split('T')[0]}.csv`;
+    const rangeSuffix = hasDateRange ? `_${activeFrom || 'start'}_to_${activeTo || 'now'}` : '';
+    a.href = url; a.download = `hashtag-${activeTag}${rangeSuffix}-${new Date().toISOString().split('T')[0]}.csv`;
     a.click(); URL.revokeObjectURL(url);
   };
 
@@ -118,6 +139,16 @@ export default function HashtagCampaignPage() {
             onKeyDown={e => e.key === 'Enter' && runSearch()}
             className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold focus:ring-2 focus:ring-rose-300 focus:border-rose-400 outline-none" />
         </div>
+        <div className="flex items-center gap-2">
+          <label className="text-xs font-bold text-gray-400">From</label>
+          <input type="date" value={fromInput} max={toInput || undefined}
+            onChange={e => setFromInput(e.target.value)}
+            className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-rose-300 focus:border-rose-400 outline-none" />
+          <label className="text-xs font-bold text-gray-400">To</label>
+          <input type="date" value={toInput} min={fromInput || undefined}
+            onChange={e => setToInput(e.target.value)}
+            className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-rose-300 focus:border-rose-400 outline-none" />
+        </div>
         <button onClick={runSearch}
           className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-sm font-bold transition-colors">
           Load Report
@@ -128,6 +159,17 @@ export default function HashtagCampaignPage() {
             className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-rose-300 focus:border-rose-400 outline-none" />
         </div>
       </div>
+
+      {hasDateRange && (
+        <div className="flex items-center gap-2 -mt-3 text-xs text-gray-500 font-medium">
+          <span>
+            Showing submissions {activeFrom ? `from ${new Date(activeFrom).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
+            {activeFrom && activeTo ? ' ' : ''}
+            {activeTo ? `to ${new Date(activeTo).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}` : ''}
+          </span>
+          <button onClick={clearDateRange} className="text-rose-500 hover:text-rose-600 underline font-bold">Clear</button>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-24">
@@ -204,6 +246,9 @@ export default function HashtagCampaignPage() {
                             <span className={`px-2 py-0.5 rounded-full font-bold ${u.uploaderType === 'STUDENT' ? 'bg-amber-50 text-amber-700 border border-amber-200' : 'bg-blue-50 text-blue-600 border border-blue-200'}`}>
                               {u.uploaderType === 'STUDENT' ? '🎓 Student' : '📱 Viewer'}
                             </span>
+                            {u.uploaderType === 'STUDENT' && u.schoolName && (
+                              <p className="text-[10px] text-gray-400 font-semibold mt-1 truncate max-w-[160px]">{u.schoolName}</p>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-center">
                             <span className="font-extrabold text-gray-800">{u.videoCount}</span>
