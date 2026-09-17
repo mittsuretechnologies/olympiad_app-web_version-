@@ -36,9 +36,12 @@ export async function GET(request: Request) {
       prisma.student.count({ where: dateWhere }),
       prisma.uploader.count({ where: dateWhere }),
       prisma.appUser.count({ where: dateWhere }),
-      prisma.video.count({ where: { status: 'PENDING', ...dateWhere } }),
-      prisma.video.count({ where: { status: 'APPROVED', ...dateWhere } }),
-      prisma.video.count({ where: { status: 'REJECTED', ...dateWhere } }),
+      // User-deleted videos are retained in the DB for audit visibility but are
+      // excluded here, the same way /api/dashboard/videos excludes them — so the
+      // overview card and the moderation queue report the same numbers.
+      prisma.video.count({ where: { status: 'PENDING', deletedAt: null, ...dateWhere } }),
+      prisma.video.count({ where: { status: 'APPROVED', deletedAt: null, ...dateWhere } }),
+      prisma.video.count({ where: { status: 'REJECTED', deletedAt: null, ...dateWhere } }),
     ]);
 
     const totalPendingRegistrations = totalAllocatedIds - totalRegisteredStudents;
@@ -93,6 +96,7 @@ export async function GET(request: Request) {
 
     // Recent video uploads across all sources
     const recentVideos = await prisma.video.findMany({
+      where: { deletedAt: null },
       orderBy: { createdAt: 'desc' },
       take: 5,
       select: {
