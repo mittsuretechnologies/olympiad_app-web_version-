@@ -5,7 +5,7 @@ import Link from 'next/link';
 import {
   School, Hash, Users, AlertCircle, UploadCloud, Smartphone,
   Clock, CheckCircle2, XCircle, ArrowRight, BookOpen, Activity,
-  PlaySquare, ChevronRight, KeyRound, BarChart2, Star, Loader2,
+  PlaySquare, ChevronRight, BarChart2, Star, Loader2,
   Download, Calendar, Check,
 } from 'lucide-react';
 import {
@@ -105,7 +105,7 @@ function StatPill({ label, value, tone }: { label: string; value: number | strin
     ? 'bg-orange-50 text-orange-600'
     : 'bg-slate-100 text-slate-600';
   return (
-    <span className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-[12px] font-semibold whitespace-nowrap ${toneClass}`}>
+    <span className={`inline-flex items-center gap-1 rounded-pill px-2.5 py-1 text-[12px] font-semibold whitespace-nowrap ${toneClass}`}>
       {label} : <span className="font-bold">{value.toLocaleString('en-IN')}</span>
     </span>
   );
@@ -130,10 +130,10 @@ function KpiTile({
 }) {
   return (
     <div
-      className={`card-body dashcard relative rounded-xl border border-slate-200 shadow-sm flex flex-col gap-3 ${tint}`}
-      style={{ width: '100%', height: 160, padding: '16px', fontFamily: 'var(--font-poppins), Poppins, sans-serif', color: '#212529' }}
+      className={`card-body dashcard relative rounded-card border border-slate-200/60 shadow-[0_2px_12px_-2px_rgba(14,79,138,0.08)] flex flex-col gap-3 ${tint}`}
+      style={{ width: '100%', height: 160, padding: '16px', color: '#212529' }}
     >
-      <h3 className="text-[15px] font-semibold leading-snug">{label}</h3>
+      <h2 className="font-heading text-[15px] font-semibold leading-snug">{label}</h2>
       <div className="flex items-center gap-2.5">
         <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white shadow-sm">
           <Icon size={18} className="text-red-600" />
@@ -396,14 +396,14 @@ function SuperAdminDashboard() {
 
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-medium text-[#004f9f]">Dashboard</h1>
+      <h1 className="font-heading text-2xl font-medium text-[#004f9f]">Dashboard</h1>
 
       {/* Filter bar: date range + download report */}
       <div className="relative flex flex-wrap items-center justify-between gap-3">
         <MascotAnimation className="absolute bottom-full mb-[-3px] w-24 h-24 pointer-events-none mascot-walk-in" />
         <DateRangeFilter value={appliedRange} onApply={handleRangeChange} />
         <button onClick={downloadReport}
-          className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-[#052E5C] text-white text-sm font-semibold hover:bg-[#063a72] transition-colors shadow-sm relative top-[3px]">
+          className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-gradient-to-r from-[#0E4F8A] to-[#16A34A] text-white text-sm font-semibold transition-all hover:-translate-y-0.5 hover:shadow-lg hover:shadow-[#0E4F8A]/25 shadow-sm relative top-[3px]">
           <Download size={15} /> Download Report
         </button>
       </div>
@@ -414,8 +414,8 @@ function SuperAdminDashboard() {
       </div>
 
       {/* Current Year Monthly Reports */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Current Year Monthly Reports</h2>
+      <div className="bg-white rounded-card border border-slate-200/60 shadow-[0_2px_12px_-2px_rgba(14,79,138,0.08)] p-6">
+        <h2 className="font-heading text-base font-bold text-slate-900 mb-4">Current Year Monthly Reports</h2>
         <ResponsiveContainer width="100%" height={340}>
           <LineChart data={data?.monthlyTrend ?? []} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#e1e0d9" />
@@ -432,11 +432,11 @@ function SuperAdminDashboard() {
 
       <div>
         {/* Video Moderation Summary */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="bg-white rounded-card border border-slate-200/60 shadow-[0_2px_12px_-2px_rgba(14,79,138,0.08)]">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <PlaySquare size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Video Moderation</h2>
+              <h2 className="font-heading text-[16px] font-bold tracking-tight text-[#1F2937]">Video Moderation</h2>
             </div>
             <Link href="/dashboard/videos" className="text-[10px] font-bold text-black hover:text-[#004f9f] hover:underline uppercase tracking-wider flex items-center gap-1">
               Review Now <ChevronRight size={10} />
@@ -461,13 +461,13 @@ function SuperAdminDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         {/* Top Schools */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="bg-white rounded-card border border-slate-200/60 shadow-[0_2px_12px_-2px_rgba(14,79,138,0.08)]">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <BarChart2 size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Top Schools by Registrations</h2>
+              <h2 className="font-heading text-[16px] font-bold tracking-tight text-[#1F2937]">Top Schools by Registrations</h2>
             </div>
             <Link href="/dashboard/schools" className="text-[10px] font-bold text-black hover:text-[#004f9f] hover:underline uppercase tracking-wider flex items-center gap-1">
               All Schools <ChevronRight size={10} />
@@ -482,14 +482,14 @@ function SuperAdminDashboard() {
                 </div>
               ))
             ) : !data?.topSchools?.length ? (
-              <p className="text-sm text-black text-center py-6">No school data available yet.</p>
+              <p className="text-sm text-text-muted text-center py-6">No school data available yet.</p>
             ) : (
               data.topSchools.map(school => (
                 <div key={school.id}>
                   <div className="flex justify-between items-center mb-1">
                     <div className="flex items-center gap-2 min-w-0">
                       <span className="text-xs font-bold text-[#1F2937] truncate">{school.name}</span>
-                      <span className="text-[10px] text-black flex-shrink-0">{school.registered}/{school.allocated}</span>
+                      <span className="text-[10px] text-text-muted flex-shrink-0">{school.registered}/{school.allocated}</span>
                     </div>
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
                       school.rate === 100 ? 'bg-green-100 text-green-700' :
@@ -510,40 +510,15 @@ function SuperAdminDashboard() {
             )}
           </div>
         </div>
-
-        {/* Quick Links */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <KeyRound size={14} className="text-[#1F2937]" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Quick Actions</h2>
-          </div>
-          <div className="p-4 grid grid-cols-2 gap-3">
-            {[
-              { label: 'Register School', icon: School, href: '/dashboard/schools/register' },
-              { label: 'Moderation', icon: PlaySquare, href: '/dashboard/videos' },
-              { label: 'Credentials', icon: KeyRound, href: '/dashboard/credentials/schools' },
-              { label: 'Reports', icon: BarChart2, href: '/dashboard/reports/schools' },
-            ].map(a => {
-              const Icon = a.icon;
-              return (
-                <Link key={a.href} href={a.href}
-                  className="bg-gray-50 hover:bg-gray-100 border border-transparent hover:border-gray-200 rounded-lg p-4 transition-all flex flex-col gap-2">
-                  <Icon size={16} className="text-black" />
-                  <p className="text-xs font-bold text-[#1F2937]">{a.label}</p>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Recent Registrations */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="bg-white rounded-card border border-slate-200/60 shadow-[0_2px_12px_-2px_rgba(14,79,138,0.08)]">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Activity size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Recent Registrations</h2>
+              <h2 className="font-heading text-[16px] font-bold tracking-tight text-[#1F2937]">Recent Registrations</h2>
             </div>
             <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
           </div>
@@ -559,7 +534,12 @@ function SuperAdminDashboard() {
                 </div>
               ))
             ) : !data?.recentStudents?.length ? (
-              <div className="px-5 py-8 text-center text-black text-sm">No registrations yet.</div>
+              <div className="px-5 py-5 text-center text-sm text-text-muted">
+                <p>No registrations yet.</p>
+                <Link href="/dashboard/schools/register" className="mt-1 inline-block text-[12px] font-semibold text-[#004f9f] hover:underline">
+                  Register a school &rarr;
+                </Link>
+              </div>
             ) : (
               data.recentStudents.map(stu => (
                 <div key={stu.id} className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
@@ -568,9 +548,9 @@ function SuperAdminDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#1F2937] truncate">{stu.name}</p>
-                    <p className="text-[10px] text-black truncate">{stu.olympiadCode} Â· {stu.schoolName}</p>
+                    <p className="text-[10px] text-text-muted truncate">{stu.olympiadCode} Â· {stu.schoolName}</p>
                   </div>
-                  <span className="text-[10px] text-black flex-shrink-0">{new Date(stu.createdAt).toLocaleDateString('en-IN')}</span>
+                  <span className="text-[10px] text-text-muted flex-shrink-0">{new Date(stu.createdAt).toLocaleDateString('en-IN')}</span>
                 </div>
               ))
             )}
@@ -578,11 +558,11 @@ function SuperAdminDashboard() {
         </div>
 
         {/* Recent Video Uploads */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="bg-white rounded-card border border-slate-200/60 shadow-[0_2px_12px_-2px_rgba(14,79,138,0.08)]">
           <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <BookOpen size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Recent Video Uploads</h2>
+              <h2 className="font-heading text-[16px] font-bold tracking-tight text-[#1F2937]">Recent Video Uploads</h2>
             </div>
             <Link href="/dashboard/videos" className="text-[10px] font-bold text-black hover:text-[#004f9f] hover:underline uppercase tracking-wider flex items-center gap-1">
               View All <ChevronRight size={10} />
@@ -600,7 +580,12 @@ function SuperAdminDashboard() {
                 </div>
               ))
             ) : !data?.recentVideos?.length ? (
-              <div className="px-5 py-8 text-center text-black text-sm">No video uploads yet.</div>
+              <div className="px-5 py-5 text-center text-sm text-text-muted">
+                <p>No video uploads yet.</p>
+                <Link href="/dashboard/videos" className="mt-1 inline-block text-[12px] font-semibold text-[#004f9f] hover:underline">
+                  Review videos &rarr;
+                </Link>
+              </div>
             ) : (
               data.recentVideos.map(v => (
                 <div key={v.id} className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
@@ -612,9 +597,16 @@ function SuperAdminDashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-semibold text-[#1F2937] truncate">{v.studentName || v.uploaderType}</p>
-                    <p className="text-[10px] text-black truncate">{v.caption || 'No caption'}</p>
+                    <p className="text-[12px] text-text-muted truncate">
+                      {v.caption
+                        ? v.caption.split(/(\b[A-Za-z ]+:)/).map((part, i) =>
+                            /:$/.test(part.trim())
+                              ? <span key={i} className="font-semibold text-text-primary">{part}</span>
+                              : part)
+                        : 'No caption'}
+                    </p>
                   </div>
-                  <span className="text-[10px] text-black flex-shrink-0">{new Date(v.createdAt).toLocaleDateString('en-IN')}</span>
+                  <span className="text-[10px] text-text-muted flex-shrink-0">{new Date(v.createdAt).toLocaleDateString('en-IN')}</span>
                 </div>
               ))
             )}

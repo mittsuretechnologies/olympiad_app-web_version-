@@ -79,7 +79,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     <div className="min-h-screen bg-[#F6F7F9] font-sans">
 
       {/* Mobile top bar */}
-      <header className="lg:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center gap-3 px-4 bg-[#0E2A5C] border-b border-white/10">
+      <header className="lg:hidden fixed top-0 inset-x-0 h-14 z-30 flex items-center gap-3 px-4 bg-[#0B2A55] border-b border-white/10">
         <button
           onClick={() => setSidebarOpen(true)}
           aria-label="Open menu"
@@ -108,7 +108,7 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
       />
 
       {/* Sidebar */}
-      <aside className={`w-[248px] max-w-[85vw] flex flex-col fixed top-0 h-screen z-50 bg-[#0E2A5C] transition-transform duration-200 ease-out lg:transition-none ${
+      <aside className={`w-[248px] max-w-[85vw] flex flex-col fixed top-0 h-screen z-50 bg-[#0B2A55] transition-transform duration-200 ease-out lg:transition-none ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
       }`}>
         <button

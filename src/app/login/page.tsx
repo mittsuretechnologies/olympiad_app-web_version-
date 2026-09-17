@@ -185,7 +185,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen w-full flex bg-[#070d1f] text-white relative overflow-hidden">
+    <div className="min-h-screen w-full flex flex-col lg:flex-row bg-[#070d1f] text-white relative overflow-hidden">
       {/* Rich gradient base */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-[#0a1834] via-[#0a1228] to-[#06110d]" />
 
@@ -207,6 +207,52 @@ export default function LoginPage() {
         className="anim-orb pointer-events-none absolute top-1/3 right-[-8rem] w-[34rem] h-[34rem] rounded-full bg-emerald-500/15 blur-[150px]"
         style={{ ['--dur' as string]: '12s', ['--delay' as string]: '0.5s' }}
       />
+
+      {/* ============ MOBILE HERO (compact showcase strip) ============ */}
+      {/* Below `lg` the full showcase panel is hidden, but mobile is the
+          majority of parent/school traffic — so instead of dropping the
+          premium first-impression entirely, show a short cropped version:
+          logo, trust badge, static headline, no world-map/typewriter. */}
+      <div className="lg:hidden relative overflow-hidden bg-[#0a1430] px-5 pt-6 pb-8">
+        <Image
+          src="/login-bg.webp"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-center opacity-40"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a1430]/70 via-[#0a1228]/80 to-[#0a1430]" />
+        <div className="relative z-10 flex flex-col gap-4">
+          <div className="flex items-center gap-2.5">
+            <div className="relative h-10 w-10 overflow-hidden rounded-xl">
+              <Image
+                src="/mittmee-icon.jpeg"
+                alt="mittmee"
+                width={80}
+                height={80}
+                priority
+                className="h-full w-full object-cover object-center"
+              />
+            </div>
+            <span className="text-lg font-bold tracking-tight"><span className="text-[#4FA8FF]">mitt</span><span className="text-[#3CB043]">mee</span></span>
+          </div>
+          <div className="flex items-center gap-2 self-start rounded-full border border-white/15 bg-white/5 px-3 py-1.5 backdrop-blur-sm">
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[10px] font-semibold tracking-wide text-blue-100">
+              INDIA&apos;S MOST TRUSTED OLYMPIAD PLATFORM
+            </span>
+          </div>
+          <h1 className="text-2xl font-extrabold leading-[1.15] tracking-tight">
+            <span className="bg-gradient-to-r from-white via-blue-100 to-cyan-200 bg-clip-text text-transparent">
+              Empowering Future{' '}
+            </span>
+            <span className="bg-gradient-to-r from-emerald-300 to-teal-400 bg-clip-text text-transparent">
+              Champions
+            </span>
+          </h1>
+        </div>
+      </div>
 
       {/* ============ LEFT: SHOWCASE PANEL ============ */}
       <div className="hidden lg:flex lg:w-[58%] relative overflow-hidden bg-[#0a1430]">
@@ -298,7 +344,7 @@ export default function LoginPage() {
                 className="h-full w-full object-cover object-center drop-shadow-[0_2px_10px_rgba(0,0,0,0.45)]"
               />
             </div>
-            <span className="text-xl font-bold tracking-tight"><span className="text-[#4FA8FF]">mitt</span><span className="text-[#7ED957]">mee</span></span>
+            <span className="text-xl font-bold tracking-tight"><span className="text-[#4FA8FF]">mitt</span><span className="text-[#3CB043]">mee</span></span>
           </div>
 
           <div className="flex items-center gap-2 self-start rounded-full border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm">

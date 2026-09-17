@@ -247,16 +247,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   const subItemClass = (isActive: boolean) =>
-    `flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive ? 'bg-[#009846] text-white font-semibold' : 'text-black font-semibold hover:bg-gray-100 hover:text-[#052E5C]'}`;
+    `flex items-center px-2 py-2 rounded-lg transition-all duration-200 text-[12.5px] whitespace-nowrap ${isActive ? 'bg-[#009846] text-white font-semibold' : 'text-black font-semibold hover:bg-gray-100 hover:text-[#0B2A55]'}`;
 
   const sectionBtnClass = (active: boolean) =>
-    `w-full flex items-center justify-between px-4 py-2.5 rounded-xl transition-all duration-200 ${active ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`;
+    `w-full flex items-center justify-between px-4 py-2 rounded-xl transition-all duration-200 ${active ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`;
 
   return (
-    <div className="flex min-h-screen bg-[#052E5C] text-[#1F2937]">
+    <div className="flex min-h-screen bg-[#0B2A55] text-[#1F2937]">
 
       {/* Mobile top bar */}
-      <header className="lg:hidden fixed top-0 inset-x-0 h-16 z-40 flex items-center gap-3 px-4 bg-[#052E5C]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/20">
+      <header className="lg:hidden fixed top-0 inset-x-0 h-16 z-40 flex items-center gap-3 px-4 bg-[#0B2A55]/95 backdrop-blur-md border-b border-white/10 shadow-lg shadow-black/20">
         <button
           onClick={() => setSidebarOpen(true)}
           aria-label="Open menu"
@@ -267,7 +267,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="flex items-center gap-2">
           <Image src="/mittmee-icon.jpeg" alt="mittmee" width={28} height={28} className="rounded-lg object-cover" />
           <span className="text-base font-bold tracking-tight">
-            <span className="text-white">mitt</span><span className="text-[#4ADE80]">mee</span>
+            <span className="text-white">mitt</span><span className="text-[#3CB043]">mee</span>
           </span>
         </div>
         <div className="ml-auto w-9 h-9 rounded-full bg-[#FF9000] text-black font-black text-xs flex items-center justify-center">
@@ -287,7 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Sidebar */}
       <aside
         style={{ scrollbarGutter: 'stable' }}
-        className={`w-72 max-w-[85vw] bg-[#052E5C] flex flex-col fixed h-screen z-50 border-r border-[#04203f] overflow-x-hidden overflow-y-auto lg:overflow-y-hidden lg:hover:overflow-y-auto custom-scrollbar transition-transform duration-300 ease-in-out lg:transition-none shadow-2xl shadow-black/40 lg:shadow-none ${
+        className={`w-72 max-w-[85vw] bg-[#0B2A55] flex flex-col fixed h-screen z-50 border-r border-[#04203f] overflow-x-hidden overflow-y-auto lg:overflow-y-hidden lg:hover:overflow-y-auto custom-scrollbar transition-transform duration-300 ease-in-out lg:transition-none shadow-2xl shadow-black/40 lg:shadow-none ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -300,10 +300,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <X size={18} />
         </button>
 
-        {/* Banner */}
+        {/* Banner — soft brand-tinted glow + gradient edge blend, matching the
+            login showcase panel's treatment (audit item #9/#13) instead of a
+            flat pasted-in image. */}
         <div className="relative px-4 pt-5 pb-2">
-          <div className="relative w-full aspect-[16/10] overflow-hidden rounded-2xl bg-white shadow-lg shadow-black/20">
+          <div className="absolute inset-x-4 top-5 aspect-[21/9] rounded-2xl bg-gradient-to-br from-[#0E4F8A]/30 to-[#16A34A]/20 blur-xl" aria-hidden />
+          <div className="relative w-full aspect-[21/9] overflow-hidden rounded-2xl bg-white shadow-lg shadow-black/20">
             <Image src="/banner.webp" alt="Kids Celebration" fill sizes="280px" className="object-cover object-center" priority />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/15 via-transparent to-transparent" />
           </div>
           <div className="absolute top-6 right-4 flex items-center gap-1.5 bg-white/90 rounded-lg px-2 py-1 shadow-sm">
             <Image src="/mittmee-icon.jpeg" alt="mittmee" width={24} height={24} className="rounded object-cover" />
@@ -311,12 +315,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
 
-        <div className="p-4 pt-6 pb-2">
+        <div className="px-4 pt-3 pb-2">
           <p className="px-4 text-[11px] font-bold text-blue-200/70 uppercase tracking-wider mb-2">Main Menu</p>
         </div>
 
         <div className="px-4 flex flex-col flex-1">
-          <nav className="flex-1 space-y-2">
+          <nav className="flex-1 space-y-1">
 
             {/* Dashboard */}
             <Link href="/dashboard"
@@ -334,8 +338,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${schoolsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${schoolsOpen ? 'max-h-80 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="relative ml-[13px] pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-4 border-l-[4px] border-b-[4px] border-white/80 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {schoolSubItems.filter((_, i) => canSeeSubItem(['schools.register','schools.bulk','schools.view','schools.attendance','schools.paperDispatch','schools.answerSheetDispatch'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
@@ -353,8 +357,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${credentialsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${credentialsOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="relative ml-[13px] pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-4 border-l-[4px] border-b-[4px] border-white/80 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {credentialsSubItems.filter((_, i) => canSeeSubItem(['credentials.schools','credentials.students','credentials.uploaders','credentials.reviewers','credentials.masterReviewers','credentials.evaluators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
@@ -372,8 +376,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${moderationOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${moderationOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="relative ml-[13px] pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-4 border-l-[4px] border-b-[4px] border-white/80 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {moderationSubItems.filter((_, i) => canSeeSubItem(['moderation.pending', 'moderation.reported', 'moderation.moderators'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
@@ -391,8 +395,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${evaluatorOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${evaluatorOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="relative ml-[13px] pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-4 border-l-[4px] border-b-[4px] border-white/80 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.content', 'evaluator.history'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
@@ -410,8 +414,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${resultOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${resultOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="relative ml-[13px] pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-4 border-l-[4px] border-b-[4px] border-white/80 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {resultSubItems.map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
@@ -429,8 +433,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${reportsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${reportsOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="relative ml-[13px] pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-4 border-l-[4px] border-b-[4px] border-white/80 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     {reportsSubItems.filter((_, i) => canSeeSubItem(['reports.students','reports.olympiad','reports.evaluation-progress','reports.schools','reports.appusers','reports.student-activity','reports.hashtag'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
@@ -495,8 +499,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <ChevronDown size={16} className={`transition-transform duration-200 ${settingsOpen ? 'rotate-180' : ''}`} />
                 </button>
                 <div className={`overflow-hidden transition-all duration-300 ease-in-out ${settingsOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
-                  <div className="relative ml-6 pl-4 my-1">
-                  <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
+                  <div className="relative ml-[13px] pl-4 my-1">
+                  <span className="absolute left-0 top-0 bottom-1/2 w-4 border-l-[4px] border-b-[4px] border-white/80 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
                     <Link href="/dashboard/settings/permission-control" className={subItemClass(pathname === '/dashboard/settings/permission-control')}>
                       <span>Permission Control</span>

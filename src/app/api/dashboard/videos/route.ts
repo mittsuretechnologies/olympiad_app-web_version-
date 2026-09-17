@@ -4,6 +4,7 @@ import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 import { createNotification } from '@/lib/notifications';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
+import { hasMittfestTag } from '@/lib/mittfest';
 
 export const dynamic = 'force-dynamic';
 
@@ -413,14 +414,21 @@ export async function PATCH(request: Request) {
 
     const before = await prisma.video.findUnique({
       where: { id: videoId },
-      select: { tags: true },
+      select: { tags: true, isMittfest: true },
     });
     if (!before) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
 
+    // A moderator adding/removing #mittfest here must flip isMittfest the same
+    // way upload does (see src/lib/mittfest.ts) — otherwise the tag shows on
+    // the video but it never reaches the MittFest home-screen row. Only ever
+    // turns it on from the tag; doesn't turn off a flag set via the checkbox.
     const video = await prisma.video.update({
       where: { id: videoId },
-      data: { tags: normalizedTags || null },
-      select: { id: true, tags: true },
+      data: {
+        tags: normalizedTags || null,
+        isMittfest: before.isMittfest || hasMittfestTag(normalizedTags),
+      },
+      select: { id: true, tags: true, isMittfest: true },
     });
 
     await recordAuditLog({

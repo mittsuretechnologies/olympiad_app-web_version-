@@ -1,16 +1,43 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #FF9000;
-  --color-primary-hover: #E68200;
-  --color-secondary: #FF6B00;
-  --color-background: #FFE4C7;
-  --color-foreground: #432818;
-  --color-sidebar: #FF9000;
+  /* Brand palette — codifies the colors already carrying real usage across
+     the app (#0E4F8A/#16A34A family) instead of the unused orange/cream
+     theme this project shipped with but never actually rendered on screen.
+     See the visual-design audit, item #1/#2: "declared" vs "actual" brand
+     colors had drifted apart. */
+  --color-primary: #0E4F8A;
+  --color-primary-hover: #0B3E6E;
+  --color-secondary: #16A34A;
+  --color-secondary-hover: #128A3E;
+  --color-background: #F7F9FC;
+  --color-foreground: #1F2937;
+  --color-sidebar: #0B2A55;
   --color-card: #ffffff;
-  --color-border: #f3d5b5;
+  --color-border: #E2E8F0;
   --font-sans: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
+  /* Heading font — Poppins was already loaded as a font variable but used in
+     exactly one inline style in the whole app (audit item #5). Promoting it
+     to a real `font-heading` utility so headings can actually use the
+     Poppins/Inter pairing the font load implies, instead of paying for a
+     second font family that renders nowhere. Named differently from
+     next/font's own `--font-poppins` CSS variable (referenced below) to
+     avoid both sharing one name in different scopes. */
+  --font-heading: var(--font-poppins), 'Poppins', system-ui, -apple-system, sans-serif;
   --animate-pulse-scale: pulse-scale 1.8s ease-in-out infinite;
+
+  /* Dashboard text-color scale (usability audit #1) — 3 semantic roles
+     instead of one-off hexes/`text-black`, so `text-text-primary` etc.
+     become real Tailwind utilities. */
+  --color-text-primary: #1F2937;
+  --color-text-secondary: #052E5C;
+  --color-text-muted: #6B7280;
+
+  /* Dashboard corner-radius scale (usability audit #2) — 2 named tiers
+     (`rounded-card`, `rounded-pill`) plus the existing `rounded-full`
+     for circular avatars/dots. */
+  --radius-card: 1rem;
+  --radius-pill: 0.5rem;
 
   @keyframes pulse-scale {
     0%, 100% { transform: scale(1); }
@@ -19,13 +46,13 @@
 }
 
 :root {
-  background-color: #FFE4C7;
-  color: #432818;
+  background-color: #F7F9FC;
+  color: #1F2937;
 }
 
 body {
-  background-color: #FFE4C7;
-  color: #432818;
+  background-color: #F7F9FC;
+  color: #1F2937;
   font-family: var(--font-inter), 'Inter', system-ui, -apple-system, sans-serif;
   margin: 0;
   min-height: 100vh;
@@ -33,13 +60,6 @@ body {
 }
 
 @layer components {
-  .card-premium {
-    background: white;
-    border: 1px solid #f3d5b5;
-    box-shadow: 0 4px 20px -2px rgba(187, 107, 0, 0.05);
-    border-radius: 1.5rem;
-  }
-  
   .btn-primary {
     @apply bg-primary hover:bg-primary-hover text-white px-6 py-2.5 rounded-xl font-bold transition-all hover:-translate-y-0.5 hover:shadow-xl hover:shadow-primary/30 flex items-center justify-center gap-2;
   }
