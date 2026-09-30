@@ -272,7 +272,7 @@ export default function EvaluateContentPage() {
               {/* Video */}
               <div>
                 <div className="rounded-xl overflow-hidden bg-black">
-                  <video src={active.videoUrl} controls className="w-full max-h-80 object-contain" />
+                  <video src={active.videoUrl} controls controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full max-h-80 object-contain" />
                 </div>
                 {active.caption && <p className="text-sm text-gray-500 mt-3">{active.caption}</p>}
 

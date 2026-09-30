@@ -315,7 +315,7 @@ export default function ReportedVideosPage() {
             ) : (
               <>
                 <div className="bg-black flex items-center justify-center relative" style={{ maxHeight: 340 }}>
-                  <video src={detail.video.videoUrl} controls autoPlay className="w-full max-h-[340px] object-contain" />
+                  <video src={detail.video.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full max-h-[340px] object-contain" />
                   <button onClick={() => setDetail(null)}
                     className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 flex items-center justify-center transition-colors">
                     <X size={14} className="text-white" />

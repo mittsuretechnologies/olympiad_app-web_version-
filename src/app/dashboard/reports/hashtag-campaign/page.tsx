@@ -318,7 +318,7 @@ export default function HashtagCampaignPage() {
               </button>
             </div>
             <div className="aspect-video bg-black">
-              <video src={videoModal.videoUrl} controls autoPlay className="w-full h-full" />
+              <video src={videoModal.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full h-full" />
             </div>
           </div>
         </div>

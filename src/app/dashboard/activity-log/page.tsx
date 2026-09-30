@@ -551,7 +551,7 @@ export default function ActivityLogPage() {
               </button>
             </div>
             {playing.videoUrl && (
-              <video src={playing.videoUrl} controls autoPlay className="w-full max-h-[70vh] bg-black object-contain" />
+              <video src={playing.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full max-h-[70vh] bg-black object-contain" />
             )}
           </div>
         </div>
