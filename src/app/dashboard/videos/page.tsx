@@ -902,7 +902,7 @@ export default function VideoModerationPage() {
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewVideo(null)}>
           <div className="bg-[#0f0f0f] rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="bg-black flex items-center justify-center relative" style={{ maxHeight: 340 }}>
-              <video src={previewVideo.videoUrl} controls autoPlay className="w-full max-h-[340px] object-contain" />
+              <video src={previewVideo.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full max-h-[340px] object-contain" />
               <button onClick={() => setPreviewVideo(null)}
                 className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 flex items-center justify-center transition-colors">
                 <X size={14} className="text-white" />

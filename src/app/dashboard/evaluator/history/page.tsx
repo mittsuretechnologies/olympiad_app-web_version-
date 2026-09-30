@@ -332,7 +332,7 @@ export default function EvaluationHistoryPage() {
 
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                             <div className="rounded-xl overflow-hidden bg-black aspect-video flex items-center justify-center">
-                              <video src={v.videoUrl} controls className="w-full h-full object-contain" />
+                              <video src={v.videoUrl} controls controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full h-full object-contain" />
                             </div>
 
                             <div className="border border-gray-100 rounded-xl p-4 space-y-3 bg-gray-50/50">

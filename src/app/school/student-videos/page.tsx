@@ -533,7 +533,7 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
       {/* Video player / thumbnail */}
       <div className="relative aspect-video bg-[#0E1726]">
         {isPlaying ? (
-          <video src={v.videoUrl} controls autoPlay className="h-full w-full object-contain" onEnded={onPlay} />
+          <video src={v.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="h-full w-full object-contain" onEnded={onPlay} />
         ) : (
           <button
             onClick={onPlay}
