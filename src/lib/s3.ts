@@ -109,6 +109,11 @@ export async function downloadFromS3(key: string, localPath: string): Promise<vo
   await pipeline(Body as Readable, createWriteStream(localPath));
 }
 
+export async function getS3ObjectBuffer(key: string): Promise<Buffer> {
+  const { Body } = await getClient().send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+  return Buffer.from(await (Body as any).transformToByteArray());
+}
+
 // The bucket is private, so a stored media URL (built by s3PublicUrl at upload
 // time) answers 403 when a browser loads it directly. Panels that need to show
 // a thumbnail or play a clip exchange that URL for a short-lived signed one.

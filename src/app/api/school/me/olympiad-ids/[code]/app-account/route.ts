@@ -19,10 +19,18 @@ export async function PATCH(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
     const { code } = await params;
-    const { name, phone } = await request.json();
+    const { name, phone, email } = await request.json();
 
     if (!name?.trim()) return NextResponse.json({ message: 'Student name is required' }, { status: 400 });
     if (!phone?.trim() || phone.trim().length < 10) return NextResponse.json({ message: 'Valid phone number is required' }, { status: 400 });
+
+    // Required, matching the Allot Student form — students allotted before email
+    // became mandatory get one added the first time their details are edited.
+    const emailNormalized = email?.trim().toLowerCase() || '';
+    if (!emailNormalized) return NextResponse.json({ message: 'Email address is required' }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
+      return NextResponse.json({ message: 'Invalid email address' }, { status: 400 });
+    }
 
     const allocation = await prisma.olympiadIdAllocation.findUnique({ where: { code } });
     if (!allocation) return NextResponse.json({ message: 'Olympiad ID not found' }, { status: 404 });
@@ -31,11 +39,19 @@ export async function PATCH(
     const appUser = await prisma.appUser.findFirst({ where: { olympiadId: code } });
     if (!appUser) return NextResponse.json({ message: 'No app account linked to this ID' }, { status: 404 });
 
+    // Same uniqueness rule as allotment, but the student's own current address
+    // doesn't count as a clash.
+    const emailOwner = await prisma.appUser.findFirst({
+      where: { email: emailNormalized, NOT: { id: appUser.id } },
+      select: { id: true },
+    });
+    if (emailOwner) return NextResponse.json({ message: 'This email is already registered on the app' }, { status: 409 });
+
     const mobileNormalized = phone.trim().replace(/\D/g, '');
 
     await prisma.appUser.update({
       where: { id: appUser.id },
-      data: { mobile: mobileNormalized },
+      data: { mobile: mobileNormalized, email: emailNormalized },
     });
 
     await prisma.olympiadIdAllocation.update({

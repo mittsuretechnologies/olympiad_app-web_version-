@@ -110,7 +110,7 @@ export async function DELETE(
 
     await prisma.olympiadIdAllocation.update({
       where: { code },
-      data: { assignedName: null, assignedAt: null },
+      data: { assignedName: null, guardianName: null, assignedAt: null },
     });
 
     return NextResponse.json({ success: true });

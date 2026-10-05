@@ -232,6 +232,7 @@ model OlympiadIdAllocation {
   createdAt    DateTime  @default(now())
   sentAt       DateTime?
   assignedName String?
+  guardianName String?
   assignedAt   DateTime?
   school       School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   student      Student?
@@ -523,6 +524,11 @@ model AppUser {
   // Mittmee. Purely a profile label: it builds no linkage and never surfaces a
   // video on any school portal — SchoolLinkRequest is the only real link.
   unlistedSchoolName     String?
+  // Collected at app sign-up: the consenting parent/guardian (required by the
+  // current signup screen) and, optionally, the child's name. Neither is shown
+  // on the public profile — userId stays the display handle.
+  guardianName           String?
+  childName              String?
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   followers              Follow[]        @relation("UserFollowers")
@@ -689,6 +695,31 @@ model SupportTicket {
   user           AppUser   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@index([status])
+  @@schema("public")
+}
+
+// Copyright/trademark notices from the public Report Infringement form on mittmee.com.
+model InfringementNotice {
+  id               String    @id @default(uuid())
+  referenceId      String    @unique
+  role             String
+  fullName         String
+  organisation     String?
+  email            String
+  phone            String
+  videoLink        String
+  rightTypes       String
+  workTypes        String
+  noticeText       String // the full notice exactly as the complainant submitted it
+  files            Json // [{ name, kind: 'ownership' | 'authority', contentType, size, storage: 's3' | 'local', key }]
+  emailSent        Boolean   @default(false)
+  status           String    @default("PENDING") // PENDING | CONTENT_REMOVED | REJECTED
+  adminNotes       String?
+  resolvedAt       DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
   @@index([status])
   @@schema("public")
 }

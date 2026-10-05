@@ -31,7 +31,7 @@ export async function POST(
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
     const { code } = await params;
-    const { name, phone, password, email, sendEmail, sendSms } = await request.json();
+    const { name, guardianName, phone, password, email, sendEmail, sendSms } = await request.json();
 
     // Which channels the school ticked in the allot dialog. Older callers that
     // don't send the flags keep the previous behaviour: email whenever an
@@ -40,6 +40,7 @@ export async function POST(
     const wantSms = Boolean(sendSms);
 
     if (!name?.trim()) return NextResponse.json({ message: 'Student name is required' }, { status: 400 });
+    if (!guardianName?.trim()) return NextResponse.json({ message: 'Parent/Guardian name is required' }, { status: 400 });
     if (!phone?.trim() || phone.trim().length < 10) return NextResponse.json({ message: 'Valid phone number is required' }, { status: 400 });
     // Password is optional: the school panel allots without asking for one and
     // lets the server generate it. If a caller does send one, it must be valid.
@@ -49,7 +50,8 @@ export async function POST(
     const finalPassword = password?.trim() || generatePassword();
 
     const emailNormalized = email?.trim().toLowerCase() || null;
-    if (emailNormalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
+    if (!emailNormalized) return NextResponse.json({ message: 'Email address is required' }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
       return NextResponse.json({ message: 'Invalid email address' }, { status: 400 });
     }
 
@@ -81,31 +83,36 @@ export async function POST(
 
     const passwordHash = await bcrypt.hash(finalPassword, 10);
 
-    // Create AppUser — same structure as app self-registration
-    const appUser = await prisma.appUser.create({
-      data: {
-        userId,
-        mobile: mobileNormalized,
-        email: emailNormalized,
-        password: passwordHash,
-        plainPassword: encryptPassword(finalPassword),
-        isVerified: true,
-        // Not accepted yet — this form collects name/contact details, not
-        // Terms agreement. The app gates the student behind a one-time Terms
-        // screen on first login instead (see /api/app/terms).
-        termsAccepted: false,
-        olympiadId: code,
-      },
-    });
-
-    // Ensure assignedName is set on allocation
-    await prisma.olympiadIdAllocation.update({
-      where: { code },
-      data: {
-        assignedName: name.trim(),
-        assignedAt: allocation.assignedAt ?? new Date(),
-      },
-    });
+    // Account creation and the allocation update commit together. They used to
+    // be two separate writes: if the second failed, the AppUser already existed
+    // with this olympiadId, the ID still showed as Pending, and every retry was
+    // refused with "already linked to an app account".
+    const [appUser] = await prisma.$transaction([
+      // Create AppUser — same structure as app self-registration
+      prisma.appUser.create({
+        data: {
+          userId,
+          mobile: mobileNormalized,
+          email: emailNormalized,
+          password: passwordHash,
+          plainPassword: encryptPassword(finalPassword),
+          isVerified: true,
+          // Not accepted yet — this form collects name/contact details, not
+          // Terms agreement. The app gates the student behind a one-time Terms
+          // screen on first login instead (see /api/app/terms).
+          termsAccepted: false,
+          olympiadId: code,
+        },
+      }),
+      prisma.olympiadIdAllocation.update({
+        where: { code },
+        data: {
+          assignedName: name.trim(),
+          guardianName: guardianName.trim(),
+          assignedAt: allocation.assignedAt ?? new Date(),
+        },
+      }),
+    ]);
 
     // Deliver the credentials on whichever channels the school ticked. Both are
     // best-effort: the account already exists, so a mail or gateway failure is

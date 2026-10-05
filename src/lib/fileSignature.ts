@@ -15,6 +15,13 @@ export function detectImageExtension(buffer: Buffer): string | null {
   return match ? match.ext : null;
 }
 
+/** PDF, JPG or PNG — the formats accepted for legal proof documents. */
+export function detectDocumentExtension(buffer: Buffer): 'pdf' | 'jpg' | 'png' | null {
+  if (buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-') return 'pdf';
+  const img = detectImageExtension(buffer);
+  return img === 'jpg' || img === 'png' ? img : null;
+}
+
 export function isLikelyVideoFile(buffer: Buffer): boolean {
   // MP4/MOV family: 'ftyp' box at offset 4. WebM/MKV: EBML header.
   if (buffer.length >= 12 && buffer.subarray(4, 8).toString('ascii') === 'ftyp') return true;

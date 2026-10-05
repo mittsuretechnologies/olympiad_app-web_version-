@@ -26,6 +26,7 @@ interface Allocation {
   student?: { name: string; isVerified: boolean } | null;
   hasAppUser?: boolean;
   appUserPhone?: string | null;
+  appUserEmail?: string | null;
 }
 
 type StatusFilter = 'ALL' | 'ASSIGNED' | 'PENDING';
@@ -46,6 +47,7 @@ export default function SchoolOlympiadIdsPage() {
    */
   const [allotRow, setAllotRow] = useState<Allocation | null>(null);
   const [allotName, setAllotName] = useState('');
+  const [allotGuardianName, setAllotGuardianName] = useState('');
   const [allotPhone, setAllotPhone] = useState('');
   const [allotEmail, setAllotEmail] = useState('');
   const [allotting, setAllotting] = useState(false);
@@ -66,10 +68,11 @@ export default function SchoolOlympiadIdsPage() {
     smsSent: boolean; smsError: string | null;
   } | null>(null);
 
-  // Edit app account modal (for ALLOTTED rows — name + phone)
+  // Edit app account modal (for ALLOTTED rows — name, phone + email)
   const [editAppModal, setEditAppModal] = useState<{ code: string } | null>(null);
   const [editAppName, setEditAppName] = useState('');
   const [editAppPhone, setEditAppPhone] = useState('');
+  const [editAppEmail, setEditAppEmail] = useState('');
   const [editingApp, setEditingApp] = useState(false);
   const [editAppError, setEditAppError] = useState('');
 
@@ -93,6 +96,7 @@ export default function SchoolOlympiadIdsPage() {
   const openAllotModal = (row: Allocation) => {
     setAllotRow(row);
     setAllotName(row.assignedName || '');
+    setAllotGuardianName('');
     setAllotPhone('');
     setAllotEmail('');
     setAllotError('');
@@ -102,17 +106,19 @@ export default function SchoolOlympiadIdsPage() {
     setSendSms(true);
   };
   const closeAllotModal = () => {
-    setAllotRow(null); setAllotName(''); setAllotPhone(''); setAllotEmail('');
+    setAllotRow(null); setAllotName(''); setAllotGuardianName(''); setAllotPhone(''); setAllotEmail('');
     setAllotError(''); setAllotSuccess(null); setAllotStep('details');
     setSendEmail(false); setSendSms(true);
   };
 
-  /** Validates the details form, then hands over to the delivery step. Email is
-   *  pre-ticked only when an address was actually filled in. */
+  /** Validates the details form, then hands over to the delivery step. All four
+   *  fields are required, so email is always available as a delivery channel. */
   const goToDeliveryStep = () => {
     if (!allotName.trim()) { setAllotError('Student name is required'); return; }
+    if (!allotGuardianName.trim()) { setAllotError('Parent/Guardian name is required'); return; }
     if (!allotPhone.trim() || allotPhone.trim().length < 10) { setAllotError('Valid phone number is required'); return; }
-    if (allotEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) {
+    if (!allotEmail.trim()) { setAllotError('Email address is required'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) {
       setAllotError('Enter a valid email address'); return;
     }
     setAllotError('');
@@ -132,8 +138,9 @@ export default function SchoolOlympiadIdsPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           name: allotName.trim(),
+          guardianName: allotGuardianName.trim(),
           phone: allotPhone.trim(),
-          email: allotEmail.trim() || null,
+          email: allotEmail.trim(),
           sendEmail,
           sendSms,
         }),
@@ -142,7 +149,7 @@ export default function SchoolOlympiadIdsPage() {
       if (!res.ok) throw new Error(data.message);
       setAllocations(prev => prev.map(a =>
         a.code === allotRow.code
-          ? { ...a, assignedName: allotName.trim(), assignedAt: new Date().toISOString(), hasAppUser: true, appUserPhone: allotPhone.trim() }
+          ? { ...a, assignedName: allotName.trim(), assignedAt: new Date().toISOString(), hasAppUser: true, appUserPhone: allotPhone.trim(), appUserEmail: allotEmail.trim().toLowerCase() }
           : a
       ));
       setAllotSuccess({
@@ -185,26 +192,29 @@ export default function SchoolOlympiadIdsPage() {
     setEditAppModal({ code: a.code });
     setEditAppName(a.assignedName || '');
     setEditAppPhone(a.appUserPhone || '');
+    setEditAppEmail(a.appUserEmail || '');
     setEditAppError('');
   };
   const closeEditAppModal = () => {
-    setEditAppModal(null); setEditAppName(''); setEditAppPhone(''); setEditAppError('');
+    setEditAppModal(null); setEditAppName(''); setEditAppPhone(''); setEditAppEmail(''); setEditAppError('');
   };
 
   const handleEditApp = async () => {
     if (!editAppName.trim()) { setEditAppError('Student name is required'); return; }
     if (!editAppPhone.trim() || editAppPhone.trim().length < 10) { setEditAppError('Valid phone number is required'); return; }
+    if (!editAppEmail.trim()) { setEditAppError('Email address is required'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAppEmail.trim())) { setEditAppError('Enter a valid email address'); return; }
     setEditingApp(true); setEditAppError('');
     try {
       const res = await fetch(`/api/school/me/olympiad-ids/${editAppModal!.code}/app-account`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: editAppName.trim(), phone: editAppPhone.trim() }),
+        body: JSON.stringify({ name: editAppName.trim(), phone: editAppPhone.trim(), email: editAppEmail.trim() }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setAllocations(prev => prev.map(a =>
-        a.code === editAppModal!.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim() } : a
+        a.code === editAppModal!.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim(), appUserEmail: editAppEmail.trim().toLowerCase() } : a
       ));
       closeEditAppModal();
     } catch (e: any) {
@@ -425,7 +435,7 @@ export default function SchoolOlympiadIdsPage() {
                                 <span className="text-[#9CA3AF]">—</span>
                               ) : a.hasAppUser || a.assignedName ? (
                                 <div className="flex items-center justify-center gap-1.5">
-                                  <button onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`} title="Edit name & phone">
+                                  <button onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`} title="Edit name, phone & email">
                                     <Pencil size={12} />
                                   </button>
                                   <button onClick={() => handleUnassign(a.code)} className={`${BTN_ICON} hover:!text-[#B91C1C]`} aria-label={`Remove assignment for ${a.code}`} title="Remove">
@@ -602,6 +612,15 @@ export default function SchoolOlympiadIdsPage() {
                 />
               </div>
               <div>
+                <label htmlFor="allot-guardian-name" className={LABEL}>Parent/Guardian name <span className="text-[#B91C1C]">*</span></label>
+                <input
+                  id="allot-guardian-name" type="text" placeholder="Parent or guardian's full name" value={allotGuardianName}
+                  onChange={e => setAllotGuardianName(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && goToDeliveryStep()}
+                  className={INPUT}
+                />
+              </div>
+              <div>
                 <label htmlFor="allot-phone" className={LABEL}>Phone number <span className="text-[#B91C1C]">*</span></label>
                 <div className="relative">
                   <Phone size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
@@ -614,7 +633,7 @@ export default function SchoolOlympiadIdsPage() {
                 </div>
               </div>
               <div>
-                <label htmlFor="allot-email" className={LABEL}>Email address</label>
+                <label htmlFor="allot-email" className={LABEL}>Email address <span className="text-[#B91C1C]">*</span></label>
                 <div className="relative">
                   <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
                   <input
@@ -623,9 +642,7 @@ export default function SchoolOlympiadIdsPage() {
                     onKeyDown={e => e.key === 'Enter' && goToDeliveryStep()}
                     className={`${INPUT} pl-8`}
                   />
-                </div>
-                <p className="mt-1 text-[11.5px] text-[#6B7280]">Optional — needed only if you want to email the credentials too.</p>
-              </div>
+                </div>              </div>
               {allotError && (
                 <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
                   <AlertCircle size={12} /> {allotError}
@@ -675,6 +692,18 @@ export default function SchoolOlympiadIdsPage() {
                 <input
                   id="edit-phone" type="tel" placeholder="10-digit mobile" value={editAppPhone}
                   onChange={e => setEditAppPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                  onKeyDown={e => e.key === 'Enter' && handleEditApp()}
+                  className={`${INPUT} pl-8`}
+                />
+              </div>
+            </div>
+            <div>
+              <label htmlFor="edit-email" className={LABEL}>Email address</label>
+              <div className="relative">
+                <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <input
+                  id="edit-email" type="email" placeholder="student@example.com" value={editAppEmail}
+                  onChange={e => setEditAppEmail(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleEditApp()}
                   className={`${INPUT} pl-8`}
                 />
