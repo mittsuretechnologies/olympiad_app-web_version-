@@ -30,7 +30,8 @@ async function withStudentNames(accounts: { id: string; userId: string; olympiad
 
 export async function POST(request: Request) {
   try {
-    const { identifier, otp, password } = await request.json();
+    const body = await request.json();
+    const { identifier, otp, password } = body;
 
     if (!identifier || !otp || !password) {
       return NextResponse.json({ message: 'All fields are required' }, { status: 400 });
@@ -42,6 +43,37 @@ export async function POST(request: Request) {
     const id = identifier.trim().toLowerCase();
     const mobile = !isEmail(id) ? id.replace(/\D/g, '') : null;
     const lookupId = mobile ?? id;
+
+    // The current signup screen sends Parent/Guardian name, child's name and
+    // email alongside the phone number the OTP went to. App versions already
+    // installed from the stores don't send these fields at all — keying the
+    // stricter rules on their presence keeps signup working for those users
+    // instead of failing every registration until they update.
+    const isDetailedSignup = 'guardianName' in body;
+    let guardianName: string | null = null;
+    let childName: string | null = null;
+    let signupEmail: string | null = null;
+    if (isDetailedSignup) {
+      guardianName = typeof body.guardianName === 'string' ? body.guardianName.trim() : '';
+      childName = typeof body.childName === 'string' && body.childName.trim() ? body.childName.trim() : null;
+      signupEmail = typeof body.email === 'string' ? body.email.trim().toLowerCase() : '';
+      if (!guardianName) {
+        return NextResponse.json({ message: 'Parent/Guardian name is required' }, { status: 400 });
+      }
+      if (!signupEmail || !isEmail(signupEmail)) {
+        return NextResponse.json({ message: 'A valid email address is required' }, { status: 400 });
+      }
+      // The OTP proves the phone number, so on this path it must be one.
+      if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
+        return NextResponse.json({ message: 'A valid 10-digit mobile number is required' }, { status: 400 });
+      }
+      // The client sends this only when the "I agree to the Terms of Use &
+      // Policies" box was ticked, so the stored consent reflects an actual
+      // agreement rather than being assumed.
+      if (body.termsAccepted !== true) {
+        return NextResponse.json({ message: 'Please agree to the Terms of Use and Policies to continue' }, { status: 400 });
+      }
+    }
 
     const record = await prisma.appOtp.findUnique({ where: { identifier: lookupId } });
     if (!record) {
@@ -88,12 +120,20 @@ export async function POST(request: Request) {
     const user = await prisma.appUser.create({
       data: {
         userId,
-        email: mobile ? null : id,
+        // Detailed signup verifies the phone and also collects an email;
+        // the legacy single-field signup stores whichever contact was verified.
+        email: isDetailedSignup ? signupEmail : mobile ? null : id,
         mobile,
+        guardianName,
+        childName,
         password: passwordHash,
         plainPassword: encryptPassword(password),
         isVerified: true,
         termsAccepted: true,
+        // When the user agreed to the Terms of Use & Policies — server time,
+        // since a device clock can be wrong or changed. Kept as the consent
+        // record (see Children's Privacy Policy 3.3).
+        termsAcceptedAt: new Date(),
       },
     });
 

@@ -569,6 +569,72 @@ export async function sendMasterReviewerCredentialsEmail(data: MasterReviewerCre
   });
 }
 
+/* ── Infringement notices (public landing-page form) ─────────────────────── */
+
+const GRIEVANCE_EMAIL = process.env.GRIEVANCE_EMAIL || 'grievance@mittsure.com';
+
+export interface InfringementNoticeMail {
+  referenceId: string;
+  complainantName: string;
+  complainantEmail: string;
+  noticeText: string;
+  files: { filename: string; content: Buffer; contentType: string }[];
+}
+
+export async function sendInfringementNoticeEmail(data: InfringementNoticeMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: GRIEVANCE_EMAIL,
+    replyTo: `${data.complainantName} <${data.complainantEmail}>`,
+    subject: `Infringement Notice ${data.referenceId} – ${data.complainantName}`,
+    text: `Reference: ${data.referenceId}\n\n${data.noticeText}`,
+    html:
+      `<p style="font-family:Arial,sans-serif;font-size:13px;color:#243244;">` +
+      `Reference: <b>${escapeHtml(data.referenceId)}</b> &middot; Submitted via mittmee.com. ` +
+      `Reply to this email to contact the complainant. Proof documents are attached.</p>` +
+      `<pre style="font-family:Consolas,'Courier New',monospace;font-size:12.5px;white-space:pre-wrap;color:#0B2A5C;">` +
+      `${escapeHtml(data.noticeText)}</pre>`,
+    attachments: data.files,
+  });
+}
+
+export async function sendInfringementAcknowledgementEmail(data: {
+  to: string;
+  name: string;
+  referenceId: string;
+}): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const html = renderEmailShell({
+    title: 'We received your infringement notice',
+    body: `
+      <p style="margin:0 0 12px;">Dear ${escapeHtml(data.name)},</p>
+      <p style="margin:0 0 12px;">We have received your infringement notice. Your reference number is:</p>
+      <p style="margin:0 0 16px;font-family:Consolas,'Courier New',monospace;font-size:18px;font-weight:bold;color:#1552B6;">${escapeHtml(data.referenceId)}</p>
+      <p style="margin:0 0 12px;">Our grievance team will review it and contact you at this email address. Please quote the reference number in any correspondence with
+        <a href="mailto:${GRIEVANCE_EMAIL}" style="color:#1552B6;">${GRIEVANCE_EMAIL}</a>.</p>
+      <p style="margin:0;">Regards,<br>Team Mittsure</p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: `We received your infringement notice (${data.referenceId})`,
+    html,
+    attachments: emailAttachments(),
+    text:
+      `Dear ${data.name},\n\nWe have received your infringement notice.\nReference number: ${data.referenceId}\n\n` +
+      `Our grievance team will review it and contact you at this email address. ` +
+      `Please quote the reference number when writing to ${GRIEVANCE_EMAIL}.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
 export async function sendStudentCredentialsEmail(data: StudentCredentialsMail): Promise<void> {
   if (!isMailerConfigured()) {
     console.log(

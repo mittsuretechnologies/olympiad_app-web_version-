@@ -22,7 +22,7 @@ interface StudentCred {
   className: string | null;
   student: {
     id: string; name: string; phone: string; username?: string | null;
-    plainPassword?: string | null; isVerified: boolean; createdAt: string; source?: string;
+    hasPassword?: boolean; isVerified: boolean; createdAt: string; source?: string;
   } | null;
 }
 
@@ -43,6 +43,10 @@ export default function SchoolCredentialsPage() {
 
   const [resetTarget, setResetTarget] = useState<StudentCred | null>(null);
   const [resetAction, setResetAction] = useState<'choose' | 'password' | 'username'>('choose');
+  // The new password after a reset. This is the only time the school ever sees
+  // a password — the list API no longer returns them — so the dialog stays open
+  // on it until the school has passed it on.
+  const [newPassword, setNewPassword] = useState<string | null>(null);
   const [resetBusy, setResetBusy] = useState(false);
   const [customPassword, setCustomPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -117,6 +121,7 @@ export default function SchoolCredentialsPage() {
   const closeDialog = () => {
     setResetTarget(null);
     setResetAction('choose');
+    setNewPassword(null);
     setCustomPassword('');
     setShowPassword(false);
     setCustomUsername('');
@@ -148,9 +153,12 @@ export default function SchoolCredentialsPage() {
         else alert(data.message || 'Failed');
         return;
       }
-      const msg = resetAction === 'username'
-        ? `Username updated for ${resetTarget.student.name}`
-        : `Password updated for ${resetTarget.student.name}`;
+      if (resetAction === 'password') {
+        setNewPassword(data.password);
+        fetchCredentials();
+        return;
+      }
+      const msg = `Username updated for ${resetTarget.student.name}`;
       closeDialog();
       fetchCredentials();
       setToast(msg);
@@ -281,8 +289,8 @@ export default function SchoolCredentialsPage() {
                             </td>
                             <td className={TD}>
                               {r.student ? (
-                                r.student.plainPassword
-                                  ? <span className="select-all font-mono font-semibold text-[#111827]">{r.student.plainPassword}</span>
+                                r.student.hasPassword
+                                  ? <span className="font-mono tracking-widest text-[#6B7280]" aria-label="Password hidden">••••••••</span>
                                   : r.student.source === 'app'
                                     ? <span className="text-[#6B7280]">App login</span>
                                     : <span className="text-[#9CA3AF]">Reset to generate</span>
@@ -331,6 +339,21 @@ export default function SchoolCredentialsPage() {
           </DialogHeader>
 
           <div className="p-5">
+            {newPassword ? (
+              <div className="space-y-3.5">
+                <div className="flex items-center gap-2 text-[13px] font-medium text-[#047857]">
+                  <CheckCircle2 size={15} /> Password updated
+                </div>
+                <div className="rounded-lg border border-[#E4E8EE] bg-[#F6F7F9] px-3 py-2.5">
+                  <p className="text-[11.5px] text-[#6B7280]">New password</p>
+                  <p className="mt-0.5 select-all font-mono text-[15px] font-semibold text-[#111827]">{newPassword}</p>
+                </div>
+                <p className="rounded-lg border border-[#FAEBBF] bg-[#FEF9E7] px-3 py-2 text-[12px] leading-snug text-[#713F12]">
+                  Share this with the student now — it won&apos;t be shown again after you close this.
+                </p>
+                <button onClick={closeDialog} className={`cursor-pointer ${BTN_PRIMARY} w-full`}>Done</button>
+              </div>
+            ) : <>
             {resetAction === 'choose' && (
               <div className="space-y-2">
                 <button
@@ -432,6 +455,7 @@ export default function SchoolCredentialsPage() {
                 </div>
               </div>
             )}
+            </>}
           </div>
         </DialogContent>
       </Dialog>

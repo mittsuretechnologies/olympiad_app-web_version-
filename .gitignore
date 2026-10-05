@@ -43,6 +43,9 @@ dev*.log
 # env files (can opt-in for committing if needed)
 .env*
 
+# infringement-notice proof documents (local fallback when S3 is off)
+/private-uploads
+
 # vercel
 .vercel
 

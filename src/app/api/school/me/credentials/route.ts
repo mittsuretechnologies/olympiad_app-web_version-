@@ -2,7 +2,10 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
-import { decryptPassword } from '@/lib/password-crypto';
+
+// Passwords are never sent to the school panel — not even decrypted for display.
+// The list only says whether a password exists (`hasPassword`); the one time a
+// school sees a password is in the reset response, so it can pass it on.
 
 export async function GET(request: Request) {
   try {
@@ -54,7 +57,7 @@ export async function GET(request: Request) {
             name: a.student.name,
             phone: a.student.phone,
             username: a.student.username,
-            plainPassword: decryptPassword(a.student.plainPassword),
+            hasPassword: Boolean(a.student.plainPassword),
             isVerified: a.student.isVerified,
             createdAt: a.student.createdAt,
             source: 'web' as const,
@@ -75,7 +78,7 @@ export async function GET(request: Request) {
             phone: appUser.mobile || '-',
             email: appUser.email || null,
             username: appUser.userId,
-            plainPassword: decryptPassword(appUser.plainPassword) || null,
+            hasPassword: Boolean(appUser.plainPassword),
             isVerified: appUser.isVerified,
             createdAt: appUser.createdAt,
             source: 'app' as const,

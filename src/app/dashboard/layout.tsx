@@ -34,6 +34,7 @@ import {
   Award,
   Flag,
   LifeBuoy,
+  ShieldAlert,
   History,
   UserX,
   Menu,
@@ -474,6 +475,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/account-deletion-requests') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <UserX size={20} />
                 <span className="text-sm font-semibold">Deletion Requests</span>
+              </Link>
+            )}
+
+            {/* Report Infringement — copyright/trademark notices from mittmee.com, superadmin only */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/infringement-notices"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/infringement-notices') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <ShieldAlert size={20} />
+                <span className="text-sm font-semibold">Report Infringement</span>
               </Link>
             )}
 
