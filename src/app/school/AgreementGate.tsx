@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { motion, useReducedMotion } from 'framer-motion';
 import { Check, CheckCircle2, Loader2, Lock, LogOut, AlertCircle, RotateCw, School, FileText } from 'lucide-react';
 import AgreementDocument from '@/components/agreements/AgreementDocument';
 import {
@@ -142,15 +141,6 @@ function GateScreen({
     return () => io.disconnect();
   }, [reachedEnd]);
 
-  // Mascots hop once when the end of the agreement is reached.
-  const [cheer, setCheer] = useState(false);
-  useEffect(() => {
-    if (!reachedEnd) return;
-    setCheer(true);
-    const t = setTimeout(() => setCheer(false), 1400);
-    return () => clearTimeout(t);
-  }, [reachedEnd]);
-
   // After acceptance, move on automatically.
   useEffect(() => {
     if (!receipt) return;
@@ -230,14 +220,6 @@ function GateScreen({
         </div>
       )}
 
-      {/* Mascots in the empty side gutters, wide screens only. */}
-      {!receipt && (
-        <div aria-hidden="true" className="hidden xl:block pointer-events-none select-none">
-          <Mascot src="/mascots/binki.webp" side="left" delay={0} cheer={cheer} />
-          <Mascot src="/mascots/binku.webp" side="right" delay={0.6} cheer={cheer} />
-        </div>
-      )}
-
       {/* Sticky reading reminder until the end is reached */}
       {!reachedEnd && !receipt && (
         <div className="fixed bottom-0 inset-x-0 z-20 border-t border-[#E6E8EC] bg-white/95 backdrop-blur">
@@ -251,48 +233,6 @@ function GateScreen({
         </div>
       )}
     </div>
-  );
-}
-
-/* ── Mascot ──────────────────────────────────────────────────────────────── */
-
-/**
- * Binku / Binki standing in a side gutter. They idle with a slow float and
- * sway (offset per side so they never move in lockstep) and hop once when
- * `cheer` flips on. The art has a white background, so multiply blends it into
- * the page colour. Reduced-motion users get a static image.
- */
-function Mascot({ src, side, delay, cheer }: { src: string; side: 'left' | 'right'; delay: number; cheer: boolean }) {
-  const reduce = useReducedMotion();
-  const tilt = side === 'left' ? -1 : 1;
-  const animate = reduce
-    ? { opacity: 1 }
-    : cheer
-      ? {
-          opacity: 1,
-          y: [0, -42, 0, -16, 0],
-          rotate: [0, 8 * tilt, -4 * tilt, 0],
-          transition: { duration: 1.2, ease: 'easeOut' as const },
-        }
-      : {
-          opacity: 1,
-          y: [0, -10, 0],
-          rotate: [-1.5 * tilt, 1.5 * tilt, -1.5 * tilt],
-          transition: {
-            opacity: { duration: 0.6, delay },
-            y: { duration: 3.2, repeat: Infinity, ease: 'easeInOut' as const, delay },
-            rotate: { duration: 4.4, repeat: Infinity, ease: 'easeInOut' as const, delay },
-          },
-        };
-  return (
-    <motion.img
-      src={src}
-      alt=""
-      initial={{ opacity: 0 }}
-      animate={animate}
-      className={`fixed bottom-16 z-10 h-[250px] 2xl:h-[300px] w-auto mix-blend-multiply ${side === 'left' ? '-translate-x-1/2' : 'translate-x-1/2'}`}
-      style={{ [side]: 'calc((100vw - 760px) / 4)', transformOrigin: 'bottom center' }}
-    />
   );
 }
 
