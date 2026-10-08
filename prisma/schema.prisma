@@ -294,6 +294,12 @@ model Video {
   likesCount         Int               @default(0)
   viewsCount         Int               @default(0)
   deletedAt          DateTime?
+  // Moderation claim: set when a moderator opens a pending video to review it,
+  // so other moderators skip it. Expires on its own (see lib/videoClaim.ts) and
+  // is cleared when the decision is saved.
+  claimedById        String?
+  claimedByName      String?
+  claimedAt          DateTime?
   student            Student?          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes              Like[]
   views              VideoView[]
@@ -730,6 +736,47 @@ model InfringementNotice {
   updatedAt        DateTime  @updatedAt
 
   @@index([status])
+  @@schema("public")
+}
+
+// Legal record of an account accepting a versioned agreement (first: the School
+// Onboarding Agreement, Section 18.4). Append-only — rows are never updated
+// except to stamp the emailed copy. Deliberately no FK to School/etc.: the
+// evidence must outlive the account it was accepted for, so everything needed
+// to prove the acceptance is snapshotted onto the row itself.
+model AgreementAcceptance {
+  id                   String    @id @default(uuid())
+  role                 String // SCHOOL (more roles later)
+  actorId              String // School.id
+  actorCode            String? // School.schoolId — human-readable code
+  actorName            String // School name at acceptance
+  documentKey          String // e.g. SCHOOL_ONBOARDING
+  documentVersion      String // e.g. "1.0"
+  documentHash         String // SHA-256 of the exact agreement text shown
+  signatoryName        String // Authorised Representative
+  signatoryDesignation String
+  signatoryPhone       String?
+  details              Json // School Details as submitted at acceptance
+  declarations         Json // checkbox statements exactly as shown and ticked
+  verificationChannel  String // EMAIL_OTP | SMS_OTP | EMAIL_SMS_OTP | DEV_OTP
+  verificationTarget   String? // where the OTP was delivered
+  verifiedAt           DateTime
+  ipAddress            String?
+  userAgent            String?
+  readStartedAt        DateTime? // client-reported: agreement opened
+  readCompletedAt      DateTime? // client-reported: scrolled to the end
+  acceptedAt           DateTime  @default(now())
+  emailCopyTo          String?
+  emailCopySentAt      DateTime?
+  // Set when a SuperAdmin asks the school to accept again. The row is kept as
+  // evidence; the school's current acceptance is its newest unrevoked row.
+  revokedAt            DateTime?
+  revokedBy            String? // SuperAdmin id
+  revokeReason         String?
+
+  @@index([role, actorId, documentKey, documentVersion], map: "AgreementAcceptance_actor_doc_version_idx")
+  @@index([role, documentKey, documentVersion], map: "AgreementAcceptance_role_doc_version_idx")
+  @@index([acceptedAt])
   @@schema("public")
 }
 

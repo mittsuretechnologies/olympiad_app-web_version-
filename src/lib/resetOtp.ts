@@ -13,6 +13,33 @@ export type SendOtpResult =
   | { ok: true; devOtp?: string }
   | { ok: false; status: number; message: string };
 
+export type IssueOtpResult =
+  | { ok: true; otp: string }
+  | { ok: false; status: number; message: string };
+
+/**
+ * Stores a fresh hashed OTP under `identifier` and hands the plain code back so
+ * the caller can deliver it itself (email/SMS). Same cooldown, TTL and attempt
+ * limits as sendResetOtp, and verified with verifyResetOtp.
+ */
+export async function issueOtp(identifier: string): Promise<IssueOtpResult> {
+  const existing = await prisma.passwordResetOtp.findUnique({ where: { identifier } });
+
+  if (existing && Date.now() - existing.lastSentAt.getTime() < RESEND_COOLDOWN_MS) {
+    return { ok: false, status: 429, message: 'Please wait a minute before requesting another OTP.' };
+  }
+
+  const otp = generateOtp();
+  const otpHash = await bcrypt.hash(otp, 10);
+  const now = new Date();
+  await prisma.passwordResetOtp.upsert({
+    where: { identifier },
+    update: { otpHash, expiresAt: new Date(now.getTime() + OTP_TTL_MS), lastSentAt: now, attempts: 0 },
+    create: { identifier, otpHash, expiresAt: new Date(now.getTime() + OTP_TTL_MS), lastSentAt: now },
+  });
+  return { ok: true, otp };
+}
+
 export async function sendResetOtp(identifier: string): Promise<SendOtpResult> {
   const existing = await prisma.passwordResetOtp.findUnique({ where: { identifier } });
 

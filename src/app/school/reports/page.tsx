@@ -79,7 +79,7 @@ const VERDICT_META: Record<Verdict, { label: string; tone: 'success' | 'warning'
 function SlotCell({ slot }: { slot: SlotReport }) {
   if (slot.status === 'empty') {
     return (
-      <div className="flex items-center gap-1.5 text-[#9CA3AF]">
+      <div className="flex items-center gap-1.5 text-[#98A1B2]">
         <Ban size={12} />
         <span className="text-[11.5px]">Not uploaded</span>
       </div>
@@ -106,13 +106,13 @@ function SlotCell({ slot }: { slot: SlotReport }) {
         {evalBadge}
       </div>
       {slot.subCategory && (
-        <p className="truncate text-[11px] text-[#6B7280]" title={slot.subCategory}>{slot.subCategory}</p>
+        <p className="truncate text-[11px] text-[#677285]" title={slot.subCategory}>{slot.subCategory}</p>
       )}
       {slot.status === 'rejected' && slot.rejectionReason && (
-        <p className="truncate text-[10.5px] text-[#B91C1C]" title={slot.rejectionReason}>{slot.rejectionReason}</p>
+        <p className="truncate text-[10.5px] text-[#B42323]" title={slot.rejectionReason}>{slot.rejectionReason}</p>
       )}
       {slot.status === 'approved' && (
-        <div className="flex items-center gap-2 text-[10.5px] text-[#9CA3AF]">
+        <div className="flex items-center gap-2 text-[10.5px] tabular-nums text-[#98A1B2]">
           <span className="flex items-center gap-0.5"><Heart size={9} />{slot.likesCount}</span>
           <span className="flex items-center gap-0.5"><Eye size={9} />{slot.viewsCount}</span>
         </div>
@@ -211,10 +211,9 @@ export default function ReportsPage() {
       <PageHeader
         icon={ClipboardList}
         title="Student Report"
-        subtitle="Registration, uploads, and evaluation status for every allotted student"
         actions={
           <div className="flex items-center gap-2">
-            <span className="text-[12px] text-[#6B7280]">{filtered.length} of {rows.length} shown</span>
+            <span className="text-[12px] tabular-nums text-[#677285]">{filtered.length} of {rows.length} shown</span>
             <button onClick={exportCSV} disabled={filtered.length === 0} className={BTN_SUBTLE}>
               <Download size={13} /> Export CSV
             </button>
@@ -234,7 +233,7 @@ export default function ReportsPage() {
       {/* Toolbar */}
       <div className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
         <div className="relative min-w-[200px] flex-1 max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={13} />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" size={13} />
           <input
             type="text"
             placeholder="Search name, ID, username, phone"
@@ -258,7 +257,7 @@ export default function ReportsPage() {
 
         {classes.length > 0 && (
           <div className="ml-auto flex items-center gap-1.5">
-            <Filter size={13} className="text-[#9CA3AF]" />
+            <Filter size={13} className="text-[#98A1B2]" />
             <select
               value={classFilter}
               onChange={e => setClassFilter(e.target.value)}
@@ -284,7 +283,7 @@ export default function ReportsPage() {
           <table className={TABLE}>
             <thead>
               <tr>
-                <th className={`${TH} sticky left-0 z-20 !bg-[#F3F5F8]`} style={{ minWidth: 200 }}>Student</th>
+                <th className={`${TH} sticky left-0 z-20 !bg-[#F8F9FB]`} style={{ minWidth: 200 }}>Student</th>
                 <th className={TH}>Class</th>
                 <th className={TH}>Registration</th>
                 <th className={TH} style={{ minWidth: 190 }}>{getCategoryDisplayLabel(OLYMPIAD_CAT_A_LABEL)}</th>
@@ -302,17 +301,17 @@ export default function ReportsPage() {
                       <div className="flex items-center gap-2">
                         <Avatar name={r.name} tint={avatarTint(i)} size={26} />
                         <div className="min-w-0">
-                          <p className="truncate text-[12.5px] font-semibold text-[#111827]">{r.name}</p>
+                          <p className="truncate text-[12.5px] font-semibold text-[#0F1B2D]">{r.name}</p>
                           <p className="truncate font-mono text-[11px] font-medium text-[#1559C7]">{r.olympiadCode}</p>
                         </div>
                       </div>
                     </td>
                     <td className={TD}>
                       {r.className ? (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-[#F8F9FB] px-1.5 py-0.5 text-[11px] font-medium text-[#475265]">
                           <BookOpen className="h-2.5 w-2.5" />{r.className}
                         </span>
-                      ) : <span className="text-[#9CA3AF]">—</span>}
+                      ) : <span className="text-[#98A1B2]">—</span>}
                     </td>
                     <td className={TD}>
                       {r.registrationStatus === 'registered' ? (
@@ -321,7 +320,7 @@ export default function ReportsPage() {
                         <StatusBadge tone="neutral" icon={UserX}>Pending</StatusBadge>
                       )}
                       {r.source === 'app' && r.registrationStatus === 'registered' && (
-                        <p className="mt-0.5 text-[10.5px] text-[#9CA3AF]">via app</p>
+                        <p className="mt-0.5 text-[10.5px] text-[#98A1B2]">via app</p>
                       )}
                     </td>
                     <td className={TD}><SlotCell slot={r.slotA} /></td>

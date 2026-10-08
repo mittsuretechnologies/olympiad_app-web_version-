@@ -55,6 +55,9 @@ interface ListResponse {
   totalPages: number;
 }
 
+// Status-only hues (green/red/amber/purple/slate) kept to their usual meaning;
+// everything else in the page is the dashboard's own brand navy (#004f9f /
+// #052E5C), not a rainbow of per-action colours.
 const ACTION_CFG: Record<string, { label: string; icon: any; color: string }> = {
   VIDEO_APPROVED:        { label: 'Video Approved',       icon: CheckCircle, color: 'text-green-600 bg-green-50 border-green-100' },
   VIDEO_REJECTED:        { label: 'Video Rejected',       icon: XCircle,     color: 'text-red-600 bg-red-50 border-red-100' },
@@ -182,11 +185,11 @@ function diffSnapshots(previousValue: string | null, newValue: string | null): F
 
 /** Colours the two states of a status change so approve/reject reads at a glance. */
 function stateTone(key: string, value: string): string {
-  if (key !== 'status') return 'text-gray-600 bg-gray-100';
-  if (value === 'APPROVED') return 'text-green-700 bg-green-50';
-  if (value === 'REJECTED') return 'text-red-700 bg-red-50';
+  if (key !== 'status') return 'text-slate-600 bg-slate-100';
+  if (value === 'APPROVED') return 'text-emerald-700 bg-emerald-50';
+  if (value === 'REJECTED') return 'text-rose-700 bg-rose-50';
   if (value === 'PENDING')  return 'text-amber-700 bg-amber-50';
-  return 'text-gray-600 bg-gray-100';
+  return 'text-slate-600 bg-slate-100';
 }
 
 function ChangeCell({ log }: { log: LogEntry }) {
@@ -208,7 +211,7 @@ function ChangeCell({ log }: { log: LogEntry }) {
                 {(FIELD_LABELS[k] ?? k).slice(0, 4)} {String(after[k])}
               </span>
             ))}
-            <span className="text-[10px] font-black text-gray-500">= {total}</span>
+            <span className="text-[10px] font-bold text-gray-500">= {total}</span>
           </div>
         );
       }
@@ -265,7 +268,7 @@ function ClipCell({ log, onPlay }: { log: LogEntry; onPlay: (v: LogVideo) => voi
         disabled={!playable}
         title={playable ? 'Play clip' : 'This clip has been removed'}
         className={`group relative w-14 h-9 flex-shrink-0 rounded-md overflow-hidden bg-gray-100 border border-gray-200 ${
-          playable ? 'cursor-pointer hover:border-[#014584]' : 'cursor-default'
+          playable ? 'cursor-pointer hover:border-[#004f9f]' : 'cursor-default'
         }`}
       >
         {video.thumbnailUrl ? (
@@ -356,40 +359,40 @@ export default function ActivityLogPage() {
           <button
             onClick={() => setFilterOpen(o => !o)}
             className={`flex items-center gap-2 h-9 px-3.5 rounded-xl border text-xs font-bold transition-colors ${
-              activeFilters ? 'border-[#014584] bg-[#014584]/5 text-[#014584]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
+              activeFilters ? 'border-[#004f9f] bg-[#004f9f]/5 text-[#004f9f]' : 'border-gray-200 bg-white text-gray-500 hover:bg-gray-50'
             }`}
           >
             <Filter size={13} />
             Filters
             {activeFilters > 0 && (
-              <span className="w-4 h-4 rounded-full bg-[#014584] text-white text-[10px] font-black flex items-center justify-center">
+              <span className="w-4 h-4 rounded-full bg-[#004f9f] text-white text-[10px] font-bold flex items-center justify-center">
                 {activeFilters}
               </span>
             )}
           </button>
 
           {filterOpen && (
-            <div className="absolute left-0 top-11 z-20 bg-white border border-gray-200 rounded-2xl shadow-lg p-4 w-72 space-y-3">
+            <div className="absolute left-0 top-11 z-20 bg-white border border-gray-200 rounded-xl shadow-lg p-4 w-72 space-y-3">
               <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Action</p>
+                <p className="text-[10px] font-bold text-gray-400 mb-1.5">Action</p>
                 <select
                   value={actionFilter}
                   onChange={e => { setActionFilter(e.target.value); setPage(1); }}
-                  className="w-full h-8 border border-gray-200 rounded-lg px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#014584]/30"
+                  className="w-full h-8 border border-gray-200 rounded-lg px-2 text-xs text-gray-700 focus:outline-none focus:ring-1 focus:ring-[#004f9f]/30"
                 >
                   <option value="">All actions</option>
                   {ACTION_OPTIONS.map(a => <option key={a} value={a}>{ACTION_CFG[a].label}</option>)}
                 </select>
               </div>
               <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Actor Role</p>
+                <p className="text-[10px] font-bold text-gray-400 mb-1.5">Actor Role</p>
                 <div className="flex flex-wrap gap-1.5">
                   {['', ...ROLE_OPTIONS].map(r => (
                     <button
                       key={r}
                       onClick={() => { setRoleFilter(r); setPage(1); }}
                       className={`px-2.5 h-7 rounded-lg text-[11px] font-bold border transition-colors ${
-                        roleFilter === r ? 'bg-[#014584] text-white border-[#014584]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                        roleFilter === r ? 'bg-[#004f9f] text-white border-[#004f9f]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'
                       }`}
                     >
                       {r || 'All'}
@@ -398,7 +401,7 @@ export default function ActivityLogPage() {
                 </div>
               </div>
               <div>
-                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">Video / Entity ID</p>
+                <p className="text-[10px] font-bold text-gray-400 mb-1.5">Video / Entity ID</p>
                 <div className="flex gap-1.5">
                   <input
                     type="text"
@@ -406,9 +409,9 @@ export default function ActivityLogPage() {
                     onChange={e => setEntityIdInput(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && applyEntityIdFilter()}
                     placeholder="Paste an ID…"
-                    className="flex-1 h-8 border border-gray-200 rounded-lg px-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#014584]/30"
+                    className="flex-1 h-8 border border-gray-200 rounded-lg px-2 text-xs focus:outline-none focus:ring-1 focus:ring-[#004f9f]/30"
                   />
-                  <button onClick={applyEntityIdFilter} className="h-8 px-2.5 rounded-lg bg-[#014584] text-white text-[11px] font-bold">Go</button>
+                  <button onClick={applyEntityIdFilter} className="h-8 px-2.5 rounded-lg bg-[#004f9f] text-white text-[11px] font-bold">Go</button>
                 </div>
               </div>
               {activeFilters > 0 && (
@@ -421,7 +424,7 @@ export default function ActivityLogPage() {
         </div>
 
         {entityIdFilter && (
-          <span className="flex items-center gap-1.5 text-[11px] font-bold text-[#014584] bg-[#014584]/5 border border-[#014584]/20 px-2.5 py-1.5 rounded-xl">
+          <span className="flex items-center gap-1.5 text-[11px] font-bold text-[#004f9f] bg-[#004f9f]/5 border border-[#004f9f]/20 px-2.5 py-1.5 rounded-xl">
             Entity: {entityIdFilter.slice(0, 8)}…
             <button onClick={() => { setEntityIdFilter(''); setEntityIdInput(''); }}><X size={11} /></button>
           </span>
@@ -432,22 +435,22 @@ export default function ActivityLogPage() {
       {isLoading ? (
         <div className="text-center py-16 text-gray-400 text-sm">Loading…</div>
       ) : logs.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-24 bg-white border border-dashed border-gray-200 rounded-2xl">
+        <div className="flex flex-col items-center justify-center py-24 bg-white border border-dashed border-gray-200 rounded-xl">
           <History size={40} className="text-gray-200 mb-3" />
           <p className="text-gray-400 font-bold text-sm">No activity recorded yet</p>
         </div>
       ) : (
-        <div className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-white border border-gray-100 rounded-xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left min-w-[640px]">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-100">
-                  <th className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">When</th>
-                  <th className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Action</th>
-                  <th className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Clip</th>
-                  <th className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">By</th>
-                  <th className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Change</th>
-                  <th className="px-4 py-2.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Reason</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400">When</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400">Action</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400">Clip</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400">By</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400">Change</th>
+                  <th className="px-4 py-2.5 text-[10px] font-bold text-gray-400">Reason</th>
                 </tr>
               </thead>
               <tbody>
@@ -461,7 +464,7 @@ export default function ActivityLogPage() {
                         <p className="text-[10px] text-gray-400">{formatDateTime(log.createdAt).time}</p>
                       </td>
                       <td className="px-4 py-3 align-top">
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2 py-1 rounded-full border ${cfg.color}`}>
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded-full border ${cfg.color}`}>
                           <Icon size={10} /> {cfg.label}
                         </span>
                       </td>
@@ -528,7 +531,7 @@ export default function ActivityLogPage() {
           onClick={() => setPlaying(null)}
         >
           <div
-            className="bg-white rounded-2xl overflow-hidden max-w-2xl w-full shadow-xl"
+            className="bg-white rounded-xl overflow-hidden max-w-2xl w-full shadow-xl"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between gap-3 px-4 py-3 border-b border-gray-100">

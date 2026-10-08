@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import useSWR from 'swr';
 import { fetcher, getDashboardToken } from '@/lib/swr';
 import {
@@ -9,6 +9,7 @@ import {
   Search, Filter, ChevronDown, X, Copy, Check,
 } from 'lucide-react';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
+import { CLAIM_RENEW_MS, claimIsLive } from '@/lib/videoClaim';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -30,6 +31,10 @@ interface Video {
   createdAt: string;
   deletedAt: string | null;
   uploaderType: string | null;
+  /** Live review claim by a moderator (see lib/videoClaim.ts). */
+  claimedById?: string | null;
+  claimedByName?: string | null;
+  claimedAt?: string | null;
   appUser: { userId: string; email: string | null; mobile: string | null; olympiadId: string | null; assignedName: string | null; school: { name: string; city: string; district: string; state: string } | null } | null;
   student: {
     name: string;
@@ -128,12 +133,27 @@ function isSuperAdmin(): boolean {
   return !!sessionStorage.getItem('token');
 }
 
+/** The signed-in staff member's id, read from their token — used to tell
+ *  their own review claims apart from other moderators'. */
+function myUserId(): string | null {
+  if (typeof window === 'undefined') return null;
+  const token = getDashboardToken();
+  if (!token) return null;
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(part))?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function VideoModerationPage() {
   // Computed once on mount from sessionStorage — the signed-in role doesn't
   // change during the page's lifetime, so this doesn't need to be reactive.
   const [canDelete] = useState(isSuperAdmin);
+  const [myId] = useState(myUserId);
 
   // ── Tab & Filters ─────────────────────────────────────────────────────────
   const [filter,       setFilter]       = useState<StatusFilter>('PENDING');
@@ -190,7 +210,15 @@ export default function VideoModerationPage() {
   if (catFilter) params.set('category', catFilter);
   if (typeFilter) params.set('uploaderType', typeFilter);
   const swrKey = `/api/dashboard/videos?${params.toString()}`;
-  const { data, isLoading: loading, mutate } = useSWR<ApiResponse>(swrKey, fetcher);
+  const { data, isLoading: loading, mutate } = useSWR<ApiResponse>(swrKey, fetcher, {
+    refreshInterval: filter === 'PENDING' ? 20_000 : 0,
+  });
+
+  // Another moderator is reviewing this video right now (live claim).
+  const claimedByOther = useCallback(
+    (v: Video) => Boolean(v.claimedById && v.claimedById !== myId && claimIsLive(v.claimedAt)),
+    [myId],
+  );
 
   const counts = data?.counts ?? { PENDING: 0, APPROVED: 0, REJECTED: 0 };
 
@@ -201,6 +229,12 @@ export default function VideoModerationPage() {
     if (contentFilter === 'MITTFEST') allVideos = allVideos.filter(v => v.isMittfest);
     else if (contentFilter === 'OLYMPIAD') allVideos = allVideos.filter(v => v.isEvaluation);
     else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation);
+
+    // Videos someone else is reviewing go to the end of the pending queue, so
+    // each moderator naturally picks up a different one.
+    if (filter === 'PENDING') {
+      allVideos = [...allVideos].sort((a, b) => Number(claimedByOther(a)) - Number(claimedByOther(b)));
+    }
 
     if (!search.trim()) return allVideos;
     const q = search.toLowerCase();
@@ -215,7 +249,7 @@ export default function VideoModerationPage() {
       v.subCategory?.toLowerCase().includes(q) ||
       v.tags?.toLowerCase().includes(q)
     );
-  }, [data, search, contentFilter]);
+  }, [data, search, contentFilter, filter, claimedByOther]);
 
   const fetchVideos = async () => {
     setRefreshing(true);
@@ -232,7 +266,73 @@ export default function VideoModerationPage() {
     setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const toggleAll = () =>
-    setSelected(allSelected ? new Set() : new Set(videos.map(v => v.id)));
+    setSelected(allSelected ? new Set() : new Set(videos.filter(v => !claimedByOther(v)).map(v => v.id)));
+
+  // ── Review claims ─────────────────────────────────────────────────────────
+  // Opening a pending video (preview, approve or reject) claims it so other
+  // moderators skip it; the claim is renewed while it stays open and released
+  // when everything is closed. A claim also lapses on its own server-side.
+  const heldClaim = useRef<string | null>(null);
+  const [heldId, setHeldId] = useState<string | null>(null);
+
+  const releaseHeld = useCallback(() => {
+    const id = heldClaim.current;
+    if (!id) return;
+    heldClaim.current = null;
+    setHeldId(null);
+    fetch('/api/dashboard/videos/claim', { method: 'DELETE', headers: authHeaders(), body: JSON.stringify({ videoId: id }) })
+      .catch(() => {});
+  }, []);
+
+  const claimVideo = async (video: Video): Promise<boolean> => {
+    if (video.status !== 'PENDING') return true;
+    if (heldClaim.current === video.id) return true;
+    if (heldClaim.current) releaseHeld();
+    const res = await fetch('/api/dashboard/videos/claim', {
+      method: 'POST', headers: authHeaders(), body: JSON.stringify({ videoId: video.id }),
+    }).catch(() => null);
+    if (res?.ok) {
+      heldClaim.current = video.id;
+      setHeldId(video.id);
+      return true;
+    }
+    const body = res ? await res.json().catch(() => null) : null;
+    alert(body?.message || 'Could not open this video for review. Please try again.');
+    mutate();
+    return false;
+  };
+
+  useEffect(() => {
+    if (!heldId) return;
+    const t = setInterval(() => {
+      fetch('/api/dashboard/videos/claim', { method: 'POST', headers: authHeaders(), body: JSON.stringify({ videoId: heldId }) })
+        .catch(() => {});
+    }, CLAIM_RENEW_MS);
+    return () => clearInterval(t);
+  }, [heldId]);
+
+  useEffect(() => () => releaseHeld(), [releaseHeld]);
+
+  const openPreview = async (video: Video) => {
+    if (!(await claimVideo(video))) return;
+    setPreviewVideo(video);
+    setEditedSubCat(video.subCategory || '');
+    setEditedCat(normalizeCat(video));
+    setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null);
+    setEditedTags(displayTags(video));
+    setTagInput('');
+  };
+
+  // A 409 means someone else decided or is reviewing the video: say who, drop
+  // whatever was open for it, and reload the list.
+  const handleConflict = async (res: Response, video: Video, fallback: string) => {
+    const body = await res.json().catch(() => null);
+    alert(body?.message || fallback);
+    if (res.status === 409) {
+      if (previewVideo?.id === video.id) setPreviewVideo(null);
+      mutate();
+    }
+  };
 
   const approve = async (video: Video, quality: 'HIGH' | 'MEDIUM' | 'LOW', subCategoryOverride?: string) => {
     setProcessingId(video.id);
@@ -244,6 +344,7 @@ export default function VideoModerationPage() {
           videoId: video.id,
           status: 'APPROVED',
           quality,
+          expectedStatus: video.status,
           ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
         }),
       });
@@ -252,8 +353,7 @@ export default function VideoModerationPage() {
         setSelected(prev => { const n = new Set(prev); n.delete(video.id); return n; });
         if (previewVideo?.id === video.id) setPreviewVideo(null);
       } else {
-        const body = await res.json().catch(() => null);
-        alert(body?.message || 'Failed to approve');
+        await handleConflict(res, video, 'Failed to approve');
       }
     } finally { setProcessingId(null); }
   };
@@ -279,6 +379,7 @@ export default function VideoModerationPage() {
           videoId: video.id,
           status: 'APPROVED',
           quality: qualityOverride ?? video.quality,
+          expectedStatus: video.status,
           ...(subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
           ...(categoryOverride !== video.category ? { category: categoryOverride } : {}),
         }),
@@ -290,8 +391,7 @@ export default function VideoModerationPage() {
         } : cur, { revalidate: false });
         setPreviewVideo(null);
       } else {
-        const body = await res.json().catch(() => null);
-        alert(body?.message || 'Failed to update category');
+        await handleConflict(res, video, 'Failed to update category');
       }
     } finally { setProcessingId(null); }
   };
@@ -331,7 +431,8 @@ export default function VideoModerationPage() {
 
   const removeTag = (tag: string) => setEditedTags(prev => prev.filter(t => t !== tag));
 
-  const openRejectModal = (video: Video) => {
+  const openRejectModal = async (video: Video) => {
+    if (!(await claimVideo(video))) return;
     setRejectReason('');
     setRejectModal({ video, bulk: false });
   };
@@ -341,7 +442,8 @@ export default function VideoModerationPage() {
     setRejectModal({ video: null, bulk: true });
   };
 
-  const openApproveModal = (video: Video, subCategoryOverride?: string) => {
+  const openApproveModal = async (video: Video, subCategoryOverride?: string) => {
+    if (!(await claimVideo(video))) return;
     setApproveQuality(null);
     setApproveModal({ video, subCategoryOverride });
   };
@@ -364,12 +466,14 @@ export default function VideoModerationPage() {
         const res = await fetch('/api/dashboard/videos', {
           method: 'POST',
           headers: authHeaders(),
-          body: JSON.stringify({ videoIds: selectedIds, status: 'REJECTED', rejectionReason: rejectReason.trim() }),
+          body: JSON.stringify({ videoIds: selectedIds, status: 'REJECTED', rejectionReason: rejectReason.trim(), expectedStatus: filter }),
         });
         if (res.ok) {
-          const deleted = new Set(selectedIds);
-          mutate(cur => cur ? { ...cur, videos: cur.videos.filter(v => !deleted.has(v.id)) } : cur, { revalidate: false });
+          const body = await res.json().catch(() => null);
+          const done = new Set<string>(Array.isArray(body?.updated) ? body.updated : selectedIds);
+          mutate(cur => cur ? { ...cur, videos: cur.videos.filter(v => !done.has(v.id)) } : cur, { revalidate: false });
           setSelected(new Set());
+          if (body?.skipped) { alert(body.message); mutate(); }
         } else alert('Failed to bulk reject');
       } finally { setBulkWorking(false); }
     } else {
@@ -381,13 +485,13 @@ export default function VideoModerationPage() {
         const res = await fetch('/api/dashboard/videos', {
           method: 'POST',
           headers: authHeaders(),
-          body: JSON.stringify({ videoId: video.id, status: 'REJECTED', rejectionReason: rejectReason.trim() }),
+          body: JSON.stringify({ videoId: video.id, status: 'REJECTED', rejectionReason: rejectReason.trim(), expectedStatus: video.status }),
         });
         if (res.ok) {
           mutate(cur => cur ? { ...cur, videos: cur.videos.filter(v => v.id !== video.id) } : cur, { revalidate: false });
           setSelected(prev => { const n = new Set(prev); n.delete(video.id); return n; });
           if (previewVideo?.id === video.id) setPreviewVideo(null);
-        } else alert('Failed to reject');
+        } else await handleConflict(res, video, 'Failed to reject');
       } finally { setProcessingId(null); }
     }
   };
@@ -430,6 +534,10 @@ export default function VideoModerationPage() {
       } else alert('Failed to delete video(s).');
     } finally { setDeleting(false); setDeleteModal(null); }
   };
+
+  useEffect(() => {
+    if (!previewVideo && !approveModal && !rejectModal.video) releaseHeld();
+  }, [previewVideo, approveModal, rejectModal.video, releaseHeld]);
 
   const activeFilters = [catFilter, typeFilter].filter(Boolean).length;
 
@@ -685,18 +793,19 @@ export default function VideoModerationPage() {
               const isChecked = selected.has(video.id);
               const catBadge  = getCategoryLabel(video.subCategory);
               const isStudent = video.uploaderType === 'STUDENT' || !!video.student;
+              const lockedBy  = claimedByOther(video) ? (video.claimedByName || 'Another moderator') : null;
 
               return (
                 <div
                   key={video.id}
                   className={`group relative bg-[#F0F4FF] rounded-2xl border overflow-hidden shadow-sm transition-all duration-200 hover:shadow-md hover:-translate-y-0.5 ${
                     isChecked ? 'border-[#014584] ring-2 ring-[#014584]/20' : 'border-[#C7D8FF]'
-                  }`}
+                  } ${lockedBy ? 'opacity-70' : ''}`}
                 >
                   {/* Thumbnail */}
                   <div
                     className="relative w-full aspect-video bg-black cursor-pointer overflow-hidden"
-                    onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(displayTags(video)); setTagInput(''); }}
+                    onClick={() => openPreview(video)}
                   >
                     {video.thumbnailUrl ? (
                       <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -712,9 +821,17 @@ export default function VideoModerationPage() {
 
                     {/* Top-left: checkbox */}
                     <div className="absolute top-2 left-2" onClick={e => e.stopPropagation()}>
-                      <input type="checkbox" checked={isChecked} onChange={() => toggleOne(video.id)}
-                        className="w-4 h-4 rounded accent-[#014584] cursor-pointer shadow" />
+                      <input type="checkbox" checked={isChecked} onChange={() => toggleOne(video.id)} disabled={!!lockedBy}
+                        className="w-4 h-4 rounded accent-[#014584] cursor-pointer shadow disabled:cursor-not-allowed" />
                     </div>
+
+                    {/* Someone else is reviewing this one right now */}
+                    {lockedBy && (
+                      <div className="absolute inset-x-2 bottom-2 flex items-center gap-1.5 rounded-lg bg-black/70 px-2 py-1 text-[10.5px] font-semibold text-white backdrop-blur-sm">
+                        <Lock size={10} className="flex-shrink-0" />
+                        <span className="truncate">Reviewing: {lockedBy}</span>
+                      </div>
+                    )}
 
                     {/* Top-right: jury / deleted badges */}
                     <div className="absolute top-2 right-2 flex flex-col items-end gap-1">
@@ -869,22 +986,22 @@ export default function VideoModerationPage() {
                       {filter === 'PENDING' ? (
                         <>
                           {/* No subcategory editor on the card grid, so no override — just quality. */}
-                          <button onClick={() => openApproveModal(video)} disabled={busy}
+                          <button onClick={() => openApproveModal(video)} disabled={busy || !!lockedBy}
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             {busy ? <Clock size={11} className="animate-spin" /> : <CheckCircle size={11} />} Approve
                           </button>
-                          <button onClick={() => openRejectModal(video)} disabled={busy}
+                          <button onClick={() => openRejectModal(video)} disabled={busy || !!lockedBy}
                             className="flex-1 flex items-center justify-center gap-1 py-2 bg-red-500 hover:bg-red-600 text-white rounded-xl text-[11px] font-black transition-colors disabled:opacity-40">
                             <XCircle size={11} /> Reject
                           </button>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(displayTags(video)); setTagInput(''); }} disabled={busy}
+                          <button onClick={() => openPreview(video)} disabled={busy}
                             className="px-2.5 py-2 rounded-xl border border-gray-200 text-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-40">
                             <Eye size={13} />
                           </button>
                         </>
                       ) : (
                         <>
-                          <button onClick={() => { setPreviewVideo(video); setEditedSubCat(video.subCategory || ''); setEditedCat(normalizeCat(video)); setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null); setEditedTags(displayTags(video)); setTagInput(''); }} disabled={busy}
+                          <button onClick={() => openPreview(video)} disabled={busy}
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>
