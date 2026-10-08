@@ -4,8 +4,44 @@ import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 import { createNotification } from '@/lib/notifications';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
+import { CLEAR_CLAIM, claimFreeFor, claimIsLive } from '@/lib/videoClaim';
 
 export const dynamic = 'force-dynamic';
+
+const STATUSES = ['PENDING', 'APPROVED', 'REJECTED'];
+
+/**
+ * Why a moderation write didn't land: someone else is reviewing the video
+ * (live claim) or already decided it. Names the other moderator where known so
+ * the reader isn't left guessing whose call stands.
+ */
+async function moderationConflict(videoId: string, userId: string) {
+  const v = await prisma.video.findUnique({
+    where: { id: videoId },
+    select: { status: true, deletedAt: true, claimedById: true, claimedByName: true, claimedAt: true },
+  });
+  if (!v || v.deletedAt) {
+    return NextResponse.json({ message: 'This video no longer exists.' }, { status: 404 });
+  }
+  if (v.claimedById && v.claimedById !== userId && claimIsLive(v.claimedAt)) {
+    return NextResponse.json(
+      { message: `${v.claimedByName || 'Another moderator'} is reviewing this video right now.`, currentStatus: v.status },
+      { status: 409 },
+    );
+  }
+  const last = await prisma.auditLog.findFirst({
+    where: { entityType: 'Video', entityId: videoId, action: { in: ['VIDEO_APPROVED', 'VIDEO_REJECTED'] } },
+    orderBy: { createdAt: 'desc' },
+    select: { actorName: true },
+  });
+  return NextResponse.json(
+    {
+      message: `This video was already ${v.status.toLowerCase()}${last?.actorName ? ` by ${last.actorName}` : ''}. The list has been refreshed.`,
+      currentStatus: v.status,
+    },
+    { status: 409 },
+  );
+}
 
 function buildVideoStatusNotification(
   video: { id: string; appUserId: string | null; caption: string | null; category: string | null; subCategory: string | null },
@@ -220,7 +256,14 @@ export async function POST(request: Request) {
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
-    const { videoId, videoIds, status, rejectionReason, subCategory: newSubCategory, category: newCategory, quality } = await request.json();
+    const { videoId, videoIds, status, rejectionReason, subCategory: newSubCategory, category: newCategory, quality, expectedStatus } = await request.json();
+
+    // The status the moderator saw when they made the call. The write only
+    // lands if the video is still in that state — otherwise someone else
+    // decided it in the meantime and this would silently overwrite them.
+    // Re-saving an approved video's category sends 'APPROVED' here.
+    const expected: string = STATUSES.includes(expectedStatus) ? expectedStatus : 'PENDING';
+    const now = new Date();
 
     if (!['APPROVED', 'REJECTED'].includes(status)) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
@@ -246,8 +289,11 @@ export async function POST(request: Request) {
     // ── Bulk action: videoIds array ─────────────────────────────────────────
     // REJECTED only at this point — APPROVED bulk was rejected above.
     if (Array.isArray(videoIds) && videoIds.length > 0) {
+      // Only the selected videos still in the expected state and not under
+      // someone else's live review are touched; the rest are reported back as
+      // skipped rather than overwritten.
       const existing = await prisma.video.findMany({
-        where: { id: { in: videoIds } },
+        where: { id: { in: videoIds }, status: expected, ...claimFreeFor(payload!.id, now) },
         select: {
           id: true, status: true, rejectionReason: true,
           appUserId: true, caption: true, category: true, subCategory: true,
@@ -255,10 +301,11 @@ export async function POST(request: Request) {
       });
 
       await prisma.video.updateMany({
-        where: { id: { in: videoIds } },
+        where: { id: { in: existing.map(v => v.id) }, status: expected },
         data: {
           status,
           rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
+          ...CLEAR_CLAIM,
         },
       });
 
@@ -276,7 +323,13 @@ export async function POST(request: Request) {
         ? createNotification(buildVideoStatusNotification(v, status, rejectionReason))
         : Promise.resolve()));
 
-      return NextResponse.json({ message: `${videoIds.length} video(s) ${status.toLowerCase()}` });
+      const skipped = videoIds.length - existing.length;
+      return NextResponse.json({
+        message: `${existing.length} video(s) ${status.toLowerCase()}`
+          + (skipped ? ` · ${skipped} skipped (already decided or being reviewed by another moderator)` : ''),
+        updated: existing.map(v => v.id),
+        skipped,
+      });
     }
 
     // ── Single action: videoId ────────────────────────────────────────────────
@@ -289,6 +342,10 @@ export async function POST(request: Request) {
         caption: true, category: true, subCategory: true,
       },
     });
+    if (!before) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+    // Fail fast before the slot checks below; the atomic write further down
+    // re-checks, which closes the gap between this read and that write.
+    if (before.status !== expected) return moderationConflict(videoId, payload!.id);
 
     // Moderator is recategorizing an olympiad (jury) video before approving — re-run
     // the same 1-per-category slot check the student's upload does, so approving into
@@ -334,8 +391,11 @@ export async function POST(request: Request) {
       derivedSlot === 'A' ? OLYMPIAD_CAT_A_LABEL :
       derivedSlot === 'B' ? OLYMPIAD_CAT_B_LABEL : null;
 
-    const video = await prisma.video.update({
-      where: { id: videoId },
+    // Conditional write: lands only if the video is still in the state the
+    // moderator saw and nobody else holds a live review claim on it. Two
+    // moderators saving at the same instant can't both succeed.
+    const written = await prisma.video.updateMany({
+      where: { id: videoId, status: expected, ...claimFreeFor(payload!.id, now) },
       data: {
         status,
         rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
@@ -346,8 +406,12 @@ export async function POST(request: Request) {
               category: categoryChanged ? newCategory : (derivedCategory ?? before?.category),
             }
           : {}),
+        ...CLEAR_CLAIM,
       },
     });
+    if (written.count === 0) return moderationConflict(videoId, payload!.id);
+
+    const video = await prisma.video.findUniqueOrThrow({ where: { id: videoId } });
 
     await recordAuditLog({
       ...actor,

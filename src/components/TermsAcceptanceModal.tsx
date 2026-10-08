@@ -1,7 +1,7 @@
 'use client';
 
-import { useRef, useState } from 'react';
-import { ShieldCheck, Loader2, AlertCircle } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ShieldCheck, Loader2, AlertCircle, ArrowDown, LogOut, Check } from 'lucide-react';
 
 const SECTIONS: { title: string; body: string }[] = [
   {
@@ -42,6 +42,18 @@ const SECTIONS: { title: string; body: string }[] = [
   },
 ];
 
+// "1. Confidentiality" -> ["1", "Confidentiality"]: the number hangs in its own
+// column; the wording itself is unchanged.
+const splitTitle = (t: string) => {
+  const m = t.match(/^(\d+)\.\s*(.*)$/);
+  return m ? [m[1], m[2]] : ['', t];
+};
+
+/**
+ * First-login Terms & Conditions gate for Moderator / Evaluator dashboard
+ * access. It cannot be dismissed: the only ways out are accepting or logging
+ * out. The checkbox unlocks once the end of the terms has been on screen.
+ */
 export default function TermsAcceptanceModal({
   onAccept,
   onLogout,
@@ -49,16 +61,39 @@ export default function TermsAcceptanceModal({
   onAccept: () => Promise<void>;
   onLogout: () => void;
 }) {
+  const [progress, setProgress] = useState(0);
   const [scrolledToEnd, setScrolledToEnd] = useState(false);
   const [checked, setChecked] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleScroll = () => {
+  const measure = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (el.scrollTop + el.clientHeight >= el.scrollHeight - 24) setScrolledToEnd(true);
+    const max = el.scrollHeight - el.clientHeight;
+    // Content that fits without scrolling counts as read to the end.
+    const p = max <= 0 ? 1 : el.scrollTop / max;
+    setProgress(Math.min(1, p));
+    if (max <= 24 || el.scrollTop >= max - 24) setScrolledToEnd(true);
+  }, []);
+
+  useEffect(() => {
+    measure();
+    window.addEventListener('resize', measure);
+    return () => window.removeEventListener('resize', measure);
+  }, [measure]);
+
+  // The page behind stays put while the gate is open.
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const scrollDown = () => {
+    const el = scrollRef.current;
+    if (el) el.scrollBy({ top: el.clientHeight * 0.8, behavior: 'smooth' });
   };
 
   const handleAccept = async () => {
@@ -73,67 +108,131 @@ export default function TermsAcceptanceModal({
     }
   };
 
+  const pct = Math.round(progress * 100);
+
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-[#04172F]/70 backdrop-blur-[6px] p-3 sm:p-6">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="terms-title"
+        aria-describedby="terms-intro"
+        className="w-full max-w-[640px] max-h-[92vh] flex flex-col rounded-2xl bg-white shadow-[0_24px_60px_-12px_rgba(4,23,47,0.45)] ring-1 ring-black/5 overflow-hidden"
+      >
         {/* Header */}
-        <div className="flex items-center gap-3 px-6 py-5 bg-[#052E5C] text-white">
-          <ShieldCheck size={22} className="text-[#4ADE80] flex-shrink-0" />
-          <div>
-            <h2 className="text-lg font-bold leading-tight">Terms and Conditions</h2>
-            <p className="text-xs text-blue-100/70 mt-0.5">Please read and accept to continue</p>
+        <div className="px-6 sm:px-7 pt-6 pb-4">
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#052E5C]/[0.06] ring-1 ring-[#052E5C]/10 flex items-center justify-center flex-shrink-0">
+              <ShieldCheck size={20} className="text-[#052E5C]" />
+            </div>
+            <div className="min-w-0">
+              <h2 id="terms-title" className="text-[17px] font-semibold tracking-[-0.01em] text-[#0B1B36] leading-tight">
+                Terms and Conditions
+              </h2>
+              <p className="mt-1 text-[12.5px] text-[#6B7280]">Please read and accept to continue</p>
+            </div>
           </div>
         </div>
 
-        {/* Scrollable body */}
-        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-6 py-5 space-y-4 text-sm text-slate-700">
-          <p className="text-slate-600">
-            By accessing this portal, you confirm that you have read, understood, and agree to the following:
-          </p>
-          {SECTIONS.map((s) => (
-            <div key={s.title}>
-              <p className="font-semibold text-slate-900">{s.title}</p>
-              <p className="mt-0.5 leading-relaxed">{s.body}</p>
+        {/* Reading progress */}
+        <div className="h-[3px] bg-[#EEF1F5]" role="progressbar" aria-label="Terms read" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100}>
+          <div className="h-full bg-[#009846] transition-[width] duration-150 motion-reduce:transition-none" style={{ width: `${pct}%` }} />
+        </div>
+
+        {/* Terms */}
+        <div className="relative flex-1 min-h-0">
+          <div
+            ref={scrollRef}
+            onScroll={measure}
+            tabIndex={0}
+            className="h-full max-h-[52vh] overflow-y-auto px-6 sm:px-7 py-5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#052E5C]/30"
+          >
+            <p id="terms-intro" className="rounded-lg bg-[#F6F7F9] px-4 py-3 text-[13px] leading-relaxed text-[#374151]">
+              By accessing this portal, you confirm that you have read, understood, and agree to the following:
+            </p>
+            <ol className="mt-4 divide-y divide-[#EEF1F5]">
+              {SECTIONS.map(sec => {
+                const [n, title] = splitTitle(sec.title);
+                return (
+                  <li key={sec.title} className="grid grid-cols-[2rem_1fr] gap-x-1 py-3.5 first:pt-1 last:pb-1">
+                    <span className="pt-[1px] text-[13px] font-semibold tabular-nums text-[#009846]">{n}.</span>
+                    <div>
+                      <p className="text-[14px] font-semibold text-[#0B1B36]">{title}</p>
+                      <p className="mt-1 text-[13.5px] leading-[1.65] text-[#4B5563]">{sec.body}</p>
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+
+          {/* Fade + nudge until the end has been reached */}
+          {!scrolledToEnd && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-white via-white/85 to-transparent flex items-end justify-center pb-3">
+              <button
+                type="button"
+                onClick={scrollDown}
+                className="pointer-events-auto inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full bg-[#052E5C] text-white text-[12px] font-medium shadow-md hover:bg-[#0A3B73] transition-colors cursor-pointer"
+              >
+                <ArrowDown size={13} className="motion-safe:animate-bounce" /> Scroll to read all terms
+              </button>
             </div>
-          ))}
+          )}
         </div>
 
         {/* Footer */}
-        <div className="border-t border-slate-100 px-6 py-4 space-y-3 bg-slate-50">
+        <div className="border-t border-[#EEF1F5] bg-[#FAFBFC] px-6 sm:px-7 py-4 space-y-3.5">
           {error && (
-            <div className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-              <AlertCircle size={14} /> {error}
+            <div role="alert" className="flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] text-red-700">
+              <AlertCircle size={14} className="flex-shrink-0" /> {error}
             </div>
           )}
-          {!scrolledToEnd && (
-            <p className="text-xs text-slate-400">Scroll to the end to enable acceptance.</p>
-          )}
-          <label className={`flex items-start gap-2.5 select-none ${scrolledToEnd ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'}`}>
+
+          <label
+            className={`flex items-center gap-3 rounded-xl border px-3.5 py-3 select-none transition-colors ${
+              !scrolledToEnd
+                ? 'border-[#E4E8EE] bg-white/60 cursor-not-allowed'
+                : checked
+                  ? 'border-[#009846]/40 bg-[#009846]/[0.05] cursor-pointer'
+                  : 'border-[#D3DAE4] bg-white cursor-pointer hover:border-[#009846]/40'
+            }`}
+          >
             <input
               type="checkbox"
               checked={checked}
               disabled={!scrolledToEnd}
-              onChange={(e) => setChecked(e.target.checked)}
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 accent-[#009846] flex-shrink-0"
+              onChange={e => setChecked(e.target.checked)}
+              className="peer sr-only"
             />
-            <span className="text-sm text-slate-700">I have read and agree to the above.</span>
+            <span
+              aria-hidden="true"
+              className={`w-[18px] h-[18px] rounded-[5px] border flex items-center justify-center flex-shrink-0 transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-[#009846]/40 ${
+                checked ? 'bg-[#009846] border-[#009846]' : 'bg-white border-[#C5CDD8]'
+              }`}
+            >
+              {checked && <Check size={12} strokeWidth={3} className="text-white" />}
+            </span>
+            <span className={`text-[13.5px] ${scrolledToEnd ? 'text-[#111827]' : 'text-[#9CA3AF]'}`}>
+              I have read and agree to the above.
+            </span>
+            {!scrolledToEnd && <span className="ml-auto text-[11.5px] text-[#9CA3AF] whitespace-nowrap">{pct}% read</span>}
           </label>
 
-          <div className="flex items-center justify-between gap-3 pt-1">
+          <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-2.5">
             <button
               type="button"
               onClick={onLogout}
-              className="text-xs font-semibold text-slate-500 hover:text-slate-700 transition-colors"
+              className="inline-flex items-center justify-center gap-1.5 h-10 px-3 rounded-lg text-[13px] font-medium text-[#6B7280] hover:text-[#B91C1C] hover:bg-red-50 transition-colors cursor-pointer"
             >
-              Log out instead
+              <LogOut size={14} /> Log out instead
             </button>
             <button
               type="button"
               disabled={!checked || submitting}
               onClick={handleAccept}
-              className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#0e4f8a] to-[#16a34a] px-5 py-2.5 text-sm font-bold text-white shadow-lg shadow-[#0e4f8a]/25 transition-all hover:-translate-y-0.5 disabled:opacity-50 disabled:hover:translate-y-0"
+              className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-[#052E5C] text-[13.5px] font-semibold text-white shadow-sm hover:bg-[#0A3B73] transition-colors disabled:bg-[#C5CDD8] disabled:text-white disabled:shadow-none disabled:cursor-not-allowed cursor-pointer"
             >
-              {submitting ? <Loader2 className="animate-spin" size={16} /> : null}
+              {submitting && <Loader2 className="animate-spin" size={15} />}
               Accept &amp; Continue
             </button>
           </div>

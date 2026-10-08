@@ -660,3 +660,123 @@ export async function sendStudentCredentialsEmail(data: StudentCredentialsMail):
       `Please keep these credentials safe.\n\nRegards,\nTeam Mittsure`,
   });
 }
+
+/* ── Legal agreements ────────────────────────────────────────────────────── */
+
+/**
+ * OTP that verifies an agreement acceptance (Section 18.2(b) of the School
+ * Onboarding Agreement). Worded for that purpose rather than reusing the
+ * signup/reset copy, so the recipient knows what they are confirming.
+ */
+export async function sendAgreementOtpEmail(data: {
+  to: string;
+  otp: string;
+  schoolName: string;
+  signatoryName: string;
+  agreementTitle: string;
+}): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(`[MAILER not configured] Agreement OTP for ${data.to}: ${data.otp}`);
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const html = renderEmailShell({
+    title: `Verify acceptance — ${data.agreementTitle}`,
+    body: `
+      <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">Verify agreement acceptance</p>
+      <p style="margin:0 0 14px;">
+        <b>${escapeHtml(data.signatoryName)}</b> is accepting the <b>${escapeHtml(data.agreementTitle)}</b>
+        on behalf of <b>${escapeHtml(data.schoolName)}</b>. Enter this code on the School Panel to verify the acceptance:
+      </p>
+      <p style="font-size:30px;font-weight:bold;letter-spacing:8px;text-align:center;background:#F4F8FE;
+                border:1px solid #E4ECF7;border-radius:8px;padding:14px 0;margin:0 0 16px;
+                font-family:Consolas,'Courier New',monospace;color:#0B2A5C;">${escapeHtml(data.otp)}</p>
+      <p style="margin:0 0 16px;font-size:13px;color:#5A6B80;">This code expires in <b>5 minutes</b>.</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="background:#FDF0F0;border-left:3px solid #C0392B;border-radius:6px;margin:0 0 16px;">
+        <tr><td style="padding:10px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;color:#8C2A20;line-height:1.5;">
+          <b>Didn't expect this?</b> Do not share the code. Someone may be trying to accept a legal agreement
+          on behalf of your school — contact support@mittsure.com.
+        </td></tr>
+      </table>
+      <p style="margin:0;font-size:13.5px;color:#5A6B80;">Regards,<br><b style="color:#0B2A5C;">Team Mittsure</b></p>
+    `,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: `${data.otp} is your code to verify the ${data.agreementTitle}`,
+    html,
+    attachments: emailAttachments(),
+    text:
+      `${data.signatoryName} is accepting the ${data.agreementTitle} on behalf of ${data.schoolName}.\n\n` +
+      `Verification code: ${data.otp} (expires in 5 minutes).\n\n` +
+      `If you didn't expect this, do not share the code and contact support@mittsure.com.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
+export interface AgreementCopyMail {
+  to: string[];
+  schoolName: string;
+  agreementTitle: string;
+  /** Label/value rows describing the acceptance record. */
+  record: { label: string; value: string }[];
+  /** Full agreement HTML (already escaped) for the email body. */
+  agreementHtml: string;
+  /** Canonical plain text of the agreement, attached as a .txt file. */
+  agreementText: string;
+  attachmentName: string;
+}
+
+/**
+ * Copy of the accepted agreement plus the acceptance record (Section 18.4).
+ * The agreement text goes in the body and as an attachment, so the school
+ * keeps a copy even if their client strips long HTML.
+ */
+export async function sendAgreementCopyEmail(data: AgreementCopyMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(`[MAILER not configured] Agreement copy for ${data.schoolName} -> ${data.to.join(', ')}`);
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const rows = data.record
+    .map((r, i) => `<tr>
+      <td style="${i < data.record.length - 1 ? 'border-bottom:1px solid #E4ECF7;' : ''}background:#F4F8FE;padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:#1552B6;white-space:nowrap;vertical-align:top;">${escapeHtml(r.label)}</td>
+      <td style="${i < data.record.length - 1 ? 'border-bottom:1px solid #E4ECF7;' : ''}padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#0B2A5C;word-break:break-word;">${escapeHtml(r.value)}</td>
+    </tr>`)
+    .join('');
+
+  const html = renderEmailShell({
+    title: `${data.agreementTitle} — accepted`,
+    body: `
+      <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">Agreement accepted</p>
+      <p style="margin:0 0 16px;">
+        This confirms that the <b>${escapeHtml(data.agreementTitle)}</b> has been accepted electronically on behalf of
+        <b>${escapeHtml(data.schoolName)}</b>. Please keep this email for your records.
+      </p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 20px;">${rows}</table>
+      <p style="margin:0 0 8px;font-size:14px;font-weight:bold;color:#0B2A5C;">Full text of the accepted Agreement</p>
+      <div style="border:1px solid #E4ECF7;border-radius:8px;padding:14px 16px;font-family:Georgia,'Times New Roman',serif;font-size:13px;line-height:1.6;color:#243244;">
+        ${data.agreementHtml}
+      </div>
+      <p style="margin:16px 0 0;font-size:13.5px;color:#5A6B80;">Regards,<br><b style="color:#0B2A5C;">Team Mittsure</b></p>
+    `,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: `Accepted: ${data.agreementTitle} — ${data.schoolName}`,
+    html,
+    attachments: [
+      ...emailAttachments(),
+      { filename: data.attachmentName, content: data.agreementText, contentType: 'text/plain; charset=utf-8' },
+    ],
+    text:
+      `The ${data.agreementTitle} has been accepted electronically on behalf of ${data.schoolName}.\n\n` +
+      data.record.map(r => `${r.label}: ${r.value}`).join('\n') +
+      `\n\nThe full text of the accepted Agreement is attached.\n\nRegards,\nTeam Mittsure`,
+  });
+}

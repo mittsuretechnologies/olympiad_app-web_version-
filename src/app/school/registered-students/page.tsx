@@ -41,62 +41,62 @@ function StudentProfile({ s, onSendCredentials }: { s: Student; onSendCredential
     new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
   return (
-    <div className="grid grid-cols-1 gap-3 bg-[#FAFBFC] p-4 sm:grid-cols-2">
-      <div className="rounded-lg border border-[#C9E9DA] bg-[#E9F7F0] p-3.5">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">Contact</p>
+    <div className="grid grid-cols-1 gap-3 bg-[#F8F9FB] p-4 sm:grid-cols-2">
+      <div className="rounded-lg border border-[#E6E8EC] bg-white p-3.5">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#677285]">Contact</p>
         <dl className="space-y-1.5 text-[12.5px]">
           <div className="flex items-center gap-2">
-            <Phone size={12} className="flex-shrink-0 text-[#9CA3AF]" />
-            <span className="font-mono text-black">{s.phone}</span>
+            <Phone size={12} className="flex-shrink-0 text-[#98A1B2]" />
+            <span className="font-mono tabular-nums text-[#0F1B2D]">{s.phone}</span>
           </div>
           {s.email && (
             <div className="flex items-center gap-2">
-              <Mail size={12} className="flex-shrink-0 text-[#9CA3AF]" />
-              <span className="truncate text-black">{s.email}</span>
+              <Mail size={12} className="flex-shrink-0 text-[#98A1B2]" />
+              <span className="truncate text-[#0F1B2D]">{s.email}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <Calendar size={12} className="flex-shrink-0 text-[#9CA3AF]" />
-            <span className="text-black">Joined {fmtDate(s.createdAt)}</span>
+            <Calendar size={12} className="flex-shrink-0 text-[#98A1B2]" />
+            <span className="text-[#0F1B2D]">Joined {fmtDate(s.createdAt)}</span>
           </div>
         </dl>
       </div>
 
       {s.source === 'app' && (
-        <div className="rounded-lg border border-[#E1DAF7] bg-[#F1EEFB] p-3.5">
-          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
+        <div className="rounded-lg border border-[#E6E8EC] bg-white p-3.5">
+          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#677285]">
             <KeyRound size={11} /> Login credentials
           </p>
           <dl className="space-y-1.5 text-[12.5px]">
             <div className="flex items-center justify-between gap-2">
-              <dt className="text-black">Username</dt>
+              <dt className="text-[#0F1B2D]">Username</dt>
               <dd className="select-all font-mono font-semibold text-[#1559C7]">{s.username || '—'}</dd>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <dt className="text-black">Password</dt>
+              <dt className="text-[#0F1B2D]">Password</dt>
               <dd className="flex items-center gap-1.5">
                 {s.password ? (
                   <>
-                    <span className="select-all font-mono font-semibold text-black">
+                    <span className="select-all font-mono font-semibold text-[#0F1B2D]">
                       {showPassword ? s.password : '••••••••'}
                     </span>
                     <button
                       onClick={() => setShowPassword(v => !v)}
                       aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      className="text-[#9CA3AF] hover:text-[#4B5563]"
+                      className="text-[#98A1B2] hover:text-[#475265]"
                     >
                       {showPassword ? <EyeOff size={12} /> : <Eye size={12} />}
                     </button>
                   </>
                 ) : (
-                  <span className="text-[#9CA3AF]">App login</span>
+                  <span className="text-[#98A1B2]">App login</span>
                 )}
               </dd>
             </div>
           </dl>
           <button
             onClick={onSendCredentials}
-            className="cursor-pointer mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#7C6FCB] bg-white px-3 py-2 text-[12.5px] font-semibold text-[#5B4FA3] transition-colors hover:bg-[#6D5FBD] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C6FCB]/40"
+            className="cursor-pointer mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#1559C7]/40 bg-white px-3 py-2 text-[12.5px] font-semibold text-[#1559C7] transition-colors hover:bg-[#1559C7] hover:text-white focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#1559C7]/25"
           >
             <Send size={13} /> Email credentials
           </button>
@@ -313,7 +313,6 @@ export default function SchoolRegisteredStudentsPage() {
       <PageHeader
         icon={Users}
         title="My Students"
-        subtitle="Full profile, olympiad status and credentials per student"
         actions={
           <button onClick={exportCSV} disabled={filtered.length === 0} className={BTN_SUBTLE}>
             <Download size={13} /> Export
@@ -332,10 +331,10 @@ export default function SchoolRegisteredStudentsPage() {
       {/* Exam / attendance banner */}
       {!loading && (
         <div className={`${CARD} flex flex-wrap items-center justify-between gap-3 px-4 py-3 text-[12.5px] ${
-          !examDate ? 'border-[#E4E8EE] text-[#6B7280]'
-          : isSubmitted ? 'border-[#BFDBFE] bg-[#EFF6FF] text-[#1E40AF]'
-          : canMarkAttendance ? 'border-[#C9E9DA] bg-[#E9F7F0] text-[#065F46]'
-          : 'border-[#FDE68A] bg-[#FFFBEB] text-[#92400E]'
+          !examDate ? 'border-[#E6E8EC] text-[#677285]'
+          : isSubmitted ? 'border-[#1559C7]/25 bg-[#1559C7]/[0.05] text-[#0B1B33]'
+          : canMarkAttendance ? 'border-[#2E9E46]/25 bg-[#2E9E46]/[0.08] text-[#1D7A3A]'
+          : 'border-[#A1530A]/25 bg-[#A1530A]/[0.08] text-[#A1530A]'
         }`}>
           <div className="flex items-center gap-2.5">
             {!examDate ? (
@@ -367,8 +366,8 @@ export default function SchoolRegisteredStudentsPage() {
               title={!allMarked ? 'Mark every student present/absent first' : undefined}
               className={`cursor-pointer inline-flex items-center gap-1.5 rounded-lg px-3.5 py-2 text-[12.5px] font-semibold transition-colors ${
                 allMarked
-                  ? 'bg-[#047857] text-white hover:bg-[#065F46]'
-                  : 'cursor-not-allowed bg-[#E5E7EB] text-[#9CA3AF]'
+                  ? 'bg-[#2E9E46] text-white hover:bg-[#25863A]'
+                  : 'cursor-not-allowed bg-[#E6E8EC] text-[#98A1B2]'
               }`}
             >
               <Send size={13} /> Confirm &amp; Send{!allMarked ? ` (${presentCount + absentCount}/${students.length} marked)` : ''}
@@ -380,7 +379,7 @@ export default function SchoolRegisteredStudentsPage() {
       {/* Toolbar */}
       <div className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
         <div className="relative min-w-[200px] flex-1 max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={13} />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" size={13} />
           <input
             type="text"
             placeholder="Search by name, ID or phone"
@@ -438,7 +437,7 @@ export default function SchoolRegisteredStudentsPage() {
                         <button
                           onClick={() => setShowResetModal(true)}
                           title="Reset all attendance marks"
-                          className="cursor-pointer rounded p-0.5 text-[#9CA3AF] hover:bg-[#FDECEC] hover:text-[#B91C1C]"
+                          className="cursor-pointer rounded p-0.5 text-[#98A1B2] hover:bg-[#B42323]/10 hover:text-[#B42323]"
                         >
                           <RotateCcw size={12} />
                         </button>
@@ -457,26 +456,26 @@ export default function SchoolRegisteredStudentsPage() {
                         onClick={() => setExpandedId(isOpen ? null : s.id)}
                         className={`${TR} cursor-pointer ${isOpen ? 'bg-[#1559C7]/[0.03]' : ''}`}
                       >
-                        <td className={`${TD} text-[#9CA3AF]`}>{i + 1}</td>
+                        <td className={`${TD} text-[#98A1B2]`}>{i + 1}</td>
                         <td className={`${TD} font-mono font-semibold text-[#1559C7]`}>{s.olympiadCode}</td>
                         <td className={TD}>
                           <span className="flex items-center gap-2">
                             <Avatar name={s.name} tint={avatarTint(i)} size={26} />
-                            <span className="font-medium text-black">{s.name}</span>
+                            <span className="font-medium text-[#0F1B2D]">{s.name}</span>
                           </span>
                         </td>
-                        <td className={`${TD} font-medium text-black`}>{s.className || s.classCode || <span className="font-normal text-[#9CA3AF]">—</span>}</td>
-                        <td className={`${TD} font-mono font-medium text-black`}>{s.phone}</td>
-                        <td className={`${TD} text-[#6B7280]`}>{fmtDate(s.createdAt)}</td>
+                        <td className={`${TD} font-medium text-[#0F1B2D]`}>{s.className || s.classCode || <span className="font-normal text-[#98A1B2]">—</span>}</td>
+                        <td className={`${TD} font-mono font-medium tabular-nums text-[#0F1B2D]`}>{s.phone}</td>
+                        <td className={`${TD} text-[#677285]`}>{fmtDate(s.createdAt)}</td>
                         <td className={TD} onClick={(e) => e.stopPropagation()}>
                           {s.attendance && editingAttendanceId !== s.id ? (
                             <div className="flex items-center gap-1.5">
                               {s.attendance === 'PRESENT' ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#FEF3C7] px-2 py-1 text-[11px] font-semibold text-[#92400E]">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#A1530A]/10 px-2 py-1 text-[11px] font-semibold text-[#A1530A]">
                                   <UserCheck size={11} /> Present
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-[#DC2626] px-2 py-1 text-[11px] font-semibold text-white">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-[#B42323] px-2 py-1 text-[11px] font-semibold text-white">
                                   <UserX size={11} /> Absent
                                 </span>
                               )}
@@ -485,7 +484,7 @@ export default function SchoolRegisteredStudentsPage() {
                                   onClick={() => setEditingAttendanceId(s.id)}
                                   disabled={!!markingId}
                                   title="Change attendance"
-                                  className="cursor-pointer rounded p-1 text-[#9CA3AF] hover:bg-[#EFF6FF] hover:text-[#1559C7] disabled:cursor-not-allowed disabled:opacity-50"
+                                  className="cursor-pointer rounded p-1 text-[#98A1B2] hover:bg-[#1559C7]/10 hover:text-[#1559C7] disabled:cursor-not-allowed disabled:opacity-50"
                                 >
                                   <Pencil size={12} />
                                 </button>
@@ -499,27 +498,27 @@ export default function SchoolRegisteredStudentsPage() {
                             </div>
                           ) : canMarkAttendance ? (
                             markingId === s.id ? (
-                              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#6B7280]">
+                              <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-[#677285]">
                                 <Loader2 size={12} className="animate-spin" /> Saving…
                               </span>
                             ) : (
                               <div className="flex items-center gap-1.5">
                                 <button
                                   onClick={() => markAttendance(s, 'PRESENT')}
-                                  className="cursor-pointer rounded-md border border-[#C9E9DA] bg-white px-2 py-1 text-[11px] font-semibold text-[#047857] hover:bg-[#E9F7F0]"
+                                  className="cursor-pointer rounded-md border border-[#2E9E46]/30 bg-white px-2 py-1 text-[11px] font-semibold text-[#1D7A3A] hover:bg-[#2E9E46]/10"
                                 >
                                   Present
                                 </button>
                                 <button
                                   onClick={() => markAttendance(s, 'ABSENT')}
-                                  className="cursor-pointer rounded-md border border-[#F3D2D2] bg-white px-2 py-1 text-[11px] font-semibold text-[#B91C1C] hover:bg-[#FDECEC]"
+                                  className="cursor-pointer rounded-md border border-[#B42323]/25 bg-white px-2 py-1 text-[11px] font-semibold text-[#B42323] hover:bg-[#B42323]/10"
                                 >
                                   Absent
                                 </button>
                                 {s.attendance && (
                                   <button
                                     onClick={() => setEditingAttendanceId(null)}
-                                    className="cursor-pointer text-[11px] text-[#9CA3AF] hover:text-[#374151]"
+                                    className="cursor-pointer text-[11px] text-[#98A1B2] hover:text-[#475265]"
                                   >
                                     Cancel
                                   </button>
@@ -527,16 +526,16 @@ export default function SchoolRegisteredStudentsPage() {
                               </div>
                             )
                           ) : (
-                            <span className="text-[11px] text-[#9CA3AF]">—</span>
+                            <span className="text-[11px] text-[#98A1B2]">—</span>
                           )}
                         </td>
-                        <td className={`${TD} text-center text-[#9CA3AF]`}>
+                        <td className={`${TD} text-center text-[#98A1B2]`}>
                           {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </td>
                       </tr>
                       {isOpen && (
                         <tr>
-                          <td colSpan={8} className="border border-[#E4E8EE] p-0">
+                          <td colSpan={8} className="border border-[#E6E8EC] p-0">
                             <StudentProfile s={s} onSendCredentials={() => openSendModal(s)} />
                           </td>
                         </tr>
@@ -547,7 +546,7 @@ export default function SchoolRegisteredStudentsPage() {
               </tbody>
             </table>
           </div>
-          <div className="flex items-center justify-between gap-3 border-t border-[#E4E8EE] bg-[#FAFBFC] px-3 py-2 text-[11.5px] text-[#6B7280]">
+          <div className="flex items-center justify-between gap-3 border-t border-[#E6E8EC] bg-[#F8F9FB] px-3 py-2 text-[11.5px] text-[#677285]">
             <RowCount shown={filtered.length} total={students.length} noun="students" />
             <span>Click a row to view full profile</span>
           </div>
@@ -564,28 +563,28 @@ export default function SchoolRegisteredStudentsPage() {
         >
           {sendSuccess ? (
             <div className="space-y-4 p-5 text-center">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#047857]/10">
-                <CheckCircle2 className="h-6 w-6 text-[#047857]" />
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#1D7A3A]/10">
+                <CheckCircle2 className="h-6 w-6 text-[#1D7A3A]" />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-[#111827]">Credentials sent</p>
-                <p className="mt-1 text-[12px] text-[#6B7280]">
+                <p className="text-[14.5px] font-semibold text-[#0F1B2D]">Credentials sent</p>
+                <p className="mt-1 text-[12px] text-[#677285]">
                   Emailed the Olympiad ID, User ID and password to{' '}
-                  <span className="font-medium text-[#374151]">{sendSuccess}</span>.
+                  <span className="font-medium text-[#475265]">{sendSuccess}</span>.
                 </p>
               </div>
               <button onClick={closeSendModal} className={`cursor-pointer ${BTN_PRIMARY} w-full`}>Done</button>
             </div>
           ) : (
             <div className="space-y-3 p-5">
-              <p className="text-[12px] leading-relaxed text-[#4B5563]">
+              <p className="text-[12px] leading-relaxed text-[#475265]">
                 Use this if credentials weren&apos;t sent automatically during allocation. This resends the login
                 details already on file — no new password is generated.
               </p>
               <div>
                 <label htmlFor="send-email" className={LABEL}>Email address</label>
                 <div className="relative">
-                  <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                  <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
                   <input
                     id="send-email"
                     type="email" placeholder="student@example.com" value={sendEmail}
@@ -597,7 +596,7 @@ export default function SchoolRegisteredStudentsPage() {
                 </div>
               </div>
               {sendError && (
-                <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]">
+                <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]">
                   <AlertCircle size={12} /> {sendError}
                 </p>
               )}
@@ -622,25 +621,25 @@ export default function SchoolRegisteredStudentsPage() {
           maxWidth="max-w-sm"
         >
           <div className="space-y-4 p-5">
-            <div className="rounded-lg border border-[#E4E8EE] bg-[#FAFBFC] p-3.5 text-[12.5px]">
+            <div className="rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] p-3.5 text-[12.5px]">
               <div className="flex justify-between py-0.5">
-                <span className="text-[#6B7280]">Total students</span>
-                <span className="font-semibold text-black">{students.length}</span>
+                <span className="text-[#677285]">Total students</span>
+                <span className="font-semibold tabular-nums text-[#0F1B2D]">{students.length}</span>
               </div>
               <div className="flex justify-between py-0.5">
-                <span className="text-[#6B7280]">Present</span>
-                <span className="font-semibold text-[#047857]">{presentCount}</span>
+                <span className="text-[#677285]">Present</span>
+                <span className="font-semibold tabular-nums text-[#1D7A3A]">{presentCount}</span>
               </div>
               <div className="flex justify-between py-0.5">
-                <span className="text-[#6B7280]">Absent</span>
-                <span className="font-semibold text-[#B91C1C]">{absentCount}</span>
+                <span className="text-[#677285]">Absent</span>
+                <span className="font-semibold tabular-nums text-[#B42323]">{absentCount}</span>
               </div>
             </div>
-            <p className="text-[12px] leading-relaxed text-[#4B5563]">
+            <p className="text-[12px] leading-relaxed text-[#475265]">
               Once confirmed, this attendance record is locked and sent to the Olympiad admin — you won&apos;t be able to change it afterwards.
             </p>
             {submitError && (
-              <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]">
+              <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]">
                 <AlertCircle size={12} /> {submitError}
               </p>
             )}
@@ -674,11 +673,11 @@ export default function SchoolRegisteredStudentsPage() {
           maxWidth="max-w-sm"
         >
           <div className="space-y-4 p-5">
-            <p className="text-[12.5px] leading-relaxed text-[#4B5563]">
-              This will clear the Present/Absent mark for <span className="font-semibold text-black">all {presentCount + absentCount} marked student(s)</span> — everyone goes back to unmarked. This cannot be undone.
+            <p className="text-[12.5px] leading-relaxed text-[#475265]">
+              This will clear the Present/Absent mark for <span className="font-semibold text-[#0F1B2D]">all {presentCount + absentCount} marked student(s)</span> — everyone goes back to unmarked. This cannot be undone.
             </p>
             {resetError && (
-              <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]">
+              <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]">
                 <AlertCircle size={12} /> {resetError}
               </p>
             )}
@@ -693,7 +692,7 @@ export default function SchoolRegisteredStudentsPage() {
               <button
                 onClick={handleResetAttendance}
                 disabled={resetting}
-                className="cursor-pointer flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#B91C1C] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#991B1B] disabled:opacity-50"
+                className="cursor-pointer flex-1 inline-flex items-center justify-center gap-1.5 rounded-lg bg-[#B42323] px-4 py-2.5 text-[13px] font-semibold text-white transition-colors hover:bg-[#992020] disabled:opacity-50"
               >
                 {resetting ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
                 Reset All

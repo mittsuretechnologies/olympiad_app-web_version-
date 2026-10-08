@@ -44,37 +44,37 @@ const fmtDate = (d: string) =>
  *  away rather than on another page. */
 function RequestDetail({ r }: { r: LinkRequest }) {
   return (
-    <div className="grid grid-cols-1 gap-3 bg-[#FAFBFC] p-4 sm:grid-cols-2">
-      <div className="rounded-lg border border-[#C9E9DA] bg-[#E9F7F0] p-3.5">
-        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">Contact</p>
+    <div className="grid grid-cols-1 gap-3 bg-[#F8F9FB] p-4 sm:grid-cols-2">
+      <div className="rounded-lg border border-[#E6E8EC] bg-white p-3.5">
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#677285]">Contact</p>
         <dl className="space-y-1.5 text-[12.5px]">
           <div className="flex items-center gap-2">
-            <Phone size={12} className="flex-shrink-0 text-[#9CA3AF]" />
-            <span className="font-mono text-black">{r.mobile || '—'}</span>
+            <Phone size={12} className="flex-shrink-0 text-[#98A1B2]" />
+            <span className="font-mono tabular-nums text-[#0F1B2D]">{r.mobile || '—'}</span>
           </div>
           {r.email && (
             <div className="flex items-center gap-2">
-              <Mail size={12} className="flex-shrink-0 text-[#9CA3AF]" />
-              <span className="truncate text-black">{r.email}</span>
+              <Mail size={12} className="flex-shrink-0 text-[#98A1B2]" />
+              <span className="truncate text-[#0F1B2D]">{r.email}</span>
             </div>
           )}
           <div className="flex items-center gap-2">
-            <Calendar size={12} className="flex-shrink-0 text-[#9CA3AF]" />
-            <span className="text-black">On Mittmee since {fmtDate(r.joinedAt)}</span>
+            <Calendar size={12} className="flex-shrink-0 text-[#98A1B2]" />
+            <span className="text-[#0F1B2D]">On Mittmee since {fmtDate(r.joinedAt)}</span>
           </div>
           <div className="flex items-center gap-2">
-            <Clock size={12} className="flex-shrink-0 text-[#9CA3AF]" />
-            <span className="text-black">Requested {fmtDate(r.createdAt)}</span>
+            <Clock size={12} className="flex-shrink-0 text-[#98A1B2]" />
+            <span className="text-[#0F1B2D]">Requested {fmtDate(r.createdAt)}</span>
           </div>
         </dl>
       </div>
 
-      <div className="rounded-lg border border-[#E1DAF7] bg-[#F1EEFB] p-3.5">
-        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">
+      <div className="rounded-lg border border-[#E6E8EC] bg-white p-3.5">
+        <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#677285]">
           <VideoIcon size={11} /> Recent videos ({r.videoCount})
         </p>
         {r.previewVideos.length === 0 ? (
-          <p className="text-[12.5px] text-[#6B7280]">This student has no approved videos yet.</p>
+          <p className="text-[12.5px] text-[#677285]">This student has no approved videos yet.</p>
         ) : (
           <div className="grid grid-cols-3 gap-2">
             {r.previewVideos.map(v => (
@@ -84,14 +84,14 @@ function RequestDetail({ r }: { r: LinkRequest }) {
                 target="_blank"
                 rel="noreferrer"
                 title={v.caption || 'Open video'}
-                className="group relative block aspect-[9/16] overflow-hidden rounded-md bg-[#DCD6F2] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#7C6FCB]/40"
+                className="group relative block aspect-[9/16] overflow-hidden rounded-md bg-[#EEF0F3] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1559C7]/25"
               >
                 {v.thumbnailUrl ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={v.thumbnailUrl} alt="" className="h-full w-full object-cover" />
                 ) : (
                   <span className="flex h-full w-full items-center justify-center">
-                    <VideoIcon size={14} className="text-[#7C6FCB]" />
+                    <VideoIcon size={14} className="text-[#1559C7]" />
                   </span>
                 )}
               </a>
@@ -195,12 +195,11 @@ export default function SchoolStudentRequestsPage() {
       <PageHeader
         icon={UserCheck}
         title="Student Requests"
-        subtitle="App users asking to be confirmed as your students"
       />
 
       {/* What approving actually does — stated once, where the decision is made,
           so nobody has to guess whether this grants Olympiad entry. */}
-      <div className="flex items-start gap-2.5 rounded-lg border border-[#BFD8F5] bg-[#EDF4FD] p-3 text-[12.5px] text-[#1F3B63]">
+      <div className="flex items-start gap-2.5 rounded-lg border border-[#1559C7]/20 bg-[#1559C7]/[0.05] p-3 text-[12.5px] text-[#0B1B33]">
         <AlertCircle size={14} className="mt-0.5 flex-shrink-0 text-[#1559C7]" />
         <p>
           Mittmee app users without an Olympiad ID, requesting to be linked to your school.
@@ -217,7 +216,7 @@ export default function SchoolStudentRequestsPage() {
 
       <div className={`${CARD} flex flex-wrap items-center gap-2 p-3`}>
         <div className="relative min-w-[200px] flex-1">
-          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+          <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -234,7 +233,7 @@ export default function SchoolStudentRequestsPage() {
       </div>
 
       {actionError && (
-        <div className="flex items-center gap-2 rounded-lg border border-[#F3C6C6] bg-[#FCEDED] p-3 text-[12.5px] text-[#B91C1C]">
+        <div className="flex items-center gap-2 rounded-lg border border-[#B42323]/20 bg-[#B42323]/[0.06] p-3 text-[12.5px] text-[#B42323]">
           <AlertCircle size={14} className="flex-shrink-0" /> {actionError}
         </div>
       )}
@@ -272,22 +271,22 @@ export default function SchoolStudentRequestsPage() {
                       <td className={TD}>
                         <button
                           onClick={() => setExpandedId(open ? null : r.id)}
-                          className="flex cursor-pointer items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1559C7]/40"
+                          className="flex cursor-pointer items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#1559C7]/25"
                           aria-expanded={open}
                         >
                           <Avatar name={r.username} tint={avatarTint(i)} />
                           <span className="min-w-0">
-                            <span className="flex items-center gap-1.5 font-semibold text-[#0E2A5C]">
+                            <span className="flex items-center gap-1.5 font-semibold text-[#0F1B2D]">
                               {r.username}
-                              {r.isPrivate && <Lock size={10} className="text-[#9CA3AF]" aria-label="Private account" />}
+                              {r.isPrivate && <Lock size={10} className="text-[#98A1B2]" aria-label="Private account" />}
                             </span>
-                            <span className="block text-[11.5px] text-[#6B7280]">No Olympiad ID</span>
+                            <span className="block text-[11.5px] text-[#677285]">No Olympiad ID</span>
                           </span>
-                          {open ? <ChevronUp size={13} className="text-[#9CA3AF]" /> : <ChevronDown size={13} className="text-[#9CA3AF]" />}
+                          {open ? <ChevronUp size={13} className="text-[#98A1B2]" /> : <ChevronDown size={13} className="text-[#98A1B2]" />}
                         </button>
                       </td>
                       <td className={TD}>
-                        <span className="font-mono text-[12px]">{r.mobile || '—'}</span>
+                        <span className="font-mono tabular-nums text-[12px]">{r.mobile || '—'}</span>
                       </td>
                       <td className={TD}>{r.videoCount}</td>
                       <td className={TD}>{fmtDate(r.createdAt)}</td>
@@ -298,7 +297,7 @@ export default function SchoolStudentRequestsPage() {
                       </td>
                       <td className={`${TD} text-right`}>
                         {busy ? (
-                          <Loader2 size={14} className="ml-auto animate-spin text-[#9CA3AF]" />
+                          <Loader2 size={14} className="ml-auto animate-spin text-[#98A1B2]" />
                         ) : r.status === 'PENDING' ? (
                           <span className="flex justify-end gap-1.5">
                             <button onClick={() => decide(r, 'APPROVE')} className={`${BTN_PRIMARY} px-2.5 py-1 text-[12px]`}>
@@ -320,7 +319,7 @@ export default function SchoolStudentRequestsPage() {
                     </tr>
                     {open && (
                       <tr>
-                        <td colSpan={6} className="border border-[#E4E8EE] p-0">
+                        <td colSpan={6} className="border border-[#E6E8EC] p-0">
                           <RequestDetail r={r} />
                         </td>
                       </tr>
@@ -340,10 +339,10 @@ export default function SchoolStudentRequestsPage() {
           onClose={() => setRemoveTarget(null)}
         >
           <div className="space-y-3">
-            <p className="text-[13px] text-[#374151]">
+            <p className="text-[13px] text-[#475265]">
               {removeTarget.status === 'APPROVED' ? (
                 <>
-                  <span className="font-semibold text-[#0E2A5C]">{removeTarget.username}</span> will
+                  <span className="font-semibold text-[#0F1B2D]">{removeTarget.username}</span> will
                   no longer be linked to your school, and their {removeTarget.videoCount} video
                   {removeTarget.videoCount === 1 ? '' : 's'} will stop appearing on your portal and
                   your school page in the app. Their videos are not deleted, and they can send a new
@@ -352,7 +351,7 @@ export default function SchoolStudentRequestsPage() {
               ) : (
                 <>
                   This clears the declined request from your list.{' '}
-                  <span className="font-semibold text-[#0E2A5C]">{removeTarget.username}</span> can
+                  <span className="font-semibold text-[#0F1B2D]">{removeTarget.username}</span> can
                   ask again after that.
                 </>
               )}

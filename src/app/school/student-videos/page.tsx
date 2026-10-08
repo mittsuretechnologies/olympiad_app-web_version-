@@ -208,11 +208,10 @@ export default function StudentVideosPage() {
       <PageHeader
         icon={Clapperboard}
         title="Student Videos"
-        subtitle="Submissions from your students"
         actions={
           // A live count belongs next to the data, not in the hover-only
           // subtitle — it changes as filters are applied.
-          <span className="text-[12px] text-[#6B7280]">
+          <span className="text-[12px] tabular-nums text-[#677285]">
             {filtered.length} of {videos.length} shown
           </span>
         }
@@ -228,7 +227,7 @@ export default function StudentVideosPage() {
       {/* Toolbar */}
       <div className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
         <div className="relative min-w-[200px] flex-1 max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={13} />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" size={13} />
           <input
             type="text"
             placeholder="Search student, ID, category"
@@ -249,7 +248,7 @@ export default function StudentVideosPage() {
 
         {classes.length > 0 && (
           <div className="ml-auto flex items-center gap-1.5">
-            <Filter size={13} className="text-[#9CA3AF]" />
+            <Filter size={13} className="text-[#98A1B2]" />
             <select
               value={classFilter}
               onChange={e => setClassFilter(e.target.value)}
@@ -302,25 +301,25 @@ export default function StudentVideosPage() {
                       <TD_CELL className="!py-2">
                         <ChevronRight
                           size={14}
-                          className={`text-[#9CA3AF] transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                          className={`text-[#98A1B2] transition-transform ${isOpen ? 'rotate-90' : ''}`}
                         />
                       </TD_CELL>
                       <TD_CELL className="!py-2">
                         <div className="flex items-center gap-2">
                           <Avatar name={g.studentName} tint={avatarTint(i)} size={26} />
                           <div className="min-w-0">
-                            <p className="truncate text-[13px] font-semibold text-[#111827]">{g.studentName}</p>
-                            {g.username && <p className="truncate text-[11px] text-[#6B7280]">@{g.username}</p>}
+                            <p className="truncate text-[13px] font-semibold text-[#0F1B2D]">{g.studentName}</p>
+                            {g.username && <p className="truncate text-[11px] text-[#677285]">@{g.username}</p>}
                           </div>
                         </div>
                       </TD_CELL>
                       <TD_CELL className="!py-2">
                         {g.className ? (
-                          <span className="inline-flex items-center gap-1 rounded-md bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[#F8F9FB] px-1.5 py-0.5 text-[11px] font-medium text-[#475265]">
                             <BookOpen className="h-2.5 w-2.5" />{g.className}
                           </span>
                         ) : (
-                          <span className="text-[#9CA3AF]">—</span>
+                          <span className="text-[#98A1B2]">—</span>
                         )}
                       </TD_CELL>
                       <TD_CELL className="!py-2">
@@ -328,24 +327,24 @@ export default function StudentVideosPage() {
                           // No Olympiad ID exists for these students - showing an
                           // empty code column would read as missing data rather
                           // than as the other, equally valid way in.
-                          <span className="inline-flex items-center gap-1 rounded-md bg-[#EDF4FD] px-1.5 py-0.5 text-[11px] font-medium text-[#1559C7]">
+                          <span className="inline-flex items-center gap-1 rounded-md bg-[#1559C7]/[0.08] px-1.5 py-0.5 text-[11px] font-medium text-[#1559C7]">
                             <UserCheck className="h-2.5 w-2.5" />Linked
                           </span>
                         ) : (
                           <span className="font-mono text-[12px] text-[#1559C7]">{g.olympiadCode}</span>
                         )}
                       </TD_CELL>
-                      <TD_CELL className="!py-2 text-center font-semibold text-[#111827]">{g.videos.length}</TD_CELL>
+                      <TD_CELL className="!py-2 text-center font-semibold tabular-nums text-[#0F1B2D]">{g.videos.length}</TD_CELL>
                       <TD_CELL className="!py-2 text-center">
-                        {oCount > 0 ? <StatusBadge tone="info" icon={Star}>{oCount}</StatusBadge> : <span className="text-[#9CA3AF]">—</span>}
+                        {oCount > 0 ? <StatusBadge tone="info" icon={Star}>{oCount}</StatusBadge> : <span className="text-[#98A1B2]">—</span>}
                       </TD_CELL>
                       <TD_CELL className="!py-2 text-center">
-                        {gCount > 0 ? <StatusBadge tone="neutral" icon={Globe}>{gCount}</StatusBadge> : <span className="text-[#9CA3AF]">—</span>}
+                        {gCount > 0 ? <StatusBadge tone="neutral" icon={Globe}>{gCount}</StatusBadge> : <span className="text-[#98A1B2]">—</span>}
                       </TD_CELL>
                     </tr>
                     {isOpen && (
                       <tr>
-                        <td colSpan={7} className="border border-[#E4E8EE] bg-[#FAFBFC] p-3">
+                        <td colSpan={7} className="border border-[#E6E8EC] bg-[#F8F9FB] p-3">
                           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
                             {g.videos.map(v => (
                               <VideoCard
@@ -432,24 +431,24 @@ function VisibilityOtpModal({ token, onVerified, onClose }: {
 
   return (
     <ModalShell
-      title={<span className="flex items-center gap-2"><ShieldCheck size={16} className="text-[#1559C7]" /> Verify it&apos;s you</span>}
+      title={<span className="flex items-center gap-2"><ShieldCheck size={16} strokeWidth={1.75} className="text-[#1559C7]" /> Verify it&apos;s you</span>}
       onClose={onClose}
       maxWidth="max-w-sm"
     >
       <div className="space-y-3 p-5">
-        <p className="text-[12px] leading-relaxed text-[#4B5563]">
+        <p className="text-[12px] leading-relaxed text-[#475265]">
           Changing a student&apos;s video visibility requires verifying an OTP sent to your school&apos;s
           registered contact.
         </p>
         {stage === 'request' ? (
           <div className="flex flex-col items-center gap-2 py-6">
             <Loader2 className="h-4 w-4 animate-spin text-[#1559C7]" />
-            <p className="text-[12px] text-[#6B7280]">Sending OTP…</p>
+            <p className="text-[12px] text-[#677285]">Sending OTP…</p>
           </div>
         ) : (
           <>
             {channelMsg && (
-              <p className="rounded-lg bg-[#F6F7F9] px-3 py-2.5 text-[12px] text-[#4B5563]">{channelMsg}</p>
+              <p className="rounded-lg bg-[#F8F9FB] px-3 py-2.5 text-[12px] text-[#475265]">{channelMsg}</p>
             )}
             <div>
               <label htmlFor="otp" className={LABEL}>Enter OTP</label>
@@ -464,7 +463,7 @@ function VisibilityOtpModal({ token, onVerified, onClose }: {
           </>
         )}
         {error && (
-          <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]">
+          <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]">
             <AlertCircle size={12} /> {error}
           </p>
         )}
@@ -531,7 +530,7 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
     <div className={`${CARD} overflow-hidden`}>
 
       {/* Video player / thumbnail */}
-      <div className="relative aspect-video bg-[#0E1726]">
+      <div className="relative aspect-video bg-[#0B1B33]">
         {isPlaying ? (
           <video src={v.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="h-full w-full object-contain" onEnded={onPlay} />
         ) : (
@@ -543,7 +542,7 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
             {v.thumbnailUrl ? (
               <img src={v.thumbnailUrl} alt="" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center bg-[#0E2A5C]">
+              <div className="flex h-full w-full items-center justify-center bg-[#0B1B33]">
                 <Video className="h-8 w-8 text-white/25" />
               </div>
             )}
@@ -556,12 +555,12 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
         )}
 
         {v.isEvaluation && (
-          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-[#111827]/85 px-2 py-1 text-[10.5px] font-semibold text-white backdrop-blur-sm">
+          <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-[#0B1B33]/85 px-2 py-1 text-[10.5px] font-semibold text-white backdrop-blur-sm">
             <Star className="h-2.5 w-2.5 fill-current" /> Olympiad
           </span>
         )}
         {v.uploaderType === 'SCHOOL' && (
-          <span className="absolute right-2 top-2 rounded-md bg-[#111827]/85 px-2 py-1 text-[10.5px] font-semibold text-white backdrop-blur-sm">
+          <span className="absolute right-2 top-2 rounded-md bg-[#0B1B33]/85 px-2 py-1 text-[10.5px] font-semibold text-white backdrop-blur-sm">
             By school
           </span>
         )}
@@ -573,11 +572,11 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
         <div className="flex items-center gap-2">
           <Avatar name={v.studentName} tint={tint} size={28} />
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[12.5px] font-semibold text-[#111827]">{v.studentName}</p>
+            <p className="truncate text-[12.5px] font-semibold text-[#0F1B2D]">{v.studentName}</p>
             <p className="truncate font-mono text-[11px] font-medium text-[#1559C7]">{v.olympiadCode}</p>
           </div>
           {v.className && (
-            <span className="flex flex-shrink-0 items-center gap-1 rounded-md bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+            <span className="flex flex-shrink-0 items-center gap-1 rounded-md bg-[#F8F9FB] px-1.5 py-0.5 text-[11px] font-medium text-[#475265]">
               <BookOpen className="h-2.5 w-2.5" />{v.className}
             </span>
           )}
@@ -592,8 +591,8 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
               title={isPrivate ? 'Private — click to make public' : 'Public — click to make private'}
               className={`cursor-pointer ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${FOCUS} ${
                 isPrivate
-                  ? 'bg-[#4B5563]/10 text-[#4B5563] hover:bg-[#4B5563]/20'
-                  : 'bg-[#047857]/10 text-[#047857] hover:bg-[#047857]/20'
+                  ? 'bg-[#475265]/10 text-[#475265] hover:bg-[#475265]/20'
+                  : 'bg-[#1D7A3A]/10 text-[#1D7A3A] hover:bg-[#1D7A3A]/20'
               }`}
             >
               {isPrivate ? <Lock className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
@@ -603,19 +602,19 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
         </div>
 
         {v.caption && (
-          <p className="line-clamp-2 text-[12px] leading-relaxed text-[#4B5563]">{v.caption}</p>
+          <p className="line-clamp-2 text-[12px] leading-relaxed text-[#475265]">{v.caption}</p>
         )}
 
         {v.tags && (
           <div className="flex flex-wrap items-center gap-1">
-            <Tag className="h-2.5 w-2.5 flex-shrink-0 text-[#9CA3AF]" />
+            <Tag className="h-2.5 w-2.5 flex-shrink-0 text-[#98A1B2]" />
             {v.tags.split(',').slice(0, 4).map(tag => (
-              <span key={tag} className="text-[11px] text-[#6B7280]">#{tag.trim()}</span>
+              <span key={tag} className="text-[11px] text-[#677285]">#{tag.trim()}</span>
             ))}
           </div>
         )}
 
-        <div className="flex items-center justify-between border-t border-[#F1F3F6] pt-2 text-[11.5px] text-[#6B7280]">
+        <div className="flex items-center justify-between border-t border-[#EEF0F3] pt-2 text-[11.5px] tabular-nums text-[#677285]">
           <div className="flex items-center gap-2.5">
             <span className="flex items-center gap-1"><Heart className="h-3 w-3" />{v.likesCount}</span>
             <span className="flex items-center gap-1"><Eye className="h-3 w-3" />{v.viewsCount}</span>
@@ -628,7 +627,7 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
             onClick={handleShare}
             title={copied ? 'Link copied' : 'Share'}
             className={`cursor-pointer inline-flex items-center gap-1 rounded-md px-2 py-1 font-medium transition-colors ${FOCUS} ${
-              copied ? 'bg-[#047857]/10 text-[#047857]' : 'text-[#4B5563] hover:bg-[#F6F7F9]'
+              copied ? 'bg-[#1D7A3A]/10 text-[#1D7A3A]' : 'text-[#475265] hover:bg-[#F8F9FB]'
             }`}
           >
             {copied ? <Check className="h-3 w-3" /> : <Share2 className="h-3 w-3" />}
