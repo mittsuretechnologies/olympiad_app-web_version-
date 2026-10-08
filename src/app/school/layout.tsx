@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, KeyRound, Menu, X, ClipboardList, PackageCheck, FileCheck2, UserCheck } from 'lucide-react';
+import { LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, Menu, X, ClipboardList, PackageCheck, FileCheck2, UserCheck } from 'lucide-react';
 import Image from 'next/image';
 import { isTokenExpired, clearSchoolSession } from '@/lib/session-token';
 import { initialsOf } from './ui';
+import AgreementGate from './AgreementGate';
 
 export default function SchoolLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -14,6 +15,8 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<any>(null);
   const [ready, setReady] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [agreementPending, setAgreementPending] = useState(false);
+  const [schoolToken, setSchoolToken] = useState<string | null>(null);
 
   // On mobile the sidebar is an overlay drawer: close it once navigation lands
   // on a new route, otherwise it stays open on top of the page you just opened.
@@ -38,7 +41,14 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     }
     try {
       setUser(JSON.parse(raw));
-      setReady(true);
+      setSchoolToken(token);
+      // Check whether the school has accepted the onboarding agreement.
+      // We kick off a lightweight fetch here; the gate shows a spinner while it resolves.
+      fetch('/api/school/me/agreement', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => (r.ok ? r.json() : Promise.reject()))
+        .then(json => { if (!json.accepted) setAgreementPending(true); })
+        .catch(() => { /* network error — show the gate, it will retry */ setAgreementPending(true); })
+        .finally(() => setReady(true));
     } catch {
       clearSchoolSession();
       router.replace('/login');
@@ -51,6 +61,17 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
   };
 
   if (!ready) return null;
+
+  // Show agreement gate before the portal if the school hasn't accepted yet.
+  if (agreementPending && schoolToken) {
+    return (
+      <AgreementGate
+        token={schoolToken}
+        onAccepted={() => setAgreementPending(false)}
+        onLogout={handleLogout}
+      />
+    );
+  }
 
   // Nav items carry no per-item colour: the active item is marked by the accent
   // fill alone, so the eye tracks one signal down the list instead of seven.
@@ -67,7 +88,6 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
     { name: 'Student Report',     href: '/school/reports',             icon: ClipboardList },
     { name: 'Upload Video',       href: '/school/upload-video',        icon: UploadCloud },
     { name: 'School Profile',     href: '/school/profile',             icon: School },
-    { name: 'Manage Credentials', href: '/school/credentials',         icon: KeyRound },
   ];
 
   const initials = initialsOf(user?.name || 'School');

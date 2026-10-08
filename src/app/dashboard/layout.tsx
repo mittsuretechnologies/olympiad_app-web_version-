@@ -42,6 +42,8 @@ import {
   Image as ImageIcon,
   Hash,
   GalleryHorizontal,
+  FileSignature,
+  BookOpen,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -326,6 +328,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-sm font-semibold">Dashboard</span>
             </Link>
 
+            {/* Moderator Handbook — always shown to moderators, not permission-gated */}
+            {role === 'MODERATOR' && (
+              <Link href="/dashboard/handbook"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/handbook') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <BookOpen size={20} />
+                <span className="text-sm font-semibold">Handbook</span>
+              </Link>
+            )}
+
             {/* Schools */}
             {canSee('schools') && (
               <div>
@@ -475,6 +486,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/account-deletion-requests') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <UserX size={20} />
                 <span className="text-sm font-semibold">Deletion Requests</span>
+              </Link>
+            )}
+
+            {/* Agreements — legal acceptance register, superadmin only */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/agreements"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/agreements') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <FileSignature size={20} />
+                <span className="text-sm font-semibold">Agreements</span>
               </Link>
             )}
 

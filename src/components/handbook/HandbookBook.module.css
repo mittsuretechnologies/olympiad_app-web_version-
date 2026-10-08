@@ -1,0 +1,440 @@
+/*
+ * Moderator Handbook — book visuals.
+ * Paper, leather and endpaper surfaces are layered CSS gradients over an SVG
+ * noise tile, so the book has grain without shipping image assets.
+ */
+
+.stage {
+  --paper: #fbf7ee;
+  --ink: #2b2620;
+  --ink-soft: #5b5246;
+  --accent: #1c2a44;
+  --gold: #c9a45c;
+  --rule: #e3dac6;
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  padding: 14px 12px 12px;
+  background-color: #e9e2d3;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .28 0 0 0 0 .18 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(120% 90% at 50% 30%, #f5f0e6 0%, #e7dfcf 55%, #d5cab4 100%);
+  user-select: none;
+}
+
+.scene {
+  position: relative;
+  display: flex;
+  justify-content: center;
+}
+
+/* Perspective lives on the book (not preserve-3d), so the turning leaf renders
+   in 3D while the flat pages keep ordinary z-index stacking — no z-fighting
+   between a leaf at rest and the page beneath it. */
+.book {
+  position: relative;
+  perspective: 2600px;
+  perspective-origin: 50% 45%;
+  transition: transform 0.75s cubic-bezier(0.45, 0.05, 0.25, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book { transition: none; }
+}
+
+/* Soft contact shadow under the whole book. */
+.shadow {
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  top: 8%;
+  bottom: -4%;
+  background: radial-gradient(ellipse at center, rgba(45, 32, 12, 0.42), rgba(45, 32, 12, 0) 70%);
+  filter: blur(16px);
+  transform: translateY(16px);
+  pointer-events: none;
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────────────── */
+
+.leather {
+  background-color: #12305f;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.3' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 .32 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(130% 90% at 28% 18%, rgba(255, 255, 255, 0.13), rgba(255, 255, 255, 0) 55%),
+    radial-gradient(120% 120% at 85% 105%, rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0) 60%),
+    linear-gradient(135deg, #18396e, #0b2247);
+}
+
+.paper {
+  background-color: var(--paper);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .4 0 0 0 0 .33 0 0 0 0 .2 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(140% 100% at 50% 50%, rgba(255, 255, 255, 0.5), rgba(236, 226, 204, 0.35) 100%);
+}
+
+.endpaper {
+  background-color: #1d3d70;
+  background-image:
+    radial-gradient(circle at 25% 25%, rgba(214, 182, 112, 0.22) 0 1.6px, transparent 2.2px),
+    radial-gradient(circle at 75% 75%, rgba(214, 182, 112, 0.22) 0 1.6px, transparent 2.2px),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.035) 75%),
+    linear-gradient(45deg, rgba(255, 255, 255, 0.035) 25%, transparent 25%, transparent 75%, rgba(255, 255, 255, 0.035) 75%);
+  background-size: 22px 22px, 22px 22px, 22px 22px, 22px 22px;
+  background-position: 0 0, 0 0, 0 0, 11px 11px;
+}
+
+/* ── Pages ────────────────────────────────────────────────────────────────── */
+
+.page {
+  position: absolute;
+  top: 0;
+  color: var(--ink);
+}
+
+.paperPage { overflow: hidden; }
+.left.paperPage { border-radius: 3px 1px 1px 3px; }
+.right.paperPage { border-radius: 1px 3px 3px 1px; }
+
+/* Gutter: pages curve down into the spine, so the inner edge sits in shadow. */
+.right.paperPage::after,
+.left.paperPage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.right.paperPage::after {
+  background:
+    linear-gradient(to right, rgba(70, 52, 22, 0.28), rgba(70, 52, 22, 0.1) 3%, rgba(70, 52, 22, 0) 11%),
+    linear-gradient(to left, rgba(70, 52, 22, 0.08), rgba(70, 52, 22, 0) 3%);
+}
+.left.paperPage::after {
+  background:
+    linear-gradient(to left, rgba(70, 52, 22, 0.28), rgba(70, 52, 22, 0.1) 3%, rgba(70, 52, 22, 0) 11%),
+    linear-gradient(to right, rgba(70, 52, 22, 0.08), rgba(70, 52, 22, 0) 3%);
+}
+
+/* Covers and endpapers overhang the page block like real hardcover boards. */
+.skin {
+  position: absolute;
+  top: -7px;
+  bottom: -7px;
+}
+.right .skin { left: 0; right: -8px; border-radius: 2px 6px 6px 2px; }
+.left .skin { left: -8px; right: 0; border-radius: 6px 2px 2px 6px; }
+
+.coverFront {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 -18px 30px rgba(0, 0, 0, 0.18);
+}
+/* Closed book: page block peeks out between the boards. */
+.closed {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    3px 3px 0 -1px #f2ebdb,
+    5px 5px 0 -2px #d7cdb6,
+    7px 7px 0 -3px #efe7d4,
+    9px 9px 0 -3px #0d2550;
+}
+/* Hinge groove near the spine. */
+.hinge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9%;
+  pointer-events: none;
+}
+.right .hinge::before {
+  left: 0;
+  background: linear-gradient(to right, rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.07) 22%, rgba(0, 0, 0, 0.2) 40%, rgba(0, 0, 0, 0) 100%);
+}
+.left .hinge::before {
+  right: 0;
+  background: linear-gradient(to left, rgba(0, 0, 0, 0.45), rgba(255, 255, 255, 0.07) 22%, rgba(0, 0, 0, 0.2) 40%, rgba(0, 0, 0, 0) 100%);
+}
+
+/* Inside of a cover: leather turn-in with the endpaper pasted down. */
+.pastedown {
+  position: absolute;
+  top: 9px;
+  bottom: 9px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+}
+.right .pastedown { left: 0; right: 10px; }
+.left .pastedown { left: 10px; right: 0; }
+
+/* Foil stamping */
+.gold {
+  background: linear-gradient(180deg, #f6e3a6 0%, #d3a95a 42%, #f2d68e 58%, #a77a30 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.55));
+}
+.goldFrame {
+  position: absolute;
+  inset: 7% 8% 7% 11%;
+  border: 1.5px solid rgba(214, 182, 112, 0.85);
+  border-radius: 2px;
+  box-shadow: inset 0 0 0 4px transparent, inset 0 0 0 5px rgba(214, 182, 112, 0.45), 0 1px 0 rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+.left .goldFrame { inset: 7% 11% 7% 8%; }
+
+/* Boards under the page block when the book is open. */
+.board {
+  position: absolute;
+  top: -7px;
+  bottom: -7px;
+  border-radius: 6px;
+}
+
+/* Page-edge thickness on the fore-edge and tail. */
+.stack {
+  position: absolute;
+  pointer-events: none;
+  background: repeating-linear-gradient(90deg, #f3ecdc 0 1px, #d5cbb5 1px 2px);
+}
+.stackBottom {
+  position: absolute;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, #f3ecdc 0 1px, #d5cbb5 1px 2px);
+}
+
+/* Page turn */
+.leaf {
+  position: absolute;
+  top: 0;
+  transform-style: preserve-3d;
+  z-index: 30;
+  will-change: transform;
+}
+.face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.faceBack { transform: rotateY(180deg); }
+.shade {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+/* Click / drag zones on the outer part of each page. */
+.hot {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 20;
+  cursor: grab;
+  touch-action: pan-y;
+}
+.hot:active { cursor: grabbing; }
+
+/* Folded corner — the hint that the page can be turned. */
+.corner {
+  position: absolute;
+  bottom: 0;
+  width: 22px;
+  height: 22px;
+  transition: width 0.25s ease, height 0.25s ease;
+  pointer-events: none;
+}
+.cornerR {
+  right: 0;
+  background: linear-gradient(315deg, rgba(233, 226, 211, 0) 50%, #e2d8c2 50%, #fffaf0 78%);
+  box-shadow: -2px -2px 5px rgba(60, 45, 20, 0.18);
+  border-top-left-radius: 2px;
+}
+.cornerL {
+  left: 0;
+  background: linear-gradient(45deg, rgba(233, 226, 211, 0) 50%, #e2d8c2 50%, #fffaf0 78%);
+  box-shadow: 2px -2px 5px rgba(60, 45, 20, 0.18);
+  border-top-right-radius: 2px;
+}
+.hot:hover .corner { width: 38px; height: 38px; }
+
+/* Ribbon bookmark tail */
+.ribbon {
+  position: absolute;
+  width: 9px;
+  pointer-events: none;
+  background: linear-gradient(90deg, #7d1515, #c23a2b 45%, #8c1a17);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 9px), 0 100%);
+  box-shadow: 1px 0 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Typography on the page ───────────────────────────────────────────────── */
+
+.body {
+  line-height: 1.55;
+  color: var(--ink);
+  font-feature-settings: 'kern', 'liga', 'onum';
+}
+.body b { font-weight: 600; color: #1d1a15; }
+.body a { color: #234a8c; text-decoration: underline; text-underline-offset: 2px; }
+.body mark { background: #f3e27a; color: inherit; padding: 0 0.1em; }
+
+.p { padding-top: 0.5em; text-align: justify; hyphens: auto; -webkit-hyphens: auto; }
+.i1 { padding-left: 1.5em; }
+.i2 { padding-left: 2.6em; color: var(--ink-soft); }
+.drop { display: flow-root; }
+.drop::first-letter {
+  float: left;
+  font-size: 3.05em;
+  line-height: 0.82;
+  padding: 0.07em 0.09em 0 0;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.chapter { padding-top: 1.5em; }
+.chapterNum {
+  font-size: 0.68em;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: #8a6a35;
+}
+.chapterTitle {
+  margin-top: 0.15em;
+  font-size: 1.42em;
+  line-height: 1.2;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: -0.005em;
+}
+.chapterSub {
+  margin-top: 0.2em;
+  font-style: italic;
+  color: var(--ink-soft);
+}
+.ornament {
+  display: flex;
+  align-items: center;
+  gap: 0.5em;
+  margin-top: 0.55em;
+  color: #b08d4a;
+  font-size: 0.6em;
+}
+.ornament::before,
+.ornament::after {
+  content: '';
+  height: 1px;
+  width: 2.6em;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+.heading {
+  padding-top: 1.05em;
+  font-weight: 600;
+  font-size: 1.02em;
+  color: var(--accent);
+}
+
+.tableWrap { padding-top: 0.6em; }
+.table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 0.8em;
+  line-height: 1.42;
+}
+.table th {
+  text-align: left;
+  font-weight: 600;
+  font-size: 0.86em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6f6250;
+  padding: 0.35em 0.5em 0.4em;
+  border-top: 1.5px solid #8f8166;
+  border-bottom: 1px solid #b7aa8f;
+}
+.table td {
+  vertical-align: top;
+  padding: 0.38em 0.5em;
+  border-bottom: 1px solid var(--rule);
+}
+.table tr:last-child td { border-bottom-color: #b7aa8f; }
+.tier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.55em;
+  height: 1.55em;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 0.92em;
+}
+.tier1 { background: rgba(185, 28, 28, 0.12); color: #9b1c1c; }
+.tier2 { background: rgba(194, 65, 12, 0.12); color: #a2410d; }
+.tier3 { background: rgba(161, 98, 7, 0.12); color: #855208; }
+.tier4 { background: rgba(75, 85, 99, 0.12); color: #4b5563; }
+
+.template { padding-top: 0.9em; }
+.templateCard {
+  border-left: 2px solid #b08d4a;
+  padding: 0.1em 0 0.1em 0.85em;
+}
+.templateTitle {
+  font-size: 0.72em;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #8a6a35;
+  font-weight: 600;
+}
+.templateLine { padding-top: 0.25em; }
+
+.runhead {
+  position: absolute;
+  font-size: 0.66em;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #a39478;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.folio {
+  position: absolute;
+  font-size: 0.74em;
+  color: #8d7f65;
+  font-feature-settings: 'onum';
+}
+
+/* Contents */
+.tocTitle {
+  font-size: 1.42em;
+  font-weight: 600;
+  color: var(--accent);
+  text-align: center;
+}
+.tocList { padding-top: 1.1em; }
+.tocItem {
+  display: flex;
+  align-items: baseline;
+  gap: 0.45em;
+  width: 100%;
+  padding: 0.28em 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--ink);
+  border-radius: 3px;
+}
+.tocItem:hover .tocText { color: #234a8c; }
+.tocNum { width: 1.6em; flex-shrink: 0; color: #8a6a35; font-feature-settings: 'onum'; }
+.tocText { flex-shrink: 1; }
+.tocDots {
+  flex: 1;
+  min-width: 1em;
+  border-bottom: 1px dotted #b9ab8d;
+  transform: translateY(-0.3em);
+}
+.tocPage { flex-shrink: 0; color: var(--ink-soft); font-feature-settings: 'onum'; }
