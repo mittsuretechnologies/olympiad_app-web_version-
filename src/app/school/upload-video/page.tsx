@@ -23,7 +23,7 @@ function Section({ title, required, children, muted }: {
     <div className={`${CARD} ${muted ? 'opacity-55' : ''}`}>
       <div className={CARD_HEADER}>
         <h2 className={CARD_TITLE}>
-          {title}{required && <span className="ml-1 text-[#B91C1C]">*</span>}
+          {title}{required && <span className="ml-1 text-[#B42323]">*</span>}
         </h2>
       </div>
       <div className="p-3.5">{children}</div>
@@ -239,28 +239,28 @@ export default function UploadVideoPage() {
     return (
       <div className="flex min-h-[65vh] items-center justify-center p-4">
         <div className={`${CARD} w-full max-w-md p-8 text-center`}>
-          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#047857]/10">
-            <CheckCircle2 className="h-6 w-6 text-[#047857]" />
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-[#1D7A3A]/10">
+            <CheckCircle2 className="h-6 w-6 text-[#1D7A3A]" />
           </div>
-          <h2 className="text-[17px] font-semibold text-[#111827]">Video uploaded</h2>
-          <p className="mt-1 text-[12.5px] text-[#6B7280]">
-            For <span className="font-medium text-[#374151]">{selectedStudent?.name}</span>
+          <h2 className="text-[17px] font-semibold text-[#0F1B2D]">Video uploaded</h2>
+          <p className="mt-1 text-[12.5px] text-[#677285]">
+            For <span className="font-medium text-[#475265]">{selectedStudent?.name}</span>
             {lastVideoMeta?.subCategory ? ` · ${lastVideoMeta.subCategory}` : ''}
           </p>
 
-          <div className="mx-auto mt-5 rounded-lg border border-[#E4E8EE] bg-[#FAFBFC] p-4">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-[#6B7280]">Video type</p>
-            <p className="mt-1 text-[14px] font-semibold text-[#111827]">
+          <div className="mx-auto mt-5 rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] p-4">
+            <p className="text-[11px] font-medium uppercase tracking-wide text-[#677285]">Video type</p>
+            <p className="mt-1 text-[14px] font-semibold text-[#0F1B2D]">
               {isEval ? 'Olympiad evaluation' : 'General feed'}
             </p>
-            <p className="mx-auto mt-1.5 max-w-[260px] text-[12px] leading-relaxed text-[#4B5563]">
+            <p className="mx-auto mt-1.5 max-w-[260px] text-[12px] leading-relaxed text-[#475265]">
               {isEval
                 ? 'This video will be reviewed and scored as an olympiad participation entry.'
                 : 'This student already has 2 approved olympiad videos, so this video appears in the general public feed only.'}
             </p>
           </div>
 
-          <p className="mt-4 text-[12px] text-[#6B7280]">Status will update after admin review.</p>
+          <p className="mt-4 text-[12px] text-[#677285]">Status will update after admin review.</p>
           <button onClick={reset} className={`cursor-pointer ${BTN_PRIMARY} mt-5`}>Upload another</button>
         </div>
       </div>
@@ -272,7 +272,7 @@ export default function UploadVideoPage() {
     <div className={STACK}>
       {/* The 9:16 / 2-minute limits are stated inside the drop zone where they
           are acted on, so they are not repeated in a hover-only subtitle. */}
-      <PageHeader icon={Upload} title="Upload Student Video" subtitle="Upload on behalf of a student" />
+      <PageHeader icon={Upload} title="Upload Student Video" />
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
@@ -283,9 +283,9 @@ export default function UploadVideoPage() {
             {/* Student selector */}
             <Section title="Select student" required>
               {loadingStudents ? (
-                <div className="h-10 animate-pulse rounded-lg bg-[#F1F3F6]" />
+                <div className="h-10 animate-pulse rounded-lg bg-[#EEF0F3]" />
               ) : students.length === 0 ? (
-                <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-[#D3DAE4] px-3.5 py-2.5 text-[12.5px] text-[#6B7280]">
+                <div className="flex items-center gap-2.5 rounded-lg border border-dashed border-[#D2D7DF] px-3.5 py-2.5 text-[12.5px] text-[#677285]">
                   <User className="h-4 w-4" /> No registered students found
                 </div>
               ) : (
@@ -294,14 +294,14 @@ export default function UploadVideoPage() {
                     type="button"
                     onClick={() => setShowDropdown(v => !v)}
                     aria-expanded={showDropdown}
-                    className={`flex w-full items-center gap-2.5 rounded-lg border border-[#E4E8EE] bg-white px-3 py-2 text-left transition-colors hover:border-[#1559C7]/50 ${FOCUS}`}
+                    className={`flex w-full items-center gap-2.5 rounded-lg border border-[#E6E8EC] bg-white px-3 py-2 text-left transition-colors hover:border-[#1559C7]/50 ${FOCUS}`}
                   >
                     {selectedStudent ? (
                       <>
                         <Avatar name={selectedStudent.name} tint={avatarTint(0)} size={28} />
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-[13px] font-medium text-[#111827]">{selectedStudent.name}</span>
-                          <span className="block truncate text-[11.5px] text-[#6B7280]">
+                          <span className="block truncate text-[13px] font-medium text-[#0F1B2D]">{selectedStudent.name}</span>
+                          <span className="block truncate text-[11.5px] text-[#677285]">
                             {selectedStudent.olympiadCode}{selectedStudent.className ? ` · ${selectedStudent.className}` : ''}
                           </span>
                         </span>
@@ -311,23 +311,23 @@ export default function UploadVideoPage() {
                           aria-label="Clear selected student"
                           onClick={e => { e.stopPropagation(); setSelectedStudent(null); }}
                           onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); setSelectedStudent(null); } }}
-                          className="flex-shrink-0 cursor-pointer rounded p-1 text-[#9CA3AF] hover:text-[#374151]"
+                          className="flex-shrink-0 cursor-pointer rounded p-1 text-[#98A1B2] hover:text-[#475265]"
                         >
                           <X className="h-4 w-4" />
                         </span>
                       </>
                     ) : (
                       <>
-                        <User className="h-4 w-4 flex-shrink-0 text-[#9CA3AF]" />
-                        <span className="flex-1 text-[13px] text-[#6B7280]">Choose a student…</span>
-                        <ChevronDown className="h-4 w-4 flex-shrink-0 text-[#9CA3AF]" />
+                        <User className="h-4 w-4 flex-shrink-0 text-[#98A1B2]" />
+                        <span className="flex-1 text-[13px] text-[#677285]">Choose a student…</span>
+                        <ChevronDown className="h-4 w-4 flex-shrink-0 text-[#98A1B2]" />
                       </>
                     )}
                   </button>
 
                   {showDropdown && (
-                    <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-lg border border-[#E4E8EE] bg-white shadow-[0_8px_24px_rgba(16,24,40,0.12)]">
-                      <div className="border-b border-[#F1F3F6] p-2">
+                    <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-lg border border-[#E6E8EC] bg-white shadow-[0_8px_24px_rgba(15,27,45,0.12)]">
+                      <div className="border-b border-[#EEF0F3] p-2">
                         <input
                           autoFocus type="text" placeholder="Search name or ID…"
                           aria-label="Search students"
@@ -337,17 +337,17 @@ export default function UploadVideoPage() {
                       </div>
                       <div className="max-h-60 overflow-y-auto">
                         {filtered.length === 0 ? (
-                          <p className="py-5 text-center text-[12.5px] text-[#6B7280]">No students found</p>
+                          <p className="py-5 text-center text-[12.5px] text-[#677285]">No students found</p>
                         ) : filtered.map((s, i) => (
                           <button
                             key={s.id} type="button"
                             onClick={() => { setSelectedStudent(s); setShowDropdown(false); setStudentSearch(''); }}
-                            className="flex w-full items-center gap-2.5 border-b border-[#F6F7F9] px-3 py-2 text-left transition-colors last:border-0 hover:bg-[#1559C7]/[0.04]"
+                            className="flex w-full items-center gap-2.5 border-b border-[#F8F9FB] px-3 py-2 text-left transition-colors last:border-0 hover:bg-[#1559C7]/[0.04]"
                           >
                             <Avatar name={s.name} tint={avatarTint(i)} size={26} />
                             <span className="min-w-0">
-                              <span className="block truncate text-[12.5px] font-medium text-[#111827]">{s.name}</span>
-                              <span className="block truncate text-[11.5px] text-[#6B7280]">
+                              <span className="block truncate text-[12.5px] font-medium text-[#0F1B2D]">{s.name}</span>
+                              <span className="block truncate text-[11.5px] text-[#677285]">
                                 {s.olympiadCode}{s.className ? ` · ${s.className}` : ''}
                               </span>
                             </span>
@@ -363,7 +363,7 @@ export default function UploadVideoPage() {
               {selectedStudent && (
                 <div className="mt-2.5">
                   {slotsLoading ? (
-                    <div className="h-7 animate-pulse rounded-lg bg-[#F1F3F6]" />
+                    <div className="h-7 animate-pulse rounded-lg bg-[#EEF0F3]" />
                   ) : slots && (
                     isGeneralOnly ? (
                       <StatusBadge tone="info" icon={CheckCircle2}>
@@ -394,7 +394,7 @@ export default function UploadVideoPage() {
             <Section title="Video file" required>
               {videoPreview ? (
                 <div className="space-y-2.5">
-                  <div className="relative overflow-hidden rounded-lg bg-[#0E1726]">
+                  <div className="relative overflow-hidden rounded-lg bg-[#0B1B33]">
                     <video src={videoPreview} controls className="max-h-64 w-full object-contain" />
                     <button
                       type="button"
@@ -406,22 +406,22 @@ export default function UploadVideoPage() {
                     </button>
                   </div>
 
-                  <p className="flex items-center gap-1.5 text-[12px] text-[#4B5563]">
-                    <Video className="h-3.5 w-3.5 flex-shrink-0 text-[#9CA3AF]" />
+                  <p className="flex items-center gap-1.5 text-[12px] text-[#475265]">
+                    <Video className="h-3.5 w-3.5 flex-shrink-0 text-[#98A1B2]" />
                     <span className="truncate">{videoFile?.name}</span>
-                    <span className="flex-shrink-0 text-[#6B7280]">
+                    <span className="flex-shrink-0 tabular-nums text-[#677285]">
                       · {((videoFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB
                     </span>
                   </p>
 
                   {aspectMismatch && (
-                    <p className="flex items-start gap-2 rounded-lg bg-[#B91C1C]/[0.08] px-3 py-2.5 text-[12px] text-[#B91C1C]">
+                    <p className="flex items-start gap-2 rounded-lg bg-[#B42323]/[0.08] px-3 py-2.5 text-[12px] text-[#B42323]">
                       <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
                       This video is not in 9:16 (portrait) format. Enable auto-crop below, or upload a portrait video.
                     </p>
                   )}
 
-                  <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#4B5563]">
+                  <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#475265]">
                     <input
                       type="checkbox" checked={autoCrop}
                       onChange={e => setAutoCrop(e.target.checked)}
@@ -437,18 +437,18 @@ export default function UploadVideoPage() {
                   onDrop={e => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f); }}
                   onClick={() => fileInputRef.current?.click()}
                   className={`cursor-pointer rounded-lg border-2 border-dashed p-9 text-center transition-colors ${
-                    dragOver ? 'border-[#1559C7] bg-[#1559C7]/[0.04]' : 'border-[#D3DAE4] hover:border-[#1559C7] hover:bg-[#FAFBFC]'
+                    dragOver ? 'border-[#1559C7] bg-[#1559C7]/[0.04]' : 'border-[#D2D7DF] hover:border-[#1559C7] hover:bg-[#F8F9FB]'
                   }`}
                 >
                   <div className={`mx-auto mb-2.5 flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-                    dragOver ? 'bg-[#1559C7] text-white' : 'bg-[#F1F3F6] text-[#6B7280]'
+                    dragOver ? 'bg-[#1559C7] text-white' : 'bg-[#EEF0F3] text-[#677285]'
                   }`}>
                     <Upload className="h-4 w-4" />
                   </div>
-                  <p className="text-[13px] font-medium text-[#374151]">
+                  <p className="text-[13px] font-medium text-[#475265]">
                     {dragOver ? 'Drop it here' : 'Click to select or drag & drop'}
                   </p>
-                  <p className="mt-1 text-[11.5px] text-[#6B7280]">
+                  <p className="mt-1 text-[11.5px] text-[#677285]">
                     MP4, MOV, AVI · 9:16 portrait · Max 2 min · Auto-compressed above 150 MB
                   </p>
                   <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
@@ -488,18 +488,18 @@ export default function UploadVideoPage() {
                       onClick={() => setIsPublic(opt.val)}
                       aria-pressed={active}
                       className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${FOCUS} ${
-                        active ? 'border-[#1559C7] bg-[#1559C7]/[0.04]' : 'border-[#E4E8EE] hover:bg-[#FAFBFC]'
+                        active ? 'border-[#1559C7] bg-[#1559C7]/[0.04]' : 'border-[#E6E8EC] hover:bg-[#F8F9FB]'
                       }`}
                     >
-                      <Icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-[#1559C7]' : 'text-[#9CA3AF]'}`} />
+                      <Icon className={`h-4 w-4 flex-shrink-0 ${active ? 'text-[#1559C7]' : 'text-[#98A1B2]'}`} />
                       <span className="min-w-0 flex-1">
-                        <span className={`block text-[12.5px] font-semibold ${active ? 'text-[#1559C7]' : 'text-[#374151]'}`}>
+                        <span className={`block text-[12.5px] font-semibold ${active ? 'text-[#1559C7]' : 'text-[#475265]'}`}>
                           {opt.label}
                         </span>
-                        <span className="block text-[11.5px] text-[#6B7280]">{opt.desc}</span>
+                        <span className="block text-[11.5px] text-[#677285]">{opt.desc}</span>
                       </span>
                       <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${
-                        active ? 'border-[#1559C7] bg-[#1559C7]' : 'border-[#D3DAE4]'
+                        active ? 'border-[#1559C7] bg-[#1559C7]' : 'border-[#D2D7DF]'
                       }`}>
                         {active && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                       </span>
@@ -515,7 +515,7 @@ export default function UploadVideoPage() {
                 <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1559C7]">
                   <AlertCircle size={13} /> General feed upload
                 </p>
-                <p className="mt-1 text-[12px] leading-relaxed text-[#4B5563]">
+                <p className="mt-1 text-[12px] leading-relaxed text-[#475265]">
                   This student has 2 approved olympiad videos. Any further uploads go to the general feed —
                   not olympiad evaluation.
                 </p>
@@ -525,7 +525,7 @@ export default function UploadVideoPage() {
             {/* Category */}
             <Section title="Category" required muted={!canPickCategory}>
               {!canPickCategory && (
-                <p className="mb-2 text-[12px] text-[#6B7280]">
+                <p className="mb-2 text-[12px] text-[#677285]">
                   {selectedStudent ? 'Loading student details…' : 'Select a student first to choose a category.'}
                 </p>
               )}
@@ -551,30 +551,30 @@ export default function UploadVideoPage() {
                       }}
                       className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${FOCUS} ${
                         isFilled
-                          ? 'cursor-not-allowed border-[#E4E8EE] bg-[#FAFBFC]'
+                          ? 'cursor-not-allowed border-[#E6E8EC] bg-[#F8F9FB]'
                           : !canPickCategory
-                            ? 'cursor-not-allowed border-[#E4E8EE]'
+                            ? 'cursor-not-allowed border-[#E6E8EC]'
                             : isSelected
                               ? 'border-[#1559C7] bg-[#1559C7]/[0.04]'
-                              : 'border-[#E4E8EE] hover:bg-[#FAFBFC]'
+                              : 'border-[#E6E8EC] hover:bg-[#F8F9FB]'
                       }`}
                     >
                       {isFilled
-                        ? <Lock className="h-4 w-4 flex-shrink-0 text-[#047857]" />
-                        : <Icon className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-[#1559C7]' : 'text-[#9CA3AF]'}`} />}
+                        ? <Lock className="h-4 w-4 flex-shrink-0 text-[#1D7A3A]" />
+                        : <Icon className={`h-4 w-4 flex-shrink-0 ${isSelected ? 'text-[#1559C7]' : 'text-[#98A1B2]'}`} />}
                       <span className="min-w-0 flex-1">
                         <span className={`block text-[12.5px] font-semibold ${
-                          isFilled ? 'text-[#047857]' : isSelected ? 'text-[#1559C7]' : 'text-[#374151]'
+                          isFilled ? 'text-[#1D7A3A]' : isSelected ? 'text-[#1559C7]' : 'text-[#475265]'
                         }`}>{cat.label}</span>
-                        {isFilled && <span className="block text-[11.5px] text-[#047857]">Already submitted</span>}
+                        {isFilled && <span className="block text-[11.5px] text-[#1D7A3A]">Already submitted</span>}
                         {isRejected && !isFilled && (
-                          <span className="flex items-center gap-1 text-[11.5px] text-[#B91C1C]">
+                          <span className="flex items-center gap-1 text-[11.5px] text-[#B42323]">
                             <RefreshCw className="h-2.5 w-2.5" /> Re-upload available
                           </span>
                         )}
                       </span>
                       {(isFilled || isSelected) && (
-                        <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${isFilled ? 'text-[#047857]' : 'text-[#1559C7]'}`} />
+                        <CheckCircle2 className={`h-4 w-4 flex-shrink-0 ${isFilled ? 'text-[#1D7A3A]' : 'text-[#1559C7]'}`} />
                       )}
                     </button>
                   );
@@ -597,7 +597,7 @@ export default function UploadVideoPage() {
                       className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${FOCUS} ${
                         subCategory === sub
                           ? 'border-[#1559C7] bg-[#1559C7] text-white'
-                          : 'border-[#E4E8EE] text-[#4B5563] hover:bg-[#FAFBFC]'
+                          : 'border-[#E6E8EC] text-[#475265] hover:bg-[#F8F9FB]'
                       }`}
                     >
                       {sub}
@@ -608,7 +608,7 @@ export default function UploadVideoPage() {
                 {isCustomTalent && (
                   <div className="mt-2.5">
                     <label htmlFor="custom-talent" className={LABEL}>
-                      {subCategory === 'Any Other' ? 'Topic' : 'Talent name'} <span className="text-[#B91C1C]">*</span>
+                      {subCategory === 'Any Other' ? 'Topic' : 'Talent name'} <span className="text-[#B42323]">*</span>
                     </label>
                     <input
                       id="custom-talent"
@@ -626,7 +626,7 @@ export default function UploadVideoPage() {
 
             {/* Error */}
             {errorMsg && (
-              <p className="flex items-start gap-2 rounded-lg bg-[#B91C1C]/[0.08] px-3 py-2.5 text-[12.5px] text-[#B91C1C]" role="alert">
+              <p className="flex items-start gap-2 rounded-lg bg-[#B42323]/[0.08] px-3 py-2.5 text-[12.5px] text-[#B42323]" role="alert">
                 <AlertCircle className="mt-0.5 h-4 w-4 flex-shrink-0" />
                 {errorMsg}
               </p>
@@ -636,10 +636,10 @@ export default function UploadVideoPage() {
             {(uploadState === 'uploading' || uploadState === 'saving') && (
               <div className={`${CARD} p-3.5`}>
                 <div className="mb-2 flex items-center justify-between text-[12.5px]">
-                  <span className="font-medium text-[#374151]">
+                  <span className="font-medium text-[#475265]">
                     {uploadState === 'uploading' ? 'Uploading…' : 'Saving details…'}
                   </span>
-                  <span className="font-semibold text-[#1559C7]">{progress}%</span>
+                  <span className="font-semibold tabular-nums text-[#1559C7]">{progress}%</span>
                 </div>
                 <ProgressBar value={progress} />
               </div>

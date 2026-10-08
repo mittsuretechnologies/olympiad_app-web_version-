@@ -44,7 +44,7 @@ function Items({ items, depth = 0 }: { items?: AgreementItem[]; depth?: number }
     <ol className="mt-2.5 space-y-2 list-none">
       {items.map((it, i) => (
         <li key={it.n} className="grid grid-cols-[2rem_1fr] gap-x-1">
-          <span className="tabular-nums text-[#6B7280]">{itemLabel(it.n, depth, i)}</span>
+          <span className="tabular-nums text-[#677285]">{itemLabel(it.n, depth, i)}</span>
           <div>
             {it.lead && <strong className="font-semibold text-[#0B1B36]">{it.lead} </strong>}
             {it.text}
@@ -69,18 +69,18 @@ export default function AgreementDocument({
   return (
     <article className={`text-[#1F2937] ${compact ? 'text-[13px]' : 'text-[14px]'} leading-[1.65] [font-feature-settings:'cv11','ss01']`}>
       {/* Title block */}
-      <header className="pb-4 border-b border-[#E4E8EE]">
+      <header className="pb-4 border-b border-[#E6E8EC]">
         <h1 className="text-[18px] sm:text-[19px] leading-[1.3] font-semibold tracking-[-0.01em] text-[#0B1B36]">{doc.title}</h1>
-        <p className="mt-1 text-[12px] leading-snug text-[#6B7280]">
+        <p className="mt-1 text-[12px] leading-snug text-[#677285]">
           Version {doc.version} <span aria-hidden="true">·</span> Last updated {doc.lastUpdated}
           {preparedFor && <> <span aria-hidden="true">·</span> Prepared for {preparedFor}</>}
         </p>
       </header>
 
       {/* Notice */}
-      <motion.div {...reveal} className="mt-5 rounded-md border border-[#E4E8EE] bg-[#FAFBFC] px-4 py-3">
-        <p className="text-[12px] font-semibold text-[#374151]">IMPORTANT – PLEASE READ:</p>
-        <p className="mt-1 text-[13px] leading-[1.6] text-[#4B5563]">{doc.notice}</p>
+      <motion.div {...reveal} className="mt-5 rounded-md border border-[#E6E8EC] bg-[#F8F9FB] px-4 py-3">
+        <p className="text-[12px] font-semibold text-[#2A3446]">IMPORTANT – PLEASE READ:</p>
+        <p className="mt-1 text-[13px] leading-[1.6] text-[#475265]">{doc.notice}</p>
       </motion.div>
 
       {/* Parties */}
@@ -88,10 +88,10 @@ export default function AgreementDocument({
         <p>{opening}</p>
         <div className="mt-3 grid md:grid-cols-2 gap-3">
           {parties.map((p, i) => (
-            <div key={i} className="rounded-lg border border-[#E4E8EE] bg-[#FAFBFC] p-3.5">
-              <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#6B7280]">Party {i + 1}</p>
+            <div key={i} className="rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] p-3.5">
+              <p className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-[#677285]">Party {i + 1}</p>
               <p className="mt-0.5 text-[13px] font-semibold text-[#0B1B36]">{partyNames[i] ?? `Party ${i + 1}`}</p>
-              <p className="mt-1.5 text-[12.5px] leading-[1.6] text-[#4B5563]">{p}</p>
+              <p className="mt-1.5 text-[12.5px] leading-[1.6] text-[#475265]">{p}</p>
             </div>
           ))}
         </div>
@@ -110,21 +110,21 @@ export default function AgreementDocument({
           {s.table && (
             <>
               {/* Desktop: true table */}
-              <motion.div {...reveal} className="mt-3 hidden md:block overflow-hidden rounded-lg border border-[#E4E8EE]">
+              <motion.div {...reveal} className="mt-3 hidden md:block overflow-hidden rounded-lg border border-[#E6E8EC]">
                 <table className="w-full border-collapse text-[12.5px] leading-[1.5]">
                   <thead>
-                    <tr className="bg-[#F6F7F9]">
+                    <tr className="bg-[#F4F5F7]">
                       {s.table.columns.map(h => (
-                        <th key={h} scope="col" className="px-4 py-2.5 text-left text-[11.5px] font-semibold text-[#4B5563] border-b border-[#E4E8EE]">{h}</th>
+                        <th key={h} scope="col" className="px-4 py-2.5 text-left text-[11.5px] font-semibold text-[#475265] border-b border-[#E6E8EC]">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {s.table.rows.map(r => (
-                      <tr key={r[0]} className="align-top border-b border-[#E4E8EE] last:border-0">
+                      <tr key={r[0]} className="align-top border-b border-[#E6E8EC] last:border-0">
                         <th scope="row" className="w-[24%] px-4 py-3 text-left font-semibold text-[#0B1B36]">{r[0]}</th>
-                        <td className="px-4 py-3 text-[#374151] border-l border-[#E4E8EE]">{r[1]}</td>
-                        <td className="px-4 py-3 text-[#374151] border-l border-[#E4E8EE]">{r[2]}</td>
+                        <td className="px-4 py-3 text-[#2A3446] border-l border-[#E6E8EC]">{r[1]}</td>
+                        <td className="px-4 py-3 text-[#2A3446] border-l border-[#E6E8EC]">{r[2]}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -133,12 +133,12 @@ export default function AgreementDocument({
               {/* Mobile: one card per responsibility, no sideways scrolling */}
               <div className="mt-3 space-y-2.5 md:hidden text-[13px] leading-[1.55]">
                 {s.table.rows.map(r => (
-                  <motion.div key={r[0]} {...reveal} className="rounded-lg border border-[#E4E8EE] p-3.5">
+                  <motion.div key={r[0]} {...reveal} className="rounded-lg border border-[#E6E8EC] p-3.5">
                     <p className="font-semibold text-[#0B1B36]">{r[0]}</p>
-                    <p className="mt-2 text-[11.5px] font-semibold text-[#6B7280]">{s.table!.columns[1]}</p>
-                    <p className="text-[#374151]">{r[1]}</p>
-                    <p className="mt-2 text-[11.5px] font-semibold text-[#6B7280]">{s.table!.columns[2]}</p>
-                    <p className="text-[#374151]">{r[2]}</p>
+                    <p className="mt-2 text-[11.5px] font-semibold text-[#677285]">{s.table!.columns[1]}</p>
+                    <p className="text-[#2A3446]">{r[1]}</p>
+                    <p className="mt-2 text-[11.5px] font-semibold text-[#677285]">{s.table!.columns[2]}</p>
+                    <p className="text-[#2A3446]">{r[2]}</p>
                   </motion.div>
                 ))}
               </div>
@@ -148,7 +148,7 @@ export default function AgreementDocument({
           <div className="mt-2.5 space-y-2.5">
             {s.clauses.map((c, i) => (
               <motion.div key={c.n ?? i} {...reveal} className={NUM_COL}>
-                <span className="pt-[1px] text-[12.5px] tabular-nums text-[#6B7280]">{clauseLabel(c.n)}</span>
+                <span className="pt-[1px] text-[12.5px] tabular-nums text-[#677285]">{clauseLabel(c.n)}</span>
                 <div>
                   {c.lead && <strong className="font-semibold text-[#0B1B36]">{c.lead} </strong>}
                   {c.text}
@@ -161,10 +161,10 @@ export default function AgreementDocument({
         </section>
       ))}
 
-      <div className="mt-10 flex items-center gap-3 text-[11.5px] text-[#6B7280]">
-        <span className="h-px flex-1 bg-[#E4E8EE]" />
+      <div className="mt-10 flex items-center gap-3 text-[11.5px] text-[#677285]">
+        <span className="h-px flex-1 bg-[#E6E8EC]" />
         End of agreement · Version {doc.version}
-        <span className="h-px flex-1 bg-[#E4E8EE]" />
+        <span className="h-px flex-1 bg-[#E6E8EC]" />
       </div>
     </article>
   );

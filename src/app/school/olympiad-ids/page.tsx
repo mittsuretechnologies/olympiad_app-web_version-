@@ -315,7 +315,6 @@ export default function SchoolOlympiadIdsPage() {
       <PageHeader
         icon={Contact}
         title="Olympiad IDs"
-        subtitle="Allot roll numbers to students"
         actions={
           <button onClick={exportCSV} disabled={filtered.length === 0} className={BTN_SUBTLE}>
             <Download size={13} /> Export
@@ -343,7 +342,7 @@ export default function SchoolOlympiadIdsPage() {
       {/* Toolbar */}
       <div className={`${CARD} flex flex-wrap items-center gap-2 px-3 py-2.5`}>
         <div className="relative min-w-[190px] flex-1 max-w-xs">
-          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" size={13} />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" size={13} />
           <input
             type="text"
             placeholder="Search ID or name"
@@ -392,16 +391,16 @@ export default function SchoolOlympiadIdsPage() {
                 <button
                   onClick={() => toggleCollapse(code)}
                   aria-expanded={!isCollapsed}
-                  className={`flex w-full items-center justify-between gap-3 border-b border-[#E4E8EE] bg-[#FAFBFC] px-3 py-2 transition-colors hover:bg-[#F3F5F8] ${FOCUS}`}
+                  className={`flex w-full items-center justify-between gap-3 border-b border-[#E6E8EC] bg-[#F8F9FB] px-3 py-2 transition-colors hover:bg-[#EEF0F3] ${FOCUS}`}
                 >
                   <span className="flex min-w-0 items-center gap-2">
-                    <BookOpen size={14} className="flex-shrink-0 text-[#6B7280]" />
-                    <span className="truncate text-[13px] font-semibold text-[#0E2A5C]">{label}</span>
-                    <span className="flex-shrink-0 rounded bg-[#EDF0F4] px-1.5 py-0.5 text-[11px] font-medium text-[#4B5563]">
+                    <BookOpen size={14} className="flex-shrink-0 text-[#677285]" />
+                    <span className="truncate text-[13px] font-semibold text-[#0B1B33]">{label}</span>
+                    <span className="flex-shrink-0 rounded bg-[#EEF0F3] px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-[#475265]">
                       {items.length} IDs
                     </span>
                   </span>
-                  <span className="flex flex-shrink-0 items-center gap-2.5 text-[12px] text-[#6B7280]">
+                  <span className="flex flex-shrink-0 items-center gap-2.5 text-[12px] tabular-nums text-[#677285]">
                     <span className="hidden sm:inline">{classAssigned}/{items.length} assigned</span>
                     {isCollapsed ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
                   </span>
@@ -422,30 +421,30 @@ export default function SchoolOlympiadIdsPage() {
                       <tbody>
                         {items.map((a, idx) => (
                           <tr key={a.id} className={TR}>
-                            <td className={`${TD} text-[#9CA3AF]`}>{idx + 1}</td>
+                            <td className={`${TD} text-[#98A1B2]`}>{idx + 1}</td>
                             <td className={`${TD} font-mono font-semibold text-[#1559C7]`}>{a.code}</td>
                             <td className={TD}>
                               {a.assignedName
-                                ? <span className="font-medium text-[#111827]">{a.assignedName}</span>
-                                : <span className="text-[#9CA3AF]">Not assigned</span>}
+                                ? <span className="font-medium text-[#0F1B2D]">{a.assignedName}</span>
+                                : <span className="text-[#98A1B2]">Not assigned</span>}
                             </td>
                             <td className={TD}>{renderStatus(a)}</td>
                             <td className={`${TD} text-center`}>
                               {a.student ? (
-                                <span className="text-[#9CA3AF]">—</span>
+                                <span className="text-[#98A1B2]">—</span>
                               ) : a.hasAppUser || a.assignedName ? (
                                 <div className="flex items-center justify-center gap-1.5">
                                   <button onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`} title="Edit name, phone & email">
                                     <Pencil size={12} />
                                   </button>
-                                  <button onClick={() => handleUnassign(a.code)} className={`${BTN_ICON} hover:!text-[#B91C1C]`} aria-label={`Remove assignment for ${a.code}`} title="Remove">
+                                  <button onClick={() => handleUnassign(a.code)} className={`${BTN_ICON} hover:!text-[#B42323]`} aria-label={`Remove assignment for ${a.code}`} title="Remove">
                                     <Trash2 size={12} />
                                   </button>
                                 </div>
                               ) : (
                                 <button
                                   onClick={() => openAllotModal(a)}
-                                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#D3DAE4] px-2.5 py-1 text-[11.5px] font-semibold text-[#374151] transition-colors hover:border-[#1559C7]/50 hover:bg-[#1559C7]/[0.04] hover:text-[#1559C7] ${FOCUS}`}
+                                  className={`inline-flex cursor-pointer items-center gap-1.5 rounded-md border border-[#D2D7DF] px-2.5 py-1 text-[11.5px] font-semibold text-[#475265] transition-colors hover:border-[#1559C7]/50 hover:bg-[#1559C7]/[0.04] hover:text-[#1559C7] ${FOCUS}`}
                                 >
                                   <UserPlus size={11} /> Allot
                                 </button>
@@ -461,7 +460,7 @@ export default function SchoolOlympiadIdsPage() {
             );
           })}
 
-          <p className="px-1 text-right text-[11.5px] text-[#6B7280]">
+          <p className="px-1 text-right text-[11.5px] text-[#677285]">
             <RowCount shown={filtered.length} total={allocations.length} noun="records" />
           </p>
         </div>
@@ -487,22 +486,22 @@ export default function SchoolOlympiadIdsPage() {
         >
           {allotSuccess ? (
             <div className="space-y-4 p-5 text-center">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#047857]/10">
-                <CheckCircle2 className="h-6 w-6 text-[#047857]" />
+              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#1D7A3A]/10">
+                <CheckCircle2 className="h-6 w-6 text-[#1D7A3A]" />
               </div>
               <div>
-                <p className="text-[14.5px] font-semibold text-[#111827]">Student allotted</p>
-                <p className="mt-0.5 text-[12px] text-[#6B7280]">Share these login details with the student</p>
+                <p className="text-[14.5px] font-semibold text-[#0F1B2D]">Student allotted</p>
+                <p className="mt-0.5 text-[12px] text-[#677285]">Share these login details with the student</p>
               </div>
-              <dl className="space-y-1.5 rounded-lg border border-[#E4E8EE] bg-[#FAFBFC] p-3 text-left">
+              <dl className="space-y-1.5 rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] p-3 text-left">
                 {[
                   ['Olympiad ID', allotSuccess.code],
                   ['User ID', allotSuccess.userId],
                   ['Password', allotSuccess.password],
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-center justify-between gap-3 text-[12px]">
-                    <dt className="text-[#6B7280]">{k}</dt>
-                    <dd className="select-all font-mono font-semibold text-[#111827]">{v}</dd>
+                    <dt className="text-[#677285]">{k}</dt>
+                    <dd className="select-all font-mono font-semibold text-[#0F1B2D]">{v}</dd>
                   </div>
                 ))}
               </dl>
@@ -512,12 +511,12 @@ export default function SchoolOlympiadIdsPage() {
               <div className="space-y-1.5">
                 {(allotSuccess.smsSent || allotSuccess.smsError) && (
                   allotSuccess.smsSent ? (
-                    <p className="flex items-start gap-1.5 rounded-lg bg-[#047857]/10 px-3 py-2 text-left text-[12px] text-[#047857]">
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#1D7A3A]/10 px-3 py-2 text-left text-[12px] text-[#1D7A3A]">
                       <CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" />
                       Credentials sent by SMS to {allotSuccess.phone}.
                     </p>
                   ) : (
-                    <p className="flex items-start gap-1.5 rounded-lg bg-[#B91C1C]/10 px-3 py-2 text-left text-[12px] text-[#B91C1C]">
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#B42323]/10 px-3 py-2 text-left text-[12px] text-[#B42323]">
                       <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
                       Could not send SMS ({allotSuccess.smsError || 'gateway error'}).
                     </p>
@@ -525,19 +524,19 @@ export default function SchoolOlympiadIdsPage() {
                 )}
                 {(allotSuccess.emailSent || allotSuccess.emailError) && (
                   allotSuccess.emailSent ? (
-                    <p className="flex items-start gap-1.5 rounded-lg bg-[#047857]/10 px-3 py-2 text-left text-[12px] text-[#047857]">
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#1D7A3A]/10 px-3 py-2 text-left text-[12px] text-[#1D7A3A]">
                       <CheckCircle2 size={13} className="mt-0.5 flex-shrink-0" />
                       Credentials emailed to {allotSuccess.email}.
                     </p>
                   ) : (
-                    <p className="flex items-start gap-1.5 rounded-lg bg-[#B91C1C]/10 px-3 py-2 text-left text-[12px] text-[#B91C1C]">
+                    <p className="flex items-start gap-1.5 rounded-lg bg-[#B42323]/10 px-3 py-2 text-left text-[12px] text-[#B42323]">
                       <AlertCircle size={13} className="mt-0.5 flex-shrink-0" />
                       Could not email credentials ({allotSuccess.emailError || 'mail error'}).
                     </p>
                   )
                 )}
                 {!allotSuccess.smsSent && !allotSuccess.emailSent && (
-                  <p className="rounded-lg bg-[#F6F7F9] px-3 py-2 text-left text-[12px] text-[#4B5563]">
+                  <p className="rounded-lg bg-[#F8F9FB] px-3 py-2 text-left text-[12px] text-[#475265]">
                     Nothing reached the student — note these details down and share them manually.
                   </p>
                 )}
@@ -546,45 +545,45 @@ export default function SchoolOlympiadIdsPage() {
             </div>
           ) : allotStep === 'deliver' ? (
             <div className="space-y-3 p-5">
-              <p className="text-[12.5px] leading-snug text-[#4B5563]">
+              <p className="text-[12.5px] leading-snug text-[#475265]">
                 Choose how {allotName.trim() || 'the student'} receives their login details.
                 They are also shown here once the ID is allotted.
               </p>
               <div className="space-y-2">
-                <label className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${sendSms ? 'border-[#1559C7] bg-[#1559C7]/[0.05]' : 'border-[#E4E8EE] bg-white'}`}>
+                <label className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${sendSms ? 'border-[#1559C7] bg-[#1559C7]/[0.05]' : 'border-[#E6E8EC] bg-white'}`}>
                   <input
                     type="checkbox" checked={sendSms}
                     onChange={e => { setSendSms(e.target.checked); setAllotError(''); }}
                     className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[#1559C7]"
                   />
                   <span className="min-w-0">
-                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#111827]">
-                      <Phone size={13} className="text-[#6B7280]" /> Send by SMS
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0F1B2D]">
+                      <Phone size={13} className="text-[#677285]" /> Send by SMS
                     </span>
-                    <span className="mt-0.5 block truncate text-[11.5px] text-[#6B7280]">{allotPhone.trim()}</span>
+                    <span className="mt-0.5 block truncate text-[11.5px] tabular-nums text-[#677285]">{allotPhone.trim()}</span>
                   </span>
                 </label>
                 {/* Email is only offerable when an address was filled in on the
                     previous step, so the disabled state explains itself rather
                     than looking like a permission problem. */}
-                <label className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${!allotEmail.trim() ? 'cursor-not-allowed border-[#E4E8EE] bg-[#F6F7F9] opacity-70' : sendEmail ? 'cursor-pointer border-[#1559C7] bg-[#1559C7]/[0.05]' : 'cursor-pointer border-[#E4E8EE] bg-white'}`}>
+                <label className={`flex items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${!allotEmail.trim() ? 'cursor-not-allowed border-[#E6E8EC] bg-[#F8F9FB] opacity-70' : sendEmail ? 'cursor-pointer border-[#1559C7] bg-[#1559C7]/[0.05]' : 'cursor-pointer border-[#E6E8EC] bg-white'}`}>
                   <input
                     type="checkbox" checked={sendEmail} disabled={!allotEmail.trim()}
                     onChange={e => { setSendEmail(e.target.checked); setAllotError(''); }}
                     className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[#1559C7] disabled:cursor-not-allowed"
                   />
                   <span className="min-w-0">
-                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#111827]">
-                      <Mail size={13} className="text-[#6B7280]" /> Send by email
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0F1B2D]">
+                      <Mail size={13} className="text-[#677285]" /> Send by email
                     </span>
-                    <span className="mt-0.5 block truncate text-[11.5px] text-[#6B7280]">
+                    <span className="mt-0.5 block truncate text-[11.5px] text-[#677285]">
                       {allotEmail.trim() || 'No email address given'}
                     </span>
                   </span>
                 </label>
               </div>
               {allotError && (
-                <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
+                <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]" role="alert">
                   <AlertCircle size={12} /> {allotError}
                 </p>
               )}
@@ -605,14 +604,14 @@ export default function SchoolOlympiadIdsPage() {
           ) : (
             <div className="space-y-3 p-5">
               <div>
-                <label htmlFor="allot-name" className={LABEL}>Student name <span className="text-[#B91C1C]">*</span></label>
+                <label htmlFor="allot-name" className={LABEL}>Student name <span className="text-[#B42323]">*</span></label>
                 <input
                   id="allot-name" type="text" placeholder="Full name" value={allotName}
                   onChange={e => setAllotName(e.target.value)} autoFocus className={INPUT}
                 />
               </div>
               <div>
-                <label htmlFor="allot-guardian-name" className={LABEL}>Parent/Guardian name <span className="text-[#B91C1C]">*</span></label>
+                <label htmlFor="allot-guardian-name" className={LABEL}>Parent/Guardian name <span className="text-[#B42323]">*</span></label>
                 <input
                   id="allot-guardian-name" type="text" placeholder="Parent or guardian's full name" value={allotGuardianName}
                   onChange={e => setAllotGuardianName(e.target.value)}
@@ -621,9 +620,9 @@ export default function SchoolOlympiadIdsPage() {
                 />
               </div>
               <div>
-                <label htmlFor="allot-phone" className={LABEL}>Phone number <span className="text-[#B91C1C]">*</span></label>
+                <label htmlFor="allot-phone" className={LABEL}>Phone number <span className="text-[#B42323]">*</span></label>
                 <div className="relative">
-                  <Phone size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                  <Phone size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
                   <input
                     id="allot-phone" type="tel" placeholder="10-digit mobile" value={allotPhone}
                     onChange={e => setAllotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
@@ -633,9 +632,9 @@ export default function SchoolOlympiadIdsPage() {
                 </div>
               </div>
               <div>
-                <label htmlFor="allot-email" className={LABEL}>Email address <span className="text-[#B91C1C]">*</span></label>
+                <label htmlFor="allot-email" className={LABEL}>Email address <span className="text-[#B42323]">*</span></label>
                 <div className="relative">
-                  <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                  <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
                   <input
                     id="allot-email" type="email" placeholder="student@example.com" value={allotEmail}
                     onChange={e => setAllotEmail(e.target.value)}
@@ -644,7 +643,7 @@ export default function SchoolOlympiadIdsPage() {
                   />
                 </div>              </div>
               {allotError && (
-                <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
+                <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]" role="alert">
                   <AlertCircle size={12} /> {allotError}
                 </p>
               )}
@@ -653,7 +652,7 @@ export default function SchoolOlympiadIdsPage() {
                   another neutral panel. Line-height is snug rather than relaxed
                   — at two lines the block otherwise stands as tall as an input
                   field, which overstates a passive note. */}
-              <p className="rounded-lg border border-[#FAEBBF] bg-[#FEF9E7] px-3 py-2 text-[12px] leading-snug text-[#713F12]">
+              <p className="rounded-lg border border-[#A1530A]/25 bg-[#A1530A]/[0.08] px-3 py-2 text-[12px] leading-snug text-[#A1530A]">
                 A login account and password are created automatically for this ID.
               </p>
               <div className="flex gap-2 pt-1">
@@ -688,7 +687,7 @@ export default function SchoolOlympiadIdsPage() {
             <div>
               <label htmlFor="edit-phone" className={LABEL}>Phone number</label>
               <div className="relative">
-                <Phone size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <Phone size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
                 <input
                   id="edit-phone" type="tel" placeholder="10-digit mobile" value={editAppPhone}
                   onChange={e => setEditAppPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
@@ -700,7 +699,7 @@ export default function SchoolOlympiadIdsPage() {
             <div>
               <label htmlFor="edit-email" className={LABEL}>Email address</label>
               <div className="relative">
-                <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#9CA3AF]" />
+                <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
                 <input
                   id="edit-email" type="email" placeholder="student@example.com" value={editAppEmail}
                   onChange={e => setEditAppEmail(e.target.value)}
@@ -710,11 +709,11 @@ export default function SchoolOlympiadIdsPage() {
               </div>
             </div>
             {editAppError && (
-              <p className="flex items-center gap-1.5 text-[12px] text-[#B91C1C]" role="alert">
+              <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]" role="alert">
                 <AlertCircle size={12} /> {editAppError}
               </p>
             )}
-            <p className="rounded-lg border border-[#FAEBBF] bg-[#FEF9E7] px-3 py-2 text-[12px] leading-snug text-[#713F12]">
+            <p className="rounded-lg border border-[#A1530A]/25 bg-[#A1530A]/[0.08] px-3 py-2 text-[12px] leading-snug text-[#A1530A]">
               This updates the student&apos;s app account. The login password stays unchanged.
             </p>
             <div className="flex gap-2">

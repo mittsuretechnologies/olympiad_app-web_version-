@@ -61,19 +61,22 @@ export type StatusTone = keyof typeof STATUS;
 
 /* ── Composable class strings ────────────────────────────────────────────── */
 
-/** Standard card: white, crisp border, one soft shadow level. */
+/** Standard card: white, crisp border, one soft shadow level. Tight corners and
+ *  a thin border keep it reading as a working surface, not a marketing tile. */
 export const CARD =
-  'bg-white rounded-xl border border-[#E6E8EC] shadow-[0_1px_2px_rgba(15,27,45,0.04),0_1px_1px_rgba(15,27,45,0.02)]';
+  'bg-white rounded-lg border border-[#E6E8EC] shadow-[0_1px_2px_rgba(15,27,45,0.04)]';
 
 /** Card section header. */
 export const CARD_HEADER =
-  'px-4 py-3 border-b border-[#EEF0F3] flex items-center gap-2';
+  'px-3.5 py-2.5 border-b border-[#EEF0F3] flex items-center gap-2';
 
 /** Section/card title. Sentence case, ink, one step below the page title. */
-export const CARD_TITLE = 'text-[13.5px] font-semibold tracking-[-0.005em] text-[#0F1B2D]';
+export const CARD_TITLE = 'text-[13px] font-semibold tracking-[-0.005em] text-[#0F1B2D]';
 
-/** Vertical rhythm between top-level sections. */
-export const STACK = 'space-y-4';
+/** Vertical rhythm between top-level sections. Deliberately tight — this is a
+ *  working surface, and every extra pixel of gap pushes a row of data below
+ *  the fold on a laptop screen. */
+export const STACK = 'space-y-3';
 
 /** Field label above an input. */
 export const LABEL = 'block text-[12.5px] font-medium text-[#2A3446] mb-1.5';

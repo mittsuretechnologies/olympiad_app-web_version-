@@ -76,10 +76,10 @@ export default function AgreementGate({
   if (status === 'error' || !data) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F6F6EE] p-4">
-        <div className="max-w-sm w-full rounded-xl border border-[#E4E8EE] bg-white p-6 text-center">
-          <AlertCircle className="mx-auto text-[#B91C1C]" size={28} />
-          <p className="mt-3 text-[15px] font-semibold text-[#0E2A5C]">Couldn&apos;t load the agreement</p>
-          <p className="mt-1 text-[13px] text-[#6B7280]">Check your connection and try again.</p>
+        <div className="max-w-sm w-full rounded-xl border border-[#E6E8EC] bg-white p-6 text-center">
+          <AlertCircle className="mx-auto text-[#B42323]" size={28} />
+          <p className="mt-3 text-[15px] font-semibold text-[#0B1B33]">Couldn&apos;t load the agreement</p>
+          <p className="mt-1 text-[13px] text-[#677285]">Check your connection and try again.</p>
           <div className="mt-5 flex justify-center gap-2">
             <button onClick={onLogout} className={BTN_SECONDARY}>Log out</button>
             <button onClick={load} className={BTN_PRIMARY}><RotateCw size={14} /> Retry</button>
@@ -164,7 +164,7 @@ function GateScreen({
   return (
     <div className="min-h-screen bg-[#F6F6EE] font-sans">
       {/* Header */}
-      <header className="sticky top-0 z-30 bg-white border-b border-[#E4E8EE]">
+      <header className="sticky top-0 z-30 bg-white border-b border-[#E6E8EC]">
         {/* Full width: brand pinned left, log out pinned right; the equal flex-1
             sides keep the stepper centred on the page. */}
         <div className="h-12 px-4 sm:px-6 flex items-center gap-3">
@@ -173,7 +173,7 @@ function GateScreen({
               <Image src="/mittmee-icon.jpeg" alt="" width={24} height={24} className="object-cover w-full h-full" priority />
             </div>
             <span className="text-[15px] font-bold tracking-tight"><span className="text-[#1559C7]">mitt</span><span className="text-[#3CB043]">mee</span></span>
-            <span className="hidden md:inline-flex items-center gap-1.5 h-7 ml-1 rounded-md border border-[#1559C7]/20 bg-[#1559C7]/[0.06] px-2.5 text-[12.5px] font-semibold text-[#0E2A5C] min-w-0">
+            <span className="hidden md:inline-flex items-center gap-1.5 h-7 ml-1 rounded-md border border-[#1559C7]/20 bg-[#1559C7]/[0.06] px-2.5 text-[12.5px] font-semibold text-[#0B1B33] min-w-0">
               <FileText size={13} className="flex-shrink-0 text-[#1559C7]" />
               <span className="truncate">Onboarding Agreement</span>
             </span>
@@ -183,13 +183,13 @@ function GateScreen({
           </div>
           <div className="flex-1 flex items-center justify-end gap-3 min-w-0">
             <span
-              className="hidden lg:inline-flex items-center gap-1.5 h-7 max-w-[260px] rounded-md border border-[#E4E8EE] bg-[#F6F7F9] px-2.5 text-[12.5px] font-medium text-[#111827]"
+              className="hidden lg:inline-flex items-center gap-1.5 h-7 max-w-[260px] rounded-md border border-[#E6E8EC] bg-[#F4F5F7] px-2.5 text-[12.5px] font-medium text-[#0F1B2D]"
               title={data.school.name}
             >
               <School size={13} className="flex-shrink-0 text-[#1559C7]" />
               <span className="truncate">{data.school.name}</span>
             </span>
-            <button onClick={onLogout} className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-[#B91C1C] hover:bg-[#B91C1C]/[0.06] cursor-pointer ${FOCUS}`}>
+            <button onClick={onLogout} className={`inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg text-[12.5px] font-medium text-[#B42323] hover:bg-[#B42323]/[0.06] cursor-pointer ${FOCUS}`}>
               <LogOut size={14} /> Log out
             </button>
           </div>
@@ -205,9 +205,9 @@ function GateScreen({
       ) : (
         <div className="px-4 sm:px-6 py-5 sm:py-8">
           <main className="min-w-0 max-w-[760px] w-full mx-auto">
-            <div className="md:hidden mb-3 rounded-lg border border-[#E4E8EE] bg-white px-3 py-2.5"><Stepper step={step} /></div>
+            <div className="md:hidden mb-3 rounded-lg border border-[#E6E8EC] bg-white px-3 py-2.5"><Stepper step={step} /></div>
 
-            <div ref={docRef} className="rounded-lg border border-[#E4E8EE] bg-white px-5 py-7 sm:px-10 sm:py-9 shadow-[0_1px_3px_rgba(16,24,40,0.06),0_1px_2px_rgba(16,24,40,0.04)]">
+            <div ref={docRef} className="rounded-lg border border-[#E6E8EC] bg-white px-5 py-7 sm:px-10 sm:py-9 shadow-[0_1px_3px_rgba(16,24,40,0.06),0_1px_2px_rgba(16,24,40,0.04)]">
               <AgreementDocument doc={SCHOOL_AGREEMENT} preparedFor={data.school.name} />
               <div ref={endRef} aria-hidden="true" className="h-1" />
             </div>
@@ -221,7 +221,7 @@ function GateScreen({
                 onDone={(r, emails) => { setEmailedTo(emails); setReceipt(r); window.scrollTo({ top: 0 }); }}
               />
             ) : (
-              <div className="mt-3 mb-20 flex items-center gap-2.5 rounded-lg border border-dashed border-[#D3DAE4] bg-white/60 px-4 py-3 text-[12.5px] text-[#6B7280]">
+              <div className="mt-3 mb-20 flex items-center gap-2.5 rounded-lg border border-dashed border-[#D2D7DF] bg-white/60 px-4 py-3 text-[12.5px] text-[#677285]">
                 <Lock size={14} className="flex-shrink-0" />
                 Read the agreement to the end to continue to acceptance.
               </div>
@@ -240,11 +240,11 @@ function GateScreen({
 
       {/* Sticky reading reminder until the end is reached */}
       {!reachedEnd && !receipt && (
-        <div className="fixed bottom-0 inset-x-0 z-20 border-t border-[#E4E8EE] bg-white/95 backdrop-blur">
+        <div className="fixed bottom-0 inset-x-0 z-20 border-t border-[#E6E8EC] bg-white/95 backdrop-blur">
           <div className="max-w-[760px] mx-auto px-4 sm:px-0 h-12 flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <p className="text-[12.5px] font-medium text-[#0E2A5C] truncate">Please read the complete agreement</p>
-              <p className="text-[11px] text-[#6B7280] truncate">The accept option appears after the last section</p>
+              <p className="text-[12.5px] font-medium text-[#0B1B33] truncate">Please read the complete agreement</p>
+              <p className="text-[11px] text-[#677285] truncate">The accept option appears after the last section</p>
             </div>
             <span className="text-[12.5px] font-semibold tabular-nums text-[#1559C7]">{pct}% read</span>
           </div>
@@ -308,14 +308,14 @@ function Stepper({ step }: { step: number }) {
         const current = n === step && step !== 3;
         return (
           <li key={label} className="flex items-center gap-2 sm:gap-3 min-w-0" aria-current={current ? 'step' : undefined}>
-            {i > 0 && <span aria-hidden="true" className={`h-px w-5 sm:w-8 ${n <= step ? 'bg-[#1559C7]' : 'bg-[#D3DAE4]'}`} />}
+            {i > 0 && <span aria-hidden="true" className={`h-px w-5 sm:w-8 ${n <= step ? 'bg-[#1559C7]' : 'bg-[#D2D7DF]'}`} />}
             <span className="flex items-center gap-2 min-w-0">
               <span className={`w-5 h-5 flex-shrink-0 rounded-full flex items-center justify-center text-[10.5px] font-semibold ${
-                done ? 'bg-[#1559C7] text-white' : current ? 'border-[1.5px] border-[#1559C7] text-[#1559C7]' : 'border border-[#D3DAE4] text-[#6B7280]'
+                done ? 'bg-[#1559C7] text-white' : current ? 'border-[1.5px] border-[#1559C7] text-[#1559C7]' : 'border border-[#D2D7DF] text-[#677285]'
               }`}>
                 {done ? <Check size={11} strokeWidth={3} /> : n}
               </span>
-              <span className={`text-[12.5px] whitespace-nowrap ${current ? 'font-medium text-[#0B1B36]' : done ? 'text-[#374151]' : 'text-[#6B7280]'} ${current ? '' : 'hidden sm:inline'}`}>{label}</span>
+              <span className={`text-[12.5px] whitespace-nowrap ${current ? 'font-medium text-[#0B1B36]' : done ? 'text-[#2A3446]' : 'text-[#677285]'} ${current ? '' : 'hidden sm:inline'}`}>{label}</span>
             </span>
           </li>
         );
@@ -374,46 +374,46 @@ function AcceptancePanel({
 
   const locked = busy;
   return (
-    <div ref={panelRef} className="mt-4 mb-10 scroll-mt-20 rounded-xl border border-[#E4E8EE] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+    <div ref={panelRef} className="mt-4 mb-10 scroll-mt-20 rounded-xl border border-[#E6E8EC] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
       <div className="px-5 sm:px-8 py-6 space-y-7">
         {/* Declarations */}
         <fieldset>
-          <legend className="text-[13px] font-semibold text-[#0E2A5C]">Declarations <span className="font-normal text-[#6B7280]">— all are required</span></legend>
+          <legend className="text-[13px] font-semibold text-[#0B1B33]">Declarations <span className="font-normal text-[#677285]">— all are required</span></legend>
           <div className="mt-3 space-y-2">
             {declarations.map((text, i) => (
               <label
                 key={i}
                 className={`flex items-start gap-3 rounded-lg border px-3.5 py-3 min-h-[44px] transition-colors ${
                   locked ? 'cursor-not-allowed opacity-70' : 'cursor-pointer hover:bg-[#F8FAFC]'
-                } ${ticks[i] ? 'border-[#1559C7]/40 bg-[#1559C7]/[0.03]' : 'border-[#E4E8EE]'}`}
+                } ${ticks[i] ? 'border-[#1559C7]/40 bg-[#1559C7]/[0.03]' : 'border-[#E6E8EC]'}`}
               >
                 <input
                   type="checkbox"
                   checked={ticks[i]}
                   disabled={locked}
                   onChange={e => setTicks(t => t.map((v, j) => (j === i ? e.target.checked : v)))}
-                  className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-[#D3DAE4] accent-[#1559C7]"
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 rounded border-[#D2D7DF] accent-[#1559C7]"
                 />
-                <span className="text-[13px] leading-relaxed text-[#374151]">{text}</span>
+                <span className="text-[13px] leading-relaxed text-[#2A3446]">{text}</span>
               </label>
             ))}
           </div>
         </fieldset>
 
         {/* Record notice */}
-        <p className="text-[12px] leading-relaxed text-[#6B7280] rounded-lg bg-[#F6F7F9] px-3.5 py-3">
+        <p className="text-[12px] leading-relaxed text-[#677285] rounded-lg bg-[#F4F5F7] px-3.5 py-3">
           We keep an electronic record of this acceptance: the School Details on record, the date and time, your IP address,
           the verification and the agreement version.
         </p>
 
         {error && (
-          <div role="alert" className="flex items-start gap-2 rounded-lg border border-[#B91C1C]/20 bg-[#B91C1C]/[0.06] px-3.5 py-2.5 text-[13px] text-[#B91C1C]">
+          <div role="alert" className="flex items-start gap-2 rounded-lg border border-[#B42323]/20 bg-[#B42323]/[0.06] px-3.5 py-2.5 text-[13px] text-[#B42323]">
             <AlertCircle size={15} className="mt-0.5 flex-shrink-0" /> {error}
           </div>
         )}
 
         <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
-          <p className="text-[12px] text-[#6B7280]">
+          <p className="text-[12px] text-[#677285]">
             {remaining > 0 && (
               <span className="text-[#B45309]">Tick {remaining === declarations.length ? 'all the declarations' : `the remaining ${remaining} declaration${remaining > 1 ? 's' : ''}`} to enable I Accept.</span>
             )}
@@ -438,22 +438,22 @@ function SuccessCard({ receipt, emailedTo, onContinue }: { receipt: Receipt; ema
   ];
   return (
     <div className="max-w-[560px] mx-auto px-4 py-12">
-      <div className="rounded-xl border border-[#E4E8EE] bg-white p-6 sm:p-8 text-center shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
-        <CheckCircle2 size={44} className="mx-auto text-[#047857]" />
-        <h1 className="mt-3 text-[19px] font-semibold text-[#0E2A5C]">Agreement accepted</h1>
-        <p className="mt-1 text-[13px] text-[#6B7280]">
+      <div className="rounded-xl border border-[#E6E8EC] bg-white p-6 sm:p-8 text-center shadow-[0_1px_2px_rgba(16,24,40,0.04)]">
+        <CheckCircle2 size={44} className="mx-auto text-[#1D7A3A]" />
+        <h1 className="mt-3 text-[19px] font-semibold text-[#0B1B33]">Agreement accepted</h1>
+        <p className="mt-1 text-[13px] text-[#677285]">
           Thank you. Your school&apos;s acceptance has been recorded{emailedTo.length ? ` and a copy emailed to ${emailedTo.join(', ')}` : ''}.
         </p>
-        <dl className="mt-6 text-left rounded-lg border border-[#E4E8EE] divide-y divide-[#E4E8EE]">
+        <dl className="mt-6 text-left rounded-lg border border-[#E6E8EC] divide-y divide-[#E6E8EC]">
           {rows.map(([k, v]) => (
             <div key={k} className="grid grid-cols-[130px_1fr] gap-3 px-4 py-2.5 text-[13px]">
-              <dt className="text-[#6B7280]">{k}</dt>
-              <dd className="text-[#111827] font-medium break-all">{v}</dd>
+              <dt className="text-[#677285]">{k}</dt>
+              <dd className="text-[#0F1B2D] font-medium break-all">{v}</dd>
             </div>
           ))}
         </dl>
         <button onClick={onContinue} className={`${BTN_PRIMARY} mt-6 h-11 px-6 text-[14px]`}>Continue to dashboard</button>
-        <p className="mt-2 text-[11.5px] text-[#9CA3AF]">Continuing automatically…</p>
+        <p className="mt-2 text-[11.5px] text-[#8A93A3]">Continuing automatically…</p>
       </div>
     </div>
   );

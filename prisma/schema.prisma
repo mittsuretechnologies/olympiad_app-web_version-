@@ -294,6 +294,12 @@ model Video {
   likesCount         Int               @default(0)
   viewsCount         Int               @default(0)
   deletedAt          DateTime?
+  // Moderation claim: set when a moderator opens a pending video to review it,
+  // so other moderators skip it. Expires on its own (see lib/videoClaim.ts) and
+  // is cleared when the decision is saved.
+  claimedById        String?
+  claimedByName      String?
+  claimedAt          DateTime?
   student            Student?          @relation(fields: [studentId], references: [id], onDelete: Cascade)
   likes              Like[]
   views              VideoView[]
