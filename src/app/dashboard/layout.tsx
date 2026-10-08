@@ -42,8 +42,8 @@ import {
   Image as ImageIcon,
   Hash,
   GalleryHorizontal,
-  FileSignature,
-  BookOpen,
+  GraduationCap,
+  Download,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -468,6 +468,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/app-carousel') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <GalleryHorizontal size={20} />
                 <span className="text-sm font-semibold">App Carousel</span>
+              </Link>
+            )}
+
+            {/* Learning & Parenting — only superadmin. Curated videos for the
+                app home screen's Learning and Parenting rows. */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/home-videos"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/home-videos') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <GraduationCap size={20} />
+                <span className="text-sm font-semibold">Learning &amp; Parenting</span>
+              </Link>
+            )}
+
+            {/* Download Videos — only superadmin. Original files of uploaded videos. */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/video-downloads"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/video-downloads') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <Download size={20} />
+                <span className="text-sm font-semibold">Download Videos</span>
               </Link>
             )}
 

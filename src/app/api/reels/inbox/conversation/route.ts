@@ -68,6 +68,13 @@ export async function GET(request: NextRequest) {
             },
           },
         },
+        // Set instead of `video` when a Learning / Parenting video was shared.
+        homeVideo: {
+          select: {
+            id: true, videoUrl: true, thumbnailUrl: true,
+            title: true, description: true, viewsCount: true,
+          },
+        },
       },
     });
 
@@ -77,7 +84,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch appUser details for video creators
     const appUserIds = [...new Set(
-      shares.map(s => s.video.appUserId).filter(Boolean) as string[]
+      shares.map(s => s.video?.appUserId).filter(Boolean) as string[]
     )];
     const appUsers = appUserIds.length
       ? await prisma.appUser.findMany({
@@ -107,7 +114,29 @@ export async function GET(request: NextRequest) {
             isLiked: likedIds.has(s.video.id),
             appUser: s.video.appUserId ? (appUserMap.get(s.video.appUserId) ?? null) : null,
           }
-        : null,
+        : s.homeVideo
+          // Learning / Parenting video, shaped like a reel for the app's player.
+          // `curated: true` tells it to hide the user-post actions (creator,
+          // like, follow, report) — sharing it on stays available.
+          ? {
+              id:           s.homeVideo.id,
+              videoUrl:     s.homeVideo.videoUrl,
+              thumbnailUrl: s.homeVideo.thumbnailUrl || null,
+              title:        s.homeVideo.title,
+              caption:      s.homeVideo.description || '',
+              category:     null,
+              tags:         '',
+              viewsCount:   s.homeVideo.viewsCount,
+              likesCount:   0,
+              isEvaluation: false,
+              appUserId:    null,
+              studentId:    null,
+              student:      null,
+              isLiked:      false,
+              appUser:      null,
+              curated:      true,
+            }
+          : null,
     }));
 
     return NextResponse.json({ messages, nextCursor, hasMore });

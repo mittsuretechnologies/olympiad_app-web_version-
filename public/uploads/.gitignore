@@ -1,3 +1,5 @@
 # Ignore all uploaded video files — keep only the folder structure
 videos/**/*
 !videos/.gitkeep
+# Learning & Parenting videos have no size cap (one was 217 MB, over GitHub's 100 MB limit)
+home-videos/**/*

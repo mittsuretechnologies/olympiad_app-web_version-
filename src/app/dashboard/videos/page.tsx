@@ -95,6 +95,10 @@ function displayTags(video: { tags: string; isMittfest: boolean }): string[] {
   return list;
 }
 
+// App upload categories for general users with a single sub-option each. The
+// recategorise dropdowns only know the Olympiad A/B lists, so these stay read-only.
+const GENERAL_ONLY_CATEGORIES = ['Learning', 'Parenting', 'Others'];
+
 function getCategoryLabel(cat: string) {
   if (OLYMPIAD_CAT_A_SUBS.includes(cat)) return { label: 'Talent Performance', color: 'bg-violet-50 text-violet-700 border-violet-200' };
   if (OLYMPIAD_CAT_B_SUBS.includes(cat)) return { label: 'Rhymes / Speech', color: 'bg-teal-50 text-teal-700 border-teal-200' };
@@ -544,7 +548,8 @@ export default function VideoModerationPage() {
   // additionally get a slot-conflict check server-side; non-evaluation videos
   // don't occupy an A/B slot so there's nothing to conflict with.
   const canEditCategory = !!previewVideo && !previewVideo.deletedAt &&
-    (filter === 'PENDING' || filter === 'APPROVED');
+    (filter === 'PENDING' || filter === 'APPROVED') &&
+    !GENERAL_ONLY_CATEGORIES.includes(previewVideo.category ?? '');
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -674,6 +679,9 @@ export default function VideoModerationPage() {
                   </optgroup>
                   <optgroup label={OLYMPIAD_CAT_B_LABEL}>
                     {OLYMPIAD_CAT_B_SUBS.map(s => <option key={s} value={s}>{s}</option>)}
+                  </optgroup>
+                  <optgroup label="General uploads">
+                    {GENERAL_ONLY_CATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                 </select>
               </div>

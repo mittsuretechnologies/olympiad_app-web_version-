@@ -101,6 +101,7 @@ export async function POST(
           // Terms agreement. The app gates the student behind a one-time Terms
           // screen on first login instead (see /api/app/terms).
           termsAccepted: false,
+          mustChangePassword: true,
           olympiadId: code,
         },
       }),

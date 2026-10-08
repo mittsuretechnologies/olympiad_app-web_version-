@@ -14,8 +14,11 @@ function slugifyName(name: string): string {
 }
 
 export async function generateUserId(assignedName?: string | null): Promise<string> {
+  // A name made only of characters the slug drops (e.g. written in Hindi)
+  // falls back to "user" rather than leaving the username as just "_ab12".
+  // No name at all (the old single-field signup) keeps the original prefix.
   const base = assignedName?.trim()
-    ? slugifyName(assignedName.trim())
+    ? slugifyName(assignedName.trim()) || 'user'
     : 'mittsure';
 
   let attempt = 0;

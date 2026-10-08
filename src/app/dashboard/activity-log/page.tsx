@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { History, RefreshCw, Filter, X, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trash2, Eye, Flag, Award, Star, Film, Play, Tag } from 'lucide-react';
+import { History, RefreshCw, Filter, X, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trash2, Eye, Flag, Award, Star, Film, Play, Tag, Download } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -59,17 +59,18 @@ interface ListResponse {
 // everything else in the page is the dashboard's own brand navy (#004f9f /
 // #052E5C), not a rainbow of per-action colours.
 const ACTION_CFG: Record<string, { label: string; icon: any; color: string }> = {
-  VIDEO_APPROVED:        { label: 'Video Approved',       icon: CheckCircle, color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-  VIDEO_REJECTED:        { label: 'Video Rejected',       icon: XCircle,     color: 'text-rose-700 bg-rose-50 border-rose-100' },
-  VIDEO_RECATEGORIZED:   { label: 'Category Changed',     icon: Tag,         color: 'text-[#004f9f] bg-[#004f9f]/[0.06] border-[#004f9f]/15' },
-  VIDEO_DELETED:         { label: 'Video Deleted',        icon: Trash2,      color: 'text-rose-700 bg-rose-50 border-rose-100' },
-  VISIBILITY_CHANGED:    { label: 'Visibility Changed',   icon: Eye,         color: 'text-violet-700 bg-violet-50 border-violet-100' },
-  REPORT_IGNORED:        { label: 'Report Ignored',       icon: Flag,        color: 'text-slate-600 bg-slate-50 border-slate-200' },
-  REPORT_VIDEO_REMOVED:  { label: 'Reported Video Removed', icon: Flag,      color: 'text-rose-700 bg-rose-50 border-rose-100' },
-  EVALUATION_SUBMITTED:  { label: 'Evaluation Submitted',  icon: Star,       color: 'text-amber-700 bg-amber-50 border-amber-100' },
-  EVALUATION_EDITED:     { label: 'Evaluation Edited',     icon: Star,       color: 'text-amber-700 bg-amber-50 border-amber-100' },
-  EVALUATION_PUBLISHED:  { label: 'Evaluation Published',  icon: Award,      color: 'text-emerald-700 bg-emerald-50 border-emerald-100' },
-  EVALUATION_UNPUBLISHED:{ label: 'Evaluation Unpublished',icon: Award,      color: 'text-slate-600 bg-slate-50 border-slate-200' },
+  VIDEO_APPROVED:        { label: 'Video Approved',       icon: CheckCircle, color: 'text-green-600 bg-green-50 border-green-100' },
+  VIDEO_REJECTED:        { label: 'Video Rejected',       icon: XCircle,     color: 'text-red-600 bg-red-50 border-red-100' },
+  VIDEO_RECATEGORIZED:   { label: 'Category Changed',     icon: Tag,         color: 'text-blue-600 bg-blue-50 border-blue-100' },
+  VIDEO_DELETED:         { label: 'Video Deleted',        icon: Trash2,      color: 'text-red-700 bg-red-50 border-red-100' },
+  VIDEO_DOWNLOADED:      { label: 'Video Downloaded',     icon: Download,    color: 'text-sky-700 bg-sky-50 border-sky-100' },
+  VISIBILITY_CHANGED:    { label: 'Visibility Changed',   icon: Eye,         color: 'text-purple-600 bg-purple-50 border-purple-100' },
+  REPORT_IGNORED:        { label: 'Report Ignored',       icon: Flag,        color: 'text-gray-600 bg-gray-50 border-gray-200' },
+  REPORT_VIDEO_REMOVED:  { label: 'Reported Video Removed', icon: Flag,      color: 'text-red-700 bg-red-50 border-red-100' },
+  EVALUATION_SUBMITTED:  { label: 'Evaluation Submitted',  icon: Star,       color: 'text-amber-600 bg-amber-50 border-amber-100' },
+  EVALUATION_EDITED:     { label: 'Evaluation Edited',     icon: Star,       color: 'text-amber-600 bg-amber-50 border-amber-100' },
+  EVALUATION_PUBLISHED:  { label: 'Evaluation Published',  icon: Award,      color: 'text-emerald-600 bg-emerald-50 border-emerald-100' },
+  EVALUATION_UNPUBLISHED:{ label: 'Evaluation Unpublished',icon: Award,      color: 'text-gray-600 bg-gray-50 border-gray-200' },
 };
 
 const ACTION_OPTIONS = Object.keys(ACTION_CFG);

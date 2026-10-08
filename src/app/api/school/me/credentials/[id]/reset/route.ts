@@ -66,7 +66,7 @@ export async function POST(
 
       const updated = await prisma.appUser.update({
         where: { id },
-        data: { password: hashedPassword, plainPassword: encryptPassword(plainPassword) },
+        data: { password: hashedPassword, plainPassword: encryptPassword(plainPassword), mustChangePassword: true },
         select: { id: true, updatedAt: true },
       });
 

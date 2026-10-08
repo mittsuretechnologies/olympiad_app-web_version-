@@ -4,6 +4,63 @@ import { prisma } from '@/lib/prisma';
 import { recordAuditLog } from '@/lib/audit-log';
 import { requireModule } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { createNotification } from '@/lib/notifications';
+import { sendVideoRemovedEmail } from '@/lib/mailer';
+
+// Tells the uploader in-app and emails the parent/guardian at the account's
+// address. Web-portal student uploads carry studentId instead of appUserId, so
+// those reach the student's app account through its Olympiad code. Both
+// channels are best-effort: the removal has already happened.
+async function notifyUploaderOfRemoval(video: {
+  id: string; appUserId: string | null; studentId: string | null;
+  caption: string | null; category: string | null; subCategory: string | null;
+}) {
+  const label = video.caption?.trim() || video.subCategory || video.category || 'your video';
+
+  let appUser = video.appUserId
+    ? await prisma.appUser.findUnique({
+        where: { id: video.appUserId },
+        select: { id: true, email: true, olympiadId: true, guardianName: true, childName: true },
+      })
+    : null;
+  if (!appUser && video.studentId) {
+    const student = await prisma.student.findUnique({ where: { id: video.studentId }, select: { olympiadCode: true } });
+    appUser = student
+      ? await prisma.appUser.findFirst({
+          where: { olympiadId: student.olympiadCode },
+          select: { id: true, email: true, olympiadId: true, guardianName: true, childName: true },
+        })
+      : null;
+  }
+  if (!appUser) return;
+
+  await createNotification({
+    userId:  appUser.id,
+    type:    'VIDEO_REMOVED',
+    title:   'Video Removed',
+    message: `Your video "${label}" was removed after being reported and reviewed by our moderation team, as it does not follow our Community Guidelines.`,
+    videoId: video.id,
+  });
+
+  if (!appUser.email) return;
+  // Olympiad accounts keep the parent and child names on the ID allocation.
+  const allocation = appUser.olympiadId
+    ? await prisma.olympiadIdAllocation.findUnique({
+        where: { code: appUser.olympiadId },
+        select: { guardianName: true, assignedName: true },
+      })
+    : null;
+  try {
+    await sendVideoRemovedEmail({
+      to: appUser.email,
+      guardianName: allocation?.guardianName || appUser.guardianName,
+      childName: allocation?.assignedName || appUser.childName,
+      videoLabel: label,
+    });
+  } catch (e) {
+    console.error(`Video-removed email for ${video.id} to ${appUser.email} failed:`, e);
+  }
+}
 
 function requireModerationAccess(request: Request) {
   const auth = request.headers.get('authorization') || '';
@@ -76,17 +133,7 @@ export async function POST(
         reason: 'Removed following user report(s)',
       });
 
-      if (video.appUserId) {
-        const label = video.caption?.trim() || video.subCategory || video.category || 'your video';
-        await prisma.notification.create({
-          data: {
-            userId:  video.appUserId,
-            type:    'VIDEO_REMOVED',
-            title:   'Video Removed',
-            message: `Your video "${label}" was removed by an admin after being reported for violating our content guidelines.`,
-          },
-        });
-      }
+      await notifyUploaderOfRemoval(video);
     }
 
     return NextResponse.json({ success: true });

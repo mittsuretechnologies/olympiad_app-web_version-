@@ -46,6 +46,27 @@ export function probeVideo(filePath: string): Promise<VideoMeta> {
   });
 }
 
+// Writes a JPEG thumbnail from the video's picture alone (-an: audio is never
+// decoded, so a damaged audio track — which makes browsers refuse the whole
+// file — doesn't matter here). `thumbnail=50` picks the most representative
+// of ~50 frames from about 1s in, which avoids black/fade frames; very short
+// clips that can't seek to 1s are retried from the start.
+export async function extractThumbnail(inputPath: string, outputPath: string): Promise<void> {
+  const run = (args: string[]) => new Promise<void>((resolve, reject) => {
+    const proc = spawn(ffmpegPath, args);
+    let stderr = '';
+    proc.stderr.on('data', d => { stderr += d; });
+    proc.on('close', code => (code === 0 ? resolve() : reject(new Error(`ffmpeg thumbnail failed: ${stderr.slice(-500)}`))));
+    proc.on('error', reject);
+  });
+  const filter = "thumbnail=50,scale='min(720,iw)':-2";
+  try {
+    await run(['-ss', '1', '-i', inputPath, '-an', '-vf', filter, '-frames:v', '1', '-q:v', '3', '-y', outputPath]);
+  } catch {
+    await run(['-i', inputPath, '-an', '-vf', filter, '-frames:v', '1', '-q:v', '3', '-y', outputPath]);
+  }
+}
+
 // Center-crops the video to a 9:16 aspect ratio and re-encodes it.
 export function cropTo9x16(inputPath: string, outputPath: string): Promise<void> {
   return new Promise((resolve, reject) => {

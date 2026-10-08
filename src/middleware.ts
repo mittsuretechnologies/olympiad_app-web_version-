@@ -41,5 +41,9 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: '/api/:path*',
+  // Everything under /api except the dashboard's Learning & Parenting video
+  // upload: Next buffers the body of every request middleware runs on (and
+  // cuts it off at middlewareClientMaxBodySize), and that upload has no size
+  // limit. It's a same-origin dashboard call, so it needs no CORS headers.
+  matcher: '/api/((?!dashboard/home-videos/upload(?:/|$)).*)',
 };

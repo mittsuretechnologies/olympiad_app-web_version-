@@ -76,6 +76,7 @@ export async function POST(request: Request) {
         // student. The app gates them behind a one-time Terms screen on first
         // login instead (see /api/app/terms).
         termsAccepted: false,
+        mustChangePassword: true,
         olympiadId: available.code,
       },
     });

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await prisma.appUser.update({
       where: { id: accountId },
-      data: { password: passwordHash, plainPassword: encryptPassword(newPassword) },
+      data: { password: passwordHash, plainPassword: encryptPassword(newPassword), mustChangePassword: false },
     });
 
     return NextResponse.json({ success: true, message: 'Password has been reset' });
