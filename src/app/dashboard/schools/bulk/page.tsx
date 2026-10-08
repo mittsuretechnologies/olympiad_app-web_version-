@@ -60,16 +60,40 @@ const PRE_PRIMARY_ALIASES: Record<string, string> = {
 const REQUIRED_COLS = ['School Name', 'CRM ID', 'State', 'District'];
 const OPTIONAL_COLS = ['City', 'Address', 'Contact Person', 'Phone', 'Email', 'Pincode', 'Exam Date', 'Classes'];
 
-// Accepts DD-MM-YYYY, DD/MM/YYYY, or YYYY-MM-DD; returns an ISO date string (YYYY-MM-DD) or null if unparseable.
+// Accepts DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, or an Excel date serial; returns
+// an ISO date string (YYYY-MM-DD) or null if unparseable.
+//
+// A cell formatted as a Date in Excel is stored as a serial number (days since
+// 1899-12-30), and sheet_to_json hands back that number — e.g. 46342 for
+// 16-11-2026 — even though Excel shows it as a date. Most real sheets arrive
+// like that, so the serial has to be understood, not rejected.
 function parseExamDate(raw: string): string | null {
   const s = raw.trim();
   if (!s) return null;
+
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const valid = (y: number, m: number, d: number) => {
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    return dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d;
+  };
+
+  // Excel serial: the 20000–80000 window is 1954–2119, well clear of any
+  // other number a school might type into this column.
+  if (/^\d+(\.\d+)?$/.test(s)) {
+    const serial = Number(s);
+    if (serial < 20000 || serial > 80000) return null;
+    const dc = XLSX.SSF.parse_date_code(serial);
+    if (!dc || !valid(dc.y, dc.m, dc.d)) return null;
+    return `${dc.y}-${pad(dc.m)}-${pad(dc.d)}`;
+  }
+
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
-  if (iso) return s;
-  const dmy = /^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/.exec(s);
+  if (iso) return valid(+iso[1], +iso[2], +iso[3]) ? s : null;
+
+  const dmy = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/.exec(s);
   if (dmy) {
     const [, d, m, y] = dmy;
-    return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    return valid(+y, +m, +d) ? `${y}-${pad(+m)}-${pad(+d)}` : null;
   }
   return null;
 }
