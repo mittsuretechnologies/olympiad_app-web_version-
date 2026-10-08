@@ -1,7 +1,8 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, DeleteObjectsCommand, ListObjectsV2Command, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { readFile } from 'fs/promises';
-import { createWriteStream } from 'fs';
+import { createReadStream, createWriteStream } from 'fs';
+import { stat } from 'fs/promises';
 import { pipeline } from 'stream/promises';
 import type { Readable } from 'stream';
 
@@ -61,6 +62,21 @@ export async function uploadBufferToS3(buffer: Buffer, key: string, contentType:
 export async function uploadFileToS3(localPath: string, key: string, contentType: string): Promise<string> {
   const body = await readFile(localPath);
   return uploadBufferToS3(body, key, contentType);
+}
+
+// Same as uploadFileToS3 but streams the file from disk instead of reading it
+// into memory — for files with no size cap (Learning & Parenting videos).
+export async function uploadLargeFileToS3(localPath: string, key: string, contentType: string): Promise<string> {
+  const { size } = await stat(localPath);
+  await getClient().send(new PutObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    Body: createReadStream(localPath),
+    ContentLength: size,
+    ContentType: contentType,
+    CacheControl: 'public, max-age=604800',
+  }));
+  return s3PublicUrl(key);
 }
 
 // Lets the client PUT the file straight to S3, bypassing our server for the actual
@@ -139,6 +155,24 @@ export function s3KeyFromUrl(url: string): string | null {
     }
   }
   return null;
+}
+
+/**
+ * Signs a stored media URL so the browser saves it as a file (Content-
+ * Disposition: attachment) under `fileName`, straight from S3. Returns null
+ * when S3 is off or the URL isn't an object in our bucket — the caller then
+ * serves the file itself.
+ */
+export async function getSignedDownloadUrl(url: string, fileName: string, expiresInSeconds = 600): Promise<string | null> {
+  if (!url || !s3Enabled()) return null;
+  const key = s3KeyFromUrl(url);
+  if (!key) return null;
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${fileName.replace(/"/g, '')}"`,
+  });
+  return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
 }
 
 /**

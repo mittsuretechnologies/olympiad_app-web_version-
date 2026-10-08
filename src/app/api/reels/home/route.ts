@@ -143,12 +143,15 @@ export async function GET(request: NextRequest) {
     const baseWhere = { status: 'APPROVED', isPublic: true, ...visWhere } as const;
 
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    // Trending feeds the app's hero carousel, so it only takes videos a
+    // moderator rated High quality at approval.
+    const trendingWhere = { ...baseWhere, quality: 'HIGH' };
 
     const [trendingViews, newReleases, categories, mittfest] = await Promise.all([
-      // Most-viewed videos based on VideoView rows recorded in the last 7 days.
+      // Most-viewed High-quality videos based on VideoView rows recorded in the last 7 days.
       prisma.videoView.groupBy({
         by: ['videoId'],
-        where: { createdAt: { gte: sevenDaysAgo } },
+        where: { createdAt: { gte: sevenDaysAgo }, video: { status: 'APPROVED', isPublic: true, quality: 'HIGH' } },
         _count: { videoId: true },
         orderBy: { _count: { videoId: 'desc' } },
         take: ROW_LIMIT,
@@ -188,7 +191,7 @@ export async function GET(request: NextRequest) {
     const trendingIds = trendingViews.map(t => t.videoId);
     const trendingVideosRaw = trendingIds.length > 0
       ? await prisma.video.findMany({
-          where: { id: { in: trendingIds }, ...baseWhere },
+          where: { id: { in: trendingIds }, ...trendingWhere },
           select: VIDEO_SELECT,
         })
       : [];
@@ -196,12 +199,12 @@ export async function GET(request: NextRequest) {
     const trendingOrder = new Map(trendingIds.map((id, i) => [id, i]));
     trendingVideosRaw.sort((a, b) => (trendingOrder.get(a.id) ?? 0) - (trendingOrder.get(b.id) ?? 0));
 
-    // Fallback: if nothing has been viewed in 7 days yet, use all-time viewsCount so the row isn't empty.
+    // Fallback: if no High-quality video has been viewed in 7 days, use all-time viewsCount so the row isn't empty.
     let trendingRaw = trendingVideosRaw;
     if (trendingRaw.length === 0) {
       trendingRaw = await prisma.video.findMany({
         take: ROW_LIMIT,
-        where: baseWhere,
+        where: trendingWhere,
         orderBy: { viewsCount: 'desc' },
         select: VIDEO_SELECT,
       });

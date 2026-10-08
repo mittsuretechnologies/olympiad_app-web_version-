@@ -87,6 +87,8 @@ export async function GET(request: NextRequest) {
         sender:    { select: { id: true, userId: true, avatarUrl: true } },
         recipient: { select: { id: true, userId: true, avatarUrl: true } },
         video:     { select: { id: true, thumbnailUrl: true, caption: true } },
+        // A share is a user reel (video) or a Learning / Parenting video.
+        homeVideo: { select: { id: true, thumbnailUrl: true, title: true } },
       },
     });
 
@@ -108,8 +110,8 @@ export async function GET(request: NextRequest) {
           otherId,
           otherName:       otherUser.userId,
           otherAvatar:     otherUser.avatarUrl ?? null,
-          lastReelThumb:   s.video.thumbnailUrl ?? null,
-          lastReelCaption: s.video.caption ?? null,
+          lastReelThumb:   s.video?.thumbnailUrl ?? (s.homeVideo?.thumbnailUrl || null),
+          lastReelCaption: s.video?.caption ?? s.homeVideo?.title ?? null,
           sentAt:          s.sentAt.toISOString(),
           direction:       isSent ? 'sent' : 'received',
           hasUnread:       unreadSet.has(otherId),

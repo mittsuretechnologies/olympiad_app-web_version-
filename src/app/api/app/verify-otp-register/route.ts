@@ -114,7 +114,9 @@ export async function POST(request: Request) {
       }, { status: 409 });
     }
 
-    const userId = await generateUserId(null);
+    // Username from the child's name, or the parent's when no child name was
+    // given — like Olympiad accounts, which use the student's name.
+    const userId = await generateUserId(childName || guardianName);
     const passwordHash = await bcrypt.hash(password, 10);
 
     const user = await prisma.appUser.create({

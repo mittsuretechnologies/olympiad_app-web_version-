@@ -5,7 +5,7 @@ import path from 'path';
 import os from 'os';
 import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
-import { s3PublicUrl, uploadFileToS3, deleteFromS3, downloadFromS3 } from '@/lib/s3';
+import { s3PublicUrl, uploadFileToS3, uploadLargeFileToS3, deleteFromS3, downloadFromS3 } from '@/lib/s3';
 import { getJwtSecret } from '@/lib/jwt-secret';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
@@ -14,7 +14,8 @@ const JWT_SECRET = getJwtSecret();
 const MAX_DURATION_SECONDS = 120;
 
 export const dynamic     = 'force-dynamic';
-export const maxDuration  = 60;
+// Cropping re-encodes the video, which takes longer than the old checks alone.
+export const maxDuration  = 300;
 
 function getAppUserFromToken(request: Request) {
   const authHeader = request.headers.get('Authorization');
@@ -67,6 +68,33 @@ function extractThumbnail(videoPath: string, thumbPath: string): Promise<void> {
   });
 }
 
+// Crops a landscape video to a 9:16 portrait frame, full height, keeping the
+// horizontal slice the user chose in the app: x = 0 is the left edge, 1 the
+// right edge. Re-encodes, so it runs only when the app asked for a crop. The
+// min() keeps it safe if the video turns out not to be landscape after all
+// (then nothing is cut off). The min() is quoted because a bare comma
+// separates filters in an ffmpeg filter graph.
+function cropToPortrait(inputPath: string, outputPath: string, x: number): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const vf = `crop=w='min(iw,trunc(ih*9/32)*2)':h=trunc(ih/2)*2:x=(iw-ow)*${x.toFixed(4)}:y=0`;
+    const proc = spawn(ffmpegPath, [
+      '-i', inputPath,
+      '-vf', vf,
+      '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-pix_fmt', 'yuv420p',
+      '-c:a', 'aac', '-b:a', '128k',
+      '-movflags', '+faststart',
+      '-y', outputPath,
+    ]);
+    let stderr = '';
+    proc.stderr.on('data', (chunk) => { stderr = (stderr + chunk.toString()).slice(-2000); });
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`ffmpeg crop exited with code ${code}: ${stderr}`));
+    });
+    proc.on('error', reject);
+  });
+}
+
 // POST /api/app/upload-video/finalize — step 2, called after the client has PUT the
 // video straight to S3 using the presigned URL from /presign. Pulls the object back
 // down from S3 (same-region, fast) to validate duration and generate a thumbnail —
@@ -78,7 +106,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const { key } = await request.json();
+    const body = await request.json();
+    let { key } = body;
+    // Optional: { crop: { x } } from app versions with the crop screen — cut a
+    // landscape video down to the portrait part the user picked. Older apps
+    // never send it, so their uploads are handled exactly as before.
+    const cropX = typeof body?.crop?.x === 'number' && isFinite(body.crop.x)
+      ? Math.min(1, Math.max(0, body.crop.x))
+      : null;
     if (!key || typeof key !== 'string') {
       return NextResponse.json({ error: 'key is required' }, { status: 400 });
     }
@@ -88,12 +123,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid key' }, { status: 403 });
     }
 
-    const videoUrl = s3PublicUrl(key);
     const ext = path.extname(key) || '.mp4';
-    const localVideoPath = path.join(os.tmpdir(), `${randomUUID()}${ext}`);
+    let localVideoPath = path.join(os.tmpdir(), `${randomUUID()}${ext}`);
     const thumbPath = path.join(os.tmpdir(), `${randomUUID()}_thumb.jpg`);
 
     await downloadFromS3(key, localVideoPath);
+
+    // Crop first, so the duration check and thumbnail below both use the video
+    // that will actually be published. The cropped file replaces the original
+    // in S3 (new key under the same user prefix; the original is deleted).
+    if (cropX !== null) {
+      const croppedPath = path.join(os.tmpdir(), `${randomUUID()}_crop.mp4`);
+      try {
+        await cropToPortrait(localVideoPath, croppedPath, cropX);
+        const croppedKey = key.replace(/\.[a-z0-9]+$/i, '') + '_crop.mp4';
+        await uploadLargeFileToS3(croppedPath, croppedKey, 'video/mp4');
+        await deleteFromS3(key).catch(() => {});
+        await unlink(localVideoPath).catch(() => {});
+        localVideoPath = croppedPath;
+        key = croppedKey;
+      } catch (err) {
+        // A failed crop must not lose the upload — publish the original.
+        console.error('Video crop failed, keeping the original:', err);
+        await unlink(croppedPath).catch(() => {});
+      }
+    }
+    const videoUrl = s3PublicUrl(key);
 
     const [durationResult, thumbnailResult] = await Promise.allSettled([
       getVideoDurationSeconds(localVideoPath),

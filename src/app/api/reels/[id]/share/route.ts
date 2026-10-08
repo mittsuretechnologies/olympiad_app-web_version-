@@ -19,7 +19,10 @@ function getAppUserIdFromToken(request: Request): string | null {
 }
 
 // POST /api/reels/[id]/share — shares from the authenticated caller
-// Body: { recipientUserIds: string[] }
+// Body: { recipientUserIds: string[], kind?: 'home' }
+// kind 'home' shares a Learning / Parenting video (HomeSectionVideo) instead of
+// a user reel; anything else (incl. older app builds that never send it) is a
+// user reel, exactly as before.
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -39,11 +42,12 @@ export async function POST(
       return NextResponse.json({ message: 'recipientUserIds must be a non-empty array' }, { status: 400 });
     }
 
-    // Verify video exists
-    const video = await prisma.video.findFirst({
-      where: { id: videoId, status: 'APPROVED', deletedAt: null },
-      select: { id: true },
-    });
+    const isHomeVideo = body.kind === 'home';
+
+    // Verify the video exists (and, for Learning / Parenting, is still shown)
+    const video = isHomeVideo
+      ? await prisma.homeSectionVideo.findFirst({ where: { id: videoId, isActive: true }, select: { id: true } })
+      : await prisma.video.findFirst({ where: { id: videoId, status: 'APPROVED', deletedAt: null }, select: { id: true } });
     if (!video) {
       return NextResponse.json({ message: 'Video not found' }, { status: 404 });
     }
@@ -60,7 +64,9 @@ export async function POST(
     // Create one ReelShare row per recipient (skip self-shares)
     const rows = recipientUserIds
       .filter(rid => rid !== senderUserId)
-      .map(recipientId => ({ videoId, senderId: senderUserId, recipientId }));
+      .map(recipientId => (isHomeVideo
+        ? { homeVideoId: videoId, senderId: senderUserId, recipientId }
+        : { videoId, senderId: senderUserId, recipientId }));
 
     if (!rows.length) {
       return NextResponse.json({ success: true, shared: 0 });

@@ -569,6 +569,51 @@ export async function sendMasterReviewerCredentialsEmail(data: MasterReviewerCre
   });
 }
 
+/* ── Video removed after a report ─────────────────────────────────────────── */
+
+export interface VideoRemovedMail {
+  to: string;
+  guardianName?: string | null;
+  childName?: string | null;
+  videoLabel: string;
+}
+
+// App accounts for children are registered with a parent's email, so this is
+// addressed to the parent/guardian rather than the child.
+export async function sendVideoRemovedEmail(data: VideoRemovedMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const greeting = data.guardianName ? `Dear ${data.guardianName},` : 'Dear Parent/Guardian,';
+  const whose = data.childName ? `${data.childName}'s video` : 'A video from your Mittmee account';
+
+  const html = renderEmailShell({
+    title: 'A video was removed from Mittmee',
+    body: `
+      <p style="margin:0 0 12px;">${escapeHtml(greeting)}</p>
+      <p style="margin:0 0 12px;">${escapeHtml(whose)}, <b>"${escapeHtml(data.videoLabel)}"</b>, has been removed from Mittmee.
+        It was reported by other users and, after review, our moderation team found that it does not follow our Community Guidelines.</p>
+      <p style="margin:0 0 12px;">The video is no longer visible to anyone on the app. Your account remains active, and you can continue to share new videos that follow the guidelines.</p>
+      <p style="margin:0 0 12px;">If you believe this was a mistake, please contact us through <b>Help &amp; Support</b> in the Mittmee app.</p>
+      <p style="margin:0;">Regards,<br>Team Mittsure</p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'A video was removed from Mittmee',
+    html,
+    attachments: emailAttachments(),
+    text:
+      `${greeting}\n\n${whose}, "${data.videoLabel}", has been removed from Mittmee. It was reported by other users and, ` +
+      `after review, our moderation team found that it does not follow our Community Guidelines.\n\n` +
+      `The video is no longer visible to anyone on the app. Your account remains active, and you can continue to share ` +
+      `new videos that follow the guidelines.\n\nIf you believe this was a mistake, please contact us through Help & Support ` +
+      `in the Mittmee app.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
 /* ── Infringement notices (public landing-page form) ─────────────────────── */
 
 const GRIEVANCE_EMAIL = process.env.GRIEVANCE_EMAIL || 'grievance@mittsure.com';

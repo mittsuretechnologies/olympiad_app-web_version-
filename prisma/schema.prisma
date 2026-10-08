@@ -502,6 +502,9 @@ model AppUser {
   plainPassword          String?
   termsAccepted          Boolean         @default(false)
   termsAcceptedAt        DateTime?
+  // True while the account still uses a password a school/admin issued; the
+  // app blocks Olympiad students until they set their own (/api/app/change-password).
+  mustChangePassword     Boolean         @default(false)
   otpHash                String?
   otpExpiresAt           DateTime?
   isVerified             Boolean         @default(false)
@@ -637,18 +640,24 @@ model FollowRequest {
 
 model ReelShare {
   id          String    @id @default(uuid())
-  videoId     String
+  // Exactly one of videoId / homeVideoId is set (enforced by a CHECK
+  // constraint in the migration): a share is either a user reel, or one of the
+  // SuperAdmin's Learning / Parenting videos.
+  videoId     String?
+  homeVideoId String?
   senderId    String
   recipientId String
   sentAt      DateTime  @default(now())
   readAt      DateTime?
-  video       Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video       Video?    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  homeVideo   HomeSectionVideo? @relation(fields: [homeVideoId], references: [id], onDelete: Cascade)
   sender      AppUser   @relation("ReelShareSender", fields: [senderId], references: [id], onDelete: Cascade)
   recipient   AppUser   @relation("ReelShareRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
 
   @@index([recipientId])
   @@index([senderId, recipientId])
   @@index([videoId])
+  @@index([homeVideoId])
   @@schema("public")
 }
 
@@ -846,6 +855,33 @@ model BannerSlide {
 // When no active slides exist the app falls back to exactly the previous
 // behaviour (video cards only), so an empty table is a valid, working state
 // and not something the app has to special-case.
+// SuperAdmin-curated videos for the app home screen's "Learning" and
+// "Parenting" rows. Deliberately a separate table from Video: Video is user
+// content, read by the feed, search, profiles, moderation, reports and
+// Olympiad scoring — admin videos would leak into all of those, and none of
+// them expect a video with no uploader. These go live without moderation
+// (SuperAdmin-authored) and are only ever shown through /api/app/home-videos.
+model HomeSectionVideo {
+  id           String   @id @default(uuid())
+  // "LEARNING" | "PARENTING"
+  section      String
+  title        String
+  description  String   @default("")
+  videoUrl     String
+  thumbnailUrl String
+  order        Int      @default(0)
+  isActive     Boolean  @default(true)
+  // Also shown as a slide in the app's home carousel (while isActive).
+  inCarousel   Boolean  @default(false)
+  viewsCount   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  reelShares   ReelShare[]
+
+  @@index([section, isActive, order])
+  @@schema("public")
+}
+
 model AppBannerSlide {
   id        String   @id @default(uuid())
   image     String

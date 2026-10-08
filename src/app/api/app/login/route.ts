@@ -77,6 +77,7 @@ export async function POST(request: Request) {
         olympiadId: user.olympiadId,
         isPrivate:  user.isPrivate,
         termsAccepted: user.termsAccepted,
+        mustChangePassword: user.mustChangePassword,
         studentName,
         school,
       },

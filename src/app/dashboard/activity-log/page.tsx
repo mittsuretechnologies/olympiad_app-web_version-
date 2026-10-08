@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import useSWR from 'swr';
-import { History, RefreshCw, Filter, X, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trash2, Eye, Flag, Award, Star, Film, Play, Tag } from 'lucide-react';
+import { History, RefreshCw, Filter, X, ChevronLeft, ChevronRight, CheckCircle, XCircle, Trash2, Eye, Flag, Award, Star, Film, Play, Tag, Download } from 'lucide-react';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,7 @@ const ACTION_CFG: Record<string, { label: string; icon: any; color: string }> = 
   VIDEO_REJECTED:        { label: 'Video Rejected',       icon: XCircle,     color: 'text-red-600 bg-red-50 border-red-100' },
   VIDEO_RECATEGORIZED:   { label: 'Category Changed',     icon: Tag,         color: 'text-blue-600 bg-blue-50 border-blue-100' },
   VIDEO_DELETED:         { label: 'Video Deleted',        icon: Trash2,      color: 'text-red-700 bg-red-50 border-red-100' },
+  VIDEO_DOWNLOADED:      { label: 'Video Downloaded',     icon: Download,    color: 'text-sky-700 bg-sky-50 border-sky-100' },
   VISIBILITY_CHANGED:    { label: 'Visibility Changed',   icon: Eye,         color: 'text-purple-600 bg-purple-50 border-purple-100' },
   REPORT_IGNORED:        { label: 'Report Ignored',       icon: Flag,        color: 'text-gray-600 bg-gray-50 border-gray-200' },
   REPORT_VIDEO_REMOVED:  { label: 'Reported Video Removed', icon: Flag,      color: 'text-red-700 bg-red-50 border-red-100' },
