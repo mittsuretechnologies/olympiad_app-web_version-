@@ -45,5 +45,7 @@ export const config = {
   // upload: Next buffers the body of every request middleware runs on (and
   // cuts it off at middlewareClientMaxBodySize), and that upload has no size
   // limit. It's a same-origin dashboard call, so it needs no CORS headers.
-  matcher: '/api/((?!dashboard/home-videos/upload(?:/|$)).*)',
+  // Also skips the development-only local-put video upload (see lib/localUploads.ts),
+  // which streams a whole video and must not be cut off at the body-size limit.
+  matcher: '/api/((?!dashboard/home-videos/upload(?:/|$)|app/upload-video/local-put(?:/|$)).*)',
 };

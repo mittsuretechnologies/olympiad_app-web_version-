@@ -33,6 +33,12 @@ export async function POST(request: Request) {
 
     const code = olympiadId.trim().toUpperCase();
 
+    // A General School is not a student: it can never claim an Olympiad ID.
+    const caller = await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { accountType: true } });
+    if (caller?.accountType === 'SCHOOL') {
+      return NextResponse.json({ message: 'School accounts cannot use an Olympiad ID' }, { status: 403 });
+    }
+
     // Verify the olympiadId exists and is allocated (belongs to a real student slot)
     const allocation = await prisma.olympiadIdAllocation.findUnique({
       where: { code },

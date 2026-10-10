@@ -120,9 +120,14 @@ export async function POST(request: Request) {
   try {
     const user = await prisma.appUser.findUnique({
       where:  { id: payload.id },
-      select: { olympiadId: true },
+      select: { olympiadId: true, accountType: true },
     });
     if (!user) return NextResponse.json({ message: 'User not found' }, { status: 404 });
+
+    // A General School is a school itself - it has no school to join.
+    if (user.accountType === 'SCHOOL') {
+      return NextResponse.json({ message: 'School accounts cannot join a school' }, { status: 403 });
+    }
 
     if (user.olympiadId) {
       return NextResponse.json(

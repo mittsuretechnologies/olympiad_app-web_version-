@@ -5,7 +5,8 @@ import path from 'path';
 import os from 'os';
 import { randomUUID } from 'crypto';
 import { spawn } from 'child_process';
-import { s3PublicUrl, uploadFileToS3, uploadLargeFileToS3, deleteFromS3, downloadFromS3 } from '@/lib/s3';
+import { s3PublicUrl, s3Enabled, uploadFileToS3, uploadLargeFileToS3, deleteFromS3, downloadFromS3 } from '@/lib/s3';
+import { localUploadsAllowed, localPathForKey, localMediaUrl, isSafeKey } from '@/lib/localUploads';
 import { getJwtSecret } from '@/lib/jwt-secret';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
@@ -123,6 +124,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid key' }, { status: 403 });
     }
 
+    // No S3 credentials on a development machine: the video is already on this
+    // server's disk (written by local-put), so validate it in place.
+    if (!s3Enabled() && localUploadsAllowed()) {
+      return await finalizeLocal(key, cropX);
+    }
+
     const ext = path.extname(key) || '.mp4';
     let localVideoPath = path.join(os.tmpdir(), `${randomUUID()}${ext}`);
     const thumbPath = path.join(os.tmpdir(), `${randomUUID()}_thumb.jpg`);
@@ -182,4 +189,53 @@ export async function POST(request: Request) {
     console.error('Finalize upload error:', error);
     return NextResponse.json({ error: error.message || 'Could not finalize upload' }, { status: 500 });
   }
+}
+
+// Development-only twin of the S3 flow above (see lib/localUploads.ts): same
+// crop, 2-minute limit and thumbnail, but the files live under public/ instead
+// of in a bucket. Kept separate so the production path above is untouched.
+async function finalizeLocal(inputKey: string, cropX: number | null) {
+  let key = inputKey;
+  if (!isSafeKey(key)) return NextResponse.json({ error: 'Invalid key' }, { status: 400 });
+
+  let videoPath = localPathForKey(key);
+  if (cropX !== null) {
+    const croppedKey = key.replace(/.[a-z0-9]+$/i, '') + '_crop.mp4';
+    const croppedPath = localPathForKey(croppedKey);
+    try {
+      await cropToPortrait(videoPath, croppedPath, cropX);
+      await unlink(videoPath).catch(() => {});
+      key = croppedKey;
+      videoPath = croppedPath;
+    } catch (err) {
+      // A failed crop must not lose the upload - publish the original.
+      console.error('Video crop failed, keeping the original:', err);
+      await unlink(croppedPath).catch(() => {});
+    }
+  }
+
+  const thumbKey = key.replace(/.[a-z0-9]+$/i, '_thumb.jpg');
+  const thumbPath = localPathForKey(thumbKey);
+
+  const [durationResult, thumbnailResult] = await Promise.allSettled([
+    getVideoDurationSeconds(videoPath),
+    extractThumbnail(videoPath, thumbPath),
+  ]);
+
+  if (durationResult.status === 'rejected') {
+    console.error('Video duration check failed:', durationResult.reason);
+    await unlink(videoPath).catch(() => {});
+    if (thumbnailResult.status === 'fulfilled') await unlink(thumbPath).catch(() => {});
+    return NextResponse.json({ error: 'Could not read video file. It may be corrupted or in an unsupported format.' }, { status: 400 });
+  }
+  if (durationResult.value > MAX_DURATION_SECONDS) {
+    await unlink(videoPath).catch(() => {});
+    if (thumbnailResult.status === 'fulfilled') await unlink(thumbPath).catch(() => {});
+    return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
+  }
+
+  return NextResponse.json({
+    videoUrl: localMediaUrl(key),
+    thumbnailUrl: thumbnailResult.status === 'fulfilled' ? localMediaUrl(thumbKey) : null,
+  }, { status: 200 });
 }

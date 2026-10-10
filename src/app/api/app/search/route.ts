@@ -17,20 +17,41 @@ function getAppUserFromToken(request: Request) {
   } catch { return null; }
 }
 
-async function searchUsers(q: string, appUserId: string) {
-  const usersRaw = await prisma.appUser.findMany({
+// Pages of 10 by default; asks the DB for one extra row to learn whether more
+// exist, so the app can show "See more people" without a separate count query.
+const USERS_PAGE_SIZE = 10;
+
+async function searchUsers(q: string, appUserId: string, offset = 0, pageSize = USERS_PAGE_SIZE) {
+  const usersWithExtra = await prisma.appUser.findMany({
     where: {
-      userId:     { contains: q, mode: 'insensitive' },
       isVerified: true,
       deletionRequestedAt: null,
       NOT:        { id: appUserId },
+      AND: [
+        // Match the handle, or a General School's name.
+        { OR: [
+          { userId: { contains: q, mode: 'insensitive' } },
+          { generalSchool: { name: { contains: q, mode: 'insensitive' } } },
+        ] },
+        // A school the Super Admin switched off is not discoverable.
+        { OR: [{ generalSchool: null }, { generalSchool: { isActive: true } }] },
+      ],
     },
-    select: { id: true, userId: true, avatarUrl: true, olympiadId: true, isPrivate: true },
-    take: 10,
+    select: {
+      id: true, userId: true, avatarUrl: true, olympiadId: true, isPrivate: true, accountType: true,
+      generalSchool: { select: { name: true } },
+    },
+    // Stable order, so paging by offset never repeats or skips someone.
+    orderBy: [{ userId: 'asc' }, { id: 'asc' }],
+    skip: offset,
+    take: pageSize + 1,
   });
 
+  const hasMore = usersWithExtra.length > pageSize;
+  const usersRaw = hasMore ? usersWithExtra.slice(0, pageSize) : usersWithExtra;
+
   const userIds = usersRaw.map(u => u.id);
-  if (userIds.length === 0) return [];
+  if (userIds.length === 0) return { users: [], hasMore: false };
 
   // Batched aggregates instead of firing 2 count() queries per matched user.
   const [followerGroups, followingGroups, existingFollows, pendingRequests] = await Promise.all([
@@ -51,25 +72,34 @@ async function searchUsers(q: string, appUserId: string) {
   const followingSet      = new Set(existingFollows.map(f => f.followingId));
   const pendingSet        = new Set(pendingRequests.map(r => r.receiverId));
 
-  return usersRaw.map(u => ({
+  const users = usersRaw.map(u => ({
     id:             u.id,
     userId:         u.userId,
     avatarUrl:      u.avatarUrl,
     olympiadId:     u.olympiadId,
     isPrivate:      u.isPrivate,
+    accountType:    u.accountType,
+    schoolName:     u.generalSchool?.name ?? null,
     followersCount: followerCountMap.get(u.id)  ?? 0,
     followingCount: followingCountMap.get(u.id) ?? 0,
     isFollowing:    followingSet.has(u.id),
     isPending:      pendingSet.has(u.id),
   }));
+
+  return { users, hasMore };
 }
 
-async function searchSchools(q: string) {
-  const schoolsRaw = await prisma.school.findMany({
+async function searchSchools(q: string, offset = 0, pageSize = USERS_PAGE_SIZE) {
+  const withExtra = await prisma.school.findMany({
     where:  { name: { contains: q, mode: 'insensitive' } },
     select: { id: true, schoolId: true, name: true, city: true, state: true },
-    take:   10,
+    // Stable order so paging by offset never repeats or skips a school.
+    orderBy: [{ name: 'asc' }, { id: 'asc' }],
+    skip: offset,
+    take: pageSize + 1,
   });
+  const hasMore = withExtra.length > pageSize;
+  const schoolsRaw = hasMore ? withExtra.slice(0, pageSize) : withExtra;
 
   const schoolVideosCounts = await Promise.all(
     schoolsRaw.map(sc =>
@@ -79,7 +109,7 @@ async function searchSchools(q: string) {
     )
   );
 
-  return schoolsRaw.map((sc, i) => ({ ...sc, videoCount: schoolVideosCounts[i] }));
+  return { schools: schoolsRaw.map((sc, i) => ({ ...sc, videoCount: schoolVideosCounts[i] })), hasMore };
 }
 
 async function searchVideos(q: string, appUserId: string, cursor: string | undefined, limit: number) {
@@ -199,7 +229,33 @@ export async function GET(request: Request) {
   const limit  = Math.min(parseInt(searchParams.get('limit') ?? '12', 10) || 12, 30);
 
   if (!q || q.length < 1) {
-    return NextResponse.json({ users: [], schools: [], videos: [], nextCursor: null, hasMore: false, totalCount: 0 });
+    return NextResponse.json({ users: [], usersHasMore: false, schools: [], schoolsHasMore: false, videos: [], nextCursor: null, hasMore: false, totalCount: 0 });
+  }
+
+  // "See more schools": same, for the Schools section.
+  if (searchParams.get('type') === 'schools') {
+    try {
+      const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) || 0);
+      const size   = Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 50);
+      const page   = await searchSchools(q, offset, size);
+      return NextResponse.json({ schools: page.schools, hasMore: page.hasMore, nextOffset: offset + page.schools.length });
+    } catch (error: any) {
+      console.error('search schools page error:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
+  }
+
+  // "See more people": just the next page of matching users, nothing else.
+  if (searchParams.get('type') === 'users') {
+    try {
+      const offset = Math.max(0, parseInt(searchParams.get('offset') ?? '0', 10) || 0);
+      const size   = Math.min(parseInt(searchParams.get('limit') ?? '20', 10) || 20, 50);
+      const page   = await searchUsers(q, appUser.id, offset, size);
+      return NextResponse.json({ users: page.users, hasMore: page.hasMore, nextOffset: offset + page.users.length });
+    } catch (error: any) {
+      console.error('search users page error:', error);
+      return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    }
   }
 
   try {
@@ -207,14 +263,15 @@ export async function GET(request: Request) {
     // instead of paying for each section's latency one after another.
     // Users/schools are only ever fetched on a fresh search (cursor is unset then),
     // so skip re-running them when this call is just paging in more videos.
-    const [users, schools, videoPage] = await Promise.all([
-      cursor ? Promise.resolve([]) : searchUsers(q, appUser.id),
-      cursor ? Promise.resolve([]) : searchSchools(q),
+    const [userPage, schoolPage, videoPage] = await Promise.all([
+      cursor ? Promise.resolve({ users: [], hasMore: false }) : searchUsers(q, appUser.id),
+      cursor ? Promise.resolve({ schools: [], hasMore: false }) : searchSchools(q),
       searchVideos(q, appUser.id, cursor, limit),
     ]);
 
     return NextResponse.json({
-      users, schools,
+      users: userPage.users, usersHasMore: userPage.hasMore,
+      schools: schoolPage.schools, schoolsHasMore: schoolPage.hasMore,
       videos:     videoPage.videos,
       nextCursor: videoPage.nextCursor,
       hasMore:    videoPage.hasMore,

@@ -519,6 +519,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )}
 
+            {/* General Schools — schools that signed up in the app themselves, superadmin only */}
+            {role === 'SUPERADMIN' && (
+              <Link href="/dashboard/general-schools"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/general-schools') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <School size={20} />
+                <span className="text-sm font-semibold">General Schools</span>
+              </Link>
+            )}
+
             {/* Report Infringement — copyright/trademark notices from mittmee.com, superadmin only */}
             {role === 'SUPERADMIN' && (
               <Link href="/dashboard/infringement-notices"

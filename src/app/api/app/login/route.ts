@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
 
 export async function POST(request: Request) {
   try {
@@ -33,6 +34,23 @@ export async function POST(request: Request) {
     if (!ok) {
       return NextResponse.json({ message: 'Incorrect password. Please try again.' }, { status: 401 });
     }
+
+    // A General School the Super Admin switched off cannot log in. Checked
+    // before lastLoginAt / deletion-flag updates so a blocked attempt changes
+    // nothing on the account.
+    const generalSchool = user.accountType === 'SCHOOL'
+      ? await prisma.generalSchool.findUnique({
+          where:  { appUserId: user.id },
+          select: { id: true, name: true, state: true, district: true, isActive: true },
+        })
+      : null;
+    if (generalSchool && !generalSchool.isActive) {
+      return NextResponse.json(
+        { message: 'Your school account has been deactivated. Please contact Mittmee support.' },
+        { status: 403 },
+      );
+    }
+    const schoolAgreement = generalSchool ? await currentGeneralSchoolAcceptance(generalSchool.id) : null;
 
     // Logging in cancels a viewer's pending 30-day deletion — "everything
     // should work normally as it was before" is exactly this: clear the flag
@@ -80,6 +98,14 @@ export async function POST(request: Request) {
         mustChangePassword: user.mustChangePassword,
         studentName,
         school,
+        accountType: user.accountType,
+        schoolProfile: generalSchool
+          ? {
+              id: generalSchool.id, name: generalSchool.name,
+              state: generalSchool.state, district: generalSchool.district,
+              agreementAccepted: Boolean(schoolAgreement),
+            }
+          : null,
       },
     });
   } catch (error) {

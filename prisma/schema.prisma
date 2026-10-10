@@ -551,6 +551,11 @@ model AppUser {
   notifications          Notification[]
   schoolLinkRequests     SchoolLinkRequest[]
   deletionRequests       AccountDeletionRequest[]
+  // "USER" for every ordinary account (students included); "SCHOOL" for a
+  // self-registered General School, whose institution details live in the
+  // 1:1 GeneralSchool row below.
+  accountType            String          @default("USER")
+  generalSchool          GeneralSchool?
 
   @@index([email])
   @@index([mobile])
@@ -832,6 +837,36 @@ model Notification {
 // model is the second, request-based path: the user asks, the school approves,
 // and from then on their videos appear on that school portal and on the school
 // page in the app. It grants nothing else — no Olympiad entry, no permissions.
+// A school that signed up in the app on its own (no Olympiad programme, no web
+// portal, no Olympiad IDs). It is deliberately a separate table from School so
+// that none of the Olympiad-only features (exam dispatch, attendance, ID
+// allotment, reports, the link-request school picker) can ever pick it up.
+// The login identity is the AppUser (accountType = "SCHOOL"); this row holds
+// the institution details the Super Admin needs. Its Terms acceptance is an
+// AgreementAcceptance row with role = "GENERAL_SCHOOL" and actorId = this id.
+model GeneralSchool {
+  id            String   @id @default(uuid())
+  appUserId     String   @unique
+  name          String
+  email         String
+  mobile        String
+  contactPerson String?
+  state         String
+  district      String
+  city          String?
+  pincode       String?
+  address       String?
+  // Super Admin switch. Off = cannot log in, videos hidden everywhere.
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  appUser       AppUser  @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@index([isActive])
+  @@index([state, district])
+  @@schema("public")
+}
+
 model SchoolLinkRequest {
   id         String    @id @default(uuid())
   appUserId  String

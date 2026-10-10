@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getLinkedSchoolForUser } from '@/lib/schoolMembers';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -41,12 +42,35 @@ export async function GET(request: Request) {
         termsAcceptedAt: true,
         mustChangePassword: true,
         unlistedSchoolName: true,
+        accountType:  true,
         createdAt:    true,
       },
     });
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
+    }
+
+    // General School: institution details + whether its agreement acceptance
+    // is current. A school the Super Admin switched off is logged out here -
+    // the app calls /me on launch and on every foreground, and treats 401 as
+    // "this session is no longer valid".
+    let schoolProfile: { id: string; name: string; state: string; district: string; city: string | null; agreementAccepted: boolean } | null = null;
+    if (user.accountType === 'SCHOOL') {
+      const gs = await prisma.generalSchool.findUnique({
+        where:  { appUserId: user.id },
+        select: { id: true, name: true, state: true, district: true, city: true, isActive: true },
+      });
+      if (gs && !gs.isActive) {
+        return NextResponse.json({ message: 'Your school account has been deactivated.' }, { status: 401 });
+      }
+      if (gs) {
+        const acceptance = await currentGeneralSchoolAcceptance(gs.id);
+        schoolProfile = {
+          id: gs.id, name: gs.name, state: gs.state, district: gs.district, city: gs.city,
+          agreementAccepted: Boolean(acceptance),
+        };
+      }
     }
 
     // If user has an olympiadId, resolve the linked school and student name
@@ -90,7 +114,7 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ user, school, schoolLinkType, studentName, classCode, className });
+    return NextResponse.json({ user: { ...user, schoolProfile }, school, schoolLinkType, studentName, classCode, className });
   } catch (error: any) {
     console.error('app/me error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

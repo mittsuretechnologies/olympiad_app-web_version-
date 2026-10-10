@@ -112,6 +112,9 @@ function normalizeCat(video: { category: string | null; subCategory: string | nu
   const c = video.category;
   if (c === OLYMPIAD_CAT_A_LABEL || c === 'Cat A') return OLYMPIAD_CAT_A_LABEL;
   if (c === OLYMPIAD_CAT_B_LABEL || c === 'Cat B') return OLYMPIAD_CAT_B_LABEL;
+  // A school's own category: keep it, so the dropdown doesn't default to
+  // Talent Performance and re-file the video if a moderator touches it.
+  if (c === 'School Activity') return c;
   if (OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '')) return OLYMPIAD_CAT_B_LABEL;
   return OLYMPIAD_CAT_A_LABEL;
 }
@@ -1212,7 +1215,7 @@ export default function VideoModerationPage() {
                         ? 'bg-amber-400/20 text-amber-300'
                         : 'bg-blue-400/20 text-blue-300'
                     }`}>
-                      {(previewVideo.uploaderType === 'STUDENT' || previewVideo.student) ? '🎓 Student' : '📱 Viewer'}
+                      {previewVideo.uploaderType === 'SCHOOL_OWN' ? '🏫 School' : (previewVideo.uploaderType === 'STUDENT' || previewVideo.student) ? '🎓 Student' : '📱 Viewer'}
                     </span>
                   </div>
                   {previewVideo.student ? (
