@@ -51,6 +51,8 @@ model School {
   paperDispatches PaperDispatch[]
   answerSheetDispatches AnswerSheetDispatch[]
   schoolLinkRequests SchoolLinkRequest[]
+  // The app account that stands in for this school inside the mobile app.
+  appAccount    AppUser?
 
   @@schema("public")
 }
@@ -556,6 +558,11 @@ model AppUser {
   // 1:1 GeneralSchool row below.
   accountType            String          @default("USER")
   generalSchool          GeneralSchool?
+  // Set only on the app account that represents an Olympiad school (see
+  // lib/schoolAccount.ts). That account never logs in by password: the login
+  // route checks School.password instead. Null for every other account.
+  schoolRefId            String?         @unique
+  schoolRef              School?         @relation(fields: [schoolRefId], references: [id], onDelete: Cascade)
 
   @@index([email])
   @@index([mobile])

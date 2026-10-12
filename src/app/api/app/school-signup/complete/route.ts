@@ -212,7 +212,7 @@ export async function POST(request: Request) {
         mustChangePassword: false,
         accountType: ACCOUNT_TYPE_SCHOOL,
         schoolProfile: {
-          id: school.id, name: school.name, state: school.state, district: school.district,
+          kind: 'GENERAL', id: school.id, name: school.name, state: school.state, district: school.district,
           agreementAccepted: true,
         },
       },

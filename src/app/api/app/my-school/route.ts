@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { createNotification } from '@/lib/notifications';
+import { ensureSchoolAccount } from '@/lib/schoolAccount';
 
 const SCHOOL_SELECT = {
   id: true, schoolId: true, name: true, city: true, district: true, state: true,
@@ -164,11 +166,17 @@ export async function POST(request: Request) {
 
     const school = await prisma.school.findFirst({
       where:  { id: schoolId, isActive: true },
-      select: { id: true, name: true },
+      select: { id: true, name: true, username: true, schoolId: true },
     });
     if (!school) {
       return NextResponse.json({ message: 'School not found' }, { status: 404 });
     }
+
+    // Only a genuinely new ask should notify the school (not a repeat tap).
+    const alreadyPending = await prisma.schoolLinkRequest.findFirst({
+      where:  { appUserId: payload.id, schoolId: school.id, status: 'PENDING' },
+      select: { id: true },
+    });
 
     // One pending request at a time: switching schools replaces the old ask
     // rather than leaving several portals waiting on the same student.
@@ -186,6 +194,18 @@ export async function POST(request: Request) {
       // A real request supersedes any free-text school they had typed before.
       prisma.appUser.update({ where: { id: payload.id }, data: { unlistedSchoolName: null } }),
     ]);
+
+    if (!alreadyPending) {
+      // Tell the school in the app: its own app account receives the notification.
+      const account = await ensureSchoolAccount(school);
+      const requester = await prisma.appUser.findUnique({ where: { id: payload.id }, select: { userId: true } });
+      await createNotification({
+        userId:  account.id,
+        type:    'SCHOOL_LINK_REQUEST',
+        title:   'New student request',
+        message: `${requester?.userId ?? 'A user'} asked to join ${school.name}. Open Student Requests to respond.`,
+      });
+    }
 
     return NextResponse.json(await resolveState(payload.id));
   } catch (err) {

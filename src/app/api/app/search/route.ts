@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
+import { schoolAccountIds } from '@/lib/schoolAccount';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 const JWT_SECRET = getJwtSecret();
@@ -27,6 +28,8 @@ async function searchUsers(q: string, appUserId: string, offset = 0, pageSize = 
       isVerified: true,
       deletionRequestedAt: null,
       NOT:        { id: appUserId },
+      // An Olympiad school's app account is found in the Schools section, not here.
+      schoolRefId: null,
       AND: [
         // Match the handle, or a General School's name.
         { OR: [
@@ -91,8 +94,9 @@ async function searchUsers(q: string, appUserId: string, offset = 0, pageSize = 
 
 async function searchSchools(q: string, offset = 0, pageSize = USERS_PAGE_SIZE) {
   const withExtra = await prisma.school.findMany({
-    where:  { name: { contains: q, mode: 'insensitive' } },
-    select: { id: true, schoolId: true, name: true, city: true, state: true },
+    // A school the Super Admin switched off is not discoverable.
+    where:  { name: { contains: q, mode: 'insensitive' }, isActive: true },
+    select: { id: true, schoolId: true, name: true, username: true, city: true, state: true },
     // Stable order so paging by offset never repeats or skips a school.
     orderBy: [{ name: 'asc' }, { id: 'asc' }],
     skip: offset,
@@ -109,7 +113,15 @@ async function searchSchools(q: string, offset = 0, pageSize = USERS_PAGE_SIZE) 
     )
   );
 
-  return { schools: schoolsRaw.map((sc, i) => ({ ...sc, videoCount: schoolVideosCounts[i] })), hasMore };
+  // Each school opens as a profile, which is its app account.
+  const accountIds = await schoolAccountIds(schoolsRaw);
+
+  return {
+    schools: schoolsRaw.map(({ username: _username, ...sc }, i) => ({
+      ...sc, videoCount: schoolVideosCounts[i], appUserId: accountIds.get(sc.id) ?? null,
+    })),
+    hasMore,
+  };
 }
 
 async function searchVideos(q: string, appUserId: string, cursor: string | undefined, limit: number) {

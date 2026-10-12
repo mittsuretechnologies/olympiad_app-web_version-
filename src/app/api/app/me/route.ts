@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { getLinkedSchoolForUser } from '@/lib/schoolMembers';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
+import { currentOlympiadSchoolAcceptance, signSchoolToken } from '@/lib/schoolAccount';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -43,6 +44,7 @@ export async function GET(request: Request) {
         mustChangePassword: true,
         unlistedSchoolName: true,
         accountType:  true,
+        schoolRefId:  true,
         createdAt:    true,
       },
     });
@@ -55,8 +57,25 @@ export async function GET(request: Request) {
     // is current. A school the Super Admin switched off is logged out here -
     // the app calls /me on launch and on every foreground, and treats 401 as
     // "this session is no longer valid".
-    let schoolProfile: { id: string; name: string; state: string; district: string; city: string | null; agreementAccepted: boolean } | null = null;
-    if (user.accountType === 'SCHOOL') {
+    let schoolProfile: { kind: 'GENERAL' | 'OLYMPIAD'; id: string; name: string; state: string | null; district: string | null; city: string | null; agreementAccepted: boolean } | null = null;
+    // Olympiad school: a fresh school token on every call, so the app's copy
+    // (used for the school-only routes) never goes stale.
+    let schoolToken: string | null = null;
+    if (user.schoolRefId) {
+      const os = await prisma.school.findUnique({
+        where:  { id: user.schoolRefId },
+        select: { id: true, schoolId: true, name: true, state: true, district: true, city: true, isActive: true },
+      });
+      if (!os || !os.isActive) {
+        return NextResponse.json({ message: 'Your school account has been deactivated.' }, { status: 401 });
+      }
+      const acceptance = await currentOlympiadSchoolAcceptance(os.id);
+      schoolProfile = {
+        kind: 'OLYMPIAD', id: os.id, name: os.name, state: os.state, district: os.district, city: os.city,
+        agreementAccepted: Boolean(acceptance),
+      };
+      schoolToken = signSchoolToken(os);
+    } else if (user.accountType === 'SCHOOL') {
       const gs = await prisma.generalSchool.findUnique({
         where:  { appUserId: user.id },
         select: { id: true, name: true, state: true, district: true, city: true, isActive: true },
@@ -67,7 +86,7 @@ export async function GET(request: Request) {
       if (gs) {
         const acceptance = await currentGeneralSchoolAcceptance(gs.id);
         schoolProfile = {
-          id: gs.id, name: gs.name, state: gs.state, district: gs.district, city: gs.city,
+          kind: 'GENERAL', id: gs.id, name: gs.name, state: gs.state, district: gs.district, city: gs.city,
           agreementAccepted: Boolean(acceptance),
         };
       }
@@ -114,7 +133,9 @@ export async function GET(request: Request) {
       }
     }
 
-    return NextResponse.json({ user: { ...user, schoolProfile }, school, schoolLinkType, studentName, classCode, className });
+    // schoolRefId is internal; the app only needs to know the kind (schoolProfile.kind).
+    const { schoolRefId: _schoolRefId, ...publicUser } = user;
+    return NextResponse.json({ user: { ...publicUser, schoolProfile }, school, schoolLinkType, studentName, classCode, className, ...(schoolToken ? { schoolToken } : {}) });
   } catch (error: any) {
     console.error('app/me error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

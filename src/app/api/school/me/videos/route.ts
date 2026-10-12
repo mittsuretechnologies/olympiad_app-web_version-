@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { olympiadSlotOf, resolveSchoolStudent, slotsForStudent } from '@/lib/olympiadSlots';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -19,7 +20,16 @@ function getSchoolFromToken(request: Request) {
   }
 }
 
-// POST — save video metadata on behalf of a student (web Student OR app AppUser)
+// POST - save a video a school uploaded ON BEHALF OF one of its students (a web
+// Student or an app AppUser). Used by the web portal and by the mobile app.
+//
+// A school can only upload the student's Olympiad videos:
+//   - the category must be an Olympiad one (Talent Performance, or Rhymes /
+//     Speech), never a general category;
+//   - one video per category, counted across EVERY upload of that student (the
+//     student's own app included) - a rejected video frees its slot again;
+//   - once both categories are filled, nothing more can be uploaded for them.
+// The school picks public or private here, and cannot change it afterwards.
 export async function POST(request: Request) {
   try {
     const school = getSchoolFromToken(request);
@@ -39,91 +49,63 @@ export async function POST(request: Request) {
       );
     }
 
-    // Try web Student first
-    const webStudent = await prisma.student.findUnique({
-      where: { id: studentId },
-      include: {
-        allocation: {
-          include: {
-            school: { select: { id: true, name: true, city: true, district: true, state: true, schoolId: true } },
-          },
-        },
-      },
+    const schoolRow = await prisma.school.findUnique({
+      where: { id: school.id },
+      select: { id: true, name: true, city: true, district: true, state: true, schoolId: true, isActive: true },
     });
-
-    if (webStudent) {
-      // Web student path
-      if (webStudent.allocation?.school?.id !== school.id) {
-        return NextResponse.json({ error: 'This student does not belong to your school' }, { status: 403 });
-      }
-
-      const approvedCount = await prisma.video.count({
-        where: { studentId, isEvaluation: true, status: 'APPROVED', deletedAt: null },
-      });
-      const isEvaluation = approvedCount < 2;
-
-      const schoolInfo = webStudent.allocation?.school;
-      const mergedTags = buildTags(schoolInfo, tags);
-
-      const newVideo = await prisma.video.create({
-        data: {
-          studentId,
-          videoUrl, thumbnailUrl, caption, category, subCategory,
-          tags: mergedTags,
-          isPublic: wantsPublic,
-          isEvaluation,
-          // No MittFest checkbox on this form — the hashtag is the only way in.
-          isMittfest: hasMittfestTag(tags),
-          olympiadVisibility: isEvaluation ? (wantsPublic ? 'public' : 'private') : null,
-          uploaderType: 'SCHOOL',
-          status: 'PENDING',
-        },
-      });
-
-      return NextResponse.json(newVideo, { status: 201 });
+    if (!schoolRow || !schoolRow.isActive) {
+      return NextResponse.json({ error: 'This school account is not active.' }, { status: 403 });
     }
 
-    // Try AppUser (mobile-registered student)
-    const appUser = await prisma.appUser.findUnique({
-      where: { id: studentId },
-      select: { id: true, userId: true, olympiadId: true },
-    });
-
-    if (!appUser || !appUser.olympiadId) {
-      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
-    }
-
-    // Verify this AppUser's olympiadId belongs to this school
-    const allocation = await prisma.olympiadIdAllocation.findUnique({
-      where: { code: appUser.olympiadId },
-      include: {
-        school: { select: { id: true, name: true, city: true, district: true, state: true, schoolId: true } },
-      },
-    });
-
-    if (!allocation || allocation.schoolId !== school.id) {
+    const student = await resolveSchoolStudent(school.id, String(studentId));
+    if (!student) {
       return NextResponse.json({ error: 'This student does not belong to your school' }, { status: 403 });
     }
 
-    // Count approved evaluation videos for this AppUser
-    const approvedCount = await prisma.video.count({
-      where: { appUserId: studentId, isEvaluation: true, status: 'APPROVED', deletedAt: null },
-    });
-    const isEvaluation = approvedCount < 2;
+    // Olympiad categories only.
+    const slot = olympiadSlotOf(category);
+    if (!slot) {
+      return NextResponse.json(
+        { error: 'Schools can only upload a student\'s Olympiad videos (Talent Performance or Rhymes / Speech).' },
+        { status: 400 },
+      );
+    }
 
-    const schoolInfo = allocation.school;
-    const mergedTags = buildTags(schoolInfo, tags);
+    const slots = await slotsForStudent(student);
+    const used = slot === 'A' ? slots.slotA : slots.slotB;
+    if (used) {
+      return NextResponse.json(
+        {
+          error: slots.slotA && slots.slotB
+            ? 'This student already has both Olympiad videos, so nothing more can be uploaded for them.'
+            : 'This student already has a video in that category.',
+          code: 'SLOT_TAKEN',
+        },
+        { status: 409 },
+      );
+    }
+
+    const mergedTags = buildTags(schoolRow, tags);
+
+    // The video belongs to the student's web record if they have one, else to
+    // their app account (same split the web form has always used).
+    const owner = student.studentRowId
+      ? { studentId: student.studentRowId }
+      : { appUserId: student.appUserId! };
+    if (!student.studentRowId && !student.appUserId) {
+      return NextResponse.json({ error: 'Student not found' }, { status: 404 });
+    }
 
     const newVideo = await prisma.video.create({
       data: {
-        appUserId: studentId,
+        ...owner,
         videoUrl, thumbnailUrl, caption, category, subCategory,
         tags: mergedTags,
         isPublic: wantsPublic,
-        isEvaluation,
-        // No MittFest checkbox on this form — the hashtag is the only way in.
+        isEvaluation: true,
+        // No MittFest checkbox on this form - the hashtag is the only way in.
         isMittfest: hasMittfestTag(tags),
-        olympiadVisibility: isEvaluation ? (wantsPublic ? 'public' : 'private') : null,
+        olympiadVisibility: wantsPublic ? 'public' : 'private',
         uploaderType: 'SCHOOL',
         status: 'PENDING',
       },

@@ -15,9 +15,8 @@ import {
   SCHOOL_UPLOAD_CATEGORIES,
   SCHOOL_ACTIVITY_SUBS,
   isSchoolActivity,
-  currentGeneralSchoolAcceptance,
-  getGeneralSchoolForUser,
 } from '@/lib/generalSchool';
+import { getSchoolIdentity } from '@/lib/schoolAccount';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -68,11 +67,12 @@ export async function POST(request: Request) {
     const isSchoolAccount = user?.accountType === ACCOUNT_TYPE_SCHOOL;
     const schoolAutoTags: string[] = [];
     if (isSchoolAccount) {
-      const school = await getGeneralSchoolForUser(appUser.id);
+      // Either kind of school (General, or an Olympiad school's own account).
+      const school = await getSchoolIdentity(appUser.id);
       if (!school || !school.isActive) {
         return NextResponse.json({ error: 'This school account is not active.' }, { status: 403 });
       }
-      if (!(await currentGeneralSchoolAcceptance(school.id))) {
+      if (!school.agreementAccepted) {
         return NextResponse.json(
           { error: 'Please accept the School Onboarding Agreement before uploading.' },
           { status: 403 },
@@ -84,10 +84,9 @@ export async function POST(request: Request) {
       if (isSchoolActivity(category) && !(SCHOOL_ACTIVITY_SUBS as readonly string[]).includes(subCategory)) {
         return NextResponse.json({ error: 'Pick a valid School Activity type.' }, { status: 400 });
       }
-      // Same auto hashtags student videos get (state, district, school name).
-      if (school.state)    schoolAutoTags.push(school.state.replace(/\s+/g, ''));
-      if (school.district) schoolAutoTags.push(school.district.replace(/\s+/g, ''));
-      schoolAutoTags.push(school.name.replace(/\s+/g, ''));
+      // Same auto hashtags student videos get (state, district, school name; an
+      // Olympiad school also carries its school code).
+      schoolAutoTags.push(...school.autoTags);
     } else if (isSchoolActivity(category)) {
       // School Activity belongs to schools. Enforced here, not just hidden in
       // the app, so an older build or a hand-made request cannot post into it.
@@ -156,8 +155,11 @@ export async function POST(request: Request) {
         // No deletedAt filter — an evaluated video must keep blocking this slot even if it
         // was later soft-deleted (e.g. an admin removing a reported video). See the matching
         // comment in GET /api/app/olympiad-video-slots for the full reasoning.
+        // Counted together with videos the school uploaded for this student under
+        // their web Student record (same Olympiad ID), so the app, the web and the
+        // school's own upload all see the same slots.
         const existingOlympiadVideos = await prisma.video.findMany({
-          where: { appUserId: appUser.id, isEvaluation: true },
+          where: { OR: [{ appUserId: appUser.id }, ...(studentId ? [{ studentId }] : [])], isEvaluation: true },
           select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
         });
         const matchesSlot = (v: { category: string | null; subCategory: string | null }) =>
