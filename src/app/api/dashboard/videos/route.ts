@@ -43,6 +43,17 @@ async function moderationConflict(videoId: string, userId: string) {
   );
 }
 
+// An approved video can be pulled back (rejected) only while no evaluator has
+// scored it — see the un-approve guard in POST.
+const NOT_EVALUATED = { evaluations: { none: {} } };
+
+function evaluatedConflict() {
+  return NextResponse.json(
+    { message: 'This video has already been evaluated by the jury, so it can no longer be rejected.', currentStatus: 'APPROVED' },
+    { status: 409 },
+  );
+}
+
 function buildVideoStatusNotification(
   video: { id: string; appUserId: string | null; caption: string | null; category: string | null; subCategory: string | null },
   status: 'APPROVED' | 'REJECTED',
@@ -109,6 +120,9 @@ export async function GET(request: Request) {
             },
           },
         },
+        // Lets the Approved tab disable "Reject" on videos a jury evaluator has
+        // already scored (the POST below refuses those anyway).
+        _count: { select: { evaluations: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -248,6 +262,87 @@ function resolveSlot(category: string | null | undefined, subCategory: string | 
   return null;
 }
 
+/**
+ * Whether another of the student's jury videos already occupies this A/B slot
+ * — evaluated, or live and not rejected. Same rule as the student's upload.
+ */
+async function slotTakenBySibling(appUserId: string, videoId: string, slot: 'A' | 'B') {
+  const siblings = await prisma.video.findMany({
+    where: { appUserId, isEvaluation: true, id: { not: videoId } },
+    select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
+  });
+  return siblings.some(v =>
+    resolveSlot(v.category, v.subCategory) === slot &&
+    (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
+  );
+}
+
+/**
+ * SuperAdmin override: send an approved or rejected video back to the Pending
+ * queue so it can be decided afresh. Quality and rejection reason are cleared
+ * since both belong to the decision being undone. Single video only.
+ */
+async function moveToPending(payload: { id: string; role: string; name?: string; email?: string }, videoId: unknown, expected: string) {
+  if (payload.role !== 'SUPERADMIN') {
+    return NextResponse.json({ message: 'Only a SuperAdmin can move a video back to Pending.' }, { status: 403 });
+  }
+  if (typeof videoId !== 'string' || !videoId) {
+    return NextResponse.json({ message: 'videoId required' }, { status: 400 });
+  }
+  if (expected !== 'APPROVED' && expected !== 'REJECTED') {
+    return NextResponse.json({ message: 'Only approved or rejected videos can be moved back to Pending.' }, { status: 400 });
+  }
+
+  const before = await prisma.video.findUnique({
+    where: { id: videoId },
+    select: {
+      status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true,
+      category: true, subCategory: true, deletedAt: true,
+      _count: { select: { evaluations: true } },
+    },
+  });
+  if (!before || before.deletedAt) return NextResponse.json({ message: 'This video no longer exists.' }, { status: 404 });
+  if (before.status !== expected) return moderationConflict(videoId, payload.id);
+  if (before._count.evaluations > 0) {
+    return NextResponse.json(
+      { message: 'This video has already been evaluated by the jury, so it can no longer be moved back to Pending.' },
+      { status: 409 },
+    );
+  }
+
+  // A rejected jury video frees its A/B slot, so the student may have uploaded
+  // a replacement since. Reviving the old one would put two videos in a slot.
+  if (expected === 'REJECTED' && before.isEvaluation && before.appUserId) {
+    const slot = resolveSlot(before.category, before.subCategory);
+    if (slot && await slotTakenBySibling(before.appUserId, videoId, slot)) {
+      return NextResponse.json(
+        { message: 'This student has since uploaded another video in the same category slot, so this one cannot be moved back to Pending.' },
+        { status: 409 },
+      );
+    }
+  }
+
+  const written = await prisma.video.updateMany({
+    where: { id: videoId, status: expected, deletedAt: null, ...NOT_EVALUATED },
+    data: { status: 'PENDING', quality: null, rejectionReason: null, ...CLEAR_CLAIM },
+  });
+  if (written.count === 0) return moderationConflict(videoId, payload.id);
+
+  await recordAuditLog({
+    actorId: payload.id,
+    actorRole: payload.role,
+    actorName: payload.name || payload.email || null,
+    action: 'VIDEO_MOVED_TO_PENDING',
+    entityType: 'Video',
+    entityId: videoId,
+    previousValue: { status: before.status, quality: before.quality, rejectionReason: before.rejectionReason },
+    newValue: { status: 'PENDING', quality: null, rejectionReason: null },
+    reason: null,
+  });
+
+  return NextResponse.json({ message: 'Video moved back to Pending' });
+}
+
 export async function POST(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
   if (error) return error;
@@ -265,6 +360,8 @@ export async function POST(request: Request) {
     const expected: string = STATUSES.includes(expectedStatus) ? expectedStatus : 'PENDING';
     const now = new Date();
 
+    if (status === 'PENDING') return moveToPending(payload!, videoId, expected);
+
     if (!['APPROVED', 'REJECTED'].includes(status)) {
       return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
     }
@@ -277,6 +374,12 @@ export async function POST(request: Request) {
     }
     if (status === 'APPROVED' && Array.isArray(videoIds) && videoIds.length > 0) {
       return NextResponse.json({ message: 'Bulk approve is not supported — quality must be set per video.' }, { status: 400 });
+    }
+
+    // Pulling back an already-approved video (Approved → Rejected) is a
+    // SuperAdmin-only override; moderators can only decide pending videos.
+    if (expected === 'APPROVED' && status === 'REJECTED' && payload!.role !== 'SUPERADMIN') {
+      return NextResponse.json({ message: 'Only a SuperAdmin can reject an already-approved video.' }, { status: 403 });
     }
 
     const actor = {
@@ -293,7 +396,7 @@ export async function POST(request: Request) {
       // someone else's live review are touched; the rest are reported back as
       // skipped rather than overwritten.
       const existing = await prisma.video.findMany({
-        where: { id: { in: videoIds }, status: expected, ...claimFreeFor(payload!.id, now) },
+        where: { id: { in: videoIds }, status: expected, ...claimFreeFor(payload!.id, now), ...(expected === 'APPROVED' ? NOT_EVALUATED : {}) },
         select: {
           id: true, status: true, rejectionReason: true,
           appUserId: true, caption: true, category: true, subCategory: true,
@@ -301,7 +404,7 @@ export async function POST(request: Request) {
       });
 
       await prisma.video.updateMany({
-        where: { id: { in: existing.map(v => v.id) }, status: expected },
+        where: { id: { in: existing.map(v => v.id) }, status: expected, ...(expected === 'APPROVED' ? NOT_EVALUATED : {}) },
         data: {
           status,
           rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
@@ -326,7 +429,7 @@ export async function POST(request: Request) {
       const skipped = videoIds.length - existing.length;
       return NextResponse.json({
         message: `${existing.length} video(s) ${status.toLowerCase()}`
-          + (skipped ? ` · ${skipped} skipped (already decided or being reviewed by another moderator)` : ''),
+          + (skipped ? ` · ${skipped} skipped (already decided, already evaluated, or being reviewed by another moderator)` : ''),
         updated: existing.map(v => v.id),
         skipped,
       });
@@ -340,12 +443,19 @@ export async function POST(request: Request) {
       select: {
         status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true,
         caption: true, category: true, subCategory: true,
+        _count: { select: { evaluations: true } },
       },
     });
     if (!before) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
     // Fail fast before the slot checks below; the atomic write further down
     // re-checks, which closes the gap between this read and that write.
     if (before.status !== expected) return moderationConflict(videoId, payload!.id);
+
+    // Un-approving: an approved jury video may already carry an evaluator's
+    // score, and rejecting it would silently drop that score from results.
+    // Only videos nobody has evaluated yet can be pulled back.
+    const unapproving = expected === 'APPROVED' && status === 'REJECTED';
+    if (unapproving && before._count.evaluations > 0) return evaluatedConflict();
 
     // Moderator is recategorizing an olympiad (jury) video before approving — re-run
     // the same 1-per-category slot check the student's upload does, so approving into
@@ -361,15 +471,7 @@ export async function POST(request: Request) {
         subCategoryChanged ? newSubCategory : before.subCategory,
       );
       if (targetSlot && before.appUserId) {
-        const siblings = await prisma.video.findMany({
-          where: { appUserId: before.appUserId, isEvaluation: true, id: { not: videoId } },
-          select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
-        });
-        const slotTaken = siblings.some(v =>
-          resolveSlot(v.category, v.subCategory) === targetSlot &&
-          (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
-        );
-        if (slotTaken) {
+        if (await slotTakenBySibling(before.appUserId, videoId, targetSlot)) {
           return NextResponse.json(
             { message: 'This student already has a video in that category slot. Reject this one instead.' },
             { status: 409 },
@@ -395,7 +497,7 @@ export async function POST(request: Request) {
     // moderator saw and nobody else holds a live review claim on it. Two
     // moderators saving at the same instant can't both succeed.
     const written = await prisma.video.updateMany({
-      where: { id: videoId, status: expected, ...claimFreeFor(payload!.id, now) },
+      where: { id: videoId, status: expected, ...claimFreeFor(payload!.id, now), ...(unapproving ? NOT_EVALUATED : {}) },
       data: {
         status,
         rejectionReason: status === 'REJECTED' ? (rejectionReason || null) : null,
@@ -409,7 +511,11 @@ export async function POST(request: Request) {
         ...CLEAR_CLAIM,
       },
     });
-    if (written.count === 0) return moderationConflict(videoId, payload!.id);
+    if (written.count === 0) {
+      // An evaluator may have scored it between the read above and this write.
+      if (unapproving && await prisma.videoEvaluation.count({ where: { videoId } }) > 0) return evaluatedConflict();
+      return moderationConflict(videoId, payload!.id);
+    }
 
     const video = await prisma.video.findUniqueOrThrow({ where: { id: videoId } });
 
@@ -418,7 +524,7 @@ export async function POST(request: Request) {
       action,
       entityType: 'Video',
       entityId: videoId,
-      previousValue: before,
+      previousValue: (({ _count, ...rest }) => rest)(before),
       newValue: { status: video.status, rejectionReason: video.rejectionReason, quality: video.quality, category: video.category, subCategory: video.subCategory },
       reason: status === 'REJECTED' ? (rejectionReason || null) : null,
     });
@@ -453,10 +559,13 @@ export async function POST(request: Request) {
   }
 }
 
-// Tags-only edit — independent of status/approve-reject, so a moderator can
-// add/fix hashtags on a video regardless of which tab (Pending/Approved/
-// Rejected) it's currently sitting in, without that edit accidentally
-// changing its moderation status.
+// Tags or caption edit — independent of status/approve-reject, so a moderator
+// can fix hashtags or the caption on a video regardless of which tab (Pending/
+// Approved/Rejected) it's currently sitting in, without that edit accidentally
+// changing its moderation status. Send `tags` or `caption` (one per request).
+
+const MAX_CAPTION_LENGTH = 500;
+
 export async function PATCH(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
   if (error) return error;
@@ -465,8 +574,40 @@ export async function PATCH(request: Request) {
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
-    const { videoId, tags } = await request.json();
+    const { videoId, tags, caption } = await request.json();
     if (!videoId) return NextResponse.json({ message: 'videoId required' }, { status: 400 });
+
+    if (caption !== undefined) {
+      if (typeof caption !== 'string') return NextResponse.json({ message: 'caption must be a string' }, { status: 400 });
+      const trimmed = caption.trim();
+      if (trimmed.length > MAX_CAPTION_LENGTH) {
+        return NextResponse.json({ message: `Caption can be at most ${MAX_CAPTION_LENGTH} characters.` }, { status: 400 });
+      }
+
+      const before = await prisma.video.findUnique({ where: { id: videoId }, select: { caption: true } });
+      if (!before) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+
+      const video = await prisma.video.update({
+        where: { id: videoId },
+        data: { caption: trimmed || null },
+        select: { id: true, caption: true },
+      });
+
+      await recordAuditLog({
+        actorId: payload!.id,
+        actorRole: payload!.role,
+        actorName: payload!.name || payload!.email || null,
+        action: 'VIDEO_CAPTION_UPDATED',
+        entityType: 'Video',
+        entityId: videoId,
+        previousValue: { caption: before.caption },
+        newValue: { caption: video.caption },
+        reason: null,
+      });
+
+      return NextResponse.json({ message: 'Caption updated', video });
+    }
+
     if (typeof tags !== 'string') return NextResponse.json({ message: 'tags must be a string' }, { status: 400 });
 
     // Normalize: dedupe, strip empties/# prefixes and surrounding whitespace,

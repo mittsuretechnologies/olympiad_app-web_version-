@@ -537,6 +537,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )}
 
+            {/* School Support — requests raised from the School Panel */}
+            {canSee('support') && (
+              <Link href="/dashboard/school-support"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/school-support') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <LifeBuoy size={20} />
+                <span className="text-sm font-semibold">School Support</span>
+              </Link>
+            )}
+
             {/* Settings — only superadmin */}
             {role === 'SUPERADMIN' && (
               <div>

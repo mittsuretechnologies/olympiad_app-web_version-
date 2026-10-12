@@ -1,16 +1,17 @@
 'use client';
 
-// Holistic Progress Passport — booklet styled to match the official "Junior
-// Power Quest" passport PDF: dark cover → ID card (photo) → welcome letter →
-// written-round performance (chunked) → talent-round overview → panchakosha
-// profile (star-rated) → panchakosha summary (puzzle wheel) → insights →
-// parent/teacher reflection → recommended tools → back cover. All content is
-// driven by the student's real data from /api/result/overview; sections with
-// no data source yet (age, batch, assessment date) show "Not available".
+// Holistic Progress Passport — a page-for-page replica of the designer's
+// "Junior Power Quest" passport PDF. Each page is the PDF's own artwork
+// (rendered and cleaned by scripts/build-passport-assets.py into
+// public/passport/) with the student's real data laid on top at the PDF's
+// coordinates. Everything inside a page is positioned in PDF points
+// (372.33 × 528.24); the page is then scaled to fit the screen.
 
-import { useCallback, useEffect, useState } from 'react';
-import { X, ChevronLeft, ChevronRight, School, MapPin, Hash, GraduationCap, Video as VideoIcon } from 'lucide-react';
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
+import { X, ChevronLeft, ChevronRight, Download, Loader2 } from 'lucide-react';
 import type { CriterionKey } from '@/lib/kosh';
+import geometry from '@/components/passport/geometry.json';
+import { roboto, robotoCondensed } from '@/components/passport/fonts';
 
 /* ── Data shapes (mirrors /api/result/overview) ─────────────── */
 
@@ -22,6 +23,10 @@ interface PassportExamQuestion {
   maxMarks: number;
   score: number | null;
   percentage: number | null;
+  // Scanner's own band for the question ("Proficient", "Did not attempt", …),
+  // AI and reviewer versions — the reviewer's wins when present.
+  performanceLevel?: string | null;
+  manualPerformanceLevel?: string | null;
   aiKoshas: { kosha: string; earned: number; weight: number }[];
   manualKoshas: { kosha: string; earned: number; weight: number }[];
 }
@@ -69,10 +74,10 @@ export interface PassportV2Student {
   status: 'Complete' | 'Incomplete';
 }
 
-/* ── Question-level grading band (no per-question rubric exists —
-   derived from percentage, same bands as the kosha grading) ────── */
+/* ── Levels ─────────────────────────────────────────────────── */
 
 type Grade = 'Beginner' | 'Progressing' | 'Proficient';
+type Badge = 'proficient' | 'progressing' | 'beginner' | 'not-attempted';
 
 function bandFromPercent(pct: number): Grade {
   if (pct >= 70) return 'Proficient';
@@ -80,15 +85,45 @@ function bandFromPercent(pct: number): Grade {
   return 'Beginner';
 }
 
-const GRADE_STYLE: Record<Grade, { color: string; bg: string; border: string }> = {
-  Proficient:  { color: '#0E9F6E', bg: '#EAF7F1', border: '#B3E4D0' },
-  Progressing: { color: '#2563EB', bg: '#EDF2FE', border: '#BCD0F7' },
-  Beginner:    { color: '#D9950C', bg: '#FCF5E6', border: '#F1DCA8' },
+function badgeOf(grade: Grade | null): Badge | null {
+  return grade ? (grade.toLowerCase() as Badge) : null;
+}
+
+function questionBadge(q: PassportExamQuestion): Badge | null {
+  const raw = (q.manualPerformanceLevel ?? q.performanceLevel ?? '').toLowerCase();
+  if (raw.includes('attempt')) return 'not-attempted';
+  if (raw.includes('proficient')) return 'proficient';
+  if (raw.includes('progress')) return 'progressing';
+  if (raw.includes('beginner')) return 'beginner';
+  return q.percentage !== null ? badgeOf(bandFromPercent(q.percentage)) : null;
+}
+
+// Puzzle colour per level, as explained on the summary page's legend.
+const PUZZLE_FAMILY: Record<Grade, 'orange' | 'blue' | 'green'> = {
+  Beginner: 'orange', Progressing: 'blue', Proficient: 'green',
 };
 
-// question_type is a code (e.g. "circle_correct") — scanner.questions has no
-// free-text instruction column yet. This label is a readable stand-in until
-// one lands; swap in the real instruction text there once it exists.
+const LEVEL_LINE: Record<Grade, string> = {
+  Beginner: 'You are an Explorer!',
+  Progressing: 'You are a Learner!',
+  Proficient: 'You are a Champion!',
+};
+
+function remarks(first: string, level: Grade | null): string {
+  switch (level) {
+    case 'Proficient':
+      return `${first} shows excellent enthusiasm and confidence during the talent round. Demonstrates skills beyond age-appropriate expectations with joyful, consistent participation. With continued encouragement, ${first} will keep shining across every dimension.`;
+    case 'Progressing':
+      return `${first} shows good enthusiasm and confidence during the talent round. Demonstrates age-appropriate skills with consistent participation. Continues to make steady progress and, with regular practice and encouragement, will achieve greater confidence and proficiency.`;
+    case 'Beginner':
+      return `${first} participated with interest during the talent round and is beginning to build age-appropriate skills. With regular practice, gentle guidance and encouragement at home and school, ${first} will grow in confidence and proficiency.`;
+    default:
+      return `${first}'s talent round evaluation is in progress. Remarks will appear here once both videos have been evaluated.`;
+  }
+}
+
+// question_type is a code (e.g. "circle_correct"); used only for older scans
+// that predate scanner.questions' instruction text.
 const QUESTION_TYPE_LABELS: Record<string, string> = {
   trace_dotted_bands: 'Trace the dotted lines.',
   circle_correct: 'Circle the correct answer.',
@@ -98,9 +133,6 @@ const QUESTION_TYPE_LABELS: Record<string, string> = {
   missing_letter: 'Fill in the missing letter.',
 };
 
-// Prefers the real instruction text (now stored on scanner.questions); falls
-// back to a readable label derived from question_type for older scans that
-// predate that column, and finally to a plain "Question N." placeholder.
 function questionLabel(text: string | null, type: string | null, num: number): string {
   if (text) return text;
   if (!type) return `Question ${num}.`;
@@ -108,514 +140,322 @@ function questionLabel(text: string | null, type: string | null, num: number): s
   return type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) + '.';
 }
 
-const KOSH_THEME: Record<string, { accent: string; soft: string; ring: string; tagline: string; skills: string[] }> = {
-  ANNAMAYA:    { accent: '#0E9F6E', soft: '#EAF7F1', ring: '#B3E4D0', tagline: 'The Physical Body', skills: ['Fine Motor Skill', 'Gross Motor Skill', 'Coordination'] },
-  PRANAMAYA:   { accent: '#D9950C', soft: '#FCF5E6', ring: '#F1DCA8', tagline: 'The Energy Body', skills: ['Vitality', 'Breath Awareness', 'Energy'] },
-  MANOMAYA:    { accent: '#DC2626', soft: '#FDEEEE', ring: '#F3C0C0', tagline: 'The Mind Body', skills: ['Emotional Awareness', 'Self-regulation', 'Moral Reasoning'] },
-  VIJNANAMAYA: { accent: '#7C3AED', soft: '#F2EDFD', ring: '#D6C4F5', tagline: 'The Wisdom Body', skills: ['Cognitive Skills', 'Problem Solving', 'Early Learning'] },
-  ANANDAMAYA:  { accent: '#D97706', soft: '#FDF3E7', ring: '#F3D9AE', tagline: 'The Bliss Body', skills: ['Creativity', 'Self-expression', 'Joy & Happiness'] },
-};
-
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
+// NEP stage for the class, as the PDF prints "Nursery/Foundational Stage".
+function developmentStage(cls: string | null): string | null {
+  if (!cls) return null;
+  if (/nursery|kg|lkg|ukg|pre|play/i.test(cls)) return `${cls}/Foundational Stage`;
+  const n = Number(cls.match(/\d+/)?.[0]);
+  if (!n) return cls;
+  const stage = n <= 2 ? 'Foundational' : n <= 5 ? 'Preparatory' : n <= 8 ? 'Middle' : 'Secondary';
+  return `${cls}/${stage} Stage`;
 }
 
-function Rise({ delay = 0, children, className = '' }: { delay?: number; children: React.ReactNode; className?: string }) {
-  return <div className={`pp2-rise ${className}`} style={{ animationDelay: `${delay}ms` }}>{children}</div>;
-}
+const BATCH = 'Junior Power Quest 2026';
+const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
-function Stars() {
-  const stars = [
-    { top: '12%', left: '14%', size: 3, delay: 0 }, { top: '20%', left: '78%', size: 2, delay: 0.8 },
-    { top: '34%', left: '8%',  size: 2, delay: 1.6 }, { top: '44%', left: '88%', size: 3, delay: 0.4 },
-    { top: '66%', left: '12%', size: 2, delay: 2.1 }, { top: '74%', left: '82%', size: 3, delay: 1.1 },
-    { top: '85%', left: '30%', size: 2, delay: 0.2 }, { top: '9%',  left: '48%', size: 2, delay: 1.9 },
-  ] as const;
+/* ── Page canvas & text primitives (all units = PDF points) ─── */
+
+const PW = geometry.page.w;
+const PH = geometry.page.h;
+const INK = '#2B2A29';
+const NAVY = '#2D2556';
+const CREAM = '#F7EBD1';
+const COND = robotoCondensed.style.fontFamily;
+// With line-height 1, Roboto's baseline sits 0.842em below the box top.
+const BASELINE = 0.842;
+
+function Canvas({ bg, children }: { bg: string; children?: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 pointer-events-none" aria-hidden>
-      {stars.map((s, i) => (
-        <span key={i} className="absolute rounded-full bg-[#FFD873] pp2-twinkle"
-          style={{ top: s.top, left: s.left, width: s.size, height: s.size, animationDelay: `${s.delay}s` }} />
-      ))}
+    <div className="absolute left-0 top-0 origin-top-left overflow-hidden" style={{ width: PW, height: PH, transform: 'scale(var(--pp-scale))' }}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`/passport/${bg}.webp`} alt="" draggable={false} className="absolute inset-0 w-full h-full select-none" />
+      {children}
     </div>
   );
 }
 
-function PageFrame({ children, footerRight, bg = '#FBF3E1' }: {
-  children: React.ReactNode; footerLeft: string; footerRight: string; bg?: string;
+function Img({ src, x, y, w, h, style }: { src: string; x: number; y: number; w: number; h: number; style?: React.CSSProperties }) {
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={`/passport/${src}.webp`} alt="" draggable={false} className="absolute select-none" style={{ left: x, top: y, width: w, height: h, ...style }} />;
+}
+
+// Single line of text placed by its baseline; shrinks to fit `max` width.
+function Txt({ x, y, size, children, align = 'left', max, family, weight = 400, italic, color = INK, spacing }: {
+  x: number; y: number; size: number; children: React.ReactNode; align?: 'left' | 'center' | 'right';
+  max?: number; family?: string; weight?: number; italic?: boolean; color?: string; spacing?: number;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState(size);
+  useLayoutEffect(() => {
+    setFit(size);
+  }, [size, children]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !max) return;
+    if (el.scrollWidth > max + 0.5) setFit(f => Math.max(f * (max / el.scrollWidth), size * 0.6));
+  }, [fit, max, size, children]);
+  const left = align === 'left' ? x : align === 'center' ? x : undefined;
   return (
-    <div className="w-full h-full rounded-2xl flex flex-col overflow-hidden relative border-2 border-dashed" style={{ background: bg, borderColor: '#D9BE8C' }}>
-      <div className="flex-1 min-h-0 px-6 pt-5 pb-2 flex flex-col relative overflow-y-auto">{children}</div>
-      <div className="px-6 py-2 flex items-center justify-center relative">
-        <span className="text-[10px] font-bold text-[#8A6D3B] bg-[#FBF3E1] px-2 rounded-full border border-[#D9BE8C] w-6 h-6 flex items-center justify-center">{footerRight}</span>
-      </div>
+    <div ref={ref} className="absolute whitespace-nowrap" style={{
+      left, right: align === 'right' ? PW - x : undefined,
+      top: y - BASELINE * fit, fontSize: fit, lineHeight: 1,
+      transform: align === 'center' ? 'translateX(-50%)' : undefined,
+      fontFamily: family, fontWeight: weight, fontStyle: italic ? 'italic' : undefined,
+      color, letterSpacing: spacing,
+    }}>
+      {children}
     </div>
   );
 }
 
-/* ── Page 1: Cover ──────────────────────────────────────────── */
-
-function CoverPage() {
-  return (
-    <div className="w-full h-full rounded-2xl flex flex-col items-center justify-center gap-4 text-center px-8 relative overflow-hidden border-2 border-dashed border-[#C9A84C]/50" style={{ background: '#1B1450' }}>
-      <Stars />
-      <div className="absolute inset-3 rounded-xl border border-[#C9A84C]/40 pointer-events-none" />
-      <Rise delay={60}>
-        <div className="flex items-center gap-1.5">
-          <div className="w-7 h-7 rounded bg-blue-600 flex items-center justify-center text-[10px] font-black text-white">M</div>
-          <div className="w-7 h-7 rounded-full bg-amber-400 flex items-center justify-center text-[10px]">🏅</div>
-          <div className="w-7 h-7 rounded bg-blue-600 flex items-center justify-center text-[10px] font-black text-white">M</div>
-        </div>
-      </Rise>
-      <Rise delay={160}>
-        <h2 className="text-2xl font-black text-white tracking-wide leading-tight">MITTSURE<br /><span className="text-[#3DBB6E]">OLYMPIAD</span><br />MASTERS</h2>
-      </Rise>
-      <Rise delay={240}>
-        <p className="text-sm font-black text-[#F5C451] tracking-wide uppercase">Junior Power Quest</p>
-      </Rise>
-      <Rise delay={340}>
-        <div className="w-28 h-28 rounded-full border-4 border-dashed border-[#F5C451] flex items-center justify-center relative pp2-spin-slow" style={{ animationDuration: '30s' }}>
-          <div className="w-20 h-20 rounded-full bg-[#F5C451] flex items-center justify-center text-3xl">🐾</div>
-        </div>
-      </Rise>
-      <Rise delay={460}>
-        <p className="text-sm font-black text-[#F5C451] uppercase tracking-wide mt-2">Holistic Progress Passport</p>
-        <p className="text-[10px] text-[#F5C451]/70 font-semibold mt-1">Beginner &nbsp;|&nbsp; Progressing &nbsp;|&nbsp; Proficient</p>
-      </Rise>
-    </div>
-  );
+function PageNo({ n }: { n: number }) {
+  return <Txt x={186.1} y={503.5} size={11.6} align="center" color={NAVY}>{n}</Txt>;
 }
 
-/* ── Page 2: ID Card ────────────────────────────────────────── */
+/* ── Pages ──────────────────────────────────────────────────── */
 
 function IdCardPage({ s }: { s: PassportV2Student }) {
-  const fields: { icon: React.ReactNode; label: string; value: string }[] = [
-    { icon: <Hash size={11} />,          label: 'Age',              value: 'Not available' },
-    { icon: <GraduationCap size={11} />, label: 'Development Stage', value: s.className || 'Not available' },
-    { icon: <School size={11} />,        label: 'School',           value: s.schoolName || 'Not available' },
-    { icon: <MapPin size={11} />,        label: 'Region',           value: [s.city, s.district, s.state].filter(Boolean).join(', ') || 'Not available' },
-    { icon: <Hash size={11} />,          label: 'Olympiad ID',      value: s.olympiadCode },
-    { icon: <Hash size={11} />,          label: 'Batch',            value: 'Not available' },
-    { icon: <Hash size={11} />,          label: 'Assessment Date',  value: 'Not available' },
+  const values: [number, string][] = [
+    [165.5, s.name.toUpperCase()],
+    [203.75, '—'],
+    [242.25, developmentStage(s.className) || '—'],
+    [282.5, s.schoolName || '—'],
+    [324.25, s.olympiadCode],
+    [363.75, BATCH],
+    [402.75, '—'],
   ];
+  const initials = s.name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
   return (
-    <PageFrame footerLeft="ID" footerRight="2">
-      <Rise delay={20}>
-        <h2 className="text-center text-lg font-black text-[#1B1450] leading-tight">MOM JUNIOR POWER QUEST</h2>
-        <p className="text-center text-[9px] font-bold text-[#8A6D3B] uppercase tracking-widest">Holistic Progress Passport</p>
-      </Rise>
-      <div className="mt-4 border-2 border-dashed border-[#D9BE8C] rounded-xl p-4 flex-1">
-        <Rise delay={100}>
-          <div className="w-24 h-28 rounded-lg bg-gradient-to-br from-[#1B1450] to-[#3A2C8A] flex items-center justify-center overflow-hidden mx-auto mb-3 relative">
-            {s.avatarUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={s.avatarUrl} alt={s.name} className="w-full h-full object-cover" />
-            ) : (
-              <span className="text-3xl font-black text-[#F5E9C8]">{initials(s.name)}</span>
-            )}
-          </div>
-        </Rise>
-        <Rise delay={160}>
-          <p className="text-center text-[9px] font-bold text-gray-400 uppercase tracking-widest">Name</p>
-          <p className="text-center text-base font-black text-gray-900 mb-3">{s.name}</p>
-        </Rise>
-        <div className="space-y-1.5">
-          {fields.map((f, i) => (
-            <Rise key={f.label} delay={220 + i * 60}>
-              <div className="flex items-center gap-2">
-                <span className="text-[#8A6D3B] flex-shrink-0">{f.icon}</span>
-                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest w-28 flex-shrink-0">{f.label}</span>
-                <span className="text-[10.5px] font-bold text-gray-800 truncate">{f.value}</span>
-              </div>
-            </Rise>
-          ))}
-        </div>
+    <Canvas bg="p02">
+      <div className="absolute overflow-hidden flex items-center justify-center" style={{
+        left: 33.75, top: 142.25, width: 99.5, height: 127.5, borderRadius: 7.5,
+        border: '0.75px solid #D7B56D', background: s.avatarUrl ? '#fff' : '#EFE0BE',
+      }}>
+        {s.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={s.avatarUrl} alt={s.name} className="w-full h-full object-cover" />
+        ) : (
+          <span style={{ fontFamily: COND, fontWeight: 700, fontSize: 34, color: NAVY, opacity: 0.55 }}>{initials}</span>
+        )}
       </div>
-    </PageFrame>
+      {values.map(([y, v], i) => (
+        <Txt key={i} x={198} y={y} size={11.6} family={COND} weight={700} max={142}>{v}</Txt>
+      ))}
+    </Canvas>
   );
 }
-
-/* ── Page 3: Welcome ────────────────────────────────────────── */
 
 function WelcomePage({ s }: { s: PassportV2Student }) {
-  const firstName = s.name.split(' ')[0];
   return (
-    <PageFrame footerLeft="WELCOME" footerRight="3">
-      <Rise delay={20}>
-        <div className="mx-auto bg-[#1B1450] text-white text-center py-2 px-4 rounded-full text-xs font-black uppercase tracking-wide">
-          Welcome to Junior Power Quest
-        </div>
-      </Rise>
-      <Rise delay={140} className="flex-1 flex flex-col justify-center">
-        <div className="border-2 border-dashed border-[#D9BE8C] rounded-xl p-4 mt-4">
-          <p className="text-sm font-bold text-gray-500 mb-2">Dear {firstName},</p>
-          <p className="text-[11.5px] text-gray-700 leading-relaxed">
-            You are officially a citizen of MOM JUNIOR POWER QUEST — a world where every little power shines!
-            This passport shows your journey, your powers, and your growth across 5 magical dimensions.
-          </p>
-          <p className="text-[11.5px] font-bold text-gray-700 mt-3">Keep exploring, keep growing!</p>
-        </div>
-      </Rise>
-      <Rise delay={320} className="mt-auto">
-        <p className="text-center text-sm font-black text-[#1B1450]">Let the adventure continue!</p>
-      </Rise>
-    </PageFrame>
+    <Canvas bg="p03">
+      <Txt x={46.5} y={160.75} size={11.6} weight={700} color="#9A8452" max={150}>Dear {firstName(s.name)},</Txt>
+    </Canvas>
   );
 }
-
-/* ── Written round pages (chunked, real per-question data) ──── */
 
 const QUESTIONS_PER_PAGE = 10;
 
-function WrittenRoundPage({ questions, part, totalParts, pageNo }: {
-  questions: PassportExamQuestion[]; part: number; totalParts: number; pageNo: number;
-}) {
+function WrittenRoundPage({ questions, part, pageNo }: { questions: PassportExamQuestion[]; part: number; pageNo: number }) {
+  const { rowLines, tableLeft, tableRight } = geometry.written;
+  const cell = geometry.badgeCell;
+  const used = questions.length;
   return (
-    <PageFrame footerLeft="WRITTEN" footerRight={String(pageNo)}>
-      <Rise delay={20}>
-        <h3 className="text-center text-base font-black text-[#1B1450] uppercase">Performance Overview</h3>
-        <p className="text-center text-[10px] font-bold text-[#8A6D3B] uppercase tracking-widest">Written Round</p>
-        <div className="mx-auto mt-1 bg-white border border-[#D9BE8C] rounded-full px-3 py-0.5 w-fit text-[10px] font-black text-[#1B1450]">PART {part}{totalParts > 1 ? `/${totalParts}` : ''}</div>
-      </Rise>
-      <div className="mt-3 border-2 border-dashed border-[#D9BE8C] rounded-xl overflow-hidden flex-1">
-        <div className="grid grid-cols-[1fr_auto] bg-[#F1DFAF] text-[9px] font-black text-[#5C4A1E] uppercase tracking-wide px-3 py-2">
-          <span>Question Instruction</span><span>Performance Level</span>
-        </div>
-        {questions.map((q, i) => {
-          const grade = q.percentage !== null ? bandFromPercent(q.percentage) : 'Beginner';
-          const style = GRADE_STYLE[grade];
-          return (
-            <Rise key={q.questionNumber} delay={80 + i * 40}>
-              <div className="grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 border-t border-[#EADCB8] bg-white/60">
-                <span className="text-[10.5px] font-semibold text-gray-700">{q.questionNumber}. {questionLabel(q.questionText, q.questionType, q.questionNumber)}</span>
-                <span className="text-[8.5px] font-black uppercase tracking-wide px-2 py-1 rounded-full border whitespace-nowrap"
-                  style={{ color: style.color, background: style.bg, borderColor: style.border }}>
-                  {q.score !== null ? grade : 'Pending'}
-                </span>
-              </div>
-            </Rise>
-          );
-        })}
-      </div>
-    </PageFrame>
+    <Canvas bg="p04">
+      <Txt x={186.25} y={76.25} size={12.9} weight={500} align="center">PART {part}</Txt>
+      {questions.map((q, i) => {
+        const top = rowLines[i] + 0.75;
+        const h = rowLines[i + 1] - top;
+        const badge = questionBadge(q);
+        return (
+          <div key={q.questionNumber}>
+            <div className="absolute flex items-center" style={{ left: 40, top, width: 171, height: h, fontSize: 11.8, lineHeight: '13.25px', color: INK }}>
+              <span className="text-right flex-shrink-0" style={{ width: 17.25 }}>{q.questionNumber}.</span>
+              <span style={{ marginLeft: 2.5, textWrap: 'balance' } as React.CSSProperties}>
+                {questionLabel(q.questionText, q.questionType, q.questionNumber).replace(/^\d+\.\s*/, '')}
+              </span>
+            </div>
+            {badge ? (
+              <Img src={`badge-${badge}`} x={cell.x} y={top} w={cell.w} h={h} />
+            ) : (
+              <Txt x={cell.x + cell.w / 2} y={top + h / 2 + 3.5} size={10} align="center" color="#9A8452" italic>Pending</Txt>
+            )}
+          </div>
+        );
+      })}
+      {used < QUESTIONS_PER_PAGE && (
+        // hide the table's unused rows (the last used row's line stays as the bottom border)
+        <div className="absolute" style={{ left: tableLeft - 1, top: rowLines[used] + 0.75, width: tableRight - tableLeft + 2, height: rowLines[QUESTIONS_PER_PAGE] - rowLines[used] + 1, background: CREAM }} />
+      )}
+      <PageNo n={pageNo} />
+    </Canvas>
   );
 }
 
-/* ── Talent round overview ────────────────────────────────────*/
-
-function TalentRoundPage({ s, pageNo }: { s: PassportV2Student; pageNo: number }) {
+function TalentRoundPage({ s, pageNo, level }: { s: PassportV2Student; pageNo: number; level: Grade | null }) {
   const videos = [...s.videos].sort((a, b) => a.slot - b.slot).slice(0, 2);
+  const lines = geometry.talent.rowLines;
+  const cell = geometry.badgeCell;
+  const byKosh = new Map(s.koshBreakdown.map(k => [k.kosh, k]));
+  const order = ['ANNAMAYA', 'PRANAMAYA', 'MANOMAYA', 'VIJNANAMAYA', 'ANANDAMAYA'];
   return (
-    <PageFrame footerLeft="TALENT" footerRight={String(pageNo)}>
-      <Rise delay={20}>
-        <div className="bg-[#8A6D3B] text-white text-xs font-black uppercase tracking-wide px-3 py-1.5 rounded-lg inline-block">Talent Round (Performance Overview)</div>
-      </Rise>
-      <div className="mt-3 space-y-1">
-        {videos.map((v, i) => (
-          <Rise key={v.id} delay={80 + i * 60}>
-            <p className="text-[11px] font-bold text-gray-700 flex items-center gap-1.5">
-              <VideoIcon size={11} className="text-[#8A6D3B]" /> Video {i + 1}: {v.category || v.subCategory || 'Talent Performance'}
-            </p>
-          </Rise>
-        ))}
-        {videos.length === 0 && <p className="text-[10px] text-gray-400 font-semibold">No videos submitted yet.</p>}
-      </div>
-
-      <div className="mt-4 border-2 border-dashed border-[#D9BE8C] rounded-xl overflow-hidden">
-        <div className="grid grid-cols-[1fr_auto] bg-[#F1DFAF] text-[9px] font-black text-[#5C4A1E] uppercase tracking-wide px-3 py-2">
-          <span>Panchakosha Domain</span><span>Performance Level</span>
-        </div>
-        {s.koshBreakdown.map((k, i) => {
-          const grade = k.grade;
-          const style = grade ? GRADE_STYLE[grade] : { color: '#9CA3AF', bg: '#F3F4F6', border: '#E5E7EB' };
-          return (
-            <Rise key={k.kosh} delay={160 + i * 60}>
-              <div className="grid grid-cols-[1fr_auto] items-center gap-2 px-3 py-2 border-t border-[#EADCB8] bg-white/60">
-                <span className="text-[10.5px] font-semibold text-gray-700">{k.label}</span>
-                <span className="text-[8.5px] font-black uppercase tracking-wide px-2 py-1 rounded-full border whitespace-nowrap"
-                  style={{ color: style.color, background: style.bg, borderColor: style.border }}>
-                  {grade || 'Pending'}
-                </span>
-              </div>
-            </Rise>
-          );
-        })}
-      </div>
-
-      <Rise delay={520} className="mt-auto">
-        <div className="bg-white/70 border border-[#D9BE8C] rounded-xl p-3 mt-3">
-          <p className="text-[9px] font-black text-[#1B1450] uppercase mb-1">Remarks</p>
-          <p className="text-[10px] text-gray-600 leading-relaxed">
-            {s.name.split(' ')[0]} scored {s.holisticPercent !== null ? `${s.holisticPercent}%` : 'pending'} overall across the written and talent rounds.
-            Continued practice will help build further confidence and proficiency.
-          </p>
-        </div>
-      </Rise>
-    </PageFrame>
-  );
-}
-
-/* ── Panchakosha profile (star-rated) ─────────────────────────*/
-
-function starsFromPercent(pct: number | null): number {
-  if (pct === null) return 0;
-  return Math.max(0, Math.min(5, Math.round((pct / 100) * 5)));
-}
-
-function StarRow({ filled, accent, delay }: { filled: number; accent: string; delay: number }) {
-  return (
-    <div className="flex gap-1">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <Rise key={i} delay={delay + i * 40}>
-          <span style={{ color: i < filled ? accent : '#E5E7EB' }} className="text-sm">★</span>
-        </Rise>
+    <Canvas bg="p06">
+      {[0, 1].map(i => (
+        <Txt key={i} x={59.5} y={i === 0 ? 94.5 : 130.5} size={12.3} weight={500} max={150}>
+          Video {i + 1}: {videos[i] ? (videos[i].category || videos[i].subCategory || 'Talent Performance') : 'Not submitted'}
+        </Txt>
       ))}
-    </div>
+      {order.map((kosh, i) => {
+        const badge = badgeOf(byKosh.get(kosh)?.grade ?? null);
+        const top = lines[i] + 0.75;
+        const h = lines[i + 1] - top;
+        return badge ? <Img key={kosh} src={`badge-${badge}`} x={cell.x} y={top} w={cell.w} h={h} /> : (
+          <Txt key={kosh} x={cell.x + cell.w / 2} y={top + h / 2 + 3.5} size={10} align="center" color="#9A8452" italic>Pending</Txt>
+        );
+      })}
+      <div className="absolute text-center" style={{ left: 52, top: 389.5, width: 268, fontSize: 11.6, lineHeight: '13.3px', color: INK }}>
+        <span style={{ color: NAVY, fontWeight: 500 }}>Remarks:</span> {remarks(firstName(s.name), level)}
+      </div>
+      <PageNo n={pageNo} />
+    </Canvas>
   );
+}
+
+function starKinds(pct: number | null): ('full' | 'half' | 'empty')[] {
+  const stars = pct === null ? 0 : Math.round((pct / 100) * 10) / 2;
+  return [0, 1, 2, 3, 4].map(i => (stars >= i + 1 ? 'full' : stars >= i + 0.5 ? 'half' : 'empty'));
+}
+
+const KOSH_ORDER = ['ANNAMAYA', 'PRANAMAYA', 'MANOMAYA', 'VIJNANAMAYA', 'ANANDAMAYA'] as const;
+
+function combinedGrade(k: PassportKosh | undefined): Grade | null {
+  return k && k.combinedPercent !== null ? bandFromPercent(k.combinedPercent) : null;
 }
 
 function PanchakoshaProfilePage({ s, pageNo }: { s: PassportV2Student; pageNo: number }) {
+  const P = geometry.profile;
+  const byKosh = new Map(s.koshBreakdown.map(k => [k.kosh, k]));
   return (
-    <PageFrame footerLeft="PROFILE" footerRight={String(pageNo)}>
-      <Rise delay={20}>
-        <h3 className="text-center text-base font-black text-[#1B1450] uppercase">Panchakosha Profile</h3>
-        <p className="text-center text-[9.5px] text-gray-500 font-semibold">Integrating Academic Learning and Talent for Holistic Development</p>
-      </Rise>
-      <div className="mt-3 space-y-2 flex-1">
-        {s.koshBreakdown.map((k, i) => {
-          const theme = KOSH_THEME[k.kosh] || KOSH_THEME.ANNAMAYA;
-          const stars = starsFromPercent(k.combinedPercent);
-          return (
-            <Rise key={k.kosh} delay={80 + i * 90}>
-              <div className="rounded-xl border p-2.5" style={{ background: theme.soft, borderColor: theme.ring }}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] font-black uppercase tracking-wide px-2 py-0.5 rounded-full text-white" style={{ background: theme.accent }}>
-                    {k.label}
-                  </span>
-                  <span className="text-[9px] font-black uppercase" style={{ color: theme.accent }}>{k.grade || 'Pending'}</span>
-                </div>
-                <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                  {theme.skills.map(skill => (
-                    <span key={skill} className="text-[8.5px] font-semibold text-gray-500 bg-white/70 px-1.5 py-0.5 rounded-full border border-gray-200">{skill}</span>
-                  ))}
-                </div>
-                <StarRow filled={stars} accent={theme.accent} delay={200 + i * 90} />
-              </div>
-            </Rise>
-          );
-        })}
-      </div>
-    </PageFrame>
-  );
-}
-
-/* ── Panchakosha summary (puzzle wheel) ───────────────────────*/
-
-function overallLevel(pct: number | null): Grade | null {
-  if (pct === null) return null;
-  return bandFromPercent(pct);
-}
-
-function PanchakoshaSummaryPage({ s, pageNo }: { s: PassportV2Student; pageNo: number }) {
-  const level = overallLevel(s.holisticPercent);
-  const style = level ? GRADE_STYLE[level] : { color: '#9CA3AF', bg: '#F3F4F6', border: '#E5E7EB' };
-  return (
-    <PageFrame footerLeft="SUMMARY" footerRight={String(pageNo)}>
-      <Rise delay={20}>
-        <h3 className="text-center text-base font-black text-[#1B1450] uppercase">Panchakosha Summary</h3>
-      </Rise>
-      <div className="flex-1 flex items-center justify-center py-4">
-        <Rise delay={120}>
-          <div className="relative w-52 h-52">
-            <div className="absolute inset-0 rounded-full border-8 border-dashed" style={{ borderColor: style.color + '55' }} />
-            <div className="absolute inset-6 rounded-full flex flex-col items-center justify-center text-center bg-white shadow-inner">
-              <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Growth Chart of</p>
-              <p className="text-sm font-black text-[#1B1450]">{s.name.split(' ')[0]}</p>
-            </div>
-            {s.koshBreakdown.map((k, i) => {
-              const theme = KOSH_THEME[k.kosh] || KOSH_THEME.ANNAMAYA;
-              const angle = (i / s.koshBreakdown.length) * 2 * Math.PI - Math.PI / 2;
-              const r = 84;
-              const x = 104 + r * Math.cos(angle);
-              const y = 104 + r * Math.sin(angle);
-              return (
-                <Rise key={k.kosh} delay={200 + i * 90} className="absolute" >
-                  <div className="absolute flex flex-col items-center" style={{ left: x - 30, top: y - 20, width: 60 }}>
-                    <div className="w-9 h-9 rounded-full flex items-center justify-center text-white text-[9px] font-black shadow" style={{ background: theme.accent }}>
-                      {k.combinedPercent !== null ? `${Math.round(k.combinedPercent)}%` : '—'}
-                    </div>
-                    <span className="text-[7.5px] font-bold text-gray-500 text-center mt-1 leading-tight">{k.label.replace(' Kosh', '')}</span>
-                  </div>
-                </Rise>
-              );
-            })}
+    <Canvas bg="p07">
+      {KOSH_ORDER.map((kosh, i) => {
+        const k = byKosh.get(kosh);
+        const badge = badgeOf(combinedGrade(k));
+        const t = P.rowTops[i];
+        const R = P.badge.r;
+        return (
+          <div key={kosh}>
+            {starKinds(k?.combinedPercent ?? null).map((kind, j) => (
+              <Img key={j} src={`star-${kind}`} x={P.starX[j] - 0.5} y={t + 46.5} w={18.5} h={18} />
+            ))}
+            {badge && badge !== 'not-attempted' && (
+              <Img src={`round-${badge}`} x={P.badge.cx[i] - R} y={P.badge.cy[i] - R} w={2 * R} h={2 * R} />
+            )}
           </div>
-        </Rise>
-      </div>
-      <Rise delay={640} className="mt-auto">
-        <div className="rounded-xl p-3 text-center border" style={{ background: style.bg, borderColor: style.border }}>
-          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Overall Holistic Growth Level</p>
-          <p className="text-xl font-black" style={{ color: style.color }}>{level || 'Pending'}</p>
-          <p className="text-[10px] font-semibold text-gray-500 mt-0.5">{s.holisticPercent !== null ? `${s.holisticPercent}% overall` : 'Awaiting full evaluation'}</p>
-        </div>
-      </Rise>
-    </PageFrame>
+        );
+      })}
+      <PageNo n={pageNo} />
+    </Canvas>
   );
 }
 
-/* ── Insights (static guidance, same across students) ────────*/
-
-const INSIGHTS = [
-  { icon: '💪', title: 'Physical Development', text: 'Encourage outdoor play, yoga, balancing activities, running, jumping, and fine motor tasks such as colouring, threading, and clay modelling.' },
-  { icon: '🌱', title: 'Vitality & Well-being', text: 'Practise simple breathing exercises, maintain healthy eating habits, ensure adequate sleep, and encourage active play every day.' },
-  { icon: '📖', title: 'Language & Literacy', text: 'Read storybooks together, encourage conversations, sing rhymes, introduce new vocabulary, and provide storytelling opportunities.' },
-  { icon: '❤️', title: 'Socio-emotional & Ethical', text: 'Promote kindness, sharing, gratitude, and respectful communication through family interactions and group activities.' },
-  { icon: '🧠', title: 'Cognitive Development', text: 'Explore puzzles, sorting games, building blocks, observation activities, and simple problem-solving tasks.' },
-  { icon: '🎨', title: 'Aesthetic & Cultural', text: 'Encourage drawing, painting, music, dance, storytelling, craft work, and imaginative play to inspire creativity.' },
-];
-
-function InsightsPage({ pageNo }: { pageNo: number }) {
+function PanchakoshaSummaryPage({ s, pageNo, level }: { s: PassportV2Student; pageNo: number; level: Grade | null }) {
+  const arcId = useId().replace(/:/g, '');
+  const byKosh = new Map(s.koshBreakdown.map(k => [k.kosh, k]));
+  const pieces = KOSH_ORDER.map(kosh => ({ kosh, g: geometry.puzzle[kosh], grade: combinedGrade(byKosh.get(kosh)) }))
+    .sort((a, b) => a.g.z - b.g.z);
+  const c = geometry.centre;
+  const e = geometry.puzzle.emoji;
+  const name = firstName(s.name).toUpperCase();
+  const nameSize = Math.min(14.8, (14.8 * 7) / Math.max(name.length, 1));
+  const rb = 31.8;
+  const ob = geometry.overall.badge;
+  const R = geometry.profile.badge.r * (ob.r / (geometry.profile.badge.r - 0.5));
+  const badge = badgeOf(level);
   return (
-    <PageFrame footerLeft="INSIGHTS" footerRight={String(pageNo)}>
-      <Rise delay={20}>
-        <h3 className="text-center text-base font-black text-[#1B1450] uppercase">Insights</h3>
-        <p className="text-center text-[9.5px] text-gray-500 font-semibold">Discovering Strengths, Inspiring Growth</p>
-      </Rise>
-      <div className="mt-3 grid grid-cols-2 gap-2 flex-1 overflow-y-auto">
-        {INSIGHTS.map((ins, i) => (
-          <Rise key={ins.title} delay={80 + i * 60}>
-            <div className="bg-white/70 border border-[#D9BE8C] rounded-xl p-2.5 h-full">
-              <div className="text-lg mb-1">{ins.icon}</div>
-              <p className="text-[9.5px] font-black text-[#1B1450] leading-tight mb-1">{ins.title}</p>
-              <p className="text-[8.5px] text-gray-500 leading-snug">{ins.text}</p>
-            </div>
-          </Rise>
-        ))}
-      </div>
-    </PageFrame>
+    <Canvas bg="p08">
+      {pieces.map(p => (
+        <Img key={p.kosh} src={`puzzle-${p.kosh.toLowerCase()}-${p.grade ? PUZZLE_FAMILY[p.grade] : 'green'}`}
+          x={p.g.x} y={p.g.y} w={p.g.w} h={p.g.h} style={p.grade ? undefined : { filter: 'grayscale(1)', opacity: 0.55 }} />
+      ))}
+      <Img src="puzzle-emoji" x={e.x} y={e.y} w={e.w} h={e.h} />
+      <Img src="p08-centre" x={c.cx - c.box} y={c.cy - c.box} w={2 * c.box} h={2 * c.box} />
+      <svg className="absolute left-0 top-0 pointer-events-none" width={PW} height={PH} viewBox={`0 0 ${PW} ${PH}`}>
+        <path id={arcId} fill="none" d={`M ${c.cx - rb} ${c.cy} A ${rb} ${rb} 0 0 0 ${c.cx + rb} ${c.cy}`} />
+        <text fill="#2655A1" fontWeight={700} fontSize={nameSize} letterSpacing={0.6} style={{ fontFamily: 'inherit' }}>
+          <textPath href={`#${arcId}`} startOffset="50%" textAnchor="middle">{name}</textPath>
+        </text>
+      </svg>
+      {level && <Txt x={167.5} y={477.25} size={12.6} weight={700} italic align="center">{LEVEL_LINE[level]}</Txt>}
+      {badge && badge !== 'not-attempted' && <Img src={`round-${badge}`} x={ob.cx - R} y={ob.cy - R} w={2 * R} h={2 * R} />}
+      <PageNo n={pageNo} />
+    </Canvas>
   );
 }
 
-/* ── Parent/Teacher reflection (static form) ──────────────────*/
-
-function ReflectionPage({ pageNo }: { pageNo: number }) {
-  const items = [
-    'The child participated in activities with great enthusiasm',
-    "The child's greatest strength was confidence and creativity",
-    'The child enjoyed written activities and talent round performance',
-    'The child showed improvement in listening and thinking skills',
-  ];
+function InsightsPage({ s, pageNo }: { s: PassportV2Student; pageNo: number }) {
   return (
-    <PageFrame footerLeft="REFLECTION" footerRight={String(pageNo)}>
-      <Rise delay={20}>
-        <h3 className="text-center text-base font-black text-[#1B1450] uppercase">Parent &amp; Teacher Reflections</h3>
-      </Rise>
-      <div className="mt-3 space-y-2 flex-1">
-        {items.map((item, i) => (
-          <Rise key={item} delay={80 + i * 70}>
-            <div className="flex items-start gap-2 bg-white/70 border border-[#D9BE8C] rounded-lg px-3 py-2">
-              <span className="w-3.5 h-3.5 rounded border-2 border-[#8A6D3B] flex-shrink-0 mt-0.5" />
-              <span className="text-[10px] font-semibold text-gray-600 leading-snug">{item}</span>
-            </div>
-          </Rise>
-        ))}
-      </div>
-      <Rise delay={420} className="mt-auto">
-        <div className="border-2 border-dashed border-[#D9BE8C] rounded-xl p-3 text-[10px] text-gray-500 font-semibold space-y-1.5">
-          <p>Name: ___________________________</p>
-          <p>Date: ___________________________</p>
-          <p>Signature: ___________________________</p>
-        </div>
-      </Rise>
-    </PageFrame>
+    <Canvas bg="p09">
+      <Txt x={185.6} y={46.5} size={17.2} family={COND} weight={700} color={NAVY} align="center" max={240}>
+        {firstName(s.name).toUpperCase()}&apos;S INSIGHTS
+      </Txt>
+      <PageNo n={pageNo} />
+    </Canvas>
   );
 }
 
-/* ── Recommended tools (static) ───────────────────────────────*/
-
-const TOOLS = [
-  { icon: '🧩', title: 'Building Blocks, Shape Sorter', develops: 'Logical Thinking' },
-  { icon: '🧵', title: 'Colouring Kit, Clay/Play Dough', develops: 'Creativity & Fine Motor Skills' },
-  { icon: '📚', title: 'Storybooks, Flashcards', develops: 'Language & Communication' },
-  { icon: '🎵', title: 'Musical Toys, Pretend Play Set', develops: 'Confidence & Self-expression' },
-];
-
-function ToolsPage({ pageNo }: { pageNo: number }) {
-  return (
-    <PageFrame footerLeft="GROWTH" footerRight={String(pageNo)}>
-      <Rise delay={20}>
-        <h3 className="text-center text-base font-black text-[#1B1450] uppercase">Keep Growing!</h3>
-        <p className="text-center text-[9.5px] text-gray-500 font-semibold">Every Little Step Leads to a Brighter Tomorrow</p>
-      </Rise>
-      <div className="mt-3 grid grid-cols-2 gap-2">
-        {TOOLS.map((t, i) => (
-          <Rise key={t.title} delay={80 + i * 70}>
-            <div className="bg-white/70 border border-[#D9BE8C] rounded-xl p-2.5 text-center">
-              <div className="text-lg">{t.icon}</div>
-              <p className="text-[9px] font-black text-gray-700 leading-tight mt-1">{t.title}</p>
-              <p className="text-[8px] font-bold text-[#8A6D3B] mt-1 uppercase">{t.develops}</p>
-            </div>
-          </Rise>
-        ))}
-      </div>
-      <Rise delay={420} className="mt-auto">
-        <div className="bg-[#1B1450] text-white rounded-xl p-3 text-center mt-3">
-          <p className="text-[10px] font-bold">Keep exploring, keep smiling, and keep learning!</p>
-        </div>
-      </Rise>
-    </PageFrame>
-  );
-}
-
-/* ── Back cover ────────────────────────────────────────────── */
-
-function BackCoverPage() {
-  return (
-    <div className="w-full h-full rounded-2xl flex items-end justify-center pb-6 relative overflow-hidden border-2 border-dashed border-[#C9A84C]/50" style={{ background: '#1B1450' }}>
-      <p className="text-[10px] text-[#F5C451]/70 font-semibold">© MOM Junior Power Quest</p>
-    </div>
-  );
+function StaticPage({ bg, pageNo }: { bg: string; pageNo?: number }) {
+  return <Canvas bg={bg}>{pageNo !== undefined && <PageNo n={pageNo} />}</Canvas>;
 }
 
 /* ── The booklet ────────────────────────────────────────────── */
 
-export default function ResultPassportV2({ student, onClose }: { student: PassportV2Student; onClose: () => void }) {
-  const writtenParts: PassportExamQuestion[][] = [];
-  for (let i = 0; i < student.examQuestions.length; i += QUESTIONS_PER_PAGE) {
-    writtenParts.push(student.examQuestions.slice(i, i + QUESTIONS_PER_PAGE));
-  }
+function usePageWidth() {
+  const [w, setW] = useState(380);
+  useEffect(() => {
+    const calc = () => setW(Math.min(window.innerWidth * 0.92, ((window.innerHeight - 165) * PW) / PH, 520));
+    calc();
+    window.addEventListener('resize', calc);
+    return () => window.removeEventListener('resize', calc);
+  }, []);
+  return w;
+}
 
-  let pageNo = 1;
+export default function ResultPassportV2({ student, onClose, initialPage = 0 }: { student: PassportV2Student; onClose: () => void; initialPage?: number }) {
+  const writtenParts: PassportExamQuestion[][] = [];
+  const questions = [...student.examQuestions].sort((a, b) => a.questionNumber - b.questionNumber);
+  for (let i = 0; i < questions.length; i += QUESTIONS_PER_PAGE) writtenParts.push(questions.slice(i, i + QUESTIONS_PER_PAGE));
+
+  const level = student.holisticPercent !== null ? bandFromPercent(student.holisticPercent) : null;
+  const after = 4 + writtenParts.length; // page number of the talent round
   const pages: React.ReactNode[] = [
-    <CoverPage key="cover" />,
+    <StaticPage key="cover" bg="p01" />,
     <IdCardPage key="id" s={student} />,
     <WelcomePage key="welcome" s={student} />,
-    ...writtenParts.map((qs, i) => {
-      pageNo++;
-      return <WrittenRoundPage key={`written-${i}`} questions={qs} part={i + 1} totalParts={writtenParts.length} pageNo={pageNo + 2} />;
-    }),
-    <TalentRoundPage key="talent" s={student} pageNo={pageNo + 3} />,
-    <PanchakoshaProfilePage key="profile" s={student} pageNo={pageNo + 4} />,
-    <PanchakoshaSummaryPage key="summary" s={student} pageNo={pageNo + 5} />,
-    <InsightsPage key="insights" pageNo={pageNo + 6} />,
-    <ReflectionPage key="reflection" pageNo={pageNo + 7} />,
-    <ToolsPage key="tools" pageNo={pageNo + 8} />,
-    <BackCoverPage key="back" />,
+    ...writtenParts.map((qs, i) => <WrittenRoundPage key={`written-${i}`} questions={qs} part={i + 1} pageNo={4 + i} />),
+    <TalentRoundPage key="talent" s={student} pageNo={after} level={level} />,
+    <PanchakoshaProfilePage key="profile" s={student} pageNo={after + 1} />,
+    <PanchakoshaSummaryPage key="summary" s={student} pageNo={after + 2} level={level} />,
+    <InsightsPage key="insights" s={student} pageNo={after + 3} />,
+    <StaticPage key="reflection" bg="p10" pageNo={after + 4} />,
+    <StaticPage key="tools" bg="p11" pageNo={after + 5} />,
+    <StaticPage key="back" bg="p12" />,
   ];
 
-  const [page, setPage] = useState(0);
-  const [turning, setTurning] = useState<'next' | 'prev' | null>(null);
+  const [page, setPage] = useState(initialPage);
+  // A turn in progress: `from` is the page being left, `to` the one arriving.
+  const [flip, setFlip] = useState<{ from: number; to: number; dir: 'next' | 'prev' } | null>(null);
+  const width = usePageWidth();
 
-  const go = useCallback((dir: 'next' | 'prev') => {
-    setPage(p => {
-      const target = dir === 'next' ? p + 1 : p - 1;
-      if (target < 0 || target >= pages.length) return p;
-      setTurning(dir);
-      window.setTimeout(() => setTurning(null), 340);
-      return target;
-    });
-  }, [pages.length]);
+  const goTo = useCallback((to: number) => {
+    if (flip || to === page || to < 0 || to >= pages.length) return;
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setPage(to);
+      return;
+    }
+    setFlip({ from: page, to, dir: to > page ? 'next' : 'prev' });
+    setPage(to);
+  }, [flip, page, pages.length]);
+
+  const go = useCallback((dir: 'next' | 'prev') => goTo(page + (dir === 'next' ? 1 : -1)), [goTo, page]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -627,57 +467,131 @@ export default function ResultPassportV2({ student, onClose }: { student: Passpo
     return () => window.removeEventListener('keydown', onKey);
   }, [go, onClose]);
 
+  // Download: mount every page off-screen at 1pt = 1px, snapshot each at 3x
+  // and stitch them into a PDF the same size as the printed passport.
+  const [exporting, setExporting] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!exporting) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [{ toJpeg, getFontEmbedCSS }, { jsPDF }] = await Promise.all([import('html-to-image'), import('jspdf')]);
+        const root = exportRef.current;
+        if (!root) return;
+        await document.fonts.ready;
+        await Promise.all(Array.from(root.querySelectorAll('img')).map(img => img.decode().catch(() => undefined)));
+        const sheets = Array.from(root.children) as HTMLElement[];
+        const fontEmbedCSS = await getFontEmbedCSS(sheets[0]);
+        // If an image can't be fetched (e.g. a photo on a host without CORS),
+        // html-to-image leaves its src empty and the whole page fails — draw
+        // a transparent pixel there instead so the rest of the passport exports.
+        const imagePlaceholder = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        const pdf = new jsPDF({ unit: 'pt', format: [PW, PH], orientation: 'portrait', compress: true });
+        for (let i = 0; i < sheets.length; i++) {
+          if (cancelled) return;
+          const jpeg = await toJpeg(sheets[i], { pixelRatio: 3, quality: 0.9, fontEmbedCSS, imagePlaceholder, width: PW, height: PH, backgroundColor: '#ffffff' });
+          if (i > 0) pdf.addPage([PW, PH], 'portrait');
+          pdf.addImage(jpeg, 'JPEG', 0, 0, PW, PH, undefined, 'FAST');
+        }
+        pdf.save(`${student.name.trim().replace(/[^\w]+/g, '_') || 'Student'}_Passport.pdf`);
+      } catch (err) {
+        // html-to-image rejects with a bare load Event when a page snapshot fails
+        const detail = err instanceof Event ? `${err.type} on ${(err.target as HTMLImageElement | null)?.src?.slice(0, 120) ?? 'unknown'}` : err;
+        console.error('Passport PDF export failed:', detail);
+        alert('Could not create the PDF. Please try again.');
+      } finally {
+        if (!cancelled) setExporting(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [exporting, student.name]);
+
+  // Turning forward, the current page lifts off the spine (left edge) and
+  // swings over to the left, uncovering the next page beneath it. Turning
+  // back, the previous page swings in from the left and lays down on top.
+  const under = flip ? (flip.dir === 'next' ? flip.to : flip.from) : page;
+  const leaf = flip ? (flip.dir === 'next' ? flip.from : flip.to) : null;
+
   return (
     <div className="fixed inset-0 z-[110] bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Result passport for ${student.name}`}>
       <style>{`
-        @keyframes pp2-turn-next { 0% { transform: perspective(1400px) rotateY(-70deg); opacity: 0.35; } 100% { transform: perspective(1400px) rotateY(0deg); opacity: 1; } }
-        @keyframes pp2-turn-prev { 0% { transform: perspective(1400px) rotateY(70deg); opacity: 0.35; } 100% { transform: perspective(1400px) rotateY(0deg); opacity: 1; } }
-        .pp2-turn-next { animation: pp2-turn-next 320ms cubic-bezier(0.22, 1, 0.36, 1); transform-origin: left center; }
-        .pp2-turn-prev { animation: pp2-turn-prev 320ms cubic-bezier(0.22, 1, 0.36, 1); transform-origin: right center; }
-        @keyframes pp2-rise { 0% { opacity: 0; transform: translateY(10px); } 100% { opacity: 1; transform: translateY(0); } }
-        .pp2-rise { opacity: 0; animation: pp2-rise 420ms cubic-bezier(0.22, 1, 0.36, 1) forwards; }
-        @keyframes pp2-twinkle { 0%, 100% { opacity: 0.25; transform: scale(0.8); } 50% { opacity: 1; transform: scale(1.2); } }
-        .pp2-twinkle { animation: pp2-twinkle 2.8s ease-in-out infinite; }
-        @keyframes pp2-spin-slow { to { transform: rotate(360deg); } }
-        .pp2-spin-slow { animation: pp2-spin-slow 40s linear infinite; }
-        @media (prefers-reduced-motion: reduce) {
-          .pp2-turn-next, .pp2-turn-prev, .pp2-twinkle, .pp2-spin-slow { animation: none; }
-          .pp2-rise { animation: none; opacity: 1; }
-        }
+        @keyframes pp-leaf-out { from { transform: perspective(2200px) rotateY(0deg); } to { transform: perspective(2200px) rotateY(-180deg); } }
+        @keyframes pp-leaf-in { from { transform: perspective(2200px) rotateY(-180deg); } to { transform: perspective(2200px) rotateY(0deg); } }
+        @keyframes pp-shade-out { 0% { opacity: 0; } 100% { opacity: 1; } }
+        @keyframes pp-shade-in { 0% { opacity: 1; } 100% { opacity: 0; } }
+        .pp-leaf { transform-origin: left center; backface-visibility: hidden; -webkit-backface-visibility: hidden; will-change: transform; }
+        .pp-leaf-out { animation: pp-leaf-out 750ms cubic-bezier(0.45, 0.05, 0.35, 1) forwards; }
+        .pp-leaf-in { animation: pp-leaf-in 750ms cubic-bezier(0.45, 0.05, 0.35, 1) forwards; }
+        .pp-shade-out { animation: pp-shade-out 750ms ease-in forwards; }
+        .pp-shade-in { animation: pp-shade-in 750ms ease-out forwards; }
       `}</style>
 
       <div className="flex flex-col items-center gap-3" onClick={e => e.stopPropagation()}>
-        <div className="relative w-[340px] sm:w-[380px] h-[520px] sm:h-[560px]">
-          <div className="absolute inset-0 translate-x-[5px] translate-y-[5px] rounded-2xl bg-[#E7E0D0] shadow-md" aria-hidden />
-          <div className="absolute inset-0 translate-x-[2.5px] translate-y-[2.5px] rounded-2xl bg-[#F1EBDD] shadow" aria-hidden />
-          <div key={page} className={`absolute inset-0 rounded-2xl shadow-2xl ${turning === 'next' ? 'pp2-turn-next' : turning === 'prev' ? 'pp2-turn-prev' : ''}`}>
-            {pages[page]}
+        <div className={`relative ${roboto.className}`} style={{ width, height: (width * PH) / PW, ['--pp-scale' as string]: width / PW } as React.CSSProperties}>
+          {/* page stack edge, so it reads as a book */}
+          <div className="absolute inset-0 translate-x-[4px] translate-y-[3px] rounded-md bg-[#E9DFC9] shadow-md" aria-hidden />
+          <div className="absolute inset-0 translate-x-[2px] translate-y-[1.5px] rounded-md bg-[#F3EADA]" aria-hidden />
+
+          <div className="absolute inset-0 overflow-hidden rounded-md shadow-2xl">
+            {pages[under]}
+            {/* shadow the turning leaf casts on the page beneath, deepest at the spine */}
+            {flip && (
+              <div className={`absolute inset-0 pointer-events-none ${flip.dir === 'next' ? 'pp-shade-in' : 'pp-shade-out'}`}
+                style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.38), rgba(0,0,0,0.08) 45%, transparent 75%)' }} aria-hidden />
+            )}
           </div>
+
+          {flip && leaf !== null && (
+            <div key={`${flip.from}-${flip.to}`}
+              className={`pp-leaf absolute inset-0 overflow-hidden rounded-md shadow-2xl ${flip.dir === 'next' ? 'pp-leaf-out' : 'pp-leaf-in'}`}
+              onAnimationEnd={() => setFlip(null)}>
+              {pages[leaf]}
+              {/* the leaf darkens as it tilts away from the light */}
+              <div className={`absolute inset-0 pointer-events-none ${flip.dir === 'next' ? 'pp-shade-out' : 'pp-shade-in'}`}
+                style={{ background: 'linear-gradient(to left, rgba(0,0,0,0.30), rgba(0,0,0,0.05) 60%)' }} aria-hidden />
+            </div>
+          )}
+
           <button onClick={onClose} className="absolute -top-3 -right-3 w-8 h-8 rounded-full bg-white shadow-lg flex items-center justify-center text-gray-500 hover:text-gray-800 hover:scale-105 transition-all cursor-pointer z-10" aria-label="Close passport">
             <X size={15} />
           </button>
         </div>
 
         <div className="flex items-center gap-4">
-          <button onClick={() => go('prev')} disabled={page === 0 || turning !== null}
+          <button onClick={() => go('prev')} disabled={page === 0 || flip !== null}
             className="w-10 h-10 rounded-full bg-white/95 shadow-lg flex items-center justify-center text-gray-700 hover:bg-white disabled:opacity-30 disabled:cursor-default cursor-pointer transition-all hover:scale-105" aria-label="Previous page">
             <ChevronLeft size={18} />
           </button>
           <div className="flex items-center gap-1.5" role="tablist" aria-label="Passport pages">
             {pages.map((_, i) => (
               <button key={i}
-                onClick={() => { if (i !== page && turning === null) { setTurning(i > page ? 'next' : 'prev'); setPage(i); window.setTimeout(() => setTurning(null), 340); } }}
+                onClick={() => goTo(i)}
                 className={`rounded-full transition-all cursor-pointer ${i === page ? 'w-5 h-2 bg-[#C9A84C]' : 'w-2 h-2 bg-white/50 hover:bg-white/80'}`}
                 role="tab" aria-selected={i === page} aria-label={`Page ${i + 1}`} />
             ))}
           </div>
-          <button onClick={() => go('next')} disabled={page === pages.length - 1 || turning !== null}
+          <button onClick={() => go('next')} disabled={page === pages.length - 1 || flip !== null}
             className="w-10 h-10 rounded-full bg-white/95 shadow-lg flex items-center justify-center text-gray-700 hover:bg-white disabled:opacity-30 disabled:cursor-default cursor-pointer transition-all hover:scale-105" aria-label="Next page">
             <ChevronRight size={18} />
           </button>
         </div>
+        <button onClick={() => setExporting(true)} disabled={exporting}
+          className="flex items-center gap-2 px-4 h-9 rounded-full bg-[#C9A84C] text-[#1B1450] text-xs font-bold shadow-lg hover:bg-[#D6B65A] disabled:opacity-70 disabled:cursor-wait cursor-pointer transition-all">
+          {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+          {exporting ? 'Preparing PDF…' : 'Download PDF'}
+        </button>
         <p className="text-[10px] text-white/50 font-semibold tracking-wide">Use ← → arrow keys to flip pages</p>
       </div>
+
+      {exporting && (
+        <div ref={exportRef} aria-hidden className={roboto.className}
+          style={{ position: 'fixed', left: -100000, top: 0, ['--pp-scale' as string]: 1 } as React.CSSProperties}>
+          {pages.map((p, i) => (
+            <div key={i} className="relative overflow-hidden" style={{ width: PW, height: PH }}>{p}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
