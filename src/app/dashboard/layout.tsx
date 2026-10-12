@@ -44,6 +44,8 @@ import {
   GalleryHorizontal,
   GraduationCap,
   Download,
+  BookOpen,
+  FileSignature,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
