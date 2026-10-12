@@ -51,6 +51,7 @@ model School {
   paperDispatches PaperDispatch[]
   answerSheetDispatches AnswerSheetDispatch[]
   schoolLinkRequests SchoolLinkRequest[]
+  supportTickets SchoolSupportTicket[]
 
   @@schema("public")
 }
@@ -944,5 +945,53 @@ model AppBannerSlide {
   updatedAt DateTime @updatedAt
 
   @@index([isActive, order])
+  @@schema("public")
+}
+
+// Help & Support requests raised by a school from the School Panel, answered
+// by the Mittmee team from the dashboard. Separate from SupportTicket, which
+// belongs to mobile-app users (AppUser). The conversation lives in
+// SchoolSupportMessage; this row holds the current state of the request.
+model SchoolSupportTicket {
+  id             String                 @id @default(uuid())
+  // Human-friendly reference shown to the school ("HS-1001"). Starts at 1001
+  // (see the migration).
+  ticketNo       Int                    @unique @default(autoincrement())
+  schoolId       String
+  category       String // see lib/schoolSupport.ts SUPPORT_CATEGORIES
+  subject        String
+  priority       String                 @default("NORMAL") // NORMAL | URGENT
+  status         String                 @default("OPEN") // OPEN | IN_PROGRESS | AWAITING_SCHOOL | RESOLVED
+  contactName    String?
+  contactPhone   String?
+  // Who has something new to read: flips on each side's message.
+  unreadBySchool Boolean                @default(false)
+  unreadByTeam   Boolean                @default(true)
+  lastMessageAt  DateTime               @default(now())
+  resolvedAt     DateTime?
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+  school         School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  messages       SchoolSupportMessage[]
+
+  @@index([schoolId, status])
+  @@index([status, lastMessageAt])
+  @@schema("public")
+}
+
+model SchoolSupportMessage {
+  id          String              @id @default(uuid())
+  ticketId    String
+  kind        String              @default("MESSAGE") // MESSAGE | STATUS (status-change event shown in the thread)
+  authorRole  String // SCHOOL | TEAM
+  authorId    String
+  authorName  String?
+  body        String
+  // [{ url, name, type }] — images or PDFs uploaded with the message.
+  attachments Json?
+  createdAt   DateTime            @default(now())
+  ticket      SchoolSupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId, createdAt])
   @@schema("public")
 }
