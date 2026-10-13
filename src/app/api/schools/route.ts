@@ -197,7 +197,6 @@ export async function POST(request: Request) {
               schoolId,
               username: generatedUsername,
               password: plainPassword,
-              contactPerson,
             });
             emailSent = true;
           } catch (mailErr: any) {

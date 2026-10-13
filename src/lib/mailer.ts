@@ -156,7 +156,6 @@ export interface SchoolCredentialsMail {
   schoolId: string;
   username: string;
   password: string;
-  contactPerson?: string | null;
 }
 
 export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): Promise<void> {
@@ -169,7 +168,9 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
     throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
   }
 
-  const greeting = data.contactPerson ? `Dear ${data.contactPerson},` : 'Dear Principal,';
+  // Addressed to the school itself, never to the coordinator/contact person
+  // on record — the credentials belong to the school.
+  const greeting = `Dear ${data.schoolName},`;
 
   const html = renderEmailShell({
     title: `School Registered — ${data.schoolName}`,
