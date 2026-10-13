@@ -269,6 +269,9 @@ model Video {
   studentId          String?
   appUserId          String?
   uploaderType       String            @default("STUDENT")
+  // School.id of the school that uploaded this on a student's behalf (set only
+  // when uploaderType = "SCHOOL"). Moderation results are notified to it too.
+  uploadedBySchoolId String?
   videoUrl           String
   thumbnailUrl       String?
   caption            String?

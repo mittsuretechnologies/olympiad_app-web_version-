@@ -16,9 +16,61 @@ export async function POST(request: Request) {
 
     const typed = String(userId).trim();
 
-    let user = await prisma.appUser.findFirst({
-      where: { userId: { equals: typed, mode: 'insensitive' } },
-    });
+    // The one login box accepts a username, an email or a 10-digit mobile number.
+    // An email/mobile can be shared by sibling accounts, so the password decides
+    // which of them is meant; if it fits more than one, the user is asked to sign
+    // in with the username instead of guessing.
+    const looksEmail  = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(typed);
+    const typedDigits = typed.replace(/\D/g, '');
+    const looksMobile = !looksEmail && /^[\d\s+\-()]+$/.test(typed) && /^(?:91)?[6-9]\d{9}$/.test(typedDigits);
+
+    let user: Awaited<ReturnType<typeof prisma.appUser.findFirst>> = null;
+    if (looksEmail || looksMobile) {
+      const mobile = typedDigits.slice(-10);
+      const candidates = await prisma.appUser.findMany({
+        where: {
+          isVerified: true,
+          ...(looksEmail ? { email: { equals: typed, mode: 'insensitive' as const } } : { mobile }),
+        },
+      });
+      const matches = [];
+      for (const c of candidates) {
+        if (c.password && await bcrypt.compare(password, c.password)) matches.push(c);
+      }
+      if (matches.length === 1) {
+        user = matches[0];
+      } else if (matches.length > 1) {
+        // The password fits several sibling accounts: hand back who they are so
+        // the app can ask which one to open (it then logs in with that username).
+        const codes = matches.map((m) => m.olympiadId).filter((c): c is string => !!c);
+        const allocations = codes.length
+          ? await prisma.olympiadIdAllocation.findMany({
+              where: { code: { in: codes } },
+              select: { code: true, assignedName: true },
+            })
+          : [];
+        const nameByCode = new Map(allocations.map((a) => [a.code, a.assignedName]));
+        return NextResponse.json(
+          {
+            message: 'More than one account uses this email/mobile and password. Choose which one to open.',
+            accounts: matches.map((m) => ({
+              userId: m.userId,
+              avatarUrl: m.avatarUrl,
+              studentName: (m.olympiadId && nameByCode.get(m.olympiadId)) || null,
+            })),
+          },
+          { status: 409 },
+        );
+      } else if (candidates.length > 0) {
+        return NextResponse.json({ message: 'Incorrect password. Please try again.' }, { status: 401 });
+      }
+    }
+
+    if (!user) {
+      user = await prisma.appUser.findFirst({
+        where: { userId: { equals: typed, mode: 'insensitive' } },
+      });
+    }
 
     // ---- Olympiad school ----------------------------------------------------
     // A school logs in with the username and password it uses on the web portal.

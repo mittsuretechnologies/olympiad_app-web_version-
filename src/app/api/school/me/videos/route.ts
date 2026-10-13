@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { studentId, videoUrl, thumbnailUrl, caption, category, subCategory, tags, isPublic } =
+    const { studentId, videoUrl, thumbnailUrl, caption, category, subCategory, tags, isPublic, isMittfest } =
       await request.json();
 
     const wantsPublic = isPublic !== undefined ? Boolean(isPublic) : true;
@@ -103,10 +103,12 @@ export async function POST(request: Request) {
         tags: mergedTags,
         isPublic: wantsPublic,
         isEvaluation: true,
-        // No MittFest checkbox on this form - the hashtag is the only way in.
-        isMittfest: hasMittfestTag(tags),
+        // The school can tick "for MittFest" on the student's behalf (same as the
+        // student's own upload form); a #mittfest hashtag counts too.
+        isMittfest: Boolean(isMittfest) || hasMittfestTag(tags),
         olympiadVisibility: wantsPublic ? 'public' : 'private',
         uploaderType: 'SCHOOL',
+        uploadedBySchoolId: schoolRow.id,
         status: 'PENDING',
       },
     });

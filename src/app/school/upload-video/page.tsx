@@ -51,6 +51,7 @@ export default function UploadVideoPage() {
   const [caption, setCaption]       = useState('');
 
   const [isPublic, setIsPublic] = useState(true);
+  const [isMittfest, setIsMittfest] = useState(false);
   const [autoCrop, setAutoCrop] = useState(false);
   const [aspectMismatch, setAspectMismatch] = useState(false);
 
@@ -210,7 +211,7 @@ export default function UploadVideoPage() {
       const metaRes = await fetch('/api/school/me/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory: finalSubCategory, isPublic }),
+        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory: finalSubCategory, isPublic, isMittfest }),
       });
       setProgress(100);
       const saved = await readJson(metaRes, 'Save failed');
@@ -224,7 +225,7 @@ export default function UploadVideoPage() {
 
   function reset() {
     setSelectedStudent(null); setStudentSearch(''); setVideoFile(null); setVideoPreview(null);
-    setCategory(''); setSubCategory(''); setCustomTalent(''); setCaption(''); setIsPublic(true);
+    setCategory(''); setSubCategory(''); setCustomTalent(''); setCaption(''); setIsPublic(true); setIsMittfest(false);
     setAutoCrop(false); setAspectMismatch(false);
     setUploadState('idle'); setProgress(0); setErrorMsg(''); setLastVideoMeta(null);
     setSlots(null);
@@ -504,6 +505,21 @@ export default function UploadVideoPage() {
                   );
                 })}
               </div>
+            </Section>
+
+            {/* MittFest - optional, on the student's behalf */}
+            <Section title="MittFest">
+              <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px] text-[#475265]">
+                <input
+                  type="checkbox" checked={isMittfest}
+                  onChange={e => setIsMittfest(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 rounded accent-[#1559C7]"
+                />
+                <span>
+                  <span className="block font-semibold">Is this video for MittFest?</span>
+                  <span className="block text-[11.5px] text-[#677285]">Optional. Tick to also submit this student's video for MittFest.</span>
+                </span>
+              </label>
             </Section>
 
             {/* Nothing left to upload for this student */}

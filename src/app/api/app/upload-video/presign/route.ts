@@ -48,7 +48,13 @@ export async function POST(request: Request) {
       // Authorization header (it is made exactly like the S3 one), so the URL
       // itself carries a short-lived signed token naming the one key it may write.
       const putToken = sign({ key, uid: appUser.id, purpose: 'local-put' }, JWT_SECRET, { expiresIn: '10m' });
-      const origin = new URL(request.url).origin;
+      // Use the address the app actually reached us on (Host header), not
+      // request.url: in dev Next reports that as "localhost:3000", which an
+      // emulator/phone can't reach, so the video PUT failed with "Network
+      // request failed". Emulator -> 10.0.2.2:3000, phone -> the PC's LAN IP.
+      const host  = request.headers.get('x-forwarded-host') || request.headers.get('host');
+      const proto = request.headers.get('x-forwarded-proto') || new URL(request.url).protocol.replace(':', '');
+      const origin = host ? `${proto}://${host}` : new URL(request.url).origin;
       const uploadUrl = `${origin}/api/app/upload-video/local-put?token=${encodeURIComponent(putToken)}`;
       return NextResponse.json({ uploadUrl, key, contentType, videoUrl: localMediaUrl(key), local: true }, { status: 200 });
     }
