@@ -153,11 +153,12 @@ const ADMIN_LOGIN_URL = 'https://admin.mittmee.com/login';
 export interface SchoolCredentialsMail {
   to: string;
   schoolName: string;
-  schoolId: string;
   username: string;
   password: string;
 }
 
+// Only what the school needs to log in (username + password) — the internal
+// School ID is deliberately left out of the email.
 export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): Promise<void> {
   if (!isMailerConfigured()) {
     // Dev fallback so registration keeps working before SMTP is set up.
@@ -184,7 +185,6 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
 
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
              style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 16px;">
-        ${credentialRow('School ID', data.schoolId)}
         ${credentialRow('Username', data.username)}
         ${credentialRow('Password', data.password, true)}
       </table>
@@ -221,7 +221,7 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
     attachments: emailAttachments(),
     text:
       `${greeting}\n\n${data.schoolName} has been registered on Mittmee.\n\n` +
-      `School ID: ${data.schoolId}\nUsername: ${data.username}\nPassword: ${data.password}\n\n` +
+      `Username: ${data.username}\nPassword: ${data.password}\n\n` +
       `Login here: ${ADMIN_LOGIN_URL}\n\n` +
       `Please keep these credentials safe.\n\nRegards,\nTeam Mittsure`,
   });

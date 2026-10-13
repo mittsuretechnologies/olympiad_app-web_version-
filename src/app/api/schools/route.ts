@@ -194,7 +194,6 @@ export async function POST(request: Request) {
             await sendSchoolCredentialsEmail({
               to: email,
               schoolName: name,
-              schoolId,
               username: generatedUsername,
               password: plainPassword,
             });
