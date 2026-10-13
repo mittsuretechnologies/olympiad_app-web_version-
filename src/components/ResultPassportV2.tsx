@@ -63,6 +63,8 @@ export interface PassportV2Student {
   state: string | null;
   district: string | null;
   city: string | null;
+  /** The school's exam date (ISO), shown as the passport's assessment date. */
+  examDate?: string | null;
   avatarUrl: string | null;
   videos: PassportVideo[];
   examPercentage: number | null;
@@ -150,6 +152,23 @@ function developmentStage(cls: string | null): string | null {
   return `${cls}/${stage} Stage`;
 }
 
+// No date of birth is collected anywhere, so the passport shows the age band
+// the student's class corresponds to under NEP 2020 / ECCE norms (Nursery 3+,
+// LKG 4+, UKG 5+, Class 1 at 6+) rather than leaving the field blank.
+function ageFromClass(cls: string | null): string | null {
+  if (!cls) return null;
+  const c = cls.trim().toLowerCase();
+  if (/play|^pg$|pre-?nursery/.test(c)) return '2–3 Years';
+  if (/nursery/.test(c)) return '3–4 Years';
+  if (/lkg|lower|kg ?1|junior kg/.test(c)) return '4–5 Years';
+  if (/ukg|upper|kg ?2|senior kg/.test(c)) return '5–6 Years';
+  const n = Number(c.match(/\d+/)?.[0]);
+  return n ? `${n + 5}–${n + 6} Years` : null;
+}
+
+const formatAssessmentDate = (iso: string | null | undefined) =>
+  iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }) : null;
+
 const BATCH = 'Junior Power Quest 2026';
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
@@ -217,12 +236,12 @@ function PageNo({ n }: { n: number }) {
 function IdCardPage({ s }: { s: PassportV2Student }) {
   const values: [number, string][] = [
     [165.5, s.name.toUpperCase()],
-    [203.75, '—'],
+    [203.75, ageFromClass(s.className) || '—'],
     [242.25, developmentStage(s.className) || '—'],
     [282.5, s.schoolName || '—'],
     [324.25, s.olympiadCode],
     [363.75, BATCH],
-    [402.75, '—'],
+    [402.75, formatAssessmentDate(s.examDate) || '—'],
   ];
   const initials = s.name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
   return (
