@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Users, Loader2, Search, Download, BookOpen, Calendar, Phone,
   Mail, CheckCircle2, Send, AlertCircle, ChevronDown, ChevronUp,
-  KeyRound, Eye, EyeOff, UserCheck, UserX, Clock, RotateCcw, Pencil,
+  KeyRound, Eye, EyeOff, UserCheck, UserX, Clock, RotateCcw, Pencil, Lock,
 } from 'lucide-react';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL,
@@ -159,6 +159,13 @@ export default function SchoolRegisteredStudentsPage() {
   const presentCount = students.filter(s => s.attendance === 'PRESENT').length;
   const absentCount = students.filter(s => s.attendance === 'ABSENT').length;
   const allMarked = students.length > 0 && presentCount + absentCount === students.length;
+  // Before exam day the attendance controls are still shown, disabled, so the
+  // school knows attendance is part of the flow and when it opens. The API
+  // refuses marks before the exam day regardless.
+  const attendanceLocked = !canMarkAttendance && !isSubmitted;
+  const attendanceLockedHint = examDate
+    ? `Attendance opens on the exam day — ${new Date(examDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`
+    : 'Attendance opens on the exam day — exam date not set yet';
 
   const handleConfirmSubmit = async () => {
     setSubmitting(true);
@@ -373,6 +380,15 @@ export default function SchoolRegisteredStudentsPage() {
               <Send size={13} /> Confirm &amp; Send{!allMarked ? ` (${presentCount + absentCount}/${students.length} marked)` : ''}
             </button>
           )}
+          {attendanceLocked && (
+            <button
+              disabled
+              title={attendanceLockedHint}
+              className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-lg bg-[#E6E8EC] px-3.5 py-2 text-[12.5px] font-semibold text-[#98A1B2]"
+            >
+              <Lock size={13} /> Confirm &amp; Send
+            </button>
+          )}
         </div>
       )}
 
@@ -525,6 +541,15 @@ export default function SchoolRegisteredStudentsPage() {
                                 )}
                               </div>
                             )
+                          ) : attendanceLocked ? (
+                            <div className="flex items-center gap-1.5" title={attendanceLockedHint}>
+                              <button disabled className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[#E6E8EC] bg-[#F8F9FB] px-2 py-1 text-[11px] font-semibold text-[#B4BBC6]">
+                                <Lock size={10} /> Present
+                              </button>
+                              <button disabled className="inline-flex cursor-not-allowed items-center gap-1 rounded-md border border-[#E6E8EC] bg-[#F8F9FB] px-2 py-1 text-[11px] font-semibold text-[#B4BBC6]">
+                                <Lock size={10} /> Absent
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-[11px] text-[#98A1B2]">—</span>
                           )}
