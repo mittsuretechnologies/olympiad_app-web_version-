@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
 import { getJwtSecret } from '@/lib/jwt-secret';
@@ -126,6 +127,9 @@ export async function POST(request: Request) {
     }
 
     // ---- Create everything atomically ----
+    if (containsAbuse(schoolName) || containsAbuse(contactPerson)) {
+      return NextResponse.json({ message: ABUSIVE_MESSAGES.name }, { status: 422 });
+    }
     const userId = await generateUserId(schoolName);
     const passwordHash = await bcrypt.hash(password, 10);
     const now = new Date();

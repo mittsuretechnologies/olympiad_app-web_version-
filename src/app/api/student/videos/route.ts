@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
@@ -32,6 +33,11 @@ export async function POST(request: Request) {
 
     if (!videoUrl || !category || !subCategory) {
       return NextResponse.json({ error: 'Missing required fields: videoUrl, category, subCategory' }, { status: 400 });
+    }
+
+    const abuse = captionTagsAbuseMessage(caption, tags);
+    if (abuse) {
+      return NextResponse.json({ error: abuse }, { status: 422 });
     }
 
     // Fetch the student's school to auto-build location hashtags

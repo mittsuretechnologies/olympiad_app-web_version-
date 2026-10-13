@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
@@ -39,6 +40,11 @@ export async function POST(request: Request) {
 
     const { studentId, videoUrl, thumbnailUrl, caption, category, subCategory, tags, isPublic, isMittfest } =
       await request.json();
+
+    const abuse = captionTagsAbuseMessage(caption, tags);
+    if (abuse) {
+      return NextResponse.json({ error: abuse }, { status: 422 });
+    }
 
     const wantsPublic = isPublic !== undefined ? Boolean(isPublic) : true;
 

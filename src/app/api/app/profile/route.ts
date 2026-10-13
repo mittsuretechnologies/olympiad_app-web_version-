@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
+import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
@@ -45,6 +46,9 @@ export async function PATCH(request: Request) {
     const trimmed = userId.trim();
     if (trimmed.length < 3 || trimmed.length > 20) {
       return NextResponse.json({ message: 'User ID must be between 3 and 20 characters' }, { status: 422 });
+    }
+    if (containsAbuse(trimmed)) {
+      return NextResponse.json({ message: ABUSIVE_MESSAGES.username }, { status: 422 });
     }
     // Uniqueness check is case-insensitive — stored as-is but compared case-insensitively
     const existing = await prisma.appUser.findFirst({

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
+import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import {
   OLYMPIAD_CAT_A_SUBS,
@@ -51,6 +52,11 @@ export async function POST(request: Request) {
         { error: 'Missing required fields: videoUrl, category, subCategory' },
         { status: 400 }
       );
+    }
+
+    const abuse = captionTagsAbuseMessage(caption, tags);
+    if (abuse) {
+      return NextResponse.json({ error: abuse }, { status: 422 });
     }
 
     // Resolve olympiadId: prefer body-supplied (entered on upload screen),
