@@ -35,6 +35,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         isPrivate:  true,
         createdAt:  true,
         deletionRequestedAt: true,
+        accountType: true,
+        generalSchool: { select: { name: true, state: true, district: true, isActive: true } },
+        // Set when this account is an Olympiad school's own app account.
+        schoolRef: { select: { id: true, name: true, state: true, district: true, isActive: true } },
       },
     });
 
@@ -42,7 +46,11 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
     // unreviewed student request) — treat exactly like the account doesn't
     // exist. The owner is logged out the moment this is set, so this can
     // only ever be someone else looking.
-    if (!target || target.deletionRequestedAt) {
+    if (
+      !target || target.deletionRequestedAt ||
+      (target.generalSchool && !target.generalSchool.isActive) ||
+      (target.schoolRef && !target.schoolRef.isActive)
+    ) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
@@ -146,6 +154,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         olympiadId:    isOwnProfile ? target.olympiadId : null,
         isPrivate:     target.isPrivate,
         studentName,
+        accountType:   target.accountType,
+        // GENERAL school (self-registered) or OLYMPIAD school (has web credentials).
+        // schoolId is the Olympiad School.id the app uses to load its student videos.
+        schoolKind:    target.schoolRef ? 'OLYMPIAD' : target.generalSchool ? 'GENERAL' : null,
+        schoolId:      target.schoolRef?.id ?? null,
+        schoolName:    target.schoolRef?.name ?? target.generalSchool?.name ?? null,
+        schoolState:   target.schoolRef?.state ?? target.generalSchool?.state ?? null,
+        schoolDistrict: target.schoolRef?.district ?? target.generalSchool?.district ?? null,
         followersCount,
         followingCount,
         videosCount,

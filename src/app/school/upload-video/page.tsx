@@ -51,6 +51,7 @@ export default function UploadVideoPage() {
   const [caption, setCaption]       = useState('');
 
   const [isPublic, setIsPublic] = useState(true);
+  const [isMittfest, setIsMittfest] = useState(false);
   const [autoCrop, setAutoCrop] = useState(false);
   const [aspectMismatch, setAspectMismatch] = useState(false);
 
@@ -110,15 +111,12 @@ export default function UploadVideoPage() {
   // so block selection until a student is chosen and their class has loaded.
   const canPickCategory = !!selectedStudent && !slotsLoading;
 
-  // Both slots approved → only general feed
-  const isGeneralOnly = slots !== null && slots.approvedCount >= 2;
+  // Both Olympiad categories are used (submitted or approved): a school can only
+  // upload a student's Olympiad videos, so there is nothing left to upload.
+  const bothFilled = slots !== null && slots.slotA && slots.slotB;
 
   const getCatStatus = (catValue: string) => {
     if (!slots) return 'available';
-    // Once both olympiad slots are filled, every further upload goes to the
-    // general feed — categories are no longer "locked" by slot status, just
-    // freely selectable so the school can still tag what kind of video it is.
-    if (isGeneralOnly) return 'available';
     const isA = catValue === OLYMPIAD_CAT_A_LABEL;
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
@@ -213,7 +211,7 @@ export default function UploadVideoPage() {
       const metaRes = await fetch('/api/school/me/videos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory: finalSubCategory, isPublic }),
+        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory: finalSubCategory, isPublic, isMittfest }),
       });
       setProgress(100);
       const saved = await readJson(metaRes, 'Save failed');
@@ -227,7 +225,7 @@ export default function UploadVideoPage() {
 
   function reset() {
     setSelectedStudent(null); setStudentSearch(''); setVideoFile(null); setVideoPreview(null);
-    setCategory(''); setSubCategory(''); setCustomTalent(''); setCaption(''); setIsPublic(true);
+    setCategory(''); setSubCategory(''); setCustomTalent(''); setCaption(''); setIsPublic(true); setIsMittfest(false);
     setAutoCrop(false); setAspectMismatch(false);
     setUploadState('idle'); setProgress(0); setErrorMsg(''); setLastVideoMeta(null);
     setSlots(null);
@@ -235,7 +233,6 @@ export default function UploadVideoPage() {
 
   /* — Done screen — */
   if (uploadState === 'done') {
-    const isEval = lastVideoMeta?.isEvaluation ?? true;
     return (
       <div className="flex min-h-[65vh] items-center justify-center p-4">
         <div className={`${CARD} w-full max-w-md p-8 text-center`}>
@@ -251,12 +248,10 @@ export default function UploadVideoPage() {
           <div className="mx-auto mt-5 rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] p-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-[#677285]">Video type</p>
             <p className="mt-1 text-[14px] font-semibold text-[#0F1B2D]">
-              {isEval ? 'Olympiad evaluation' : 'General feed'}
+              Olympiad evaluation
             </p>
             <p className="mx-auto mt-1.5 max-w-[260px] text-[12px] leading-relaxed text-[#475265]">
-              {isEval
-                ? 'This video will be reviewed and scored as an olympiad participation entry.'
-                : 'This student already has 2 approved olympiad videos, so this video appears in the general public feed only.'}
+              This video will be reviewed and scored as an olympiad participation entry.
             </p>
           </div>
 
@@ -365,9 +360,9 @@ export default function UploadVideoPage() {
                   {slotsLoading ? (
                     <div className="h-7 animate-pulse rounded-lg bg-[#EEF0F3]" />
                   ) : slots && (
-                    isGeneralOnly ? (
+                    bothFilled ? (
                       <StatusBadge tone="info" icon={CheckCircle2}>
-                        Both olympiad slots filled — this video goes to General Feed
+                        Both Olympiad videos are already submitted — nothing more can be uploaded for this student
                       </StatusBadge>
                     ) : (
                       <div className="flex flex-wrap items-center gap-1.5">
@@ -474,10 +469,13 @@ export default function UploadVideoPage() {
 
             {/* Visibility */}
             <Section title="Visibility">
+              <p className="mb-2 text-[11.5px] leading-relaxed text-[#677285]">
+                Choose now. It cannot be changed after the video is uploaded.
+              </p>
               <div className="space-y-1.5">
                 {[
                   { val: true,  icon: Globe,  label: 'Public',  desc: 'Anyone on Mittmee can see this video' },
-                  { val: false, icon: EyeOff, label: 'Private', desc: 'Only reviewers and school can see this' },
+                  { val: false, icon: EyeOff, label: 'Private', desc: 'Only the student and reviewers can see this' },
                 ].map(opt => {
                   const Icon = opt.icon;
                   const active = isPublic === opt.val;
@@ -509,15 +507,30 @@ export default function UploadVideoPage() {
               </div>
             </Section>
 
-            {/* General feed notice */}
-            {isGeneralOnly && (
+            {/* MittFest - optional, on the student's behalf */}
+            <Section title="MittFest">
+              <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px] text-[#475265]">
+                <input
+                  type="checkbox" checked={isMittfest}
+                  onChange={e => setIsMittfest(e.target.checked)}
+                  className="mt-0.5 h-3.5 w-3.5 rounded accent-[#1559C7]"
+                />
+                <span>
+                  <span className="block font-semibold">Is this video for MittFest?</span>
+                  <span className="block text-[11.5px] text-[#677285]">Optional. Tick to also submit this student's video for MittFest.</span>
+                </span>
+              </label>
+            </Section>
+
+            {/* Nothing left to upload for this student */}
+            {bothFilled && (
               <div className={`${CARD} p-3.5`}>
                 <p className="flex items-center gap-1.5 text-[12.5px] font-semibold text-[#1559C7]">
-                  <AlertCircle size={13} /> General feed upload
+                  <AlertCircle size={13} /> Olympiad videos complete
                 </p>
                 <p className="mt-1 text-[12px] leading-relaxed text-[#475265]">
-                  This student has 2 approved olympiad videos. Any further uploads go to the general feed —
-                  not olympiad evaluation.
+                  This student already has both Olympiad videos (Talent Performance and Rhymes / Speech).
+                  A school can only upload a student's Olympiad videos, so nothing more can be added.
                 </p>
               </div>
             )}
@@ -648,7 +661,7 @@ export default function UploadVideoPage() {
             {/* Submit */}
             <button
               type="submit"
-              disabled={uploadState === 'uploading' || uploadState === 'saving'}
+              disabled={uploadState === 'uploading' || uploadState === 'saving' || bothFilled}
               className={`cursor-pointer ${BTN_PRIMARY} w-full !py-2.5`}
             >
               <Upload className="h-4 w-4" />

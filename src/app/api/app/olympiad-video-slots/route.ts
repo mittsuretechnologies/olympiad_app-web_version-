@@ -27,12 +27,19 @@ export async function GET(request: Request) {
   }
 
   try {
+    // The student may also exist as a web Student under the same Olympiad ID; a
+    // video the school uploaded for that record fills the same slot.
+    const me = await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { olympiadId: true } });
+    const webStudent = me?.olympiadId
+      ? await prisma.student.findUnique({ where: { olympiadCode: me.olympiadId }, select: { id: true } })
+      : null;
+
     const [videos, user] = await Promise.all([
       prisma.video.findMany({
         // No deletedAt filter here — an evaluated video must keep locking its slot even if
         // it was later soft-deleted (e.g. an admin removing a reported video), so we need to
         // see soft-deleted rows too. Non-evaluated videos are filtered by deletedAt below.
-        where: { appUserId: appUser.id, isEvaluation: true },
+        where: { OR: [{ appUserId: appUser.id }, ...(webStudent ? [{ studentId: webStudent.id }] : [])], isEvaluation: true },
         select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
       }),
       prisma.appUser.findUnique({

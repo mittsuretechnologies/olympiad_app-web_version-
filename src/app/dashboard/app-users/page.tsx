@@ -16,6 +16,7 @@ interface AppUser {
   olympiadId: string | null;
   isVerified: boolean;
   termsAccepted: boolean;
+  accountType?: string;
   plainPassword: string | null;
   createdAt: string;
 }
@@ -39,7 +40,8 @@ export default function AppUsersPage() {
   const filtered = useMemo(() => {
     return users.filter(u => {
       if (filterRole === 'Student' && !u.olympiadId) return false;
-      if (filterRole === 'Viewer' && u.olympiadId) return false;
+      if (filterRole === 'Viewer' && (u.olympiadId || u.accountType === 'SCHOOL')) return false;
+      if (filterRole === 'School' && u.accountType !== 'SCHOOL') return false;
       if (filterDateFrom && new Date(u.createdAt) < new Date(filterDateFrom)) return false;
       if (filterDateTo && new Date(u.createdAt) > new Date(filterDateTo + 'T23:59:59')) return false;
       if (search) {
@@ -56,14 +58,15 @@ export default function AppUsersPage() {
   }, [users, filterRole, filterDateFrom, filterDateTo, search]);
 
   const studentCount = filtered.filter(u => u.olympiadId).length;
-  const viewerCount = filtered.filter(u => !u.olympiadId).length;
+  const schoolCount = filtered.filter(u => u.accountType === 'SCHOOL').length;
+  const viewerCount = filtered.filter(u => !u.olympiadId && u.accountType !== 'SCHOOL').length;
 
   const exportCSV = () => {
     if (filtered.length === 0) return;
     const headers = ['#', 'Username', 'Role', 'Email', 'Mobile', 'Olympiad ID', 'Registered On'];
     const rows = filtered.map((u, i) => [
       i + 1, u.userId,
-      u.olympiadId ? 'Student' : 'Viewer',
+      u.accountType === 'SCHOOL' ? 'School' : u.olympiadId ? 'Student' : 'Viewer',
       u.email || '-', u.mobile || '-',
       u.olympiadId || '-',
       new Date(u.createdAt).toLocaleDateString(),
@@ -110,7 +113,7 @@ export default function AppUsersPage() {
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Role</label>
             <select value={filterRole} onChange={e => setFilterRole(e.target.value)} className={sel}>
-              <option>All</option><option>Student</option><option>Viewer</option>
+              <option>All</option><option>Student</option><option>Viewer</option><option>School</option>
             </select>
           </div>
           <div className="space-y-1">
@@ -151,6 +154,10 @@ export default function AppUsersPage() {
           <Eye size={17} className="text-blue-600" />
           <span className="text-2xl font-bold text-blue-700">{viewerCount}</span>
           <span className="text-sm text-gray-400">Viewers</span>
+        </div>
+        <div className="flex items-center gap-3 px-6 py-3">
+          <span className="text-2xl font-bold text-green-700">{schoolCount}</span>
+          <span className="text-sm text-gray-400">Schools</span>
         </div>
       </div>
 
@@ -195,7 +202,9 @@ export default function AppUsersPage() {
                   </td>
                   <td className="px-4 py-2.5 font-mono font-bold text-[#004f9f] text-sm">{u.userId}</td>
                   <td className="px-4 py-2.5">
-                    {u.olympiadId
+                    {u.accountType === 'SCHOOL'
+                      ? <span className="inline-flex items-center gap-1 text-[11px] font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-0.5">School</span>
+                      : u.olympiadId
                       ? <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5"><GraduationCap size={10} />Student</span>
                       : <span className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5"><Eye size={10} />Viewer</span>
                     }

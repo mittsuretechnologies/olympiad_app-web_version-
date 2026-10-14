@@ -75,9 +75,18 @@ export async function POST(request: Request) {
   try {
     const user = await prisma.appUser.findUnique({
       where:  { id: appUser.id },
-      select: { olympiadId: true, deletionRequestedAt: true },
+      select: { olympiadId: true, deletionRequestedAt: true, schoolRefId: true },
     });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    // An Olympiad school's app account is part of its school record; the school
+    // is managed by the Super Admin and cannot be deleted from the app.
+    if (user.schoolRefId) {
+      return NextResponse.json(
+        { error: 'An Olympiad school account cannot be deleted from the app. Contact Mittmee support.' },
+        { status: 403 },
+      );
+    }
 
     const isStudent = !!user.olympiadId;
 

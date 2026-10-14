@@ -3,13 +3,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   Video, Clapperboard, Star, Eye, Heart, BookOpen, Search, Filter, Calendar, Tag,
-  Loader2, Share2, Check, Lock, Globe, ShieldCheck, AlertCircle, ChevronRight, UserCheck,
+  Share2, Check, Lock, Globe, ChevronRight, UserCheck,
 } from 'lucide-react';
 import { getCategoryDisplayLabel } from '@/lib/olympiad-categories';
-import { CARD, STACK, INPUT, LABEL, FOCUS, BTN_PRIMARY, BTN_SECONDARY, TABLE, TH, TD, TR, avatarTint } from '../ui';
+import { CARD, STACK, INPUT, FOCUS, TABLE, TH, TD, TR, avatarTint } from '../ui';
 import {
   PageHeader, StatTile, StatusBadge, FilterPill, Avatar,
-  LoadingState, ErrorState, EmptyState, ModalShell, TableShell, RowCount,
+  LoadingState, ErrorState, EmptyState, TableShell, RowCount,
 } from '../components';
 
 interface VideoItem {
@@ -39,35 +39,6 @@ interface VideoItem {
   linkType?: 'OLYMPIAD' | 'LINKED';
 }
 
-const STEP_UP_STORAGE_KEY = 'schoolVisibilityStepUp';
-
-function getCachedStepUpToken(): string | null {
-  if (typeof window === 'undefined') return null;
-  const raw = sessionStorage.getItem(STEP_UP_STORAGE_KEY);
-  if (!raw) return null;
-  try {
-    const { token, expiresAt } = JSON.parse(raw);
-    if (Date.now() >= expiresAt) {
-      sessionStorage.removeItem(STEP_UP_STORAGE_KEY);
-      return null;
-    }
-    return token;
-  } catch {
-    return null;
-  }
-}
-
-function cacheStepUpToken(token: string, expiresInSeconds: number) {
-  sessionStorage.setItem(STEP_UP_STORAGE_KEY, JSON.stringify({
-    token,
-    expiresAt: Date.now() + expiresInSeconds * 1000,
-  }));
-}
-
-function clearCachedStepUpToken() {
-  sessionStorage.removeItem(STEP_UP_STORAGE_KEY);
-}
-
 export default function StudentVideosPage() {
   const [videos, setVideos]     = useState<VideoItem[]>([]);
   const [loading, setLoading]   = useState(true);
@@ -76,9 +47,6 @@ export default function StudentVideosPage() {
   const [typeFilter, setTypeFilter] = useState<'ALL' | 'OLYMPIAD' | 'GENERAL'>('ALL');
   const [classFilter, setClassFilter] = useState('ALL');
   const [playing, setPlaying]   = useState<string | null>(null);
-
-  // Pending visibility change awaiting OTP step-up verification, if any
-  const [pendingVisibility, setPendingVisibility] = useState<{ videoId: string; next: 'public' | 'private' } | null>(null);
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') || '' : '';
 
@@ -150,56 +118,6 @@ export default function StudentVideosPage() {
       else next.add(key);
       return next;
     });
-  };
-
-  // Applies a visibility change against the API using a valid step-up token.
-  // Returns true on success, false if the step-up token was rejected (expired/invalid).
-  const applyVisibilityChange = async (videoId: string, next: 'public' | 'private', stepUpToken: string): Promise<boolean> => {
-    const res = await fetch(`/api/school/me/videos/${videoId}/visibility`, {
-      method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-        'x-step-up-token': stepUpToken,
-      },
-      body: JSON.stringify({ olympiadVisibility: next }),
-    });
-    if (res.status === 401) {
-      clearCachedStepUpToken();
-      return false;
-    }
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to update visibility');
-    setVideos(prev => prev.map(v => v.id === videoId ? { ...v, olympiadVisibility: next } : v));
-    return true;
-  };
-
-  const handleToggleVisibility = async (video: VideoItem) => {
-    const next: 'public' | 'private' = video.olympiadVisibility === 'private' ? 'public' : 'private';
-    const cached = getCachedStepUpToken();
-    if (cached) {
-      try {
-        const ok = await applyVisibilityChange(video.id, next, cached);
-        if (ok) return;
-      } catch (e: any) {
-        alert(e.message);
-        return;
-      }
-    }
-    // No valid cached step-up token — prompt for OTP verification first.
-    setPendingVisibility({ videoId: video.id, next });
-  };
-
-  const handleVerified = async (stepUpToken: string, expiresIn: number) => {
-    cacheStepUpToken(stepUpToken, expiresIn);
-    if (!pendingVisibility) return;
-    try {
-      await applyVisibilityChange(pendingVisibility.videoId, pendingVisibility.next, stepUpToken);
-    } catch (e: any) {
-      alert(e.message);
-    } finally {
-      setPendingVisibility(null);
-    }
   };
 
   return (
@@ -353,7 +271,6 @@ export default function StudentVideosPage() {
                                 tint={avatarTint(i)}
                                 isPlaying={playing === v.id}
                                 onPlay={() => setPlaying(playing === v.id ? null : v.id)}
-                                onToggleVisibility={() => handleToggleVisibility(v)}
                               />
                             ))}
                           </div>
@@ -368,114 +285,7 @@ export default function StudentVideosPage() {
         </TableShell>
       )}
 
-      {pendingVisibility && (
-        <VisibilityOtpModal
-          token={token}
-          onVerified={handleVerified}
-          onClose={() => setPendingVisibility(null)}
-        />
-      )}
     </div>
-  );
-}
-
-function VisibilityOtpModal({ token, onVerified, onClose }: {
-  token: string;
-  onVerified: (stepUpToken: string, expiresIn: number) => void;
-  onClose: () => void;
-}) {
-  const [stage, setStage] = useState<'request' | 'enter'>('request');
-  const [otp, setOtp] = useState('');
-  const [channelMsg, setChannelMsg] = useState('');
-  const [error, setError] = useState('');
-  const [busy, setBusy] = useState(false);
-
-  const requestOtp = async () => {
-    setBusy(true); setError('');
-    try {
-      const res = await fetch('/api/school/me/video-visibility/request-otp', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
-      setChannelMsg(data.message);
-      setStage('enter');
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  useEffect(() => { requestOtp(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
-
-  const verify = async () => {
-    if (!otp.trim()) { setError('Enter the OTP'); return; }
-    setBusy(true); setError('');
-    try {
-      const res = await fetch('/api/school/me/video-visibility/verify-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ otp: otp.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Verification failed');
-      onVerified(data.stepUpToken, data.expiresIn);
-    } catch (e: any) {
-      setError(e.message);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <ModalShell
-      title={<span className="flex items-center gap-2"><ShieldCheck size={16} strokeWidth={1.75} className="text-[#1559C7]" /> Verify it&apos;s you</span>}
-      onClose={onClose}
-      maxWidth="max-w-sm"
-    >
-      <div className="space-y-3 p-5">
-        <p className="text-[12px] leading-relaxed text-[#475265]">
-          Changing a student&apos;s video visibility requires verifying an OTP sent to your school&apos;s
-          registered contact.
-        </p>
-        {stage === 'request' ? (
-          <div className="flex flex-col items-center gap-2 py-6">
-            <Loader2 className="h-4 w-4 animate-spin text-[#1559C7]" />
-            <p className="text-[12px] text-[#677285]">Sending OTP…</p>
-          </div>
-        ) : (
-          <>
-            {channelMsg && (
-              <p className="rounded-lg bg-[#F8F9FB] px-3 py-2.5 text-[12px] text-[#475265]">{channelMsg}</p>
-            )}
-            <div>
-              <label htmlFor="otp" className={LABEL}>Enter OTP</label>
-              <input
-                id="otp"
-                type="text" inputMode="numeric" placeholder="6-digit code" value={otp} autoFocus
-                onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                onKeyDown={e => e.key === 'Enter' && verify()}
-                className={`${INPUT} tracking-[0.3em]`}
-              />
-            </div>
-          </>
-        )}
-        {error && (
-          <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]">
-            <AlertCircle size={12} /> {error}
-          </p>
-        )}
-        <div className="flex gap-2 pt-1">
-          <button onClick={onClose} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
-          <button onClick={stage === 'request' ? requestOtp : verify} disabled={busy || stage === 'request'} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
-            {busy && <Loader2 size={14} className="animate-spin" />}
-            Verify
-          </button>
-        </div>
-      </div>
-    </ModalShell>
   );
 }
 
@@ -509,12 +319,11 @@ async function shareVideo(v: VideoItem, onCopied: () => void) {
   }
 }
 
-function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
+function VideoCard({ video: v, tint, isPlaying, onPlay }: {
   video: VideoItem;
   tint: string;
   isPlaying: boolean;
   onPlay: () => void;
-  onToggleVisibility: () => void;
 }) {
   const [copied, setCopied] = useState(false);
   const isPrivate = v.olympiadVisibility === 'private';
@@ -586,18 +395,17 @@ function VideoCard({ video: v, tint, isPlaying, onPlay, onToggleVisibility }: {
           <StatusBadge tone="neutral">{getCategoryDisplayLabel(v.category)}</StatusBadge>
           {v.subCategory && <StatusBadge tone="neutral">{v.subCategory}</StatusBadge>}
           {v.isEvaluation && (
-            <button
-              onClick={onToggleVisibility}
-              title={isPrivate ? 'Private — click to make public' : 'Public — click to make private'}
-              className={`cursor-pointer ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${FOCUS} ${
-                isPrivate
-                  ? 'bg-[#475265]/10 text-[#475265] hover:bg-[#475265]/20'
-                  : 'bg-[#1D7A3A]/10 text-[#1D7A3A] hover:bg-[#1D7A3A]/20'
+            // Shown for information only: the school chooses public or private when it
+            // uploads the video and cannot change it afterwards.
+            <span
+              title={isPrivate ? 'Private - visible only to the student' : 'Public'}
+              className={`ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-semibold ${
+                isPrivate ? 'bg-[#475265]/10 text-[#475265]' : 'bg-[#1D7A3A]/10 text-[#1D7A3A]'
               }`}
             >
               {isPrivate ? <Lock className="h-2.5 w-2.5" /> : <Globe className="h-2.5 w-2.5" />}
               {isPrivate ? 'Private' : 'Public'}
-            </button>
+            </span>
           )}
         </div>
 

@@ -26,7 +26,15 @@ export async function POST(
       where: { id, isActive: true },
       data: { viewsCount: { increment: 1 } },
     });
-    if (result.count === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (result.count === 0) {
+      // Not a SuperAdmin video: it may be a user's Learning/Parenting upload
+      // shown in the same rows (see /api/app/home-videos).
+      const userVideo = await prisma.video.updateMany({
+        where: { id, status: 'APPROVED', deletedAt: null },
+        data: { viewsCount: { increment: 1 } },
+      });
+      if (userVideo.count === 0) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    }
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error('home-video view error:', e);

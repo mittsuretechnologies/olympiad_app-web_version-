@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 import { createNotification } from '@/lib/notifications';
+import { ensureSchoolAccount } from '@/lib/schoolAccount';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 import { CLEAR_CLAIM, claimFreeFor, claimIsLive } from '@/lib/videoClaim';
 
@@ -43,6 +44,53 @@ async function moderationConflict(videoId: string, userId: string) {
   );
 }
 
+type StatusNotifyVideo = {
+  id: string; appUserId: string | null; uploadedBySchoolId: string | null;
+  caption: string | null; category: string | null; subCategory: string | null;
+};
+
+// Tells the student (when they have an app account) and, for a video a school
+// uploaded on their behalf, that school too. A video the student uploaded
+// themselves only ever notifies the student.
+async function notifyVideoStatus(
+  video: StatusNotifyVideo,
+  status: 'APPROVED' | 'REJECTED',
+  rejectionReason?: string | null,
+) {
+  if (video.appUserId) {
+    await createNotification(buildVideoStatusNotification(video, status, rejectionReason));
+  }
+  if (!video.uploadedBySchoolId) return;
+
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: video.uploadedBySchoolId },
+      select: { id: true, username: true, schoolId: true, name: true },
+    });
+    if (!school) return;
+    const account = await ensureSchoolAccount(school);
+
+    const label = video.caption?.trim() || video.subCategory || video.category || 'the video';
+    await createNotification(status === 'APPROVED'
+      ? {
+          userId:  account.id,
+          type:    'VIDEO_APPROVED',
+          title:   'Video Approved',
+          message: `The video "${label}" you uploaded for your student has been approved and is now live!`,
+          videoId: video.id,
+        }
+      : {
+          userId:  account.id,
+          type:    'VIDEO_REJECTED',
+          title:   'Video Rejected',
+          message: rejectionReason
+            ? `The video "${label}" you uploaded for your student was not approved. Reason: ${rejectionReason}`
+            : `The video "${label}" you uploaded for your student was not approved.`,
+          videoId: video.id,
+        });
+  } catch (error) {
+    console.error('Failed to notify school of video status:', error);
+  }
 // An approved video can be pulled back (rejected) only while no evaluator has
 // scored it — see the un-approve guard in POST.
 const NOT_EVALUATED = { evaluations: { none: {} } };
@@ -399,7 +447,7 @@ export async function POST(request: Request) {
         where: { id: { in: videoIds }, status: expected, ...claimFreeFor(payload!.id, now), ...(expected === 'APPROVED' ? NOT_EVALUATED : {}) },
         select: {
           id: true, status: true, rejectionReason: true,
-          appUserId: true, caption: true, category: true, subCategory: true,
+          appUserId: true, uploadedBySchoolId: true, caption: true, category: true, subCategory: true,
         },
       });
 
@@ -422,9 +470,7 @@ export async function POST(request: Request) {
         reason: status === 'REJECTED' ? (rejectionReason || null) : null,
       })));
 
-      await Promise.all(existing.map(v => v.appUserId
-        ? createNotification(buildVideoStatusNotification(v, status, rejectionReason))
-        : Promise.resolve()));
+      await Promise.all(existing.map(v => notifyVideoStatus(v, status, rejectionReason)));
 
       const skipped = videoIds.length - existing.length;
       return NextResponse.json({
@@ -441,7 +487,7 @@ export async function POST(request: Request) {
     const before = await prisma.video.findUnique({
       where: { id: videoId },
       select: {
-        status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true,
+        status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true, uploadedBySchoolId: true,
         caption: true, category: true, subCategory: true,
         _count: { select: { evaluations: true } },
       },
@@ -544,13 +590,7 @@ export async function POST(request: Request) {
       });
     }
 
-    if (before?.appUserId) {
-      await createNotification(buildVideoStatusNotification(
-        { id: videoId, ...before },
-        status,
-        rejectionReason,
-      ));
-    }
+    await notifyVideoStatus({ id: videoId, ...before }, status, rejectionReason);
 
     return NextResponse.json({ message: `Video ${status.toLowerCase()} successfully`, video });
   } catch (error) {

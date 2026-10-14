@@ -47,6 +47,13 @@ interface Video {
   } | null;
 }
 
+// A video is a student's when it carries an Olympiad ID: either a Student row, or
+// an app account that holds one (that is how a video a school uploads on a
+// student's behalf is stored - under the student's own app account).
+function isStudentVideo(v: Pick<Video, 'uploaderType' | 'student' | 'appUser'>): boolean {
+  return v.uploaderType === 'STUDENT' || !!v.student || !!v.appUser?.olympiadId;
+}
+
 interface ApiResponse {
   videos: Video[];
   counts: { PENDING: number; APPROVED: number; REJECTED: number };
@@ -113,6 +120,15 @@ function getCategoryLabel(cat: string) {
   return null;
 }
 
+// Videos uploaded under Learning / Parenting are shown on the app's home
+// Learning / Parenting rows once approved, so moderators get a distinct badge.
+function homeSectionBadge(category: string | null) {
+  const c = (category ?? '').trim().toLowerCase();
+  if (c === 'learning')  return { label: 'Learning Section',  card: 'text-white bg-blue-600',  modal: 'bg-blue-500 text-white' };
+  if (c === 'parenting') return { label: 'Parenting Section', card: 'text-white bg-pink-600',  modal: 'bg-pink-500 text-white' };
+  return null;
+}
+
 // Seeds the main-category dropdown. Older rows store the raw 'Cat A' / 'Cat B'
 // values instead of the display labels, and some have no usable category at all
 // — fall back to deriving it from the subcategory so the select is never blank.
@@ -120,6 +136,9 @@ function normalizeCat(video: { category: string | null; subCategory: string | nu
   const c = video.category;
   if (c === OLYMPIAD_CAT_A_LABEL || c === 'Cat A') return OLYMPIAD_CAT_A_LABEL;
   if (c === OLYMPIAD_CAT_B_LABEL || c === 'Cat B') return OLYMPIAD_CAT_B_LABEL;
+  // A school's own category: keep it, so the dropdown doesn't default to
+  // Talent Performance and re-file the video if a moderator touches it.
+  if (c === 'School Activity') return c;
   if (OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '')) return OLYMPIAD_CAT_B_LABEL;
   return OLYMPIAD_CAT_A_LABEL;
 }
@@ -854,7 +873,7 @@ export default function VideoModerationPage() {
               const tagList   = displayTags(video);
               const isChecked = selected.has(video.id);
               const catBadge  = getCategoryLabel(video.subCategory);
-              const isStudent = video.uploaderType === 'STUDENT' || !!video.student;
+              const isStudent = isStudentVideo(video);
               const lockedBy  = claimedByOther(video) ? (video.claimedByName || 'Another moderator') : null;
 
               return (
@@ -907,6 +926,9 @@ export default function VideoModerationPage() {
                           <Award size={9} /> Olympiad
                         </span>
                       )}
+                      {(() => { const hb = homeSectionBadge(video.category); return hb ? (
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shadow ${hb.card}`}>{hb.label}</span>
+                      ) : null; })()}
                     </div>
 
                     {/* Bottom gradient + date */}
@@ -1164,6 +1186,9 @@ export default function VideoModerationPage() {
                       <Award size={10} /> Olympiad
                     </span>
                   )}
+                  {(() => { const hb = homeSectionBadge(previewVideo.category); return hb ? (
+                    <span className={`text-[10px] font-black px-2 py-1 rounded-full ${hb.modal}`}>{hb.label}</span>
+                  ) : null; })()}
                   {previewVideo.deletedAt && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-red-600 text-white px-2 py-1 rounded-full">
                       <Trash2 size={10} /> Deleted by user
@@ -1296,7 +1321,7 @@ export default function VideoModerationPage() {
               {/* Student / uploader info */}
               <div className="flex items-center gap-3 bg-white/8 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
-                  (previewVideo.uploaderType === 'STUDENT' || previewVideo.student)
+                  isStudentVideo(previewVideo)
                     ? 'bg-amber-400/20 text-amber-300'
                     : 'bg-blue-400/20 text-blue-300'
                 }`}>
@@ -1308,11 +1333,11 @@ export default function VideoModerationPage() {
                       {previewVideo.student?.name ?? previewVideo.appUser?.userId ?? '—'}
                     </p>
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
-                      (previewVideo.uploaderType === 'STUDENT' || previewVideo.student)
+                      isStudentVideo(previewVideo)
                         ? 'bg-amber-400/20 text-amber-300'
                         : 'bg-blue-400/20 text-blue-300'
                     }`}>
-                      {(previewVideo.uploaderType === 'STUDENT' || previewVideo.student) ? '🎓 Student' : '📱 Viewer'}
+                      {previewVideo.uploaderType === 'SCHOOL_OWN' ? '🏫 School' : isStudentVideo(previewVideo) ? '🎓 Student' : '📱 Viewer'}
                     </span>
                   </div>
                   {previewVideo.student ? (
