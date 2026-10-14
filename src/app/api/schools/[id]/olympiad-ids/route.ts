@@ -1,18 +1,25 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const { id } = await params;
     const allocations = await prisma.olympiadIdAllocation.findMany({
       where: { schoolId: id },
       orderBy: [{ prefix: 'asc' }, { sequence: 'asc' }],
+    });
+    // Allocations carry the student and guardian names the school entered.
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'OlympiadIdAllocation',
+      subjectIds: allocations.filter((a) => a.assignedName).map((a) => a.id), request,
+      details: { schoolId: id },
     });
     return NextResponse.json(allocations);
   } catch (error) {

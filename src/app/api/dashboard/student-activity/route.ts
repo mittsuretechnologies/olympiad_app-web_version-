@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // Combined "last active" view across every account type in this schema:
 //   - Student: registered through a school's Olympiad enrollment, logs in
@@ -17,7 +18,7 @@ import { requireRole } from '@/lib/auth-guard';
 // rather than hiding one of them. `accountKind` carries that split to the
 // client so it doesn't have to re-derive it from identifier shape.
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
 
   try {
@@ -112,6 +113,10 @@ export async function GET(request: Request) {
       return +new Date(b.createdAt) - +new Date(a.createdAt);
     });
 
+    // Student and AppUser ids together — the two are distinct rows here.
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'AppUser', subjectIds: rows.map(r => r.id), request,
+    });
     return NextResponse.json(rows);
   } catch (error) {
     console.error('student-activity GET error:', error);

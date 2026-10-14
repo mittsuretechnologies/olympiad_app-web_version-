@@ -3,18 +3,22 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 function generateEvaluatorId(): string {
   return `EVL${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const evaluators = await prisma.talentEvaluator.findMany({
       orderBy: { createdAt: 'desc' },
       select: { id: true, evaluatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true, assignedStates: true },
+    });
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'TalentEvaluator', subjectIds: evaluators.map((e) => e.id), request,
     });
     return NextResponse.json(
       evaluators.map((e) => ({ ...e, plainPassword: decryptPassword(e.plainPassword) }))

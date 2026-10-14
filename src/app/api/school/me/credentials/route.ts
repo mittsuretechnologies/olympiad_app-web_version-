@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // Passwords are never sent to the school panel — not even decrypted for display.
 // The list only says whether a password exists (`hasPassword`); the one time a
@@ -89,6 +90,10 @@ export async function GET(request: Request) {
       return { id: a.id, code: a.code, classCode: a.classCode, className: a.className, student: null };
     });
 
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'Student',
+      subjectIds: result.map(r => r.student?.id).filter(Boolean) as string[], request,
+    });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('GET school credentials failed:', error);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // GET /api/dashboard/account-deletion-requests
 // Every student account-deletion request — PENDING first (oldest first, so
@@ -9,7 +10,7 @@ import { requireRole } from '@/lib/auth-guard';
 // AppUser row entirely (see the [id] route), and this row cascades away
 // with it — there is nothing left to list.
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
 
   try {
@@ -26,6 +27,9 @@ export async function GET(request: Request) {
       },
     });
 
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'AppUser', subjectIds: requests.map(r => r.appUser.id), request,
+    });
     return NextResponse.json(requests.map(r => ({
       id:         r.id,
       status:     r.status,

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     // Video counts — web (studentId) + app (appUserId)
@@ -107,6 +108,9 @@ export async function GET(request: Request) {
         }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'Student', subjectIds: result.map((r) => r.id), request,
+    });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('GET credentials/registered-students failed:', error);

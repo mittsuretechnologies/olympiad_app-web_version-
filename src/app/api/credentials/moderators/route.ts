@@ -3,18 +3,22 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 function generateModeratorId(): string {
   return `MOD${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const moderators = await prisma.moderator.findMany({
       orderBy: { createdAt: 'desc' },
       select: { id: true, moderatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true, termsAccepted: true, termsAcceptedAt: true },
+    });
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'Moderator', subjectIds: moderators.map((m) => m.id), request,
     });
     return NextResponse.json(
       moderators.map((m) => ({ ...m, plainPassword: decryptPassword(m.plainPassword) }))

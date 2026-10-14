@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendEvaluatorCredentialsEmail } from '@/lib/mailer';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // POST /api/credentials/evaluators/:id/send — emails the evaluator their current
 // login credentials over SMTP (see src/lib/mailer.ts). Mirrors the school
@@ -11,7 +12,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const { id } = await params;
@@ -44,6 +45,10 @@ export async function POST(
       return NextResponse.json({ message: mailErr?.message || 'Failed to send email' }, { status: 502 });
     }
 
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_SENT', entityType: 'TalentEvaluator', subjectIds: [id], request,
+      details: { method: 'email', sentTo: evaluator.email },
+    });
     return NextResponse.json({ success: true, sentTo: evaluator.email });
   } catch (error) {
     console.error('POST credentials/evaluators/[id]/send failed:', error);

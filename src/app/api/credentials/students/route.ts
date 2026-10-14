@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const allocations = await prisma.olympiadIdAllocation.findMany({
@@ -80,6 +81,11 @@ export async function GET(request: Request) {
       return { id: a.id, code: a.code, school: a.school, student: null };
     });
 
+    // Student.id (web) or AppUser.id (app) of every registered student shown.
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'Student',
+      subjectIds: result.map((r) => r.student?.id).filter(Boolean) as string[], request,
+    });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('GET credentials/students failed:', error);

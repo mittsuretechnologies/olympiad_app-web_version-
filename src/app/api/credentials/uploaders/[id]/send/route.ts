@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendUploaderCredentialsEmail } from '@/lib/mailer';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // POST /api/credentials/uploaders/:id/send — emails the uploader's current
 // username + password. Uploader.plainPassword is only set after a reset (see
@@ -11,7 +12,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const { id } = await params;
@@ -43,6 +44,10 @@ export async function POST(
       return NextResponse.json({ message: mailErr?.message || 'Failed to send email' }, { status: 502 });
     }
 
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_SENT', entityType: 'Uploader', subjectIds: [id], request,
+      details: { method: 'email', sentTo: uploader.email },
+    });
     return NextResponse.json({ success: true, sentTo: uploader.email });
   } catch (error) {
     console.error('POST credentials/uploaders/[id]/send failed:', error);

@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const schools = await prisma.school.findMany({
@@ -22,6 +23,9 @@ export async function GET(request: Request) {
       updatedAt: s.updatedAt,
       createdAt: s.createdAt,
     }));
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'School', subjectIds: schools.map((s) => s.id), request,
+    });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('GET credentials/schools failed:', error);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // GET /api/school/me/student-requests
 // Every link request aimed at the logged-in school: PENDING ones awaiting a
@@ -58,6 +59,9 @@ export async function GET(request: Request) {
     );
     const previewBy = new Map(pending.map((r, i) => [r.appUser.id, previewLists[i]]));
 
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'AppUser', subjectIds: appUserIds, request,
+    });
     return NextResponse.json(requests.map(r => ({
       id:        r.id,
       status:    r.status,

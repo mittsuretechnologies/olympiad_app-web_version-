@@ -4,6 +4,7 @@ import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 import { sendCredentialsSms } from '@/lib/sms';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // POST /api/credentials/schools/:id/send — body: { method: 'sms' | 'email' }
 // Sends the school's current username + password via SMS or email.
@@ -13,7 +14,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const { id } = await params;
@@ -65,11 +66,12 @@ export async function POST(
       }
     }
 
-    return NextResponse.json({
-      success: true,
-      method,
-      sentTo: method === 'sms' ? school.phone : school.email,
+    const sentTo = method === 'sms' ? school.phone : school.email;
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_SENT', entityType: 'School', subjectIds: [id], request,
+      details: { method, sentTo },
     });
+    return NextResponse.json({ success: true, method, sentTo });
   } catch (error) {
     console.error('POST credentials/schools/[id]/send failed:', error);
     return NextResponse.json({ message: 'Failed to send credentials' }, { status: 500 });

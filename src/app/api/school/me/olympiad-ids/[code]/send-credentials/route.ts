@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { sendStudentCredentialsEmail } from '@/lib/mailer';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function POST(
   request: Request,
@@ -53,6 +54,10 @@ export async function POST(
       password: decryptPassword(appUser.plainPassword)!,
     });
 
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_SENT', entityType: 'AppUser', subjectIds: [appUser.id], request,
+      details: { method: 'email', sentTo: emailNormalized, olympiadCode: code },
+    });
     return NextResponse.json({ success: true, email: emailNormalized });
   } catch (error: any) {
     console.error('POST send-credentials failed:', error);

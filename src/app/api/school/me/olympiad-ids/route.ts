@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
   try {
@@ -47,6 +48,10 @@ export async function GET(request: Request) {
       appUserEmail: appUserByCode.get(a.code)?.email ?? null,
     }));
 
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'OlympiadIdAllocation',
+      subjectIds: result.filter(a => a.assignedName || a.student || a.hasAppUser).map(a => a.id), request,
+    });
     return NextResponse.json(result);
   } catch (error) {
     console.error('GET school olympiad-ids failed:', error);

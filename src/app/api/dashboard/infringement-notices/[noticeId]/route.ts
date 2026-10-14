@@ -17,6 +17,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ no
 
     if (status !== undefined) {
       if (!STATUSES.includes(status)) return NextResponse.json({ message: 'Invalid status' }, { status: 400 });
+      // A takedown under review is closed through the review actions, which also put the video back.
+      const open = await prisma.infringementNotice.findFirst({
+        where: { id: noticeId, disabledAt: { not: null }, reviewOutcome: null },
+        select: { id: true },
+      });
+      if (open && status !== 'CONTENT_REMOVED') {
+        return NextResponse.json(
+          { message: 'The video is disabled under this notice. Restore or remove it before changing the status.' },
+          { status: 409 },
+        );
+      }
       data.status = status;
       data.resolvedAt = status === 'PENDING' ? null : new Date();
     }

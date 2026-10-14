@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const users = await prisma.appUser.findMany({
@@ -21,6 +22,9 @@ export async function GET(request: Request) {
         plainPassword: true,
         createdAt: true,
       },
+    });
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'AppUser', subjectIds: users.map((u) => u.id), request,
     });
     return NextResponse.json(
       users.map((u) => ({ ...u, plainPassword: decryptPassword(u.plainPassword) }))
