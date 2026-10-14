@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, Menu, X,
-  ClipboardList, UserCheck, type LucideIcon,
+  ClipboardList, UserCheck, LifeBuoy, type LucideIcon,
 } from 'lucide-react';
 import { initialsOf } from './ui';
 import { jakarta } from './fonts';
@@ -40,7 +40,10 @@ const NAV: { label?: string; items: NavItem[] }[] = [
     ],
   },
   { label: 'School', items: [{ name: 'School Profile', href: '/school/profile', icon: School }] },
+  { label: 'Help', items: [{ name: 'Help & Support', href: '/school/support', icon: LifeBuoy }] },
 ];
+
+const SUPPORT_HREF = '/school/support';
 
 const isActive = (pathname: string, href: string) =>
   href === '/school' ? pathname === '/school' : pathname.startsWith(href);
@@ -73,6 +76,20 @@ export default function SchoolShell({
   }, [open]);
 
   const initials = initialsOf(user?.name || 'School');
+
+  // Badge on "Help & Support": requests with a team reply the school hasn't
+  // opened. Re-checked on every navigation so opening a reply clears it.
+  const [supportUnread, setSupportUnread] = useState(0);
+  useEffect(() => {
+    const token = sessionStorage.getItem('schoolToken');
+    if (!token) return;
+    let cancelled = false;
+    fetch('/api/school/me/support/unread-count', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (!cancelled && j) setSupportUnread(j.unread || 0); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pathname]);
 
   return (
     // The panel's own typeface: overriding --font-sans here makes every
@@ -167,6 +184,11 @@ export default function SchoolShell({
                       {active && <span aria-hidden="true" className="absolute -left-3 top-1/2 h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-[#1559C7]" />}
                       <Icon size={17} strokeWidth={active ? 2 : 1.75} className="flex-shrink-0" />
                       <span className="truncate">{item.name}</span>
+                      {item.href === SUPPORT_HREF && supportUnread > 0 && (
+                        <span className="ml-auto rounded-full bg-[#1559C7] px-1.5 py-[1px] text-[10.5px] font-semibold tabular-nums text-white" aria-label={`${supportUnread} new replies`}>
+                          {supportUnread}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

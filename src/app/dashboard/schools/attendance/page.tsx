@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import useSWR from 'swr';
 import {
   ClipboardCheck, Search, Loader2, Eye, Download, FileText,
-  CheckCircle2, Clock, AlertCircle, XCircle,
+  CheckCircle2, Clock, AlertCircle, XCircle, Unlock,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
@@ -305,7 +305,7 @@ function buildSchoolExcel(detail: SchoolDetail) {
 // ─── Component ──────────────────────────────────────────────────────────────
 
 export default function SchoolAttendancePage() {
-  const { data, isLoading } = useSWR<SchoolAttendanceRow[]>('/api/schools/attendance', fetcher);
+  const { data, isLoading, mutate } = useSWR<SchoolAttendanceRow[]>('/api/schools/attendance', fetcher);
   const rows: SchoolAttendanceRow[] = Array.isArray(data) ? data : [];
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -314,6 +314,7 @@ export default function SchoolAttendancePage() {
   const [viewSchoolId, setViewSchoolId] = useState<string | null>(null);
   const [detail, setDetail] = useState<SchoolDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [reopening, setReopening] = useState(false);
 
   const filtered = useMemo(() => {
     return rows.filter((r) => {
@@ -342,6 +343,33 @@ export default function SchoolAttendancePage() {
       setDetail(null);
     } finally {
       setDetailLoading(false);
+    }
+  };
+
+  // Undo a school's "Confirm & Send": attendance marks are kept, the school can
+  // edit them and its exam date again, and must submit once more.
+  const reopenAttendance = async () => {
+    if (!detail || !viewSchoolId) return;
+    const reason = window.prompt(
+      `Reopen attendance for ${detail.school.name}?\n\n` +
+      'Present/Absent marks will NOT be deleted. The school will be able to edit attendance and its exam date again, and must Confirm & Send once more.\n\n' +
+      'Reason for reopening (required):',
+    );
+    if (reason === null) return;
+    if (!reason.trim()) { alert('A reason is required to reopen attendance.'); return; }
+    setReopening(true);
+    try {
+      const res = await fetch(`/api/schools/${viewSchoolId}/attendance/reopen`, {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ reason }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok) { alert(json?.message || 'Failed to reopen attendance'); return; }
+      await openView(viewSchoolId);
+      mutate();
+    } finally {
+      setReopening(false);
     }
   };
 
@@ -505,6 +533,16 @@ export default function SchoolAttendancePage() {
             </DialogHeader>
             {detail && (
               <div className="flex gap-2">
+                {detail.school.attendanceSubmittedAt && (
+                  <button
+                    onClick={reopenAttendance}
+                    disabled={reopening}
+                    title="Unlock attendance and exam date for this school"
+                    className="inline-flex items-center gap-1.5 bg-[#FF9000] hover:bg-[#e68200] text-white px-3 py-1.5 text-xs font-semibold transition-colors disabled:opacity-50"
+                  >
+                    {reopening ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Unlock className="w-3.5 h-3.5" />} Reopen
+                  </button>
+                )}
                 <button
                   onClick={() => buildSchoolPDF(detail)}
                   className="inline-flex items-center gap-1.5 bg-white/15 hover:bg-white/25 text-white px-3 py-1.5 text-xs font-semibold transition-colors"

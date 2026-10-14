@@ -153,12 +153,12 @@ const ADMIN_LOGIN_URL = 'https://admin.mittmee.com/login';
 export interface SchoolCredentialsMail {
   to: string;
   schoolName: string;
-  schoolId: string;
   username: string;
   password: string;
-  contactPerson?: string | null;
 }
 
+// Only what the school needs to log in (username + password) — the internal
+// School ID is deliberately left out of the email.
 export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): Promise<void> {
   if (!isMailerConfigured()) {
     // Dev fallback so registration keeps working before SMTP is set up.
@@ -169,7 +169,9 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
     throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
   }
 
-  const greeting = data.contactPerson ? `Dear ${data.contactPerson},` : 'Dear Principal,';
+  // Addressed to the school itself, never to the coordinator/contact person
+  // on record — the credentials belong to the school.
+  const greeting = `Dear ${data.schoolName},`;
 
   const html = renderEmailShell({
     title: `School Registered — ${data.schoolName}`,
@@ -183,7 +185,6 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
 
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
              style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 16px;">
-        ${credentialRow('School ID', data.schoolId)}
         ${credentialRow('Username', data.username)}
         ${credentialRow('Password', data.password, true)}
       </table>
@@ -220,7 +221,7 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
     attachments: emailAttachments(),
     text:
       `${greeting}\n\n${data.schoolName} has been registered on Mittmee.\n\n` +
-      `School ID: ${data.schoolId}\nUsername: ${data.username}\nPassword: ${data.password}\n\n` +
+      `Username: ${data.username}\nPassword: ${data.password}\n\n` +
       `Login here: ${ADMIN_LOGIN_URL}\n\n` +
       `Please keep these credentials safe.\n\nRegards,\nTeam Mittsure`,
   });
@@ -823,5 +824,142 @@ export async function sendAgreementCopyEmail(data: AgreementCopyMail): Promise<v
       `The ${data.agreementTitle} has been accepted electronically on behalf of ${data.schoolName}.\n\n` +
       data.record.map(r => `${r.label}: ${r.value}`).join('\n') +
       `\n\nThe full text of the accepted Agreement is attached.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
+/* ── School Panel Help & Support ─────────────────────────────────────────── */
+
+/** Inbox the support team watches for new school requests and replies. */
+const SCHOOL_SUPPORT_EMAIL = process.env.SCHOOL_SUPPORT_EMAIL || process.env.SUPPORT_EMAIL || 'support@mittsure.com';
+
+/** Base URL of the web panels, for "open this request" links. Omitted when unset. */
+const PANEL_URL = (process.env.PANEL_URL || process.env.SERVER_URL || '').replace(/\/+$/, '');
+
+export interface SchoolSupportTeamMail {
+  event: 'NEW' | 'SCHOOL_REPLY';
+  ticketRef: string;
+  ticketId: string;
+  subject: string;
+  category: string;
+  priority: string;
+  schoolName: string;
+  schoolCode: string;
+  schoolEmail?: string | null;
+  contactName?: string | null;
+  contactPhone?: string | null;
+  message: string;
+  attachmentCount: number;
+}
+
+/**
+ * Tells the support inbox a school raised a request or replied on one. The
+ * school's email is set as Reply-To for a quick personal follow-up, but the
+ * answer the school sees in its panel has to be written on the dashboard.
+ */
+export async function sendSchoolSupportTeamEmail(data: SchoolSupportTeamMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(`[MAILER not configured] School support ${data.event} ${data.ticketRef} from ${data.schoolCode}`);
+    return;
+  }
+
+  const heading = data.event === 'NEW' ? 'New support request' : 'School replied';
+  const link = PANEL_URL ? `${PANEL_URL}/dashboard/school-support?ticket=${encodeURIComponent(data.ticketId)}` : null;
+  const rows: [string, string][] = [
+    ['Reference', data.ticketRef],
+    ['School', `${data.schoolName} (${data.schoolCode})`],
+    ['Category', data.category],
+    ['Priority', data.priority === 'URGENT' ? 'Urgent' : 'Normal'],
+    ...(data.contactName ? [['Contact person', data.contactName] as [string, string]] : []),
+    ...(data.contactPhone ? [['Contact phone', data.contactPhone] as [string, string]] : []),
+    ...(data.attachmentCount ? [['Attachments', `${data.attachmentCount} file(s) — open the request to view`] as [string, string]] : []),
+  ];
+
+  const html = renderEmailShell({
+    title: `${heading} — ${data.ticketRef}`,
+    body: `
+      <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">${escapeHtml(heading)}: ${escapeHtml(data.subject)}</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:12px 0 16px;">
+        ${rows.map(([k, v], i) => `<tr>
+          <td style="${i < rows.length - 1 ? 'border-bottom:1px solid #E4ECF7;' : ''}background:#F4F8FE;padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12px;font-weight:bold;color:#1552B6;white-space:nowrap;">${escapeHtml(k)}</td>
+          <td style="${i < rows.length - 1 ? 'border-bottom:1px solid #E4ECF7;' : ''}padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#0B2A5C;">${escapeHtml(v)}</td>
+        </tr>`).join('')}
+      </table>
+      <div style="border-left:3px solid #1552B6;background:#F4F8FE;border-radius:6px;padding:10px 14px;margin:0 0 16px;font-size:13.5px;color:#243244;white-space:pre-wrap;">${escapeHtml(data.message)}</div>
+      ${link ? `<p style="margin:0 0 12px;"><a href="${escapeHtml(link)}" style="color:#1552B6;font-weight:bold;">Open the request on the dashboard →</a></p>` : ''}
+      <p style="margin:0;font-size:12.5px;color:#5A6B80;">Reply from the dashboard so the school sees it in their panel.</p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: SCHOOL_SUPPORT_EMAIL,
+    ...(data.schoolEmail ? { replyTo: `${data.schoolName} <${data.schoolEmail}>` } : {}),
+    subject: `[${data.ticketRef}]${data.priority === 'URGENT' ? ' [URGENT]' : ''} ${heading}: ${data.subject} — ${data.schoolName}`,
+    html,
+    attachments: emailAttachments(),
+    text:
+      `${heading}: ${data.subject}\n\n` +
+      rows.map(([k, v]) => `${k}: ${v}`).join('\n') +
+      `\n\n${data.message}\n\n` +
+      (link ? `Open: ${link}\n` : '') +
+      `Reply from the dashboard so the school sees it in their panel.`,
+  });
+}
+
+export interface SchoolSupportSchoolMail {
+  event: 'RECEIVED' | 'TEAM_REPLY' | 'RESOLVED';
+  to: string;
+  schoolName: string;
+  ticketRef: string;
+  subject: string;
+  /** The team's reply, for TEAM_REPLY / RESOLVED-with-note. */
+  message?: string | null;
+}
+
+/** Keeps the school informed: request received, team replied, request resolved. */
+export async function sendSchoolSupportSchoolEmail(data: SchoolSupportSchoolMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    console.log(`[MAILER not configured] School support ${data.event} ${data.ticketRef} -> ${data.to}`);
+    return;
+  }
+
+  const link = PANEL_URL ? `${PANEL_URL}/school/support` : null;
+  const copy = {
+    RECEIVED: {
+      title: `We received your request ${data.ticketRef}`,
+      lead: `Thank you for contacting Mittmee support. We have received your request and our team will get back to you soon. Your reference number is:`,
+    },
+    TEAM_REPLY: {
+      title: `Reply on your request ${data.ticketRef}`,
+      lead: `Our support team has replied to your request:`,
+    },
+    RESOLVED: {
+      title: `Your request ${data.ticketRef} has been resolved`,
+      lead: `Our support team has marked your request as resolved. If the problem is not fixed, simply reply on the request from your School Panel and it will be reopened.`,
+    },
+  }[data.event];
+
+  const html = renderEmailShell({
+    title: copy.title,
+    body: `
+      <p style="margin:0 0 12px;">Dear ${escapeHtml(data.schoolName)},</p>
+      <p style="margin:0 0 12px;">${escapeHtml(copy.lead)}</p>
+      <p style="margin:0 0 12px;"><span style="font-family:Consolas,'Courier New',monospace;font-size:16px;font-weight:bold;color:#1552B6;">${escapeHtml(data.ticketRef)}</span>
+        &nbsp;·&nbsp; <b>${escapeHtml(data.subject)}</b></p>
+      ${data.message ? `<div style="border-left:3px solid #2E9E46;background:#F3FAF5;border-radius:6px;padding:10px 14px;margin:0 0 16px;font-size:13.5px;color:#243244;white-space:pre-wrap;">${escapeHtml(data.message)}</div>` : ''}
+      <p style="margin:0 0 12px;">You can view the full conversation and reply under <b>Help &amp; Support</b> in your School Panel${link ? ` — <a href="${escapeHtml(link)}" style="color:#1552B6;">open it here</a>` : ''}.</p>
+      <p style="margin:0;">Regards,<br>Team Mittsure</p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: `[${data.ticketRef}] ${copy.title.replace(` ${data.ticketRef}`, '')}: ${data.subject}`,
+    html,
+    attachments: emailAttachments(),
+    text:
+      `Dear ${data.schoolName},\n\n${copy.lead}\n\n${data.ticketRef} · ${data.subject}\n\n` +
+      (data.message ? `${data.message}\n\n` : '') +
+      `View the full conversation and reply under Help & Support in your School Panel${link ? `: ${link}` : ''}.\n\nRegards,\nTeam Mittsure`,
   });
 }

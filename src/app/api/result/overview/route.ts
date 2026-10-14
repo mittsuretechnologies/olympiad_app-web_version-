@@ -31,7 +31,7 @@ export async function GET(request: Request) {
             allocation: {
               select: {
                 classCode: true, className: true, assignedName: true,
-                school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true } },
+                school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true, examDate: true } },
               },
             },
           },
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
         where: { assignedAt: { not: null } },
         select: {
           code: true, classCode: true, className: true, assignedName: true,
-          school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true } },
+          school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true, examDate: true } },
         },
       }),
       prisma.student.findMany({
@@ -69,7 +69,7 @@ export async function GET(request: Request) {
           allocation: {
             select: {
               classCode: true, className: true, assignedName: true,
-              school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true } },
+              school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true, examDate: true } },
             },
           },
         },
@@ -101,6 +101,7 @@ export async function GET(request: Request) {
       state: string | null;
       district: string | null;
       city: string | null;
+      examDate: Date | null;
       source: 'web' | 'app';
       avatarUrl: string | null;
       videos: VideoEntry[];
@@ -122,6 +123,7 @@ export async function GET(request: Request) {
         state: s.allocation?.school?.state || null,
         district: s.allocation?.school?.district || null,
         city: s.allocation?.school?.city || null,
+        examDate: s.allocation?.school?.examDate ?? null,
         source: 'web',
         avatarUrl: null,
         videos: [],
@@ -140,6 +142,7 @@ export async function GET(request: Request) {
         state: alloc?.school?.state || null,
         district: alloc?.school?.district || null,
         city: alloc?.school?.city || null,
+        examDate: alloc?.school?.examDate ?? null,
         source: 'app',
         avatarUrl: u.avatarUrl || null,
         videos: [],
