@@ -91,6 +91,8 @@ async function notifyVideoStatus(
   } catch (error) {
     console.error('Failed to notify school of video status:', error);
   }
+}
+
 // An approved video can be pulled back (rejected) only while no evaluator has
 // scored it — see the un-approve guard in POST.
 const NOT_EVALUATED = { evaluations: { none: {} } };
