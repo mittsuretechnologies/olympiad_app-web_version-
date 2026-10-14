@@ -3,6 +3,8 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { stateNameToCode } from '@/lib/indianStateCodes';
 import { requireRole } from '@/lib/auth-guard';
+import { olympiadPrefixForCrm } from '@/lib/olympiadIdFormat';
+import { crmIdProblem } from '@/lib/schoolCrm';
 
 async function generateSchoolId(): Promise<string> {
   const last = await prisma.school.findFirst({
@@ -46,7 +48,23 @@ export async function POST(request: Request) {
     const created: Array<{ schoolId: string; name: string; username: string; password: string }> = [];
     const errors: Array<{ name: string; reason: string }> = [];
 
+    // CRM numbers already taken earlier in this same upload.
+    const crmsInBatch = new Set<string>();
+
     for (const school of validSchools) {
+      // The CRM number is the Olympiad ID prefix — it must be valid and unique.
+      const crmProblem = await crmIdProblem(String(school.olympiadId));
+      const prefix = olympiadPrefixForCrm(String(school.olympiadId));
+      if (crmProblem || !prefix) {
+        errors.push({ name: school.name, reason: crmProblem || 'Invalid CRM ID' });
+        continue;
+      }
+      if (crmsInBatch.has(prefix)) {
+        errors.push({ name: school.name, reason: `CRM ID "${school.olympiadId}" appears more than once in this file.` });
+        continue;
+      }
+      crmsInBatch.add(prefix);
+
       let attempts = 0;
       while (attempts < 3) {
         const schoolId = await generateSchoolId();

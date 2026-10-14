@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { crmIdProblem } from '@/lib/schoolCrm';
 
 export async function PUT(
   request: Request,
@@ -32,6 +33,12 @@ export async function PUT(
         { message: 'School name, CRM ID, State, and District are required' },
         { status: 400 }
       );
+    }
+
+    // The CRM number is the Olympiad ID prefix — keep it valid and unique.
+    const crmProblem = await crmIdProblem(olympiadId, id);
+    if (crmProblem) {
+      return NextResponse.json({ message: crmProblem }, { status: 400 });
     }
 
     const updated = await prisma.school.update({

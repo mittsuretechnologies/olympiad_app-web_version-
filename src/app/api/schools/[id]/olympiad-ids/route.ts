@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
+import { CLASS_CODE_BY_NAME } from '@/lib/classes';
+import { buildOlympiadCode, olympiadPrefixForCrm, OLYMPIAD_MAX_SEQUENCE } from '@/lib/olympiadIdFormat';
+import { crmIdProblem } from '@/lib/schoolCrm';
 
 export async function GET(
   request: Request,
@@ -37,33 +40,32 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { prefix, count, padding = 4, classes } = body as {
-      prefix?: string;
-      count?: number;
-      padding?: number;
-      classes?: { classCode?: string; className?: string; count: number }[];
-    };
+    // The ID format is fixed (see lib/olympiadIdFormat): the prefix comes from
+    // the CRM ID and each class code from the class name, so the client
+    // only says which classes and how many.
+    const { classes } = body as { classes?: { className?: string; count?: number }[] };
 
-    if (!prefix || !prefix.trim()) {
-      return NextResponse.json({ message: 'Prefix is required' }, { status: 400 });
+    if (!Array.isArray(classes) || classes.length === 0) {
+      return NextResponse.json({ message: 'Add at least one class' }, { status: 400 });
+    }
+    const rows: { className: string; classCode: string; count: number }[] = [];
+    for (const c of classes) {
+      const className = String(c?.className || '').trim();
+      const classCode = CLASS_CODE_BY_NAME[className];
+      if (!classCode) {
+        return NextResponse.json({ message: `Invalid class: ${className || '(empty)'}` }, { status: 400 });
+      }
+      const count = Number(c?.count);
+      if (!Number.isInteger(count) || count < 1) {
+        return NextResponse.json({ message: `Enter a valid count for ${className}` }, { status: 400 });
+      }
+      rows.push({ className, classCode, count });
     }
 
-    // Either a flat `count`, or a per-class breakdown (`classes`) — normalize
-    // both into one list of { classCode, className, count } rows.
-    const rows = Array.isArray(classes) && classes.length > 0
-      ? classes
-      : [{ classCode: undefined, className: undefined, count: count ?? 0 }];
-
-    const totalCount = rows.reduce((sum, r) => sum + (r.count || 0), 0);
-    if (!totalCount || totalCount < 1 || totalCount > 1000) {
+    const totalCount = rows.reduce((sum, r) => sum + r.count, 0);
+    if (totalCount > 1000) {
       return NextResponse.json(
         { message: 'Total count must be between 1 and 1000' },
-        { status: 400 }
-      );
-    }
-    if (rows.some((r) => !r.count || r.count < 1)) {
-      return NextResponse.json(
-        { message: 'Each class must have a count of at least 1' },
         { status: 400 }
       );
     }
@@ -73,36 +75,50 @@ export async function POST(
       return NextResponse.json({ message: 'School not found' }, { status: 404 });
     }
 
-    const cleanPrefix = prefix.trim();
-    const padLen = Math.max(padding, 1);
+    // A malformed CRM, or one shared with another school, would give IDs that
+    // are the wrong length or clash — fix the school's CRM ID first.
+    const crmProblem = await crmIdProblem(school.olympiadId, school.id);
+    if (crmProblem) {
+      return NextResponse.json(
+        { message: `${crmProblem} Correct the CRM ID before allocating Olympiad IDs.` },
+        { status: 400 }
+      );
+    }
+    const prefix = olympiadPrefixForCrm(school.olympiadId)!;
 
     const last = await prisma.olympiadIdAllocation.findFirst({
-      where: { schoolId: id, prefix: cleanPrefix },
+      where: { schoolId: id, prefix },
       orderBy: { sequence: 'desc' },
       select: { sequence: true },
     });
 
-    let seq = (last?.sequence ?? 0) + 1;
+    const firstSeq = (last?.sequence ?? 0) + 1;
+    if (firstSeq + totalCount - 1 > OLYMPIAD_MAX_SEQUENCE) {
+      return NextResponse.json(
+        { message: `This school can have at most ${OLYMPIAD_MAX_SEQUENCE} IDs; ${firstSeq - 1} already exist.` },
+        { status: 400 }
+      );
+    }
+
+    let seq = firstSeq;
     const allocations: {
       code: string;
       prefix: string;
       sequence: number;
       schoolId: string;
-      classCode?: string;
-      className?: string;
+      classCode: string;
+      className: string;
     }[] = [];
 
     for (const row of rows) {
-      const classCode = row.classCode?.trim() || undefined;
       for (let i = 0; i < row.count; i++) {
-        const code = `${cleanPrefix}${classCode ?? ''}${String(seq).padStart(padLen, '0')}`;
         allocations.push({
-          code,
-          prefix: cleanPrefix,
+          code: buildOlympiadCode(prefix, row.classCode, seq),
+          prefix,
           sequence: seq,
           schoolId: id,
-          classCode,
-          className: row.className?.trim() || undefined,
+          classCode: row.classCode,
+          className: row.className,
         });
         seq++;
       }
@@ -117,7 +133,7 @@ export async function POST(
     console.error('POST olympiad-ids failed:', error);
     if (error?.code === 'P2002') {
       return NextResponse.json(
-        { message: 'Duplicate ID detected. Try again or change prefix.' },
+        { message: 'Duplicate ID detected. Someone may have just allocated IDs for this school; refresh and try again.' },
         { status: 409 }
       );
     }
