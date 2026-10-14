@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     const cursor   = searchParams.get('cursor')   ?? undefined;
     const limit    = Math.min(parseInt(searchParams.get('limit') ?? '10'), 20);
     const category = searchParams.get('category') ?? undefined;
+    const subCategory = searchParams.get('subCategory') ?? undefined;
     const userId   = searchParams.get('userId')   ?? undefined;
     const seed     = searchParams.get('seed')     ?? undefined;
     const offset   = cursor ? Math.max(parseInt(cursor) || 0, 0) : 0;
@@ -71,7 +72,13 @@ export async function GET(request: NextRequest) {
       ...visWhere,
     };
 
-    if (category) where.category = { equals: category, mode: 'insensitive' };
+    // category may be a comma-separated list (e.g. the Olympiad and normal
+    // names of the same group); subCategory narrows it to one item.
+    if (category) {
+      const cats = category.split(',').map(c => c.trim()).filter(Boolean);
+      where.AND = ([] as any[]).concat(where.AND ?? [], { OR: cats.map(c => ({ category: { equals: c, mode: 'insensitive' } })) } as any);
+    }
+    if (subCategory) where.subCategory = { equals: subCategory, mode: 'insensitive' };
 
     // Resolve the viewer's own school/city/state, when there is one (Olympiad
     // accounts only — an olympiadId is what makes "their school" a meaningful

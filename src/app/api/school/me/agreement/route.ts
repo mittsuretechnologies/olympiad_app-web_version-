@@ -4,7 +4,9 @@ import { requireRole } from '@/lib/auth-guard';
 import {
   SCHOOL_AGREEMENT_KEY,
   SCHOOL_AGREEMENT_VERSION,
+  SCHOOL_AGREEMENT_TITLE,
   schoolAgreementDeclarations,
+  agreementPlainText,
 } from '@/lib/agreements/school-onboarding';
 import {
   clientIp,
@@ -15,7 +17,10 @@ import {
   ACCEPTED_VIA,
   schoolAgreementHash,
   userAgent,
+  agreementEmailHtml,
+  formatIst,
 } from '@/lib/agreements/server';
+import { sendAgreementCopyEmail } from '@/lib/mailer';
 
 export const dynamic = 'force-dynamic';
 
@@ -144,8 +149,41 @@ export async function POST(request: Request) {
       },
     });
 
-    // No automatic email: the copy of the agreement (Section 18.4) is not
-    // sent on acceptance or re-acceptance.
+    // Copy of the agreement + acceptance record to the school's registered
+    // email (Section 18.4), on acceptance and re-acceptance alike. A mail
+    // failure never undoes the acceptance — it is already recorded; the
+    // SuperAdmin Agreements page shows whether the copy went out.
+    const emailedTo: string[] = [];
+    const to = isEmail(school.email) ? school.email!.trim().toLowerCase() : null;
+    if (to) {
+      try {
+        await sendAgreementCopyEmail({
+          to: [to],
+          schoolName: school.name,
+          agreementTitle: SCHOOL_AGREEMENT_TITLE,
+          record: [
+            { label: 'School', value: `${school.name} (${school.schoolId})` },
+            { label: 'Accepted by', value: record.signatoryDesignation },
+            { label: 'Accepted at', value: formatIst(record.acceptedAt) },
+            { label: 'Agreement version', value: record.documentVersion },
+            { label: 'Verification', value: 'School admin account login' },
+            { label: 'IP address', value: record.ipAddress || '—' },
+            { label: 'Declarations', value: declarations.map((d, i) => `(${i + 1}) ${d}`).join('  ') },
+            { label: 'Document fingerprint (SHA-256)', value: record.documentHash },
+          ],
+          agreementHtml: agreementEmailHtml(),
+          agreementText: agreementPlainText(),
+          attachmentName: `${SCHOOL_AGREEMENT_TITLE} v${record.documentVersion} - ${school.schoolId}.txt`,
+        });
+        await prisma.agreementAcceptance.update({
+          where: { id: record.id },
+          data: { emailCopyTo: to, emailCopySentAt: new Date() },
+        });
+        emailedTo.push(to);
+      } catch (mailErr) {
+        console.error('Agreement copy email failed for school', school.schoolId, mailErr);
+      }
+    }
 
     return NextResponse.json({
       accepted: true,
@@ -157,7 +195,7 @@ export async function POST(request: Request) {
         documentVersion: record.documentVersion,
         ipAddress: record.ipAddress,
       },
-      emailedTo: [],
+      emailedTo,
     });
   } catch (err) {
     console.error('POST school/me/agreement failed:', err);

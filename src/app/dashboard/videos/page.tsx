@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { fetcher, getDashboardToken } from '@/lib/swr';
 import {
   Play, CheckCircle, XCircle, Clock, School,
-  Eye, Globe, Lock, Award, RefreshCw, Trash2,
+  Eye, Globe, Lock, Award, RefreshCw, Trash2, RotateCcw,
   Search, Filter, ChevronDown, X, Copy, Check,
 } from 'lucide-react';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
@@ -35,6 +35,8 @@ interface Video {
   claimedById?: string | null;
   claimedByName?: string | null;
   claimedAt?: string | null;
+  /** Jury evaluations recorded — an evaluated video can't be un-approved. */
+  _count?: { evaluations: number };
   appUser: { userId: string; email: string | null; mobile: string | null; olympiadId: string | null; assignedName: string | null; school: { name: string; city: string; district: string; state: string } | null } | null;
   student: {
     name: string;
@@ -43,6 +45,13 @@ interface Video {
       school: { name: string; city: string; district: string; state: string };
     };
   } | null;
+}
+
+// A video is a student's when it carries an Olympiad ID: either a Student row, or
+// an app account that holds one (that is how a video a school uploads on a
+// student's behalf is stored - under the student's own app account).
+function isStudentVideo(v: Pick<Video, 'uploaderType' | 'student' | 'appUser'>): boolean {
+  return v.uploaderType === 'STUDENT' || !!v.student || !!v.appUser?.olympiadId;
 }
 
 interface ApiResponse {
@@ -80,6 +89,12 @@ const TAB_CFG = {
 
 // ─── Helper ───────────────────────────────────────────────────────────────────
 
+// An approved video that a jury evaluator has already scored can't be pulled
+// back — the API refuses it too (see POST /api/dashboard/videos).
+function isEvaluated(video: { _count?: { evaluations: number } }) {
+  return (video._count?.evaluations ?? 0) > 0;
+}
+
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 }
@@ -105,6 +120,15 @@ function getCategoryLabel(cat: string) {
   return null;
 }
 
+// Videos uploaded under Learning / Parenting are shown on the app's home
+// Learning / Parenting rows once approved, so moderators get a distinct badge.
+function homeSectionBadge(category: string | null) {
+  const c = (category ?? '').trim().toLowerCase();
+  if (c === 'learning')  return { label: 'Learning Section',  card: 'text-white bg-blue-600',  modal: 'bg-blue-500 text-white' };
+  if (c === 'parenting') return { label: 'Parenting Section', card: 'text-white bg-pink-600',  modal: 'bg-pink-500 text-white' };
+  return null;
+}
+
 // Seeds the main-category dropdown. Older rows store the raw 'Cat A' / 'Cat B'
 // values instead of the display labels, and some have no usable category at all
 // — fall back to deriving it from the subcategory so the select is never blank.
@@ -112,6 +136,9 @@ function normalizeCat(video: { category: string | null; subCategory: string | nu
   const c = video.category;
   if (c === OLYMPIAD_CAT_A_LABEL || c === 'Cat A') return OLYMPIAD_CAT_A_LABEL;
   if (c === OLYMPIAD_CAT_B_LABEL || c === 'Cat B') return OLYMPIAD_CAT_B_LABEL;
+  // A school's own category: keep it, so the dropdown doesn't default to
+  // Talent Performance and re-file the video if a moderator touches it.
+  if (c === 'School Activity') return c;
   if (OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '')) return OLYMPIAD_CAT_B_LABEL;
   return OLYMPIAD_CAT_A_LABEL;
 }
@@ -153,6 +180,9 @@ export default function VideoModerationPage() {
   // Computed once on mount from sessionStorage — the signed-in role doesn't
   // change during the page's lifetime, so this doesn't need to be reactive.
   const [canDelete] = useState(isSuperAdmin);
+  // Approved → Rejected and Approved/Rejected → Pending are SuperAdmin-only
+  // overrides (enforced by the API too).
+  const [canUnapprove] = useState(isSuperAdmin);
   const [myId] = useState(myUserId);
 
   // ── Tab & Filters ─────────────────────────────────────────────────────────
@@ -181,6 +211,8 @@ export default function VideoModerationPage() {
   const [editedTags,   setEditedTags]   = useState<string[]>([]);
   const [tagInput,     setTagInput]     = useState('');
   const [savingTags,   setSavingTags]   = useState(false);
+  const [editedCaption, setEditedCaption] = useState('');
+  const [savingCaption, setSavingCaption] = useState(false);
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
   // Approval is gated behind picking a quality — see QUALITY_OPTIONS. Always
@@ -320,6 +352,7 @@ export default function VideoModerationPage() {
     setEditedCat(normalizeCat(video));
     setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null);
     setEditedTags(displayTags(video));
+    setEditedCaption(video.caption || '');
     setTagInput('');
   };
 
@@ -396,6 +429,29 @@ export default function VideoModerationPage() {
     } finally { setProcessingId(null); }
   };
 
+  // SuperAdmin override: send an approved/rejected video back to the Pending
+  // queue so it can be decided again. The API clears quality and reason.
+  const moveToPending = async (video: Video) => {
+    const from = video.status === 'APPROVED' ? 'approved' : 'rejected';
+    if (!confirm(`Move this ${from} video back to Pending? Its ${video.status === 'APPROVED' ? 'approval and quality' : 'rejection reason'} will be cleared and it will need to be reviewed again.`)) return;
+    setProcessingId(video.id);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify({ videoId: video.id, status: 'PENDING', expectedStatus: video.status }),
+      });
+      if (res.ok) {
+        mutate(cur => cur ? { ...cur, videos: cur.videos.filter(v => v.id !== video.id) } : cur, { revalidate: false });
+        setSelected(prev => { const n = new Set(prev); n.delete(video.id); return n; });
+        if (previewVideo?.id === video.id) setPreviewVideo(null);
+        mutate();
+      } else {
+        await handleConflict(res, video, 'Failed to move video to Pending');
+      }
+    } finally { setProcessingId(null); }
+  };
+
   // Tags-only save — works regardless of status (Pending/Approved/Rejected),
   // via the dedicated PATCH endpoint so it never touches moderation status.
   const saveTags = async (video: Video, tags: string[]) => {
@@ -420,6 +476,31 @@ export default function VideoModerationPage() {
         alert(body?.message || 'Failed to update tags');
       }
     } finally { setSavingTags(false); }
+  };
+
+  // Caption save — same status-independent PATCH endpoint as tags.
+  const saveCaption = async (video: Video) => {
+    setSavingCaption(true);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ videoId: video.id, caption: editedCaption }),
+      });
+      if (res.ok) {
+        const body = await res.json();
+        const newCaption: string = body.video?.caption || '';
+        mutate(cur => cur ? {
+          ...cur,
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, caption: newCaption } : v),
+        } : cur, { revalidate: false });
+        setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, caption: newCaption } : cur);
+        setEditedCaption(newCaption);
+      } else {
+        const body = await res.json().catch(() => null);
+        alert(body?.message || 'Failed to update caption');
+      }
+    } finally { setSavingCaption(false); }
   };
 
   const addTagFromInput = () => {
@@ -792,7 +873,7 @@ export default function VideoModerationPage() {
               const tagList   = displayTags(video);
               const isChecked = selected.has(video.id);
               const catBadge  = getCategoryLabel(video.subCategory);
-              const isStudent = video.uploaderType === 'STUDENT' || !!video.student;
+              const isStudent = isStudentVideo(video);
               const lockedBy  = claimedByOther(video) ? (video.claimedByName || 'Another moderator') : null;
 
               return (
@@ -845,6 +926,9 @@ export default function VideoModerationPage() {
                           <Award size={9} /> Olympiad
                         </span>
                       )}
+                      {(() => { const hb = homeSectionBadge(video.category); return hb ? (
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shadow ${hb.card}`}>{hb.label}</span>
+                      ) : null; })()}
                     </div>
 
                     {/* Bottom gradient + date */}
@@ -1005,6 +1089,20 @@ export default function VideoModerationPage() {
                             className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-50 text-[11px] font-bold transition-colors disabled:opacity-40">
                             <Eye size={12} /> Preview
                           </button>
+                          {canUnapprove && !video.deletedAt && (
+                            <button onClick={() => moveToPending(video)} disabled={busy || isEvaluated(video)}
+                              title={isEvaluated(video) ? 'Already evaluated by the jury — cannot be moved back' : 'Move back to Pending for re-review'}
+                              className="flex items-center gap-1 px-3 py-2 rounded-xl border border-amber-200 text-amber-600 hover:bg-amber-50 text-[11px] font-bold transition-colors disabled:opacity-40">
+                              <RotateCcw size={12} /> Pending
+                            </button>
+                          )}
+                          {filter === 'APPROVED' && canUnapprove && !video.deletedAt && (
+                            <button onClick={() => openRejectModal(video)} disabled={busy || isEvaluated(video)}
+                              title={isEvaluated(video) ? 'Already evaluated by the jury — cannot be rejected' : 'Reject this approved video'}
+                              className="flex items-center gap-1 px-3 py-2 rounded-xl border border-red-200 text-red-500 hover:bg-red-50 text-[11px] font-bold transition-colors disabled:opacity-40">
+                              <XCircle size={12} /> Reject
+                            </button>
+                          )}
                           {canDelete && (
                             <button onClick={() => openDeleteModal([video.id])} disabled={busy}
                               className="px-3 py-2 rounded-xl border border-red-200 text-red-400 hover:bg-red-50 transition-colors disabled:opacity-40">
@@ -1088,6 +1186,9 @@ export default function VideoModerationPage() {
                       <Award size={10} /> Olympiad
                     </span>
                   )}
+                  {(() => { const hb = homeSectionBadge(previewVideo.category); return hb ? (
+                    <span className={`text-[10px] font-black px-2 py-1 rounded-full ${hb.modal}`}>{hb.label}</span>
+                  ) : null; })()}
                   {previewVideo.deletedAt && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-red-600 text-white px-2 py-1 rounded-full">
                       <Trash2 size={10} /> Deleted by user
@@ -1097,11 +1198,35 @@ export default function VideoModerationPage() {
                 <span className="text-[11px] text-white/30">{formatDate(previewVideo.createdAt)}</span>
               </div>
 
-              {/* Caption */}
-              {previewVideo.caption && (
+              {/* Caption — editable by moderators via the same status-independent
+                  PATCH endpoint as hashtags. */}
+              {previewVideo.deletedAt ? (previewVideo.caption && (
                 <p className="text-sm font-semibold text-white bg-white/10 rounded-xl px-3 py-2">
                   {previewVideo.caption}
                 </p>
+              )) : (
+                <div className="space-y-1.5">
+                  <textarea
+                    value={editedCaption}
+                    onChange={e => setEditedCaption(e.target.value)}
+                    maxLength={500}
+                    rows={2}
+                    placeholder="Add a caption…"
+                    className="w-full text-sm font-semibold text-white bg-white/10 border border-white/20 rounded-xl px-3 py-2 resize-none placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                  />
+                  {editedCaption.trim() !== (previewVideo.caption || '').trim() && (
+                    <div className="flex justify-end gap-1.5">
+                      <button type="button" onClick={() => setEditedCaption(previewVideo.caption || '')} disabled={savingCaption}
+                        className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[11px] font-bold hover:bg-white/15 disabled:opacity-30 transition-colors">
+                        Cancel
+                      </button>
+                      <button type="button" onClick={() => saveCaption(previewVideo)} disabled={savingCaption}
+                        className="px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white text-[11px] font-bold hover:bg-indigo-600 disabled:opacity-40 transition-colors whitespace-nowrap">
+                        {savingCaption ? 'Saving…' : 'Save Caption'}
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Hashtags — editable regardless of status/tab, via the tags-only
@@ -1196,7 +1321,7 @@ export default function VideoModerationPage() {
               {/* Student / uploader info */}
               <div className="flex items-center gap-3 bg-white/8 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.07)' }}>
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
-                  (previewVideo.uploaderType === 'STUDENT' || previewVideo.student)
+                  isStudentVideo(previewVideo)
                     ? 'bg-amber-400/20 text-amber-300'
                     : 'bg-blue-400/20 text-blue-300'
                 }`}>
@@ -1208,11 +1333,11 @@ export default function VideoModerationPage() {
                       {previewVideo.student?.name ?? previewVideo.appUser?.userId ?? '—'}
                     </p>
                     <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
-                      (previewVideo.uploaderType === 'STUDENT' || previewVideo.student)
+                      isStudentVideo(previewVideo)
                         ? 'bg-amber-400/20 text-amber-300'
                         : 'bg-blue-400/20 text-blue-300'
                     }`}>
-                      {(previewVideo.uploaderType === 'STUDENT' || previewVideo.student) ? '🎓 Student' : '📱 Viewer'}
+                      {previewVideo.uploaderType === 'SCHOOL_OWN' ? '🏫 School' : isStudentVideo(previewVideo) ? '🎓 Student' : '📱 Viewer'}
                     </span>
                   </div>
                   {previewVideo.student ? (
@@ -1279,6 +1404,20 @@ export default function VideoModerationPage() {
                     <CheckCircle size={14} /> {previewVideo.quality ? 'Save Category' : 'Set Quality & Save'}
                   </button>
                 )}
+                {filter !== 'PENDING' && canUnapprove && !previewVideo.deletedAt && (
+                  <button onClick={() => moveToPending(previewVideo)} disabled={processingId === previewVideo.id || isEvaluated(previewVideo)}
+                    title={isEvaluated(previewVideo) ? 'Already evaluated by the jury — cannot be moved back' : 'Move back to Pending for re-review'}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
+                    <RotateCcw size={14} /> Pending
+                  </button>
+                )}
+                {filter === 'APPROVED' && canUnapprove && !previewVideo.deletedAt && (
+                  <button onClick={() => openRejectModal(previewVideo)} disabled={processingId === previewVideo.id || isEvaluated(previewVideo)}
+                    title={isEvaluated(previewVideo) ? 'Already evaluated by the jury — cannot be rejected' : 'Reject this approved video'}
+                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
+                    <XCircle size={14} /> Reject
+                  </button>
+                )}
                 {canDelete && (
                   <button onClick={() => { setPreviewVideo(null); openDeleteModal([previewVideo.id]); }} disabled={processingId === previewVideo.id}
                     className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-red-400 rounded-xl font-black text-sm transition-colors disabled:opacity-40">
@@ -1301,7 +1440,9 @@ export default function VideoModerationPage() {
             <p className="text-[11px] text-gray-400 mb-3">
               {rejectModal.bulk
                 ? `All ${selectedIds.length} selected videos will be rejected with this reason.`
-                : 'The student will see this reason on their profile.'}
+                : rejectModal.video?.status === 'APPROVED'
+                  ? 'This video is already approved and live. Rejecting it takes it down and notifies the student with this reason.'
+                  : 'The student will see this reason on their profile.'}
             </p>
 
             {/* Quick-select templates */}

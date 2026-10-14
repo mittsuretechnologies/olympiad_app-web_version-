@@ -23,7 +23,6 @@ export async function GET(request: Request) {
       totalSchools,
       activeSchools,
       totalAllocatedIds,
-      totalRegisteredStudents,
       totalUploaders,
       totalAppUsers,
       pendingVideos,
@@ -33,7 +32,6 @@ export async function GET(request: Request) {
       prisma.school.count({ where: dateWhere }),
       prisma.school.count({ where: { isActive: true, ...dateWhere } }),
       prisma.olympiadIdAllocation.count({ where: dateWhere }),
-      prisma.student.count({ where: dateWhere }),
       prisma.uploader.count({ where: dateWhere }),
       prisma.appUser.count({ where: dateWhere }),
       // User-deleted videos are retained in the DB for audit visibility but are
@@ -44,55 +42,83 @@ export async function GET(request: Request) {
       prisma.video.count({ where: { status: 'REJECTED', deletedAt: null, ...dateWhere } }),
     ]);
 
-    const totalPendingRegistrations = totalAllocatedIds - totalRegisteredStudents;
+    // An Olympiad ID counts as "registered" when either a web Student or a
+    // verified mobile AppUser has claimed it — the same rule the school's own
+    // dashboard uses (api/school/me/stats). Students mostly sign up through the
+    // app, so counting the Student table alone reads as 0.
+    const [allocations, linkedAppUsers] = await Promise.all([
+      prisma.olympiadIdAllocation.findMany({
+        select: {
+          code: true,
+          assignedName: true,
+          assignedAt: true,
+          student: { select: { id: true, name: true, createdAt: true, lastLoginAt: true } },
+          school: { select: { id: true, name: true, schoolId: true, city: true, state: true } },
+        },
+      }),
+      prisma.appUser.findMany({
+        where: { olympiadId: { not: null }, isVerified: true },
+        select: { id: true, userId: true, olympiadId: true, createdAt: true, lastLoginAt: true },
+      }),
+    ]);
+    const appUserByCode = new Map(linkedAppUsers.map(u => [u.olympiadId as string, u]));
+
+    const inRange = (d: Date | null) => {
+      if (!createdAtRange) return true;
+      if (!d) return false;
+      if (createdAtRange.gte && d < createdAtRange.gte) return false;
+      if (createdAtRange.lte && d > createdAtRange.lte) return false;
+      return true;
+    };
+
+    // One registration per allocation; the web Student wins if both exist.
+    // Allotting an ID creates a pre-verified AppUser (api/school/me/olympiad-ids/allot),
+    // so "registered" only means the school handed out credentials — loggedIn
+    // (lastLoginAt stamped by the login routes) is what shows the student
+    // actually used them.
+    const registrations = allocations.flatMap(a => {
+      if (a.student) {
+        return [{ id: a.student.id, name: a.student.name, code: a.code, school: a.school, createdAt: a.student.createdAt, loggedIn: !!a.student.lastLoginAt }];
+      }
+      const u = appUserByCode.get(a.code);
+      return u ? [{ id: u.id, name: a.assignedName || u.userId, code: a.code, school: a.school, createdAt: u.createdAt, loggedIn: !!u.lastLoginAt }] : [];
+    });
+
+    const registeredInRange = registrations.filter(r => inRange(r.createdAt));
+    const totalRegisteredStudents = registeredInRange.length;
+    const registeredLoggedIn = registeredInRange.filter(r => r.loggedIn).length;
+    const registeredNotLoggedIn = totalRegisteredStudents - registeredLoggedIn;
+    const schoolsWithRegistrations = new Set(registeredInRange.map(r => r.school.id)).size;
+
+    // IDs a school has put a student's name against (Olympiad IDs page → assign).
+    const mappedInRange = allocations.filter(a => a.assignedName?.trim() && inRange(a.assignedAt));
+    const totalMappedIds = mappedInRange.length;
+    const schoolsMapping = new Set(mappedInRange.map(a => a.school.id)).size;
+
+    const totalPendingRegistrations = Math.max(totalAllocatedIds - totalRegisteredStudents, 0);
     const registrationRate = totalAllocatedIds > 0
       ? Math.round((totalRegisteredStudents / totalAllocatedIds) * 100)
       : 0;
 
     // Top schools by registered student count
-    const schools = await prisma.school.findMany({
-      select: {
-        id: true,
-        name: true,
-        schoolId: true,
-        city: true,
-        state: true,
-        olympiadIds: {
-          select: { id: true, student: { select: { id: true } } },
-        },
-      },
-    });
-
-    const topSchools = schools
-      .map(s => {
-        const allocated = s.olympiadIds.length;
-        const registered = s.olympiadIds.filter(a => a.student !== null).length;
-        return {
-          id: s.id,
-          name: s.name,
-          schoolId: s.schoolId,
-          city: s.city,
-          state: s.state,
-          allocated,
-          registered,
-          rate: allocated > 0 ? Math.round((registered / allocated) * 100) : 0,
-        };
-      })
+    const registeredCodes = new Set(registrations.map(r => r.code));
+    const schoolMap = new Map<string, { id: string; name: string; schoolId: string; city: string | null; state: string | null; allocated: number; registered: number }>();
+    for (const a of allocations) {
+      const entry = schoolMap.get(a.school.id) ?? { ...a.school, allocated: 0, registered: 0 };
+      entry.allocated += 1;
+      if (registeredCodes.has(a.code)) entry.registered += 1;
+      schoolMap.set(a.school.id, entry);
+    }
+    const topSchools = Array.from(schoolMap.values())
+      .filter(s => s.registered > 0)
+      .map(s => ({ ...s, rate: s.allocated > 0 ? Math.round((s.registered / s.allocated) * 100) : 0 }))
       .sort((a, b) => b.registered - a.registered)
       .slice(0, 5);
 
     // Recent student registrations across all schools
-    const recentStudents = await prisma.student.findMany({
-      orderBy: { createdAt: 'desc' },
-      take: 5,
-      select: {
-        id: true,
-        name: true,
-        olympiadCode: true,
-        createdAt: true,
-        allocation: { select: { school: { select: { name: true } } } },
-      },
-    });
+    const recentStudents = [...registrations]
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+      .slice(0, 5);
 
     // Recent video uploads across all sources
     const recentVideos = await prisma.video.findMany({
@@ -112,9 +138,9 @@ export async function GET(request: Request) {
     // Monthly trend for the current calendar year — schools, school
     // students, and app users registered per month, for the overview line chart.
     const yearStart = new Date(new Date().getFullYear(), 0, 1);
-    const [yearSchools, yearStudents, yearAppUsers] = await Promise.all([
+    const yearStudents = registrations.filter(r => r.createdAt >= yearStart);
+    const [yearSchools, yearAppUsers] = await Promise.all([
       prisma.school.findMany({ where: { createdAt: { gte: yearStart } }, select: { createdAt: true } }),
-      prisma.student.findMany({ where: { createdAt: { gte: yearStart } }, select: { createdAt: true } }),
       prisma.appUser.findMany({ where: { createdAt: { gte: yearStart } }, select: { createdAt: true } }),
     ]);
 
@@ -143,6 +169,11 @@ export async function GET(request: Request) {
         totalRegisteredStudents,
         totalPendingRegistrations,
         registrationRate,
+        schoolsWithRegistrations,
+        registeredLoggedIn,
+        registeredNotLoggedIn,
+        totalMappedIds,
+        schoolsMapping,
         totalUploaders,
         totalAppUsers,
         pendingVideos,
@@ -153,8 +184,8 @@ export async function GET(request: Request) {
       recentStudents: recentStudents.map(s => ({
         id: s.id,
         name: s.name,
-        olympiadCode: s.olympiadCode,
-        schoolName: s.allocation?.school?.name ?? '-',
+        olympiadCode: s.code,
+        schoolName: s.school.name,
         createdAt: s.createdAt.toISOString(),
       })),
       recentVideos: recentVideos.map(v => ({

@@ -21,6 +21,11 @@ interface Overview {
     totalRegisteredStudents: number;
     totalPendingRegistrations: number;
     registrationRate: number;
+    schoolsWithRegistrations: number;
+    registeredLoggedIn: number;
+    registeredNotLoggedIn: number;
+    totalMappedIds: number;
+    schoolsMapping: number;
     totalUploaders: number;
     totalAppUsers: number;
     pendingVideos: number;
@@ -321,6 +326,11 @@ function SuperAdminDashboard() {
       ['Registered Students', s?.totalRegisteredStudents ?? 0],
       ['Pending Registrations', s?.totalPendingRegistrations ?? 0],
       ['Registration Rate %', s?.registrationRate ?? 0],
+      ['Schools With Registrations', s?.schoolsWithRegistrations ?? 0],
+      ['Registered - Logged In On App', s?.registeredLoggedIn ?? 0],
+      ['Registered - Not Logged In Yet', s?.registeredNotLoggedIn ?? 0],
+      ['IDs Mapped To Students By Schools', s?.totalMappedIds ?? 0],
+      ['Schools That Mapped IDs', s?.schoolsMapping ?? 0],
       ['Uploaders', s?.totalUploaders ?? 0],
       ['App Users', s?.totalAppUsers ?? 0],
       ['Pending Videos', s?.pendingVideos ?? 0],
@@ -343,20 +353,26 @@ function SuperAdminDashboard() {
       pills: [
         { label: 'Active', value: s?.activeSchools ?? 0, tone: 'good' as const },
         { label: 'Inactive', value: (s?.totalSchools ?? 0) - (s?.activeSchools ?? 0), tone: 'warning' as const },
+        { label: 'Mapping started', value: s?.schoolsMapping ?? 0, tone: 'default' as const },
       ],
     },
     {
       label: 'Allocated IDs', icon: Hash, iconBg: 'bg-indigo-50', iconColor: 'text-indigo-600',
       value: s?.totalAllocatedIds ?? 0, href: '/dashboard/credentials/students',
       pills: [
-        { label: 'Registered', value: s?.totalRegisteredStudents ?? 0, tone: 'good' as const },
-        { label: 'Pending', value: s?.totalPendingRegistrations ?? 0, tone: 'warning' as const },
+        { label: 'Mapped by schools', value: s?.totalMappedIds ?? 0, tone: 'good' as const },
+        { label: 'Unmapped', value: Math.max((s?.totalAllocatedIds ?? 0) - (s?.totalMappedIds ?? 0), 0), tone: 'warning' as const },
       ],
     },
     {
       label: 'Registered Students', icon: CheckCircle2, iconBg: 'bg-emerald-50', iconColor: 'text-emerald-600',
       value: s?.totalRegisteredStudents ?? 0, href: '/dashboard/credentials/registered-students',
-      pills: [{ label: 'Reg. rate', value: `${s?.registrationRate ?? 0}%`, tone: 'default' as const }],
+      pills: [
+        { label: 'Logged in on app', value: s?.registeredLoggedIn ?? 0, tone: 'good' as const },
+        { label: 'Not logged in', value: s?.registeredNotLoggedIn ?? 0, tone: 'warning' as const },
+        { label: 'Reg. rate', value: `${s?.registrationRate ?? 0}%`, tone: 'default' as const },
+        { label: 'Schools', value: s?.schoolsWithRegistrations ?? 0, tone: 'default' as const },
+      ],
     },
     {
       label: 'Uploaders', icon: UploadCloud, iconBg: 'bg-purple-50', iconColor: 'text-purple-600',

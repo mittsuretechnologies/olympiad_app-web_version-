@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
 import { getJwtSecret } from '@/lib/jwt-secret';
@@ -141,6 +142,11 @@ export async function POST(request: Request) {
 
     // Username from the child's name, or the parent's when no child name was
     // given — like Olympiad accounts, which use the student's name.
+    // The username is built from these names, so an abusive one would become
+    // an abusive username.
+    if (containsAbuse(childName) || containsAbuse(guardianName)) {
+      return NextResponse.json({ message: ABUSIVE_MESSAGES.name }, { status: 422 });
+    }
     const userId = await generateUserId(childName || guardianName);
     const passwordHash = await bcrypt.hash(password, 10);
 

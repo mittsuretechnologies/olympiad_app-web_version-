@@ -46,10 +46,8 @@ export async function POST(
         await sendSchoolCredentialsEmail({
           to: school.email!,
           schoolName: school.name,
-          schoolId: school.schoolId,
           username: school.username,
           password: decryptPassword(school.plainPassword)!,
-          contactPerson: school.contactPerson,
         });
       } catch (mailErr: any) {
         console.error(`Credentials email to ${school.email} failed:`, mailErr);

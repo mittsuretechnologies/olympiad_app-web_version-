@@ -18,6 +18,7 @@ export async function GET(request: Request) {
         olympiadId: true,
         isVerified: true,
         termsAccepted: true,
+        accountType: true,
         plainPassword: true,
         createdAt: true,
       },

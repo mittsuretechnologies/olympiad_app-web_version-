@@ -41,11 +41,20 @@ export async function visibilityWhere(viewerId: string | null): Promise<object> 
   // yet, only hidden — see AppUser.deletionRequestedAt). Blocked
   // unconditionally, unlike private accounts: there's no "owner" exception
   // because the owner is logged out the moment deletion is requested.
-  const [privateUsers, pendingDeletionUsers] = await Promise.all([
+  // A General School the Super Admin switched off is hidden the same way: its
+  // videos disappear from every feed/search/profile until it is re-enabled.
+  const [privateUsers, pendingDeletionUsers, inactiveSchools, inactiveOlympiadSchools] = await Promise.all([
     prisma.appUser.findMany({ where: { isPrivate: true }, select: { id: true } }),
     prisma.appUser.findMany({ where: { deletionRequestedAt: { not: null } }, select: { id: true } }),
+    prisma.generalSchool.findMany({ where: { isActive: false }, select: { appUserId: true } }),
+    // An Olympiad school's own app account (its own videos) - same rule.
+    prisma.appUser.findMany({ where: { schoolRef: { isActive: false } }, select: { id: true } }),
   ]);
-  const pendingDeletionIds = pendingDeletionUsers.map(u => u.id);
+  const pendingDeletionIds = [
+    ...pendingDeletionUsers.map(u => u.id),
+    ...inactiveSchools.map(s => s.appUserId),
+    ...inactiveOlympiadSchools.map(u => u.id),
+  ];
 
   if (privateUsers.length === 0) {
     if (pendingDeletionIds.length === 0) {

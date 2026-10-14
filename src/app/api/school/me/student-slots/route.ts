@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import jwt from 'jsonwebtoken';
-import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { resolveSchoolStudent, slotsForStudent, computeOlympiadSlots } from '@/lib/olympiadSlots';
 
+// GET /api/school/me/student-slots?studentId=<Student.id or AppUser.id>
+// Which Olympiad categories this student has already used. Same rule (and the
+// same code) as the student's own app, so the school, the web and the student
+// always agree. Used by the web upload page and the mobile app.
 export async function GET(request: Request) {
   try {
     const auth = request.headers.get('authorization') || '';
@@ -19,62 +22,27 @@ export async function GET(request: Request) {
     const studentId = searchParams.get('studentId');
     if (!studentId) return NextResponse.json({ message: 'studentId required' }, { status: 400 });
 
-    const emptySlots = { slotA: false, slotB: false, rejectedA: false, rejectedB: false, approvedCount: 0 };
-
-    // Determine if web student or app user (use findFirst to avoid UUID format crash)
-    const webStudent = await prisma.student.findFirst({
-      where: { id: studentId },
-      select: { id: true, allocation: { select: { schoolId: true } } },
-    });
-
-    let where: any;
-    if (webStudent) {
-      if (webStudent.allocation?.schoolId !== payload.id)
-        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-      where = { studentId };
-    } else {
-      const appUser = await prisma.appUser.findFirst({
-        where: { id: studentId },
-        select: { olympiadId: true },
+    const student = await resolveSchoolStudent(payload.id, studentId);
+    // Not this school's student (or an assigned-only ID with no account yet).
+    if (!student) {
+      return NextResponse.json({ message: 'Student not found for this school' }, { status: 404 });
+    }
+    if (!student.studentRowId && !student.appUserId) {
+      return NextResponse.json({
+        ...computeOlympiadSlots([]),
+        name: student.name, olympiadCode: student.olympiadCode,
+        classCode: student.classCode, className: student.className,
       });
-      // studentId might be an olympiadCode (assigned-only, no web/app user yet) — return empty slots
-      if (!appUser?.olympiadId) {
-        return NextResponse.json(emptySlots);
-      }
-
-      const alloc = await prisma.olympiadIdAllocation.findUnique({
-        where: { code: appUser.olympiadId },
-        select: { schoolId: true },
-      });
-      if (alloc?.schoolId !== payload.id)
-        return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-      where = { appUserId: studentId };
     }
 
-    // Fetch evaluation videos for this student
-    const evalVideos = await prisma.video.findMany({
-      where: { ...where, isEvaluation: true, deletedAt: null },
-      select: { category: true, status: true },
+    const slots = await slotsForStudent(student);
+    return NextResponse.json({
+      ...slots,
+      name: student.name,
+      olympiadCode: student.olympiadCode,
+      classCode: student.classCode,
+      className: student.className,
     });
-
-    // Cat A slot (matches current label, plus legacy 'Cat A' values from older records)
-    const catAVideos = evalVideos.filter(v =>
-      v.category === OLYMPIAD_CAT_A_LABEL ||
-      v.category === 'Cat A'
-    );
-    const catBVideos = evalVideos.filter(v =>
-      v.category === OLYMPIAD_CAT_B_LABEL ||
-      v.category === 'Cat B'
-    );
-
-    const slotA = catAVideos.some(v => v.status === 'PENDING' || v.status === 'APPROVED');
-    const slotB = catBVideos.some(v => v.status === 'PENDING' || v.status === 'APPROVED');
-    const rejectedA = catAVideos.some(v => v.status === 'REJECTED') && !slotA;
-    const rejectedB = catBVideos.some(v => v.status === 'REJECTED') && !slotB;
-
-    const approvedCount = evalVideos.filter(v => v.status === 'APPROVED').length;
-
-    return NextResponse.json({ slotA, slotB, rejectedA, rejectedB, approvedCount });
   } catch (error: any) {
     return NextResponse.json({ message: error.message }, { status: 500 });
   }

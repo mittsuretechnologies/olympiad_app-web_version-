@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
-import { verify } from 'jsonwebtoken';
+import { verify, sign } from 'jsonwebtoken';
 import { getPresignedUploadUrl, s3PublicUrl, s3Enabled, videoContentType } from '@/lib/s3';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { localUploadsAllowed, localMediaUrl } from '@/lib/localUploads';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -26,7 +27,11 @@ export async function POST(request: Request) {
   if (!appUser) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  if (!s3Enabled()) {
+  // Without S3 credentials the only option is the local-development fallback
+  // below. It is never available in production, where a missing bucket is a
+  // real misconfiguration that must stay an error.
+  const useLocal = !s3Enabled() && localUploadsAllowed();
+  if (!s3Enabled() && !useLocal) {
     return NextResponse.json({ error: 'Direct upload is not configured on this server.' }, { status: 500 });
   }
 
@@ -37,6 +42,22 @@ export async function POST(request: Request) {
     const fileName = `${Date.now()}_${appUser.id.slice(0, 8)}.${safeExt}`;
     const key = `uploads/app-videos/${appUser.id}/${fileName}`;
     const contentType = videoContentType(safeExt);
+
+    if (useLocal) {
+      // The app PUTs the bytes to this server instead of S3. The PUT carries no
+      // Authorization header (it is made exactly like the S3 one), so the URL
+      // itself carries a short-lived signed token naming the one key it may write.
+      const putToken = sign({ key, uid: appUser.id, purpose: 'local-put' }, JWT_SECRET, { expiresIn: '10m' });
+      // Use the address the app actually reached us on (Host header), not
+      // request.url: in dev Next reports that as "localhost:3000", which an
+      // emulator/phone can't reach, so the video PUT failed with "Network
+      // request failed". Emulator -> 10.0.2.2:3000, phone -> the PC's LAN IP.
+      const host  = request.headers.get('x-forwarded-host') || request.headers.get('host');
+      const proto = request.headers.get('x-forwarded-proto') || new URL(request.url).protocol.replace(':', '');
+      const origin = host ? `${proto}://${host}` : new URL(request.url).origin;
+      const uploadUrl = `${origin}/api/app/upload-video/local-put?token=${encodeURIComponent(putToken)}`;
+      return NextResponse.json({ uploadUrl, key, contentType, videoUrl: localMediaUrl(key), local: true }, { status: 200 });
+    }
 
     const uploadUrl = await getPresignedUploadUrl(key, contentType);
 
