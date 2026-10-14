@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { requireRole } from '@/lib/auth-guard';
 import { STATES } from '@/lib/locations';
 import { currentGeneralSchoolAcceptance, getGeneralSchoolForUser } from '@/lib/generalSchool';
@@ -46,11 +47,13 @@ export async function PATCH(request: Request) {
       if (name.length < 3 || name.length > 120) {
         return NextResponse.json({ message: 'Enter the full school name (3 to 120 characters)' }, { status: 400 });
       }
+      if (containsAbuse(name)) return NextResponse.json({ message: ABUSIVE_MESSAGES.name }, { status: 422 });
       data.name = name;
     }
     for (const key of ['contactPerson', 'city', 'address'] as const) {
       if (body[key] !== undefined) {
         const v = String(body[key] ?? '').trim();
+        if (containsAbuse(v)) return NextResponse.json({ message: ABUSIVE_MESSAGES.name }, { status: 422 });
         data[key] = v ? v.slice(0, key === 'address' ? 300 : 100) : null;
       }
     }

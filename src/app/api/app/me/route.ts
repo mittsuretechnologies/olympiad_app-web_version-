@@ -57,14 +57,14 @@ export async function GET(request: Request) {
     // is current. A school the Super Admin switched off is logged out here -
     // the app calls /me on launch and on every foreground, and treats 401 as
     // "this session is no longer valid".
-    let schoolProfile: { kind: 'GENERAL' | 'OLYMPIAD'; id: string; name: string; state: string | null; district: string | null; city: string | null; agreementAccepted: boolean } | null = null;
+    let schoolProfile: { kind: 'GENERAL' | 'OLYMPIAD'; id: string; name: string; state: string | null; district: string | null; city: string | null; agreementAccepted: boolean; email?: string | null; mobile?: string | null } | null = null;
     // Olympiad school: a fresh school token on every call, so the app's copy
     // (used for the school-only routes) never goes stale.
     let schoolToken: string | null = null;
     if (user.schoolRefId) {
       const os = await prisma.school.findUnique({
         where:  { id: user.schoolRefId },
-        select: { id: true, schoolId: true, name: true, state: true, district: true, city: true, isActive: true },
+        select: { id: true, schoolId: true, name: true, state: true, district: true, city: true, isActive: true, email: true, phone: true },
       });
       if (!os || !os.isActive) {
         return NextResponse.json({ message: 'Your school account has been deactivated.' }, { status: 401 });
@@ -73,6 +73,10 @@ export async function GET(request: Request) {
       schoolProfile = {
         kind: 'OLYMPIAD', id: os.id, name: os.name, state: os.state, district: os.district, city: os.city,
         agreementAccepted: Boolean(acceptance),
+        // The app account itself carries no email or mobile (so forgot-password
+        // can never match it); the school's own contact details are shown
+        // read-only from the school record instead.
+        email: os.email, mobile: os.phone,
       };
       schoolToken = signSchoolToken(os);
     } else if (user.accountType === 'SCHOOL') {

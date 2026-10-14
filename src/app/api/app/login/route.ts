@@ -80,16 +80,17 @@ export async function POST(request: Request) {
     let olympiadSchool = null as null | {
       id: string; schoolId: string; name: string; username: string | null;
       state: string | null; district: string | null; isActive: boolean; password: string | null;
+      email: string | null; phone: string | null;
     };
     if (user?.schoolRefId) {
       olympiadSchool = await prisma.school.findUnique({
         where: { id: user.schoolRefId },
-        select: { id: true, schoolId: true, name: true, username: true, state: true, district: true, isActive: true, password: true },
+        select: { id: true, schoolId: true, name: true, username: true, state: true, district: true, isActive: true, password: true, email: true, phone: true },
       });
     } else if (!user) {
       olympiadSchool = await prisma.school.findFirst({
         where: { username: { equals: typed, mode: 'insensitive' } },
-        select: { id: true, schoolId: true, name: true, username: true, state: true, district: true, isActive: true, password: true },
+        select: { id: true, schoolId: true, name: true, username: true, state: true, district: true, isActive: true, password: true, email: true, phone: true },
       });
     }
 
@@ -134,6 +135,7 @@ export async function POST(request: Request) {
             kind: 'OLYMPIAD',
             id: olympiadSchool.id, name: olympiadSchool.name,
             state: olympiadSchool.state, district: olympiadSchool.district,
+            email: olympiadSchool.email, mobile: olympiadSchool.phone,
             agreementAccepted: Boolean(accepted),
           },
         },
