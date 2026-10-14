@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
@@ -60,6 +61,9 @@ export async function GET(request: Request) {
       },
     }));
 
+    await recordAccessLog(admin, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'AppUser', subjectIds: result.map(t => t.user.id), request,
+    });
     return NextResponse.json({ counts: { OPEN: openCount, RESOLVED: resolvedCount }, tickets: result });
   } catch (error: any) {
     console.error('GET dashboard/support-tickets failed:', error);

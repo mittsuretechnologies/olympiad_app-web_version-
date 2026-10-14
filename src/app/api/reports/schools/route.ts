@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
@@ -73,6 +74,10 @@ export async function GET(request: Request) {
       };
     });
 
+    // Contact person's name, phone and email for each school.
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'School', subjectIds: result.map((s) => s.id), request,
+    });
     return NextResponse.json(result);
   } catch (error: any) {
     console.error('GET reports/schools failed:', error);

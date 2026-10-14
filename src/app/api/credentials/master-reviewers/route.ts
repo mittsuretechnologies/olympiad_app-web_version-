@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 function generateMasterReviewerId(): string {
   const num = Math.floor(1000 + Math.random() * 9000);
@@ -10,12 +11,15 @@ function generateMasterReviewerId(): string {
 }
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const masterReviewers = await prisma.masterReviewer.findMany({
       orderBy: { createdAt: 'desc' },
       select: { id: true, masterReviewerId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true },
+    });
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'MasterReviewer', subjectIds: masterReviewers.map((m) => m.id), request,
     });
     return NextResponse.json(
       masterReviewers.map((m) => ({ ...m, plainPassword: decryptPassword(m.plainPassword) }))

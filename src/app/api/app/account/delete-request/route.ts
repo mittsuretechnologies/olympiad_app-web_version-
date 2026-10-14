@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { verifyDeletionOtp } from '@/lib/deletionOtp';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -78,6 +79,19 @@ export async function POST(request: Request) {
       select: { olympiadId: true, deletionRequestedAt: true },
     });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+
+    // Every deletion is confirmed with the code from POST /delete-otp, sent to
+    // the registered phone/email. App builds older than this send no body and
+    // get a clear "update the app" message rather than a silent bypass.
+    const body = await request.json().catch(() => ({}));
+    if (!body || !('otp' in body)) {
+      return NextResponse.json(
+        { error: 'Please update the Mittmee app to delete your account. Deletion now needs a verification code.' },
+        { status: 400 },
+      );
+    }
+    const check = await verifyDeletionOtp(appUser.id, body.otp);
+    if (!check.ok) return NextResponse.json({ error: check.message }, { status: check.status });
 
     const isStudent = !!user.olympiadId;
 

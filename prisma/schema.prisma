@@ -306,6 +306,7 @@ model Video {
   reelShares         ReelShare[]
   evaluations        VideoEvaluation[]
   reports            VideoReport[]
+  infringementNotices InfringementNotice[]
 
   @@index([studentId])
   @@index([appUserId])
@@ -538,6 +539,10 @@ model AppUser {
   // on the public profile — userId stays the display handle.
   guardianName           String?
   childName              String?
+  // The child's date of birth, collected at app sign-up. Date only (no time or
+  // timezone). Null for accounts created before this field existed and for
+  // school-provisioned Olympiad accounts.
+  dateOfBirth            DateTime?       @db.Date
   createdAt              DateTime        @default(now())
   updatedAt              DateTime        @updatedAt
   followers              Follow[]        @relation("UserFollowers")
@@ -735,7 +740,26 @@ model InfringementNotice {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
+  // The video the notice is about. Matched from videoLink on submission, or
+  // linked by hand on the Report Infringement page. Null until linked.
+  videoId          String?
+  video            Video?    @relation(fields: [videoId], references: [id], onDelete: SetNull)
+
+  // "Disable for copyright" (Infringement Policy 5–6): the video is set to
+  // COPYRIGHT_DISABLED and kept down for 21 days from the notice date
+  // (reviewDueAt), then restored, removed for good, or held for a court order.
+  disabledAt           DateTime?
+  disabledById         String?
+  disabledByName       String?
+  videoPrevStatus      String? // status to put back on restore (normally APPROVED)
+  reviewDueAt          DateTime?
+  reviewReminderSentAt DateTime?
+  reviewOutcome        String? // RESTORED | REMOVED_PERMANENTLY — null while the review is open
+  reviewedAt           DateTime?
+
   @@index([status])
+  @@index([videoId])
+  @@index([reviewDueAt])
   @@schema("public")
 }
 
@@ -777,6 +801,37 @@ model AgreementAcceptance {
   @@index([role, actorId, documentKey, documentVersion], map: "AgreementAcceptance_actor_doc_version_idx")
   @@index([role, documentKey, documentVersion], map: "AgreementAcceptance_role_doc_version_idx")
   @@index([acceptedAt])
+  @@schema("public")
+}
+
+// Consent record of an app user (Privacy Policy 3, Children's Privacy Policy
+// 3.3): one row per document agreed to, with its version, how and when — and
+// any withdrawal. Modelled on AgreementAcceptance, and like it deliberately
+// has no FK to AppUser: the evidence must outlive the account, so the handle
+// and consenting guardian are snapshotted onto the row. Rows are never
+// deleted; withdrawal only stamps withdrawnAt. See src/lib/consent.ts.
+model ConsentRecord {
+  id                  String    @id @default(uuid())
+  appUserId           String // AppUser.id
+  userHandle          String // AppUser.userId at consent
+  consentedByName     String? // parent/guardian who gave consent, when known
+  documentKey         String // e.g. TERMS_OF_USE, PRIVACY_POLICY (lib/consent.ts)
+  documentVersion     String // the document's "Last updated" date, e.g. "2026-10-01"
+  documentUrl         String?
+  method              String // SIGNUP_CHECKBOX | SIGNUP_IMPLIED | TERMS_GATE | LEGACY_BACKFILL
+  verificationChannel String? // SMS_OTP | EMAIL_OTP | PASSWORD_LOGIN
+  verificationTarget  String? // masked phone/email the OTP went to
+  ipAddress           String?
+  userAgent           String?
+  consentedAt         DateTime  @default(now())
+  withdrawnAt         DateTime?
+  withdrawnById       String? // SuperAdmin id who recorded the withdrawal
+  withdrawnByName     String?
+  withdrawalReason    String?
+
+  @@index([appUserId, documentKey])
+  @@index([documentKey, documentVersion])
+  @@index([consentedAt])
   @@schema("public")
 }
 

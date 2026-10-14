@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -86,7 +87,7 @@ export async function GET(request: NextRequest) {
       include: {
         sender:    { select: { id: true, userId: true, avatarUrl: true } },
         recipient: { select: { id: true, userId: true, avatarUrl: true } },
-        video:     { select: { id: true, thumbnailUrl: true, caption: true } },
+        video:     { select: { id: true, thumbnailUrl: true, caption: true, status: true } },
         // A share is a user reel (video) or a Learning / Parenting video.
         homeVideo: { select: { id: true, thumbnailUrl: true, title: true } },
       },
@@ -106,12 +107,14 @@ export async function GET(request: NextRequest) {
         if (!s) return null;
         const isSent    = s.senderId === userId;
         const otherUser = isSent ? s.recipient : s.sender;
+        // A copyright takedown shows its notice instead of the video's thumbnail and caption.
+        const removed   = s.video?.status === COPYRIGHT_DISABLED;
         return {
           otherId,
           otherName:       otherUser.userId,
           otherAvatar:     otherUser.avatarUrl ?? null,
-          lastReelThumb:   s.video?.thumbnailUrl ?? (s.homeVideo?.thumbnailUrl || null),
-          lastReelCaption: s.video?.caption ?? s.homeVideo?.title ?? null,
+          lastReelThumb:   removed ? null : s.video?.thumbnailUrl ?? (s.homeVideo?.thumbnailUrl || null),
+          lastReelCaption: removed ? COPYRIGHT_REMOVED_NOTICE : s.video?.caption ?? s.homeVideo?.title ?? null,
           sentAt:          s.sentAt.toISOString(),
           direction:       isSent ? 'sent' : 'received',
           hasUnread:       unreadSet.has(otherId),

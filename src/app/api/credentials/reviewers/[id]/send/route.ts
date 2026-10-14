@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { sendReviewerCredentialsEmail } from '@/lib/mailer';
 import { requireRole } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 // POST /api/credentials/reviewers/:id/send — emails the reviewer's current
 // reviewerId + password.
@@ -10,7 +11,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const { id } = await params;
@@ -38,6 +39,10 @@ export async function POST(
       return NextResponse.json({ message: mailErr?.message || 'Failed to send email' }, { status: 502 });
     }
 
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_SENT', entityType: 'Reviewer', subjectIds: [id], request,
+      details: { method: 'email', sentTo: reviewer.email },
+    });
     return NextResponse.json({ success: true, sentTo: reviewer.email });
   } catch (error) {
     console.error('POST credentials/reviewers/[id]/send failed:', error);

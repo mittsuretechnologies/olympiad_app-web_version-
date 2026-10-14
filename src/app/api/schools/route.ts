@@ -6,13 +6,17 @@ import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 import { stateNameToCode } from '@/lib/indianStateCodes';
 import { requireRole } from '@/lib/auth-guard';
 import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const schools = await prisma.school.findMany({
       orderBy: { createdAt: 'desc' },
+    });
+    await recordAccessLog(payload, {
+      action: 'CREDENTIALS_VIEWED', entityType: 'School', subjectIds: schools.map((s) => s.id), request,
     });
     return NextResponse.json(
       schools.map(({ password, ...s }) => ({ ...s, plainPassword: decryptPassword(s.plainPassword) }))

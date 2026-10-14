@@ -5,11 +5,26 @@ import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { encryptPassword } from '@/lib/password-crypto';
+import { recordConsent } from '@/lib/consent';
 
 const MAX_APP_OTP_ATTEMPTS = 5;
 
 function isEmail(val: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val);
+}
+
+// "YYYY-MM-DD" -> a Date for that calendar day (UTC midnight), or null when the
+// text is not a real date, is in the future, or is more than 100 years ago.
+function parseDateOfBirth(value: unknown): Date | null {
+  if (typeof value !== 'string') return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+  if (!m) return null;
+  const [y, mo, d] = [Number(m[1]), Number(m[2]), Number(m[3])];
+  const date = new Date(Date.UTC(y, mo - 1, d));
+  if (date.getUTCFullYear() !== y || date.getUTCMonth() !== mo - 1 || date.getUTCDate() !== d) return null;
+  const now = new Date();
+  if (date > now || y < now.getUTCFullYear() - 100) return null;
+  return date;
 }
 
 async function withStudentNames(accounts: { id: string; userId: string; olympiadId: string | null }[]) {
@@ -53,6 +68,7 @@ export async function POST(request: Request) {
     let guardianName: string | null = null;
     let childName: string | null = null;
     let signupEmail: string | null = null;
+    let dateOfBirth: Date | null = null;
     if (isDetailedSignup) {
       guardianName = typeof body.guardianName === 'string' ? body.guardianName.trim() : '';
       childName = typeof body.childName === 'string' && body.childName.trim() ? body.childName.trim() : null;
@@ -62,6 +78,15 @@ export async function POST(request: Request) {
       }
       if (!signupEmail || !isEmail(signupEmail)) {
         return NextResponse.json({ message: 'A valid email address is required' }, { status: 400 });
+      }
+      // Sent by app builds that have the date-of-birth field. Builds without
+      // it send no key at all and keep working; a key that is present must be
+      // a real date.
+      if ('dateOfBirth' in body) {
+        dateOfBirth = parseDateOfBirth(body.dateOfBirth);
+        if (!dateOfBirth) {
+          return NextResponse.json({ message: "A valid date of birth is required (child's date of birth)" }, { status: 400 });
+        }
       }
       // The OTP proves the phone number, so on this path it must be one.
       if (!mobile || !/^[6-9]\d{9}$/.test(mobile)) {
@@ -119,24 +144,39 @@ export async function POST(request: Request) {
     const userId = await generateUserId(childName || guardianName);
     const passwordHash = await bcrypt.hash(password, 10);
 
-    const user = await prisma.appUser.create({
-      data: {
-        userId,
-        // Detailed signup verifies the phone and also collects an email;
-        // the legacy single-field signup stores whichever contact was verified.
-        email: isDetailedSignup ? signupEmail : mobile ? null : id,
-        mobile,
-        guardianName,
-        childName,
-        password: passwordHash,
-        plainPassword: encryptPassword(password),
-        isVerified: true,
-        termsAccepted: true,
-        // When the user agreed to the Terms of Use & Policies — server time,
-        // since a device clock can be wrong or changed. Kept as the consent
-        // record (see Children's Privacy Policy 3.3).
-        termsAcceptedAt: new Date(),
-      },
+    // The account and its consent record commit together: no account without the record.
+    const user = await prisma.$transaction(async (tx) => {
+      const created = await tx.appUser.create({
+        data: {
+          userId,
+          // Detailed signup verifies the phone and also collects an email;
+          // the legacy single-field signup stores whichever contact was verified.
+          email: isDetailedSignup ? signupEmail : mobile ? null : id,
+          mobile,
+          guardianName,
+          childName,
+          dateOfBirth,
+          password: passwordHash,
+          plainPassword: encryptPassword(password),
+          isVerified: true,
+          termsAccepted: true,
+          // When the user agreed to the Terms of Use & Policies — server time,
+          // since a device clock can be wrong or changed. The full record
+          // (document, version, method) is in ConsentRecord.
+          termsAcceptedAt: new Date(),
+        },
+      });
+      await recordConsent({
+        appUserId: created.id,
+        userHandle: created.userId,
+        consentedByName: guardianName,
+        // Old builds send no checkbox value; the current one must send true (checked above).
+        method: body.termsAccepted === true ? 'SIGNUP_CHECKBOX' : 'SIGNUP_IMPLIED',
+        verificationChannel: mobile ? 'SMS_OTP' : 'EMAIL_OTP',
+        verificationTarget: lookupId,
+        request,
+      }, tx);
+      return created;
     });
 
     await prisma.appOtp.delete({ where: { identifier: lookupId } }).catch(() => {});

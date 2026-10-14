@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { encryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 function generatePassword(length = 10): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnpqrstuvwxyz';
@@ -15,7 +16,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const { id } = await params;
@@ -53,6 +54,7 @@ export async function POST(
       select: { id: true, uploaderId: true, name: true, username: true, updatedAt: true },
     });
 
+    await recordAccessLog(payload, { action: 'CREDENTIALS_RESET', entityType: 'Uploader', subjectIds: [id], request });
     return NextResponse.json({ ...updated, password: plainPassword, action: 'password' });
   } catch (error) {
     console.error('POST reset uploader failed:', error);

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
             isEvaluation: true,
             appUserId:    true,
             studentId:    true,
+            status:       true,
             student: {
               select: { id: true, name: true },
             },
@@ -108,7 +110,12 @@ export async function GET(request: NextRequest) {
       id:        s.id,
       sentAt:    s.sentAt.toISOString(),
       direction: s.senderId === userId ? 'sent' : 'received',
-      video: s.video
+      // Taken down for copyright: no video, and the notice the policy requires
+      // in its place. Older app builds show their "no longer available" text.
+      ...(s.video?.status === COPYRIGHT_DISABLED ? { removedNotice: COPYRIGHT_REMOVED_NOTICE } : {}),
+      video: s.video?.status === COPYRIGHT_DISABLED
+        ? null
+        : s.video
         ? {
             ...s.video,
             isLiked: likedIds.has(s.video.id),

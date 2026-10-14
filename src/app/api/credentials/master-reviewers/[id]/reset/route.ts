@@ -3,12 +3,13 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
 import { encryptPassword } from '@/lib/password-crypto';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const { id } = await params;
@@ -21,6 +22,7 @@ export async function POST(
       where: { id },
       data: { password: hash, plainPassword: encryptPassword(newPassword) },
     });
+    await recordAccessLog(payload, { action: 'CREDENTIALS_RESET', entityType: 'MasterReviewer', subjectIds: [id], request });
 
     return NextResponse.json({ success: true, plainPassword: newPassword });
   } catch (e: any) {

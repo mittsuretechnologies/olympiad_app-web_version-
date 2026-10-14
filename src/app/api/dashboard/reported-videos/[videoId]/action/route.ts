@@ -6,32 +6,17 @@ import { requireModule } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { createNotification } from '@/lib/notifications';
 import { sendVideoRemovedEmail } from '@/lib/mailer';
+import { findUploaderAppUser, videoLabel } from '@/lib/videoUploader';
 
 // Tells the uploader in-app and emails the parent/guardian at the account's
-// address. Web-portal student uploads carry studentId instead of appUserId, so
-// those reach the student's app account through its Olympiad code. Both
-// channels are best-effort: the removal has already happened.
+// address. Both channels are best-effort: the removal has already happened.
 async function notifyUploaderOfRemoval(video: {
   id: string; appUserId: string | null; studentId: string | null;
   caption: string | null; category: string | null; subCategory: string | null;
 }) {
-  const label = video.caption?.trim() || video.subCategory || video.category || 'your video';
+  const label = videoLabel(video);
 
-  let appUser = video.appUserId
-    ? await prisma.appUser.findUnique({
-        where: { id: video.appUserId },
-        select: { id: true, email: true, olympiadId: true, guardianName: true, childName: true },
-      })
-    : null;
-  if (!appUser && video.studentId) {
-    const student = await prisma.student.findUnique({ where: { id: video.studentId }, select: { olympiadCode: true } });
-    appUser = student
-      ? await prisma.appUser.findFirst({
-          where: { olympiadId: student.olympiadCode },
-          select: { id: true, email: true, olympiadId: true, guardianName: true, childName: true },
-        })
-      : null;
-  }
+  const appUser = await findUploaderAppUser(video);
   if (!appUser) return;
 
   await createNotification({

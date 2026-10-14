@@ -2,13 +2,17 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { requireRole } from '@/lib/auth-guard';
+import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
     const uploaders = await prisma.uploader.findMany({
       orderBy: { createdAt: 'desc' },
+    });
+    await recordAccessLog(payload, {
+      action: 'USER_DETAILS_VIEWED', entityType: 'Uploader', subjectIds: uploaders.map((u) => u.id), request,
     });
     return NextResponse.json(uploaders);
   } catch (error) {

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordConsent } from '@/lib/consent';
 
 // Terms & Conditions gate for AppUser accounts. Mirrors /api/staff/terms for
 // Moderator/Evaluator. General (non-Olympiad) signups already collect real
@@ -14,7 +15,7 @@ import { getJwtSecret } from '@/lib/jwt-secret';
 //
 // GET  -> whether the logged-in user still needs to accept.
 // POST -> record acceptance (id captured server-side from the JWT, not the
-//         client, so it can't be spoofed).
+//         client, so it can't be spoofed), with a ConsentRecord row per document.
 
 const JWT_SECRET = getJwtSecret();
 
@@ -51,10 +52,31 @@ export async function POST(request: Request) {
   const appUser = getAppUserFromToken(request);
   if (!appUser) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
 
-  const now = new Date();
-  await prisma.appUser.update({
+  const account = await prisma.appUser.findUnique({
     where: { id: appUser.id },
-    data: { termsAccepted: true, termsAcceptedAt: now },
+    select: { userId: true, guardianName: true, olympiadId: true },
+  });
+  if (!account) return NextResponse.json({ message: 'Account not found' }, { status: 404 });
+  // Olympiad accounts keep the parent/guardian on the school's ID allocation.
+  const allocation = account.olympiadId
+    ? await prisma.olympiadIdAllocation.findUnique({ where: { code: account.olympiadId }, select: { guardianName: true } })
+    : null;
+
+  const now = new Date();
+  await prisma.$transaction(async (tx) => {
+    await tx.appUser.update({
+      where: { id: appUser.id },
+      data: { termsAccepted: true, termsAcceptedAt: now },
+    });
+    await recordConsent({
+      appUserId: appUser.id,
+      userHandle: account.userId,
+      consentedByName: allocation?.guardianName || account.guardianName,
+      method: 'TERMS_GATE',
+      verificationChannel: 'PASSWORD_LOGIN',
+      verificationTarget: null,
+      request,
+    }, tx);
   });
 
   return NextResponse.json({ termsAccepted: true, termsAcceptedAt: now });

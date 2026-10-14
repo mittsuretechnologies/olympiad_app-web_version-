@@ -229,18 +229,39 @@ export async function sendSchoolCredentialsEmail(data: SchoolCredentialsMail): P
 export async function sendOtpEmail(
   to: string,
   otp: string,
-  purpose: 'signup' | 'reset' = 'signup'
+  purpose: 'signup' | 'reset' | 'delete' = 'signup'
 ): Promise<void> {
   if (!isMailerConfigured()) {
     console.log(`[MAILER not configured] OTP for ${to}: ${otp}`);
     throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
   }
 
-  const heading = purpose === 'reset' ? 'Mittmee — Password Reset Code' : 'Mittmee — Verification Code';
-  const line =
-    purpose === 'reset'
-      ? 'Use this code to reset the password of your Mittmee account:'
-      : 'Use this code to verify your email and create your Mittmee account:';
+  const copy = {
+    signup: {
+      heading: 'Mittmee — Verification Code',
+      line: 'Use this code to verify your email and create your Mittmee account:',
+      subject: `${otp} is your Mittmee verification code`,
+      text: `Your Mittmee verification code is ${otp}. It expires in 5 minutes.`,
+      ignore: "If you didn't request this, you can safely ignore this email.",
+    },
+    reset: {
+      heading: 'Mittmee — Password Reset Code',
+      line: 'Use this code to reset the password of your Mittmee account:',
+      subject: `${otp} is your Mittmee password reset code`,
+      text: `Use this code to reset the password of your Mittmee account: ${otp}. It expires in 5 minutes.`,
+      ignore: "If you didn't request this, you can safely ignore this email.",
+    },
+    // A deletion code is the one that matters if it was NOT the user: someone
+    // holding their session is trying to delete the account.
+    delete: {
+      heading: 'Mittmee — Account Deletion Code',
+      line: 'Use this code to confirm the request to delete your Mittmee account:',
+      subject: `${otp} is your Mittmee account deletion code`,
+      text: `Use this code to confirm deleting your Mittmee account: ${otp}. It expires in 5 minutes. If you did not ask to delete your account, do not share this code and change your password.`,
+      ignore: "If you didn't ask to delete your account, do not share this code with anyone and change your password. Your account will not be deleted without it.",
+    },
+  }[purpose];
+  const { heading, line } = copy;
 
   const html = `
   <div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;border:1px solid #e5e7eb">
@@ -253,7 +274,7 @@ export async function sendOtpEmail(
                 background:#f9fafb;border:1px solid #d1d5db;padding:14px 0;margin:18px 0;
                 font-family:Consolas,monospace;color:#06013E">${otp}</p>
       <p>This code expires in <b>5 minutes</b>.</p>
-      <p style="color:#6b7280;font-size:12px">If you didn't request this, you can safely ignore this email.</p>
+      <p style="color:#6b7280;font-size:12px">${copy.ignore}</p>
     </div>
     <div style="background:#f3f4f6;color:#6b7280;padding:12px 24px;font-size:11px">
       This is an automated email — please do not reply.
@@ -263,15 +284,9 @@ export async function sendOtpEmail(
   await getTransporter().sendMail({
     from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
     to,
-    subject:
-      purpose === 'reset'
-        ? `${otp} is your Mittmee password reset code`
-        : `${otp} is your Mittmee verification code`,
+    subject: copy.subject,
     html,
-    text:
-      purpose === 'reset'
-        ? `Use this code to reset the password of your Mittmee account: ${otp}. It expires in 5 minutes.`
-        : `Your Mittmee verification code is ${otp}. It expires in 5 minutes.`,
+    text: copy.text,
   });
 }
 
@@ -616,7 +631,7 @@ export async function sendVideoRemovedEmail(data: VideoRemovedMail): Promise<voi
 
 /* ── Infringement notices (public landing-page form) ─────────────────────── */
 
-const GRIEVANCE_EMAIL = process.env.GRIEVANCE_EMAIL || 'grievance@mittsure.com';
+export const GRIEVANCE_EMAIL = process.env.GRIEVANCE_EMAIL || 'grievance@mittsure.com';
 
 export interface InfringementNoticeMail {
   referenceId: string;
@@ -677,6 +692,102 @@ export async function sendInfringementAcknowledgementEmail(data: {
       `Dear ${data.name},\n\nWe have received your infringement notice.\nReference number: ${data.referenceId}\n\n` +
       `Our grievance team will review it and contact you at this email address. ` +
       `Please quote the reference number when writing to ${GRIEVANCE_EMAIL}.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
+/* ── Copyright takedown (Infringement Policy 5–6) ─────────────────────────── */
+
+export interface CopyrightTakedownMail {
+  to: string;
+  guardianName?: string | null;
+  childName?: string | null;
+  videoLabel: string;
+  referenceId: string;
+  reviewDate: string; // already formatted for display
+}
+
+// Addressed to the parent/guardian, like sendVideoRemovedEmail.
+export async function sendCopyrightTakedownEmail(data: CopyrightTakedownMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const greeting = data.guardianName ? `Dear ${data.guardianName},` : 'Dear Parent/Guardian,';
+  const whose = data.childName ? `${data.childName}'s video` : 'A video from your Mittmee account';
+
+  const html = renderEmailShell({
+    title: 'A video was removed following a copyright complaint',
+    body: `
+      <p style="margin:0 0 12px;">${escapeHtml(greeting)}</p>
+      <p style="margin:0 0 12px;">${escapeHtml(whose)}, <b>"${escapeHtml(data.videoLabel)}"</b>, has been removed from Mittmee following a copyright complaint
+        (reference <b>${escapeHtml(data.referenceId)}</b>).</p>
+      <p style="margin:0 0 12px;">Under our Infringement Policy the video stays unavailable until at least <b>${escapeHtml(data.reviewDate)}</b>, after which we will review it.</p>
+      <p style="margin:0 0 12px;">If you believe this is a mistake, or that you have the right to use the content, write to
+        <a href="mailto:${GRIEVANCE_EMAIL}" style="color:#1552B6;">${GRIEVANCE_EMAIL}</a> quoting the reference. We will share your response with the complainant
+        and take it into account at the review.</p>
+      <p style="margin:0;">Regards,<br>Team Mittsure</p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'A video was removed following a copyright complaint',
+    html,
+    attachments: emailAttachments(),
+    text:
+      `${greeting}\n\n${whose}, "${data.videoLabel}", has been removed from Mittmee following a copyright complaint ` +
+      `(reference ${data.referenceId}).\n\nUnder our Infringement Policy the video stays unavailable until at least ` +
+      `${data.reviewDate}, after which we will review it.\n\nIf you believe this is a mistake, or that you have the right ` +
+      `to use the content, write to ${GRIEVANCE_EMAIL} quoting the reference. We will share your response with the ` +
+      `complainant and take it into account at the review.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
+export interface CopyrightReviewReminderItem {
+  referenceId: string;
+  complainantName: string;
+  videoLabel: string;
+  reviewDate: string;
+  overdue: boolean;
+}
+
+// Daily digest to the grievance inbox of 21-day reviews that are due soon or overdue.
+export async function sendCopyrightReviewReminderEmail(items: CopyrightReviewReminderItem[], dashboardUrl: string): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const rows = items.map((i) =>
+    `<tr><td style="padding:6px 8px;border-bottom:1px solid #E3E8F0;font-family:Consolas,monospace;">${escapeHtml(i.referenceId)}</td>` +
+    `<td style="padding:6px 8px;border-bottom:1px solid #E3E8F0;">${escapeHtml(i.complainantName)}</td>` +
+    `<td style="padding:6px 8px;border-bottom:1px solid #E3E8F0;">${escapeHtml(i.videoLabel)}</td>` +
+    `<td style="padding:6px 8px;border-bottom:1px solid #E3E8F0;${i.overdue ? 'color:#B42318;font-weight:bold;' : ''}">` +
+    `${escapeHtml(i.reviewDate)}${i.overdue ? ' (overdue)' : ''}</td></tr>`).join('');
+
+  const html = renderEmailShell({
+    title: 'Copyright takedown reviews due',
+    body: `
+      <p style="margin:0 0 12px;">The following videos were disabled following a copyright complaint and have reached, or are about to reach,
+        the end of the 21-day period under the Infringement Policy. For each one, check whether the complainant has produced a court order,
+        then restore the video or remove it permanently.</p>
+      <table style="border-collapse:collapse;font-size:13px;margin:0 0 16px;">
+        <tr><th align="left" style="padding:6px 8px;">Reference</th><th align="left" style="padding:6px 8px;">Complainant</th>
+          <th align="left" style="padding:6px 8px;">Video</th><th align="left" style="padding:6px 8px;">Review date</th></tr>
+        ${rows}
+      </table>
+      <p style="margin:0;"><a href="${escapeHtml(dashboardUrl)}" style="color:#1552B6;">Open Report Infringement in the admin panel</a></p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: GRIEVANCE_EMAIL,
+    subject: `Copyright takedown review${items.length === 1 ? '' : 's'} due (${items.length})`,
+    html,
+    attachments: emailAttachments(),
+    text:
+      `These videos were disabled following a copyright complaint and their 21-day review is due:\n\n` +
+      items.map((i) => `${i.referenceId} · ${i.complainantName} · "${i.videoLabel}" · ${i.reviewDate}${i.overdue ? ' (overdue)' : ''}`).join('\n') +
+      `\n\nRestore or remove each one at ${dashboardUrl}`,
   });
 }
 

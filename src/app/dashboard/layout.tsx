@@ -140,6 +140,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, []);
 
+  // Copyright takedowns whose 21-day review is due soon or overdue — badge on Report Infringement.
+  const [reviewDueCount, setReviewDueCount] = useState(0);
+  useEffect(() => {
+    const token = sessionStorage.getItem('token');
+    if (role !== 'SUPERADMIN' || !token) return;
+    fetch('/api/dashboard/infringement-notices?status=REVIEW_DUE', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => setReviewDueCount(data?.counts?.REVIEW_DUE ?? 0))
+      .catch(() => { /* badge only */ });
+  }, [role, pathname]);
+
   const canSee = (moduleKey: string) => {
     if (allowedModules === null) return true;
     return allowedModules.includes(moduleKey);
@@ -525,6 +536,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/infringement-notices') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <ShieldAlert size={20} />
                 <span className="text-sm font-semibold">Report Infringement</span>
+                {reviewDueCount > 0 && (
+                  <span title="Copyright reviews due" className="ml-auto min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-black flex items-center justify-center">
+                    {reviewDueCount}
+                  </span>
+                )}
               </Link>
             )}
 

@@ -24,7 +24,7 @@ const SMS_CAMPAIGN_NAME = process.env.SMS_CAMPAIGN_NAME || 'mittmee-otp';
 
 const SEND_TIMEOUT_MS = 10_000;
 
-export type OtpPurpose = 'signup' | 'reset';
+export type OtpPurpose = 'signup' | 'reset' | 'delete';
 
 /**
  * Approved DLT templates, by purpose. Each body is the registered text with
@@ -40,6 +40,13 @@ const TEMPLATES: Record<OtpPurpose, { id?: string; body?: string }> = {
     id: process.env.SMS_TEMPLATE_RESET,
     body: process.env.SMS_TEMPLATE_RESET_BODY,
   },
+  // Account-deletion confirmation. Until a dedicated template is approved on
+  // DLT, the signup template ("...OTP to verify your Mittmee account...") is
+  // used — its wording fits confirming the account holder. id and body always
+  // come from the same pair, since a mismatched pair is dropped by the operator.
+  delete: process.env.SMS_TEMPLATE_DELETE
+    ? { id: process.env.SMS_TEMPLATE_DELETE, body: process.env.SMS_TEMPLATE_DELETE_BODY }
+    : { id: process.env.SMS_TEMPLATE_SIGNUP, body: process.env.SMS_TEMPLATE_SIGNUP_BODY },
 };
 
 /**

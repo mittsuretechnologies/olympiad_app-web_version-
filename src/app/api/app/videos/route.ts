@@ -8,6 +8,7 @@ import {
   OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 const JWT_SECRET = getJwtSecret();
@@ -197,12 +198,28 @@ export async function GET(request: Request) {
         })).map(l => l.videoId))
       : new Set<string>();
 
+    // Copyright takedowns: the notice to show in place of the video, and when it
+    // will be reviewed (the latest date, if more than one notice holds it down).
+    const disabledIds = videos.filter(v => v.status === COPYRIGHT_DISABLED).map(v => v.id);
+    const reviewDates = new Map(
+      disabledIds.length
+        ? (await prisma.infringementNotice.findMany({
+            where:   { videoId: { in: disabledIds }, disabledAt: { not: null }, reviewOutcome: null },
+            orderBy: { reviewDueAt: 'asc' },
+            select:  { videoId: true, reviewDueAt: true },
+          })).map(n => [n.videoId!, n.reviewDueAt])
+        : [],
+    );
+
     // Expose only whether marks exist (not the scores themselves — those stay
     // gated behind VideoEvaluation.isPublished) so the app can block/explain deletion.
     const normalized = videos.map(({ evaluations, ...v }) => ({
       ...v,
       isLiked: likedIds.has(v.id),
       hasEvaluation: !!evaluations?.length,
+      ...(v.status === COPYRIGHT_DISABLED
+        ? { removedNotice: COPYRIGHT_REMOVED_NOTICE, copyrightReviewDate: reviewDates.get(v.id) ?? null }
+        : {}),
     }));
 
     return NextResponse.json(normalized);

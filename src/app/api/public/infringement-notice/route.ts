@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { detectDocumentExtension } from '@/lib/fileSignature';
 import { storeNoticeFile } from '@/lib/infringementFiles';
 import { sendInfringementNoticeEmail, sendInfringementAcknowledgementEmail } from '@/lib/mailer';
+import { videoIdCandidates } from '@/lib/copyright';
 
 // Public (unauthenticated) endpoint behind the landing page's Report
 // Infringement form. Saves the notice (shown to SuperAdmin under Report
@@ -109,10 +110,16 @@ export async function POST(request: Request) {
       ...(await Promise.all(ownership.map((f) => storeNoticeFile(referenceId, f, 'ownership')))),
       ...(await Promise.all(authority.map((f) => storeNoticeFile(referenceId, f, 'authority')))),
     ];
+    // Link the video straight away when the pasted link names exactly one that exists.
+    const candidates = videoIdCandidates(videoLink);
+    const matches = candidates.length
+      ? await prisma.video.findMany({ where: { id: { in: candidates } }, select: { id: true } })
+      : [];
     saved = await prisma.infringementNotice.create({
       data: {
         referenceId, role, fullName, organisation: organisation || null, email, phone,
         videoLink, rightTypes, workTypes, noticeText, files: stored as any,
+        videoId: matches.length === 1 ? matches[0].id : null,
       },
       select: { id: true },
     });
