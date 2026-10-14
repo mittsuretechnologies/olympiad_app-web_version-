@@ -1,6 +1,6 @@
 ﻿'use client';
 
-import { useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
@@ -21,9 +21,13 @@ import {
   ToggleLeft,
   ToggleRight,
   AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { STATES, STATE_CODE_BY_NAME, getDistrictsForState } from '@/lib/locations';
+import { CLASSES } from '@/lib/classes';
+import { olympiadPrefixForCrm } from '@/lib/olympiadIdFormat';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -58,34 +62,54 @@ function authHeaders(): Record<string, string> {
   return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
 }
 
-const CLASS_OPTIONS = [
-  { name: 'Nursery', code: 'N' },
-  { name: 'LKG', code: 'L' },
-  { name: 'UKG', code: 'U' },
-  { name: 'Class 1', code: '1' },
-  { name: 'Class 2', code: '2' },
-  { name: 'Class 3', code: '3' },
-  { name: 'Class 4', code: '4' },
-  { name: 'Class 5', code: '5' },
-  { name: 'Class 6', code: '6' },
-  { name: 'Class 7', code: '7' },
-  { name: 'Class 8', code: '8' },
-  { name: 'Class 9', code: '9' },
-  { name: 'Class 10', code: '10' },
-  { name: 'Class 11', code: '11' },
-  { name: 'Class 12', code: '12' },
-];
+const SCHOOLS_PAGE_SIZE = 25;
+
+// Olympiad IDs bucketed by class for the ID pool table, in CLASSES order
+// (Nursery → LKG → UKG); anything with an unknown or missing class goes last.
+function groupAllocationsByClass(allocations: any[]) {
+  const groups = new Map<string, any[]>();
+  for (const a of allocations) {
+    const key = a.className || '';
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key)!.push(a);
+  }
+  const rank = (name: string) => {
+    const i = CLASSES.findIndex((c) => c.name === name);
+    return i === -1 ? CLASSES.length : i;
+  };
+  return [...groups.entries()]
+    .sort(([a], [b]) => rank(a) - rank(b))
+    .map(([className, items]) => ({ className, items }));
+}
 
 export default function SchoolsPage() {
   const router = useRouter();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [page, setPage] = useState(1);
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(searchTerm.trim()); setPage(1); }, 350);
+    return () => clearTimeout(t);
+  }, [searchTerm]);
+  const schoolsQuery = new URLSearchParams({ page: String(page), pageSize: String(SCHOOLS_PAGE_SIZE), q: debouncedSearch });
   const {
     data: schoolsData,
     isLoading: schoolsLoading,
     mutate: mutateSchools,
-  } = useSWR<School[]>('/api/schools', fetcher);
-  const schools: School[] = Array.isArray(schoolsData) ? schoolsData : [];
+  } = useSWR<{ schools: School[]; total: number; totalAll: number; page: number; pageSize: number }>(
+    `/api/schools?${schoolsQuery}`,
+    fetcher,
+    { keepPreviousData: true },
+  );
+  const schools: School[] = Array.isArray(schoolsData?.schools) ? schoolsData.schools : [];
+  const totalMatching = schoolsData?.total ?? 0;
+  const totalSchools = schoolsData?.totalAll ?? 0;
+  const totalPages = Math.max(1, Math.ceil(totalMatching / SCHOOLS_PAGE_SIZE));
+  // After a delete empties the last page, step back to the new last page.
+  useEffect(() => {
+    if (schoolsData && page > totalPages) setPage(totalPages);
+  }, [schoolsData, page, totalPages]);
   const loading = schoolsLoading;
-  const [searchTerm, setSearchTerm] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isBulkModalOpen, setIsBulkModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -99,8 +123,6 @@ export default function SchoolsPage() {
   const [allocations, setAllocations] = useState<any[]>([]);
   const [allocLoading, setAllocLoading] = useState(false);
   const [showAllocateForm, setShowAllocateForm] = useState(false);
-  const [allocPrefix, setAllocPrefix] = useState('');
-  const [allocPadding, setAllocPadding] = useState(4);
   const [allocClasses, setAllocClasses] = useState<
     { classCode: string; className: string; count: number }[]
   >([{ classCode: '', className: '', count: 10 }]);
@@ -241,28 +263,11 @@ export default function SchoolsPage() {
     setAllocClasses([{ classCode: '', className: '', count: 10 }]);
     setAllocLoading(true);
 
-    const crm = (school.olympiadId || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase();
-    const nm = (school.name || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase();
-    const defaultPrefix = (crm + nm).slice(0, 10);
-    
-    // Initial guess
-    setAllocPrefix(defaultPrefix);
-    setAllocPadding(2);
-
     try {
       const res = await fetch(`/api/schools/${school.id}/olympiad-ids`, { headers: authHeaders() });
       const data = await res.json();
       const loadedAllocations = Array.isArray(data) ? data : [];
       setAllocations(loadedAllocations);
-
-      if (loadedAllocations.length > 0) {
-        const lastAlloc = loadedAllocations[loadedAllocations.length - 1];
-        if (lastAlloc.prefix) {
-          setAllocPrefix(lastAlloc.prefix);
-          const pad = lastAlloc.code.length - lastAlloc.prefix.length;
-          setAllocPadding(pad > 0 ? pad : 2);
-        }
-      }
     } catch (err) {
       console.error('Fetch allocations failed:', err);
       setAllocations([]);
@@ -276,17 +281,7 @@ export default function SchoolsPage() {
     try {
       const res = await fetch(`/api/schools/${schoolId}/olympiad-ids`, { headers: authHeaders() });
       const data = await res.json();
-      const loaded = Array.isArray(data) ? data : [];
-      setAllocations(loaded);
-
-      if (loaded.length > 0) {
-        const lastAlloc = loaded[loaded.length - 1];
-        if (lastAlloc.prefix) {
-          setAllocPrefix(lastAlloc.prefix);
-          const pad = lastAlloc.code.length - lastAlloc.prefix.length;
-          setAllocPadding(pad > 0 ? pad : 2);
-        }
-      }
+      setAllocations(Array.isArray(data) ? data : []);
     } finally {
       setAllocLoading(false);
     }
@@ -297,10 +292,6 @@ export default function SchoolsPage() {
     if (!viewSchool) return;
     setAllocError(null);
 
-    if (!allocPrefix.trim()) {
-      setAllocError('Prefix is required');
-      return;
-    }
     if (allocClasses.some((c) => !c.className.trim())) {
       setAllocError('Class is required for every row');
       return;
@@ -321,10 +312,7 @@ export default function SchoolsPage() {
         method: 'POST',
         headers: authHeaders(),
         body: JSON.stringify({
-          prefix: allocPrefix.trim(),
-          padding: allocPadding,
           classes: allocClasses.map((c) => ({
-            classCode: c.classCode.trim(),
             className: c.className.trim(),
             count: c.count,
           })),
@@ -380,7 +368,7 @@ export default function SchoolsPage() {
     if (!viewSchool || allocations.length === 0) return;
     const rows = [
       ['Olympiad ID', 'Class', 'Delivery', 'Allocated On'],
-      ...allocations.map((a) => [
+      ...groupAllocationsByClass(allocations).flatMap((g) => g.items).map((a) => [
         a.code,
         a.className || '',
         a.sentAt ? 'Delivered' : 'Pending',
@@ -485,19 +473,17 @@ export default function SchoolsPage() {
     reader.readAsBinaryString(file);
   };
 
+  // New IDs always use the 6-digit CRM prefix (lib/olympiadIdFormat) and
+  // continue that prefix's sequence; IDs from the old format keep their own.
+  const allocPrefix = viewSchool ? olympiadPrefixForCrm(viewSchool.olympiadId || '') ?? '' : '';
   const lastAllocationWithPrefix = allocations
     .filter((a) => a.prefix === allocPrefix)
     .reduce((max, a) => (a.sequence > max ? a.sequence : max), 0);
   const startSeq = lastAllocationWithPrefix + 1;
 
-  const filteredSchools = Array.isArray(schools)
-    ? schools.filter(
-        (s) =>
-          s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.olympiadId?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          s.schoolId?.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : [];
+  // Search runs server-side (see /api/schools GET); this is just the current page.
+  const filteredSchools = schools;
+  const rowOffset = (page - 1) * SCHOOLS_PAGE_SIZE;
 
   return (
     <div className="space-y-3">
@@ -508,7 +494,7 @@ export default function SchoolsPage() {
       <div className="bg-gray-50 border-b border-gray-300 px-6 py-3 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2 text-sm">
           <span className="text-gray-600">Total Registered Schools:</span>
-          <span className="font-bold text-[#004f9f]">{schools.length}</span>
+          <span className="font-bold text-[#004f9f]">{totalSchools}</span>
         </div>
 
         <div className="flex items-center gap-2">
@@ -608,7 +594,7 @@ export default function SchoolsPage() {
                   }`}
                 >
                   <td className="px-4 py-2.5 border-r border-gray-200 text-gray-700">
-                    {idx + 1}
+                    {rowOffset + idx + 1}
                   </td>
                   <td className="px-4 py-2.5 border-r border-gray-200">
                     <div className="flex items-center gap-2">
@@ -690,9 +676,31 @@ export default function SchoolsPage() {
       {/* Footer Row */}
       <div className="bg-gray-50 border-t border-gray-300 px-6 py-2 text-xs text-gray-200 flex justify-between items-center">
         <span>
-          Showing <span className="font-bold">{filteredSchools.length}</span> of{' '}
-          <span className="font-bold">{schools.length}</span> records
+          Showing{' '}
+          <span className="font-bold">
+            {totalMatching === 0 ? 0 : rowOffset + 1}–{rowOffset + filteredSchools.length}
+          </span>{' '}
+          of <span className="font-bold">{totalMatching}</span> records
         </span>
+        <div className="flex items-center gap-2 text-gray-700">
+          <button
+            disabled={page <= 1}
+            onClick={() => setPage((p) => p - 1)}
+            className="border border-gray-300 bg-white p-1.5 disabled:opacity-40"
+            aria-label="Previous page"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <span className="tabular-nums">Page {page} of {totalPages}</span>
+          <button
+            disabled={page >= totalPages}
+            onClick={() => setPage((p) => p + 1)}
+            className="border border-gray-300 bg-white p-1.5 disabled:opacity-40"
+            aria-label="Next page"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
         <span className="italic">© mittmee</span>
       </div>
 
@@ -1235,34 +1243,11 @@ export default function SchoolsPage() {
                   onSubmit={handleAllocate}
                   className="bg-blue-50 border border-blue-200 p-4 space-y-3"
                 >
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
-                        Prefix <span className="text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        value={allocPrefix}
-                        onChange={(e) => setAllocPrefix(e.target.value)}
-                        className="w-full h-9 border border-gray-300 px-3 text-sm font-mono focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                        placeholder="e.g. MITT-DPS-26-"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-bold text-[#004f9f] mb-1 uppercase">
-                        Padding (digits)
-                      </label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={6}
-                        value={allocPadding}
-                        onChange={(e) => setAllocPadding(parseInt(e.target.value || '4', 10))}
-                        onWheel={(e) => e.currentTarget.blur()}
-                        className="w-full h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                      />
-                    </div>
+                  <div className="text-xs text-gray-700">
+                    ID format (fixed, 11 characters):{' '}
+                    <span className="font-mono font-semibold text-[#004f9f]">
+                      {allocPrefix || 'invalid CRM ID'} + class letter + 4-digit number
+                    </span>
                   </div>
 
                   {/* Per-class breakdown */}
@@ -1277,7 +1262,7 @@ export default function SchoolsPage() {
                             value={row.className}
                             onChange={(e) => {
                               const name = e.target.value;
-                              const match = CLASS_OPTIONS.find((c) => c.name === name);
+                              const match = CLASSES.find((c) => c.name === name);
                               setAllocClasses((prev) =>
                                 prev.map((r, i) =>
                                   i === idx
@@ -1286,30 +1271,18 @@ export default function SchoolsPage() {
                                 )
                               );
                             }}
-                            className="col-span-5 h-9 border border-gray-300 px-3 text-sm bg-white focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                            className="col-span-7 h-9 border border-gray-300 px-3 text-sm bg-white focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                             required
                           >
                             <option value="" disabled>
                               Select class
                             </option>
-                            {CLASS_OPTIONS.map((c) => (
+                            {CLASSES.map((c) => (
                               <option key={c.name} value={c.name}>
                                 {c.name}
                               </option>
                             ))}
                           </select>
-                          <input
-                            type="text"
-                            value={row.classCode}
-                            onChange={(e) => {
-                              const v = e.target.value.toUpperCase();
-                              setAllocClasses((prev) =>
-                                prev.map((r, i) => (i === idx ? { ...r, classCode: v } : r))
-                              );
-                            }}
-                            placeholder="Code (e.g. N)"
-                            className="col-span-3 h-9 border border-gray-300 px-3 text-sm font-mono focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
-                          />
                           <input
                             type="number"
                             min={1}
@@ -1322,7 +1295,7 @@ export default function SchoolsPage() {
                             }}
                             onWheel={(e) => e.currentTarget.blur()}
                             placeholder="Count"
-                            className="col-span-3 h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+                            className="col-span-4 h-9 border border-gray-300 px-3 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
                             required
                           />
                           <button
@@ -1362,12 +1335,12 @@ export default function SchoolsPage() {
                     <div className="h-9 bg-white border border-gray-300 px-3 flex items-center text-sm font-mono text-gray-700">
                       {allocPrefix || '---'}
                       {allocClasses[0]?.classCode || ''}
-                      {String(startSeq).padStart(Math.max(allocPadding, 1), '0')} ...{' '}
+                      {String(startSeq).padStart(4, '0')} ...{' '}
                       {allocPrefix || '---'}
                       {allocClasses[allocClasses.length - 1]?.classCode || ''}
                       {String(
                         startSeq + allocClasses.reduce((sum, c) => sum + (c.count || 0), 0) - 1
-                      ).padStart(Math.max(allocPadding, 1), '0')}
+                      ).padStart(4, '0')}
                     </div>
                   </div>
 
@@ -1412,9 +1385,6 @@ export default function SchoolsPage() {
                           Olympiad ID
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300">
-                          Class
-                        </th>
-                        <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300">
                           Delivery
                         </th>
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase">
@@ -1425,18 +1395,30 @@ export default function SchoolsPage() {
                     <tbody>
                       {allocLoading ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center">
+                          <td colSpan={4} className="py-8 text-center">
                             <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#004f9f]" />
                           </td>
                         </tr>
                       ) : allocations.length === 0 ? (
                         <tr>
-                          <td colSpan={5} className="py-8 text-center text-gray-500 text-sm">
+                          <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">
                             No Olympiad IDs allocated yet. Click "Allocate New IDs" to generate.
                           </td>
                         </tr>
                       ) : (
-                        allocations.map((a, idx) => (
+                        groupAllocationsByClass(allocations).map(({ className, items }) => (
+                          <Fragment key={className || 'no-class'}>
+                          <tr className="bg-[#004f9f]/10 border-b border-[#004f9f]/30">
+                            <td colSpan={4} className="px-3 py-1.5 text-xs font-bold uppercase text-[#004f9f]">
+                              {className || 'No class'}
+                              <span className="ml-2 font-semibold normal-case text-gray-600">
+                                {items.length} {items.length === 1 ? 'ID' : 'IDs'}
+                                {' · '}Sent: <span className="text-green-700">{items.filter((a) => a.sentAt).length}</span>
+                                {' · '}Pending: <span className="text-orange-700">{items.filter((a) => !a.sentAt).length}</span>
+                              </span>
+                            </td>
+                          </tr>
+                          {items.map((a, idx) => (
                           <tr
                             key={a.id}
                             className={`border-b border-gray-200 ${
@@ -1448,9 +1430,6 @@ export default function SchoolsPage() {
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200 font-mono font-semibold text-[#004f9f]">
                               {a.code}
-                            </td>
-                            <td className="px-3 py-2 border-r border-gray-200 text-gray-700 text-xs">
-                              {a.className || '—'}
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200">
                               {a.sentAt ? (
@@ -1470,6 +1449,8 @@ export default function SchoolsPage() {
                               {new Date(a.createdAt).toLocaleDateString()}
                             </td>
                           </tr>
+                          ))}
+                          </Fragment>
                         ))
                       )}
                     </tbody>

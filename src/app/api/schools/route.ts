@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { CLASS_CODE_BY_NAME } from '@/lib/classes';
+import { buildOlympiadCode, olympiadPrefixForCrm } from '@/lib/olympiadIdFormat';
+import { crmIdProblem } from '@/lib/schoolCrm';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 import { stateNameToCode } from '@/lib/indianStateCodes';
 import { requireRole } from '@/lib/auth-guard';
@@ -12,15 +15,40 @@ export async function GET(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN']);
   if (error) return error;
   try {
-    const schools = await prisma.school.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
+    // Paginated: ?page=1&pageSize=25&q=<name | School ID | CRM ID>
+    const { searchParams } = new URL(request.url);
+    const q = (searchParams.get('q') || '').trim();
+    const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
+    const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '25', 10) || 25));
+
+    const where: Prisma.SchoolWhereInput = q
+      ? { OR: [
+          { name: { contains: q, mode: 'insensitive' } },
+          { schoolId: { contains: q, mode: 'insensitive' } },
+          { olympiadId: { contains: q, mode: 'insensitive' } },
+        ] }
+      : {};
+
+    const [schools, total, totalAll] = await Promise.all([
+      prisma.school.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+      prisma.school.count({ where }),
+      prisma.school.count(),
+    ]);
     await recordAccessLog(payload, {
       action: 'CREDENTIALS_VIEWED', entityType: 'School', subjectIds: schools.map((s) => s.id), request,
     });
-    return NextResponse.json(
-      schools.map(({ password, ...s }) => ({ ...s, plainPassword: decryptPassword(s.plainPassword) }))
-    );
+    return NextResponse.json({
+      schools: schools.map(({ password, ...s }) => ({ ...s, plainPassword: decryptPassword(s.plainPassword) })),
+      total,
+      totalAll,
+      page,
+      pageSize,
+    });
   } catch (error) {
     return NextResponse.json({ message: 'Failed to fetch schools' }, { status: 500 });
   }
@@ -53,12 +81,6 @@ function generateUsername(schoolName: string, schoolId: string): string {
   const available = Math.max(0, 10 - schoolId.length);
   const prefix = nameClean.slice(0, available);
   return (prefix + schoolId).slice(0, 10);
-}
-
-// New format: 6 chars of CRM ID, then a single class code char, then a 4-digit
-// continuous sequence number. e.g. OLY202 + 5 + 0001 => "OLY20250001"
-function buildCrmPrefix(crmId: string): string {
-  return crmId.replace(/[^A-Za-z0-9]/g, '').slice(0, 6).toUpperCase();
 }
 
 export async function POST(request: Request) {
@@ -121,6 +143,14 @@ export async function POST(request: Request) {
       }
     }
 
+    // The CRM number is the Olympiad ID prefix, so it must be well-formed and
+    // not already used by another school.
+    const crmProblem = await crmIdProblem(olympiadId);
+    if (crmProblem) {
+      return NextResponse.json({ message: crmProblem }, { status: 400 });
+    }
+    const prefix = olympiadPrefixForCrm(olympiadId)!;
+
     // Generate schoolId with retry on race condition
     for (let attempt = 0; attempt < 3; attempt++) {
       const schoolId = await generateSchoolId();
@@ -128,63 +158,59 @@ export async function POST(request: Request) {
       const hashedPassword = await bcrypt.hash(plainPassword, 10);
 
       try {
-        // Create school
-        const school = await prisma.school.create({
-          data: {
-            schoolId,
-            olympiadId,
-            name,
-            address,
-            email,
-            phone,
-            contactPerson,
-            city,
-            district,
-            districtCode,
-            state,
-            stateCode: stateCode || stateNameToCode(state),
-            pincode,
-            examDate: examDate ? new Date(examDate) : null,
-            username: generateUsername(name, schoolId),
-            password: hashedPassword,
-            plainPassword: encryptPassword(plainPassword),
-          },
-        });
-
-        // Auto-generate Olympiad IDs.
-        // Format: [6 char CRM][1 char classCode][4 digit continuous seq]
-        // The sequence number runs continuously across the whole school while
-        // the class char changes per class. e.g. OLY202 5 0001, OLY202 5 0002,
-        // OLY202 A 0003 ...
-        const prefix = buildCrmPrefix(olympiadId);
+        // Auto-generate Olympiad IDs (format: lib/olympiadIdFormat, e.g.
+        // 112535N0001). The sequence runs continuously across the whole school
+        // while the class char changes per class: 112535N0001, 112535N0002,
+        // 112535L0003 ...
         const now = new Date();
-
         let seq = 0;
         const olympiadIds = classRows.flatMap((cls) =>
           Array.from({ length: cls.count }, () => {
             seq += 1;
-            const numStr = String(seq).padStart(4, '0');
-            const code = `${prefix}${cls.classCode}${numStr}`;
             return {
-              code,
+              code: buildOlympiadCode(prefix, cls.classCode, seq),
               prefix,
               sequence: seq,
               classCode: cls.classCode,
               className: cls.className,
-              schoolId: school.id,
               sentAt: now, // auto-sent since generated by admin at registration
             };
           })
         );
 
-        const totalCount = classRows.reduce((sum, c) => sum + c.count, 0);
-
-        if (olympiadIds.length > 0) {
-          await prisma.olympiadIdAllocation.createMany({
-            data: olympiadIds,
-            skipDuplicates: true,
+        // School and its IDs land together: if any ID fails (e.g. a duplicate),
+        // nothing is created and the retry below starts clean.
+        const school = await prisma.$transaction(async (tx) => {
+          const created = await tx.school.create({
+            data: {
+              schoolId,
+              olympiadId,
+              name,
+              address,
+              email,
+              phone,
+              contactPerson,
+              city,
+              district,
+              districtCode,
+              state,
+              stateCode: stateCode || stateNameToCode(state),
+              pincode,
+              examDate: examDate ? new Date(examDate) : null,
+              username: generateUsername(name, schoolId),
+              password: hashedPassword,
+              plainPassword: encryptPassword(plainPassword),
+            },
           });
-        }
+          if (olympiadIds.length > 0) {
+            await tx.olympiadIdAllocation.createMany({
+              data: olympiadIds.map((o) => ({ ...o, schoolId: created.id })),
+            });
+          }
+          return created;
+        });
+
+        const totalCount = classRows.reduce((sum, c) => sum + c.count, 0);
 
         const generatedUsername = generateUsername(name, schoolId);
 
