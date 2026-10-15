@@ -6,6 +6,7 @@ import { spawn } from 'child_process';
 import { probeVideo, cropTo9x16, compressVideo } from '@/lib/videoProbe';
 import { prisma } from '@/lib/prisma';
 import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
+import { optimizeForStreaming } from '@/lib/videoOptimize';
 import { getJwtSecret } from '@/lib/jwt-secret';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const ffmpegPath: string = require('ffmpeg-static');
@@ -174,6 +175,15 @@ export async function POST(request: Request) {
     // Move the final working file into place as the canonical fileName
     if (workingPath !== filePath) {
       await rename(workingPath, filePath);
+    }
+
+    // Make it light enough for a phone to stream (about 720p / 2.5 Mbps).
+    // An already-light video is left alone; a failure keeps the file as is.
+    const optimisedPath = path.join(uploadDir, `${baseName}_opt.mp4`);
+    const optimised = await optimizeForStreaming(filePath, optimisedPath);
+    if (optimised === 'remux' || optimised === 'encode') {
+      await unlink(filePath).catch(() => {});
+      await rename(optimisedPath, filePath);
     }
 
     let thumbCreated = false;
