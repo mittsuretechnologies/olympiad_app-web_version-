@@ -24,6 +24,12 @@ function getViewerIdFromToken(request: NextRequest): string | null {
 // scroll through in a session; raise if that stops being true.
 const CANDIDATE_POOL_SIZE = 2000;
 
+// Short-lived cache of ranked video ids for the endless `all=1` feed (see the
+// fullRandom branch). Per server instance; a miss just recomputes.
+const MIX_TTL_MS    = 5 * 60 * 1000;
+const MIX_CACHE_MAX = 100;
+const MIX_CACHE = new Map<string, { at: number; ids: string[] }>();
+
 // A school's own reels, then its city, then its state, then everything else.
 // 3 has no upper neighbour so ties (score never seen) can't collide with it.
 const TIER_SCHOOL = 0;
@@ -139,7 +145,42 @@ export async function GET(request: NextRequest) {
     let hasMore: boolean;
     let nextCursor: string | null;
 
-    if (useSeededFeed) {
+    // `all=1` + seed: an endless, school-agnostic random feed over EVERY video
+    // that matches `where`, not just the latest CANDIDATE_POOL_SIZE. Only ids
+    // are scanned and ranked (cheap even for tens of thousands of videos), then
+    // just the requested page's rows are loaded in full. Used by the "keep
+    // scrolling" continuation after a Home row / Search category runs out.
+    const fullRandom = !!seed && searchParams.get('all') === '1';
+
+    if (fullRandom) {
+      // The ranked id list is the expensive part, and every page of one feed
+      // needs the same one — so keep it briefly, keyed by viewer + seed (+ any
+      // category filter). Pages after the first are then a slice + one query.
+      const cacheKey = `${viewerId ?? 'anon'}|${seed}|${category ?? ''}|${subCategory ?? ''}`;
+      const now = Date.now();
+      let rankedIds = MIX_CACHE.get(cacheKey)?.ids;
+      if (!rankedIds || now - (MIX_CACHE.get(cacheKey)?.at ?? 0) > MIX_TTL_MS) {
+        const idRows = await prisma.video.findMany({ where, select: { id: true } });
+        rankedIds = idRows
+          .map(r => ({ id: r.id, rank: seededRank(seed!, r.id) }))
+          .sort((a, b) => (a.rank - b.rank) || (a.id < b.id ? -1 : 1))
+          .map(r => r.id);
+        if (MIX_CACHE.size >= MIX_CACHE_MAX) {
+          const oldest = MIX_CACHE.keys().next().value;
+          if (oldest !== undefined) MIX_CACHE.delete(oldest);
+        }
+        MIX_CACHE.set(cacheKey, { at: now, ids: rankedIds });
+      }
+      const ranked = rankedIds;
+      const pageIds = ranked.slice(offset, offset + limit);
+      const rows = pageIds.length
+        ? await prisma.video.findMany({ where: { id: { in: pageIds } }, select: baseSelect })
+        : [];
+      const byId = new Map(rows.map(v => [v.id, v]));
+      items      = pageIds.map(id => byId.get(id)).filter(Boolean);
+      hasMore    = offset + limit < ranked.length;
+      nextCursor = hasMore ? String(offset + limit) : null;
+    } else if (useSeededFeed) {
       // Whole pool fetched once, tiered + seed-ranked in memory, then sliced
       // for this page. Videos carry their uploader's school only two ways
       // (student.allocation.school, or appUser.olympiadId -> allocation ->

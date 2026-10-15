@@ -4,9 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { recordAccessLog } from '@/lib/audit-log';
 
-// Passwords are never sent to the school panel — not even decrypted for display.
-// The list only says whether a password exists (`hasPassword`); the one time a
-// school sees a password is in the reset response, so it can pass it on.
+// Neither usernames nor passwords are sent to the school panel from here. A
+// school sees a student's login only once, in the response to allotting them.
 
 export async function GET(request: Request) {
   try {
@@ -28,7 +27,6 @@ export async function GET(request: Request) {
         student: {
           select: {
             id: true, name: true, phone: true,
-            username: true, plainPassword: true,
             isVerified: true, createdAt: true,
           },
         },
@@ -41,7 +39,6 @@ export async function GET(request: Request) {
       select: {
         id: true, userId: true, mobile: true, email: true,
         olympiadId: true, isVerified: true, createdAt: true,
-        plainPassword: true,
       },
     });
     const appUserByCode = new Map(appUsers.map(u => [u.olympiadId, u]));
@@ -57,8 +54,6 @@ export async function GET(request: Request) {
             id: a.student.id,
             name: a.student.name,
             phone: a.student.phone,
-            username: a.student.username,
-            hasPassword: Boolean(a.student.plainPassword),
             isVerified: a.student.isVerified,
             createdAt: a.student.createdAt,
             source: 'web' as const,
@@ -78,8 +73,6 @@ export async function GET(request: Request) {
             name: a.assignedName || appUser.userId,
             phone: appUser.mobile || '-',
             email: appUser.email || null,
-            username: appUser.userId,
-            hasPassword: Boolean(appUser.plainPassword),
             isVerified: appUser.isVerified,
             createdAt: appUser.createdAt,
             source: 'app' as const,

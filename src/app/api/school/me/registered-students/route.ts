@@ -3,7 +3,6 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
 import { getJwtSecret } from '@/lib/jwt-secret';
-import { decryptPassword } from '@/lib/password-crypto';
 import { recordAccessLog } from '@/lib/audit-log';
 
 /** One evaluation-slot's worth of state for a student's directory row. */
@@ -89,7 +88,7 @@ export async function GET(request: Request) {
       where: { olympiadId: { in: codes }, isVerified: true },
       select: {
         id: true, userId: true, mobile: true, email: true, olympiadId: true,
-        isVerified: true, createdAt: true, plainPassword: true,
+        isVerified: true, createdAt: true,
       },
     });
 
@@ -135,8 +134,6 @@ export async function GET(request: Request) {
           source: 'web' as const,
           olympiadVideos: (slots.slotA.status === 'approved' ? 1 : 0) + (slots.slotB.status === 'approved' ? 1 : 0),
           email: null as string | null,
-          username: null as string | null,
-          password: null as string | null,
           slotA: slots.slotA,
           slotB: slots.slotB,
           attendance: attendanceByCode.get(s.olympiadCode) ?? null,
@@ -159,8 +156,6 @@ export async function GET(request: Request) {
             source: 'app' as const,
             olympiadVideos: (slots.slotA.status === 'approved' ? 1 : 0) + (slots.slotB.status === 'approved' ? 1 : 0),
             email: u.email || null,
-            username: u.userId,
-            password: decryptPassword(u.plainPassword),
             slotA: slots.slotA,
             slotB: slots.slotB,
             attendance: attendanceByCode.get(u.olympiadId!) ?? null,
@@ -168,9 +163,10 @@ export async function GET(request: Request) {
         }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    // App-registered rows carry a decrypted password; web rows only personal details.
+    // Login credentials (username / password) are never sent here — a school
+    // sees them only once, in the response to allotting the student.
     await recordAccessLog(payload, {
-      action: result.some(r => r.password) ? 'CREDENTIALS_VIEWED' : 'USER_DETAILS_VIEWED',
+      action: 'USER_DETAILS_VIEWED',
       entityType: 'Student', subjectIds: result.map(r => r.id), request,
     });
     return NextResponse.json({
