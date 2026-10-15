@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
-import { writeFile, mkdir, unlink } from 'fs/promises';
+import { writeFile, mkdir, unlink, rename } from 'fs/promises';
 import path from 'path';
 import { probeVideo } from '@/lib/videoProbe';
 import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
+import { optimizeForStreaming } from '@/lib/videoOptimize';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 const JWT_SECRET = getJwtSecret();
@@ -65,6 +66,15 @@ export async function POST(request: Request) {
     if (meta.durationSeconds > MAX_DURATION_S) {
       await unlink(filePath).catch(() => {});
       return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
+    }
+
+    // Make it light enough for a phone to stream (about 720p / 2.5 Mbps).
+    // An already-light video is left alone; a failure keeps the file as is.
+    const optimisedPath = path.join(uploadDir, `${fileName.replace(/\.mp4$/, '')}_opt.mp4`);
+    const optimised = await optimizeForStreaming(filePath, optimisedPath);
+    if (optimised === 'remux' || optimised === 'encode') {
+      await unlink(filePath).catch(() => {});
+      await rename(optimisedPath, filePath);
     }
 
     if (s3Enabled()) {
