@@ -172,7 +172,7 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
   const uploaders = appUserIds.length
     ? await prisma.appUser.findMany({
         where:  { id: { in: appUserIds } },
-        select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
+        select: { id: true, userId: true, avatarUrl: true, olympiadId: true, schoolRefId: true },
       })
     : [];
   const uploaderMap = new Map(uploaders.map(u => [u.id, u]));
@@ -209,7 +209,9 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
     return {
       ...v,
       isLiked:  likedIds.has(v.id),
-      uploader: uploaderRaw ?? null,
+      uploader: uploaderRaw
+        ? { id: uploaderRaw.id, userId: uploaderRaw.userId, avatarUrl: uploaderRaw.avatarUrl, olympiadId: uploaderRaw.olympiadId, isOlympiadSchool: !!uploaderRaw.schoolRefId }
+        : null,
       student: v.student ? {
         id:         v.student.id,
         name:       v.student.name,

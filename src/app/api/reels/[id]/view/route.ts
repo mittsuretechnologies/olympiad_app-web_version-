@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 // POST /api/reels/[id]/view
-// Body: { sessionId: string }  — deduplicated per session per 15 min window
+// Body: { sessionId: string }  — every play is counted, repeats included
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,25 +25,16 @@ export async function POST(
       return NextResponse.json({ message: 'Video not found' }, { status: 404 });
     }
 
-    // Deduplicate: only count a view if this session hasn't viewed in last 15 min
-    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
-    const recentView = await prisma.videoView.findFirst({
-      where: {
-        videoId,
-        sessionId,
-        createdAt: { gte: fifteenMinsAgo },
-      },
-    });
-
-    if (!recentView) {
-      await prisma.$transaction([
-        prisma.videoView.create({ data: { videoId, sessionId } }),
-        prisma.video.update({
-          where: { id: videoId },
-          data:  { viewsCount: { increment: 1 } },
-        }),
-      ]);
-    }
+    // Every play counts — including the same person watching the same video
+    // again. (This used to skip a view if the same session had one in the last
+    // 15 minutes; that cooldown was removed on purpose.)
+    await prisma.$transaction([
+      prisma.videoView.create({ data: { videoId, sessionId } }),
+      prisma.video.update({
+        where: { id: videoId },
+        data:  { viewsCount: { increment: 1 } },
+      }),
+    ]);
 
     const updated = await prisma.video.findUnique({
       where:  { id: videoId },

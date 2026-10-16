@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Users, Loader2, Search, Download, BookOpen, Calendar, Phone,
   Mail, CheckCircle2, Send, AlertCircle, ChevronDown, ChevronUp,
-  KeyRound, Eye, EyeOff, UserCheck, UserX, Clock, RotateCcw, Pencil, Lock,
+  UserCheck, UserX, Clock, RotateCcw, Pencil, Lock,
 } from 'lucide-react';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL,
@@ -27,16 +27,14 @@ interface Student {
   source?: 'web' | 'app';
   olympiadVideos?: number;
   email?: string | null;
-  username?: string | null;
-  password?: string | null;
   attendance?: 'PRESENT' | 'ABSENT' | null;
 }
 
-/** Expandable profile shown under a student's row: contact, and — for
- *  app-registered students only — login credentials. Olympiad submission
+/** Expandable profile shown under a student's row: contact details only.
+ *  Login credentials are deliberately not shown anywhere on this page — the
+ *  school sees them once, when allotting the student. Olympiad submission
  *  status (slots A/B) lives on its own page rather than here. */
-function StudentProfile({ s, onSendCredentials }: { s: Student; onSendCredentials: () => void }) {
-  const [showPassword, setShowPassword] = useState(false);
+function StudentProfile({ s }: { s: Student }) {
   const fmtDate = (d: string) =>
     new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
@@ -62,46 +60,6 @@ function StudentProfile({ s, onSendCredentials }: { s: Student; onSendCredential
         </dl>
       </div>
 
-      {s.source === 'app' && (
-        <div className="rounded-lg border border-[#E6E8EC] bg-white p-3.5">
-          <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#677285]">
-            <KeyRound size={11} /> Login credentials
-          </p>
-          <dl className="space-y-1.5 text-[12.5px]">
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-[#0F1B2D]">Username</dt>
-              <dd className="select-all font-mono font-semibold text-[#1559C7]">{s.username || '—'}</dd>
-            </div>
-            <div className="flex items-center justify-between gap-2">
-              <dt className="text-[#0F1B2D]">Password</dt>
-              <dd className="flex items-center gap-1.5">
-                {s.password ? (
-                  <>
-                    <span className="select-all font-mono font-semibold text-[#0F1B2D]">
-                      {showPassword ? s.password : '••••••••'}
-                    </span>
-                    <button
-                      onClick={() => setShowPassword(v => !v)}
-                      aria-label={showPassword ? 'Hide password' : 'Show password'}
-                      className="text-[#98A1B2] hover:text-[#475265]"
-                    >
-                      {showPassword ? <EyeOff size={12} /> : <Eye size={12} />}
-                    </button>
-                  </>
-                ) : (
-                  <span className="text-[#98A1B2]">App login</span>
-                )}
-              </dd>
-            </div>
-          </dl>
-          <button
-            onClick={onSendCredentials}
-            className="cursor-pointer mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg border border-[#1559C7]/40 bg-white px-3 py-2 text-[12.5px] font-semibold text-[#1559C7] transition-colors hover:bg-[#1559C7] hover:text-white focus-visible:outline-none focus-visible:ring-[3px] focus-visible:ring-[#1559C7]/25"
-          >
-            <Send size={13} /> Email credentials
-          </button>
-        </div>
-      )}
     </div>
   );
 }
@@ -123,13 +81,6 @@ export default function SchoolRegisteredStudentsPage() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
-
-  // Send credentials modal
-  const [sendModal, setSendModal] = useState<Student | null>(null);
-  const [sendEmail, setSendEmail] = useState('');
-  const [sending, setSending] = useState(false);
-  const [sendError, setSendError] = useState('');
-  const [sendSuccess, setSendSuccess] = useState<string | null>(null);
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') : '';
 
@@ -226,40 +177,6 @@ export default function SchoolRegisteredStudentsPage() {
       alert(e.message);
     } finally {
       setMarkingId(null);
-    }
-  };
-
-  const openSendModal = (s: Student) => {
-    setSendModal(s);
-    setSendEmail(s.email || '');
-    setSendError('');
-    setSendSuccess(null);
-  };
-  const closeSendModal = () => {
-    setSendModal(null); setSendEmail(''); setSendError(''); setSendSuccess(null);
-  };
-
-  const handleSendCredentials = async () => {
-    if (!sendModal) return;
-    if (sendEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(sendEmail.trim())) {
-      setSendError('Enter a valid email address'); return;
-    }
-    if (!sendEmail.trim()) { setSendError('Email address is required'); return; }
-    setSending(true); setSendError('');
-    try {
-      const res = await fetch(`/api/school/me/olympiad-ids/${sendModal.olympiadCode}/send-credentials`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ email: sendEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Failed to send credentials');
-      setSendSuccess(data.email);
-      setStudents(prev => prev.map(s => s.id === sendModal.id ? { ...s, email: data.email } : s));
-    } catch (e: any) {
-      setSendError(e.message);
-    } finally {
-      setSending(false);
     }
   };
 
@@ -561,7 +478,7 @@ export default function SchoolRegisteredStudentsPage() {
                       {isOpen && (
                         <tr>
                           <td colSpan={8} className="border border-[#E6E8EC] p-0">
-                            <StudentProfile s={s} onSendCredentials={() => openSendModal(s)} />
+                            <StudentProfile s={s} />
                           </td>
                         </tr>
                       )}
@@ -576,65 +493,6 @@ export default function SchoolRegisteredStudentsPage() {
             <span>Click a row to view full profile</span>
           </div>
         </div>
-      )}
-
-      {/* Send Credentials Modal */}
-      {sendModal && (
-        <ModalShell
-          eyebrow="Send credentials"
-          title={sendModal.name}
-          onClose={closeSendModal}
-          maxWidth="max-w-sm"
-        >
-          {sendSuccess ? (
-            <div className="space-y-4 p-5 text-center">
-              <div className="mx-auto flex h-11 w-11 items-center justify-center rounded-full bg-[#1D7A3A]/10">
-                <CheckCircle2 className="h-6 w-6 text-[#1D7A3A]" />
-              </div>
-              <div>
-                <p className="text-[14.5px] font-semibold text-[#0F1B2D]">Credentials sent</p>
-                <p className="mt-1 text-[12px] text-[#677285]">
-                  Emailed the Olympiad ID, User ID and password to{' '}
-                  <span className="font-medium text-[#475265]">{sendSuccess}</span>.
-                </p>
-              </div>
-              <button onClick={closeSendModal} className={`cursor-pointer ${BTN_PRIMARY} w-full`}>Done</button>
-            </div>
-          ) : (
-            <div className="space-y-3 p-5">
-              <p className="text-[12px] leading-relaxed text-[#475265]">
-                Use this if credentials weren&apos;t sent automatically during allocation. This resends the login
-                details already on file — no new password is generated.
-              </p>
-              <div>
-                <label htmlFor="send-email" className={LABEL}>Email address</label>
-                <div className="relative">
-                  <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
-                  <input
-                    id="send-email"
-                    type="email" placeholder="student@example.com" value={sendEmail}
-                    onChange={e => setSendEmail(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSendCredentials()}
-                    autoFocus
-                    className={`${INPUT} pl-8`}
-                  />
-                </div>
-              </div>
-              {sendError && (
-                <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]">
-                  <AlertCircle size={12} /> {sendError}
-                </p>
-              )}
-              <div className="flex gap-2 pt-1">
-                <button onClick={closeSendModal} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
-                <button onClick={handleSendCredentials} disabled={sending} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
-                  {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  Send
-                </button>
-              </div>
-            </div>
-          )}
-        </ModalShell>
       )}
 
       {/* Confirm & Send Attendance Modal */}

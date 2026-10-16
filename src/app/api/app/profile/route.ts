@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { verifyMobileChangeOtp } from '@/lib/mobileChangeOtp';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -32,13 +33,29 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ message: 'Invalid JSON' }, { status: 400 });
   }
 
-  const { userId, email, mobile, avatarUrl, isPrivate } = body;
+  const { userId, email, mobile, avatarUrl, isPrivate, mobileOtp } = body;
 
   if (
     userId === undefined && email === undefined && mobile === undefined &&
     avatarUrl === undefined && isPrivate === undefined
   ) {
     return NextResponse.json({ message: 'No fields to update' }, { status: 400 });
+  }
+
+  // An Olympiad school's contact details belong to the school record and are
+  // managed by Mittsure (the app shows them read-only) — refuse them here too,
+  // so the app's read-only field isn't the only thing protecting them.
+  if (email !== undefined || mobile !== undefined) {
+    const account = await prisma.appUser.findUnique({
+      where: { id: appUser.id },
+      select: { schoolRefId: true },
+    });
+    if (account?.schoolRefId) {
+      return NextResponse.json(
+        { message: 'Email and mobile number are managed by Mittsure for school accounts. Please contact support to change them.' },
+        { status: 403 },
+      );
+    }
   }
 
   // Validate userId: 3-20 chars, any characters allowed
@@ -77,16 +94,30 @@ export async function PATCH(request: Request) {
 
   // Validate mobile: exactly 10 digits. Mobile numbers may be shared across
   // sibling accounts, so no uniqueness check here.
-  if (mobile !== undefined && mobile !== null && mobile !== '') {
-    if (!/^\d{10}$/.test(mobile.trim())) {
+  let mobileChanged = false;
+  if (mobile !== undefined) {
+    if (mobile === null || String(mobile).trim() === '') {
+      return NextResponse.json({ message: 'Mobile number cannot be removed' }, { status: 422 });
+    }
+    const newMobile = String(mobile).trim();
+    if (!/^\d{10}$/.test(newMobile)) {
       return NextResponse.json({ message: 'Mobile number must be exactly 10 digits' }, { status: 422 });
+    }
+
+    // Changing the number needs the code sent to the NEW number, so the account
+    // holder proves they own it (same protection as signup and account deletion).
+    const current = await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { mobile: true } });
+    mobileChanged = (current?.mobile ?? '') !== newMobile;
+    if (mobileChanged) {
+      const check = await verifyMobileChangeOtp(appUser.id, newMobile, mobileOtp);
+      if (!check.ok) return NextResponse.json({ message: check.message }, { status: check.status });
     }
   }
 
   const data: Record<string, any> = {};
   if (userId !== undefined)    data.userId    = userId.trim();
   if (email !== undefined)     data.email     = email?.trim()  || null;
-  if (mobile !== undefined)    data.mobile    = mobile?.trim() || null;
+  if (mobile !== undefined)    data.mobile    = String(mobile).trim();
   if (avatarUrl !== undefined) data.avatarUrl = avatarUrl      || null;
   if (isPrivate !== undefined) data.isPrivate = Boolean(isPrivate);
 

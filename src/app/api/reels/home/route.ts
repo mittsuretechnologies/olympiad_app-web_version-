@@ -79,7 +79,7 @@ async function hydrate(items: RawVideo[], effectiveUserId?: string) {
   const appUsersRaw = appUserIds.length > 0
     ? await prisma.appUser.findMany({
         where: { id: { in: appUserIds } },
-        select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
+        select: { id: true, userId: true, avatarUrl: true, olympiadId: true, schoolRefId: true },
       })
     : [];
   const appUserMap = new Map(appUsersRaw.map(u => [u.id, u]));
@@ -126,7 +126,7 @@ async function hydrate(items: RawVideo[], effectiveUserId?: string) {
         : school
         ? { id: null, name: appUserRaw?.userId ?? null, schoolId: school.id, schoolName: school.name, state: school.state ?? null, city: school.city ?? null }
         : null,
-      appUser: appUserRaw ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: appUserRaw.avatarUrl } : null,
+      appUser: appUserRaw ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: appUserRaw.avatarUrl, isOlympiadSchool: !!appUserRaw.schoolRefId } : null,
     };
   });
 }

@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
     const appUsersRaw = appUserIds.length > 0
       ? await prisma.appUser.findMany({
           where: { id: { in: appUserIds } },
-          select: { id: true, userId: true, avatarUrl: true },
+          select: { id: true, userId: true, avatarUrl: true, schoolRefId: true },
         })
       : [];
     const appUserMap = new Map(appUsersRaw.map(u => [u.id, u]));
@@ -136,7 +136,7 @@ export async function GET(request: NextRequest) {
           ? { id: v.student.id, name: v.student.name, schoolId: school?.id ?? null, schoolName: school?.name ?? null }
           : null,
         appUser: appUserRaw
-          ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: appUserRaw.avatarUrl }
+          ? { id: appUserRaw.id, userId: appUserRaw.userId, avatarUrl: appUserRaw.avatarUrl, isOlympiadSchool: !!appUserRaw.schoolRefId }
           : null,
       };
     });

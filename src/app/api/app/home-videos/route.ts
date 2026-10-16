@@ -62,13 +62,13 @@ export async function GET(request: Request) {
       const uploaderIds = [...new Set(userRows.map((v) => v.appUserId).filter(Boolean))] as string[];
       const [uploaders, myLikes] = await Promise.all([
         uploaderIds.length
-          ? prisma.appUser.findMany({ where: { id: { in: uploaderIds } }, select: { id: true, userId: true, avatarUrl: true } })
+          ? prisma.appUser.findMany({ where: { id: { in: uploaderIds } }, select: { id: true, userId: true, avatarUrl: true, schoolRefId: true } })
           : Promise.resolve([]),
         userRows.length
           ? prisma.like.findMany({ where: { userId: user.id, videoId: { in: userRows.map((v) => v.id) } }, select: { videoId: true } })
           : Promise.resolve([]),
       ]);
-      const uploaderById = new Map(uploaders.map((u) => [u.id, u]));
+      const uploaderById = new Map(uploaders.map(({ schoolRefId, ...u }) => [u.id, { ...u, isOlympiadSchool: !!schoolRefId }]));
       const likedIds = new Set(myLikes.map((l) => l.videoId));
       fromUsers = userRows.map((v) => {
         const caption = (v.caption ?? '').trim();

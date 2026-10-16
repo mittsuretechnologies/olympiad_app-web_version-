@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
-import { createNotification } from '@/lib/notifications';
+import { createNotification, notifyFollowersOfNewVideo } from '@/lib/notifications';
 import { ensureSchoolAccount } from '@/lib/schoolAccount';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 import { CLEAR_CLAIM, claimFreeFor, claimIsLive } from '@/lib/videoClaim';
@@ -490,7 +490,7 @@ export async function POST(request: Request) {
       where: { id: videoId },
       select: {
         status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true, uploadedBySchoolId: true,
-        caption: true, category: true, subCategory: true,
+        caption: true, category: true, subCategory: true, isPublic: true, olympiadVisibility: true,
         _count: { select: { evaluations: true } },
       },
     });
@@ -593,6 +593,19 @@ export async function POST(request: Request) {
     }
 
     await notifyVideoStatus({ id: videoId, ...before }, status, rejectionReason);
+
+    // Followers hear about it only the first time it goes live (not when an
+    // approved video is merely re-saved with a new category), and only if they
+    // can actually see it: not a private/hidden video or a private Olympiad one.
+    const visibleToFollowers = before.isPublic && !(before.isEvaluation && before.olympiadVisibility !== 'public');
+    if (status === 'APPROVED' && before.status !== 'APPROVED' && before.appUserId && visibleToFollowers) {
+      const uploader = await prisma.appUser.findUnique({ where: { id: before.appUserId }, select: { userId: true } });
+      await notifyFollowersOfNewVideo({
+        uploaderId: before.appUserId,
+        videoId,
+        uploaderUserId: uploader?.userId ?? 'Someone',
+      });
+    }
 
     return NextResponse.json({ message: `Video ${status.toLowerCase()} successfully`, video });
   } catch (error) {
