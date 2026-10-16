@@ -38,10 +38,11 @@ export async function POST(
       if (action === 'username') {
         const newUserId: string = (body?.username || '').trim();
         if (!newUserId) return NextResponse.json({ message: 'Username is required' }, { status: 400 });
+        // Case-insensitive: app login matches exact case, so names differing only by capitals can't coexist.
         const existing = await prisma.appUser.findFirst({
-          where: { userId: newUserId, id: { not: id } },
+          where: { userId: { equals: newUserId, mode: 'insensitive' }, id: { not: id } },
         });
-        if (existing) return NextResponse.json({ message: 'Username already taken' }, { status: 409 });
+        if (existing) return NextResponse.json({ message: 'Username already taken (usernames that differ only in capital letters count as the same)' }, { status: 409 });
         const updated = await prisma.appUser.update({
           where: { id },
           data: { userId: newUserId },

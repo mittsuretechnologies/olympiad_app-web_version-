@@ -25,7 +25,12 @@ export async function generateUserId(assignedName?: string | null): Promise<stri
   while (attempt < 20) {
     const suffix = randomSuffix(4);
     const userId = `${base}_${suffix}`;
-    const exists = await prisma.appUser.findUnique({ where: { userId } });
+    // Case-insensitive: login matches exact case, so "Ravi_ab12" and
+    // "ravi_ab12" must never both exist.
+    const exists = await prisma.appUser.findFirst({
+      where: { userId: { equals: userId, mode: 'insensitive' } },
+      select: { id: true },
+    });
     if (!exists) return userId;
     attempt++;
   }

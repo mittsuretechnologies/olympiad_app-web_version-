@@ -43,11 +43,13 @@ export async function POST(
         return NextResponse.json({ message: 'Username must be max 10 characters' }, { status: 400 });
       }
       // Check uniqueness (exclude self)
+      // Case-insensitive: schools log in to the app with this exact username, so
+      // names differing only by capitals can't coexist.
       const existing = await prisma.school.findFirst({
-        where: { username: newUsername, id: { not: id } },
+        where: { username: { equals: newUsername, mode: 'insensitive' }, id: { not: id } },
       });
       if (existing) {
-        return NextResponse.json({ message: 'Username already taken by another school' }, { status: 409 });
+        return NextResponse.json({ message: 'Username already taken by another school (capital letters do not make it different)' }, { status: 409 });
       }
       const updated = await prisma.school.update({
         where: { id },
