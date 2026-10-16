@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { getSignedMediaUrl } from '@/lib/s3';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,7 @@ const PAGE_SIZE = 24;
 // from / to (YYYY-MM-DD, upload date), search (caption, hashtags, username,
 // Olympiad ID, email, student name or school name), page.
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'videoDownloads');
   if (error) return error;
 
   try {

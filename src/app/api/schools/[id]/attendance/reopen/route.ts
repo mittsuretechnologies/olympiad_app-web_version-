@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 
 // POST /api/schools/:id/attendance/reopen — body: { reason }
@@ -13,7 +13,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { payload, error } = requireRole(request, ['SUPERADMIN']);
+  const { payload, error } = await requireAdmin(request, 'schools.attendance');
   if (error) return error;
 
   try {

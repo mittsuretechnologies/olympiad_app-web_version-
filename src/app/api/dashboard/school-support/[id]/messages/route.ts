@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 // The reply carries a status (default: Awaiting school), so answering and
 // moving the request along is one action. The school is emailed.
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { payload, error } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  const { payload, error } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
   if (error) return error;
-  const moduleCheck = await requireModule(payload, 'support');
+  const moduleCheck = await requireModule(payload, 'support', request);
   if (moduleCheck.error) return moduleCheck.error;
   const { id } = await params;
 

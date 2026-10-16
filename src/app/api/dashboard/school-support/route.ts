@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic';
 // inbox of School Panel requests. Unread (new school activity) first, then by
 // latest activity. Gated by the same 'support' module as app-user tickets.
 export async function GET(request: Request) {
-  const { payload, error } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  const { payload, error } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
   if (error) return error;
-  const moduleCheck = await requireModule(payload, 'support');
+  const moduleCheck = await requireModule(payload, 'support', request);
   if (moduleCheck.error) return moduleCheck.error;
 
   try {

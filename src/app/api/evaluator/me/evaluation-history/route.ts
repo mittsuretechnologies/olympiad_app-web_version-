@@ -18,14 +18,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    if (!['EVALUATOR', 'SUPERADMIN', 'REVIEWER'].includes(payload?.role) || !payload?.id) {
+    if (!['EVALUATOR', 'SUPERADMIN', 'MASTER_ADMIN', 'REVIEWER'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
     // Reviewer/SuperAdmin are oversight roles with unconditional access here;
-    // only Evaluator is gated by the evaluator.history module permission.
-    if (payload.role === 'EVALUATOR') {
-      const moduleCheck = await requireModule(payload, 'evaluator.history');
+    // Evaluator and MasterAdmin are gated by the evaluator.history module permission.
+    if (payload.role === 'EVALUATOR' || payload.role === 'MASTER_ADMIN') {
+      const moduleCheck = await requireModule(payload, 'evaluator.history', request);
       if (moduleCheck.error) return moduleCheck.error;
     }
 

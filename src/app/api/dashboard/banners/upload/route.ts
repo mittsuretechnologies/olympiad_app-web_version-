@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { detectImageExtension } from '@/lib/fileSignature';
 import { s3Enabled, uploadBufferToS3, imageContentType } from '@/lib/s3';
 
@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 // `field` in the form data just labels which slot the file is for so the
 // admin UI can call this once per image without two near-duplicate routes.
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, ['banners', 'appCarousel', 'homeVideos']);
   if (error) return error;
 
   try {

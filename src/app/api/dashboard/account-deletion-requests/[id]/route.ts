@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 import { hardDeleteAppUser } from '@/lib/accountDeletion';
 
@@ -9,7 +9,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { payload, error } = requireRole(request, ['SUPERADMIN']);
+  const { payload, error } = await requireAdmin(request, 'deletionRequests');
   if (error) return error;
 
   const { id } = await params;

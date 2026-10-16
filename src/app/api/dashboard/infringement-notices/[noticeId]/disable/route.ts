@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { recordAuditLog } from '@/lib/audit-log';
-import { requireSuperAdmin } from '../../auth';
+import { requireInfringementAdmin } from '../../auth';
 import { COPYRIGHT_DISABLED, copyrightReviewDueAt, formatReviewDate } from '@/lib/copyright';
 import { notifyUploaderOfCopyrightAction } from '@/lib/infringementNotices';
 
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // hidden everywhere, a notice shown in its place, and a review set for 21 days
 // from the date of the notice.
 export async function POST(request: Request, { params }: { params: Promise<{ noticeId: string }> }) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireInfringementAdmin(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {

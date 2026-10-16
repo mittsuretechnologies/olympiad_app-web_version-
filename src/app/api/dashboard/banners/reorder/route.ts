@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 
 // Body: { order: string[] } — array of BannerSlide ids in the desired display
 // order. Rewrites each row's `order` field to its index in the array.
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'banners');
   if (error) return error;
   try {
     const { order } = await request.json();

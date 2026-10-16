@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { getSignedMediaUrl } from '@/lib/s3';
 
 export const dynamic = 'force-dynamic';
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 // moderation/evaluation action (who did what, to what, and when).
 // Query params: action, actorRole, entityType, entityId, from, to, page, pageSize
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'activityLog');
   if (error) return error;
 
   try {

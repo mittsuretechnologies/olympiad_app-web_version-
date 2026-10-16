@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
 import { CLASS_CODE_BY_NAME } from '@/lib/classes';
 import { buildOlympiadCode, olympiadPrefixForCrm, OLYMPIAD_MAX_SEQUENCE } from '@/lib/olympiadIdFormat';
@@ -10,7 +10,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'schools.view');
   if (error) return error;
   try {
     const { id } = await params;
@@ -35,7 +35,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'schools.view');
   if (error) return error;
   try {
     const { id } = await params;

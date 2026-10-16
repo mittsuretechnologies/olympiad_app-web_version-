@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { SCHOOL_AGREEMENT_KEY, SCHOOL_AGREEMENT_VERSION } from '@/lib/agreements/school-onboarding';
 import { GENERAL_SCHOOL_AGREEMENT_ROLE } from '@/lib/generalSchool';
 
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // Query: q, status (all|active|inactive|agreement-pending), state, page,
 //        pageSize, all=1 (no pagination - for CSV export)
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'generalSchools');
   if (error) return error;
 
   try {

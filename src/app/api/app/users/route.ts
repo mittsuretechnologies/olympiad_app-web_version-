@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
 import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'reports.appusers');
   if (error) return error;
   try {
     const users = await prisma.appUser.findMany({

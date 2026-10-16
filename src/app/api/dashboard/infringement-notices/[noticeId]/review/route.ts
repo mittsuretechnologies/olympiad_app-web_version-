@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { recordAuditLog } from '@/lib/audit-log';
-import { requireSuperAdmin } from '../../auth';
+import { requireInfringementAdmin } from '../../auth';
 import { COPYRIGHT_DISABLED } from '@/lib/copyright';
 import { notifyUploaderOfCopyrightAction } from '@/lib/infringementNotices';
 
@@ -14,7 +14,7 @@ type Action = (typeof ACTIONS)[number];
 // body: { action: 'RESTORE' | 'REMOVE' | 'EXTEND', reason, dueAt? (EXTEND: ISO date) }
 // Closes (or postpones) the 21-day review of a copyright takedown (Policy 6.1–6.3).
 export async function POST(request: Request, { params }: { params: Promise<{ noticeId: string }> }) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireInfringementAdmin(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { readNoticeFile, type StoredNoticeFile } from '@/lib/infringementFiles';
-import { requireSuperAdmin } from '../../../auth';
+import { requireInfringementAdmin } from '../../../auth';
 
 export const dynamic = 'force-dynamic';
 
 // GET /api/dashboard/infringement-notices/:noticeId/files/:index — streams one proof document. SuperAdmin only.
 export async function GET(request: Request, { params }: { params: Promise<{ noticeId: string; index: string }> }) {
-  if (!requireSuperAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+  if (!await requireInfringementAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {
     const { noticeId, index } = await params;

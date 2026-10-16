@@ -25,7 +25,7 @@ export async function GET(request: Request) {
     // Reviewer/SuperAdmin are oversight roles with unconditional access here;
     // only Evaluator is gated by the evaluator.content module permission.
     if (isEvaluator) {
-      const moduleCheck = await requireModule(payload, 'evaluator.content');
+      const moduleCheck = await requireModule(payload, 'evaluator.content', request);
       if (moduleCheck.error) return moduleCheck.error;
     }
     const filter = isEvaluator ? { evaluatorId: payload.id } : {};

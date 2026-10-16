@@ -1,10 +1,10 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'credentials');
   if (error) return error;
   try {
     const viewers = await prisma.viewer.findMany({

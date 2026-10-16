@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { getSignedDownloadUrl } from '@/lib/s3';
 import { recordAuditLog } from '@/lib/audit-log';
@@ -19,7 +19,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'videoDownloads');
   if (error) return error;
 
   try {

@@ -4,10 +4,10 @@ import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 
 export async function POST(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'EVALUATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'EVALUATOR']);
   if (error) return error;
 
-  const moduleCheck = await requireModule(payload, 'evaluator.content');
+  const moduleCheck = await requireModule(payload, 'evaluator.content', request);
   if (moduleCheck.error) return moduleCheck.error;
 
   try {

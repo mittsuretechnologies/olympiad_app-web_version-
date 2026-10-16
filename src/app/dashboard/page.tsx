@@ -6,8 +6,9 @@ import {
   School, Hash, Users, AlertCircle, UploadCloud, Smartphone,
   Clock, CheckCircle2, XCircle, ArrowRight, BookOpen, Activity,
   PlaySquare, ChevronRight, KeyRound, BarChart2, Star, Loader2,
-  Download, Calendar, Check,
+  Download, Calendar, Check, ShieldCheck,
 } from 'lucide-react';
+import { tokenRole } from '@/lib/session-token';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
@@ -293,18 +294,44 @@ function DateRangeFilter({ value, onApply }: { value: DateRange; onApply: (range
   );
 }
 
+// "Super Admin" / "Master Admin" pill next to the page title — both roles
+// sign in under the same 'token' key, so this reads the role claim from it.
+function AdminRoleBadge() {
+  const [info, setInfo] = useState<{ role: string; name: string } | null>(null);
+  useEffect(() => {
+    const role = tokenRole(sessionStorage.getItem('token'));
+    let name = '';
+    try { name = JSON.parse(sessionStorage.getItem('adminUser') || '{}').name || ''; } catch { /* ignore */ }
+    if (role === 'SUPERADMIN' || role === 'MASTER_ADMIN') setInfo({ role, name });
+  }, []);
+  if (!info) return null;
+  const isMaster = info.role === 'MASTER_ADMIN';
+  return (
+    <span className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-bold ${isMaster ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-[#004f9f]/5 border-[#004f9f]/20 text-[#004f9f]'}`}>
+      <ShieldCheck size={13} />
+      {isMaster ? 'Master Admin' : 'Super Admin'}
+      {info.name && <span className="font-medium opacity-80">· {info.name}</span>}
+    </span>
+  );
+}
+
 function SuperAdminDashboard() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
   const [appliedRange, setAppliedRange] = useState<DateRange>(null);
+  // A Master Admin without the Dashboard Overview module gets a 403 here.
+  const [forbidden, setForbidden] = useState(false);
 
   const fetchOverview = (range: DateRange) => {
     setLoading(true);
     const qs = range ? `?from=${range.from}&to=${range.to}` : '';
     const token = sessionStorage.getItem('token') || '';
     fetch(`/api/dashboard/overview${qs}`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(d => setData(d))
+      .then(r => {
+        if (r.status === 403) { setForbidden(true); return null; }
+        return r.json();
+      })
+      .then(d => { if (d) setData(d); })
       .finally(() => setLoading(false));
   };
 
@@ -410,9 +437,24 @@ function SuperAdminDashboard() {
     return Array.from({ length: 5 }, (_, i) => Math.round(step * i));
   }, [data]);
 
+
+  if (forbidden) {
+    let name = '';
+    try { name = JSON.parse(sessionStorage.getItem('adminUser') || '{}').name || ''; } catch { /* ignore */ }
+    return (
+      <div className="py-16 text-center">
+        <h1 className="text-2xl font-medium text-[#004f9f]">Welcome{name ? `, ${name}` : ''}</h1>
+        <div className="mt-3"><AdminRoleBadge /></div>
+        <p className="text-sm text-gray-500 mt-2">Use the menu on the left to open the sections you have access to.</p>
+      </div>
+    );
+  }
   return (
     <div className="space-y-5">
-      <h1 className="text-2xl font-medium text-[#004f9f]">Dashboard</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="text-2xl font-medium text-[#004f9f]">Dashboard</h1>
+        <AdminRoleBadge />
+      </div>
 
       {/* Filter bar: date range + download report */}
       <div className="relative flex flex-wrap items-center justify-between gap-3">
@@ -863,6 +905,7 @@ function ReviewerDashboard() {
 }
 
 export default function Dashboard() {
+  // MASTER_ADMIN shares the SuperAdmin dashboard (gated by the 'overview' module server-side).
   const [role, setRole] = useState<'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | null>(null);
 
   useEffect(() => {

@@ -84,7 +84,7 @@ const ACTION_CFG: Record<string, { label: string; icon: any; color: string }> = 
 };
 
 const ACTION_OPTIONS = Object.keys(ACTION_CFG);
-const ROLE_OPTIONS = ['SUPERADMIN', 'MODERATOR', 'EVALUATOR', 'SCHOOL', 'REVIEWER'];
+const ROLE_OPTIONS = ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR', 'EVALUATOR', 'SCHOOL', 'REVIEWER'];
 
 function getAuthToken() {
   if (typeof window === 'undefined') return '';

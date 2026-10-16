@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireRole, requireModule } from '@/lib/auth-guard';
 import { CLAIM_TTL_MS, CLEAR_CLAIM, claimFreeFor } from '@/lib/videoClaim';
 
 export const dynamic = 'force-dynamic';
@@ -11,8 +11,12 @@ export const dynamic = 'force-dynamic';
 // See lib/videoClaim.ts for how claims lapse.
 
 export async function POST(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
   if (error) return error;
+  if (payload.role === 'MASTER_ADMIN') {
+    const moduleCheck = await requireModule(payload, 'moderation.pending', request);
+    if (moduleCheck.error) return moduleCheck.error;
+  }
 
   try {
     const { videoId } = await request.json().catch(() => ({}));
@@ -61,8 +65,12 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
   if (error) return error;
+  if (payload.role === 'MASTER_ADMIN') {
+    const moduleCheck = await requireModule(payload, 'moderation.pending', request);
+    if (moduleCheck.error) return moduleCheck.error;
+  }
 
   try {
     const { videoId } = await request.json().catch(() => ({}));

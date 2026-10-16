@@ -1,14 +1,8 @@
-import jwt from 'jsonwebtoken';
-import { getJwtSecret } from '@/lib/jwt-secret';
+import { requireAdmin } from '@/lib/auth-guard';
 
-export function requireSuperAdmin(request: Request) {
-  const auth = request.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  if (!token) return null;
-  try {
-    const payload = jwt.verify(token, getJwtSecret()) as any;
-    return payload?.role === 'SUPERADMIN' ? payload : null;
-  } catch {
-    return null;
-  }
+// SuperAdmin, or a MasterAdmin granted the Report Infringement module.
+// Returns the caller's token payload, or null when they may not act here.
+export async function requireInfringementAdmin(request: Request) {
+  const { payload } = await requireAdmin(request, 'infringement');
+  return payload ?? null;
 }

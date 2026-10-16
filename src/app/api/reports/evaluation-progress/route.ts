@@ -6,9 +6,9 @@ import { videoPercent } from '@/lib/kosh';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'EVALUATOR', 'REVIEWER']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'EVALUATOR', 'REVIEWER']);
   if (error) return error;
-  const moduleCheck = await requireModule(payload, 'reports.evaluation-progress');
+  const moduleCheck = await requireModule(payload, 'reports.evaluation-progress', request);
   if (moduleCheck.error) return moduleCheck.error;
   try {
     // 1. Get all approved evaluation videos with their evaluation status

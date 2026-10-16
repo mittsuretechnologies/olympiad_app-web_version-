@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { sendUploaderCredentialsEmail } from '@/lib/mailer';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { decryptPassword } from '@/lib/password-crypto';
 import { recordAccessLog } from '@/lib/audit-log';
 
@@ -12,7 +12,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'credentials.uploaders');
   if (error) return error;
   try {
     const { id } = await params;

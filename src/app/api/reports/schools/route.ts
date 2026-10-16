@@ -4,9 +4,9 @@ import { requireRole, requireModule } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
   if (error) return error;
-  const moduleCheck = await requireModule(payload, 'reports.schools');
+  const moduleCheck = await requireModule(payload, 'reports.schools', request);
   if (moduleCheck.error) return moduleCheck.error;
   try {
     const schools = await prisma.school.findMany({

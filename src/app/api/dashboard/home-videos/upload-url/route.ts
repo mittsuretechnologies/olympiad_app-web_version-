@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { getPresignedUploadUrl, s3Enabled, s3PublicUrl, videoContentType } from '@/lib/s3';
 import { safeVideoExt } from '@/lib/homeSectionVideos';
 
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // has no CORS rule for the dashboard's origin — the dashboard falls back to
 // POSTing the file to ./upload instead.
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'homeVideos');
   if (error) return error;
 
   if (!s3Enabled()) return NextResponse.json({ mode: 'server' });

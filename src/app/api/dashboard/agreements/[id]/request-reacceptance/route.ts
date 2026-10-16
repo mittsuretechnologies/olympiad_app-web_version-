@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // School Panel shows the agreement gate on the school's next visit and records
 // a fresh acceptance. Body: { reason?: string }
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { payload, error } = requireRole(request, ['SUPERADMIN']);
+  const { payload, error } = await requireAdmin(request, ['agreements', 'generalSchools']);
   if (error) return error;
 
   try {

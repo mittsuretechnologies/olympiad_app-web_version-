@@ -17,9 +17,9 @@ import { MITTFEST_TAG } from '@/lib/mittfest';
 // moderation screen already surfaces those as #mittfest too, so this report
 // needs to agree with that view.
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
   if (error) return error;
-  const moduleCheck = await requireModule(payload, 'reports.hashtag');
+  const moduleCheck = await requireModule(payload, 'reports.hashtag', request);
   if (moduleCheck.error) return moduleCheck.error;
 
   try {

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
 
 // Combined "last active" view across every account type in this schema:
@@ -18,7 +18,7 @@ import { recordAccessLog } from '@/lib/audit-log';
 // rather than hiding one of them. `accountKind` carries that split to the
 // client so it doesn't have to re-derive it from identifier shape.
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'reports.student-activity');
   if (error) return error;
 
   try {
