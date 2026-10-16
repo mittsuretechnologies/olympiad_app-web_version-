@@ -66,9 +66,13 @@ export async function POST(request: Request) {
       }
     }
 
+    // Usernames are matched exactly, capitals included ("Binku" is not "binku").
+    // New usernames can't differ from an existing one only by case (see
+    // generateUserId and the username-change routes), so this never splits one
+    // person across two accounts. Emails above stay case-insensitive.
     if (!user) {
       user = await prisma.appUser.findFirst({
-        where: { userId: { equals: typed, mode: 'insensitive' } },
+        where: { userId: typed },
       });
     }
 
@@ -89,7 +93,7 @@ export async function POST(request: Request) {
       });
     } else if (!user) {
       olympiadSchool = await prisma.school.findFirst({
-        where: { username: { equals: typed, mode: 'insensitive' } },
+        where: { username: typed },
         select: { id: true, schoolId: true, name: true, username: true, state: true, district: true, isActive: true, password: true, email: true, phone: true },
       });
     }
