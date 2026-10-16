@@ -139,6 +139,33 @@ export async function transcodeForStreaming(
   outputPath: string,
   opts: TranscodeOptions = {},
 ): Promise<void> {
+  try {
+    await transcodeOnce(inputPath, outputPath, opts);
+  } catch (err) {
+    // Some phones write an H.264 colour-range tag that ffmpeg refuses to
+    // negotiate ("Invalid color range") — the picture data is fine. Rewrite
+    // just that tag (a lossless copy, takes seconds) and encode from the copy.
+    if (!(err instanceof Error) || !err.message.includes('Invalid color range')) throw err;
+    const fixedPath = `${outputPath}.range-fixed.mp4`;
+    try {
+      await runFfmpeg([
+        '-i', inputPath,
+        '-bsf:v', 'h264_metadata=video_full_range_flag=0:colour_primaries=1:transfer_characteristics=1:matrix_coefficients=1',
+        '-c', 'copy',
+        '-y', fixedPath,
+      ], 120_000);
+      await transcodeOnce(fixedPath, outputPath, opts);
+    } finally {
+      await unlink(fixedPath).catch(() => {});
+    }
+  }
+}
+
+async function transcodeOnce(
+  inputPath: string,
+  outputPath: string,
+  opts: TranscodeOptions,
+): Promise<void> {
   const filters: string[] = [];
   if (typeof opts.cropX === 'number') {
     const x = Math.min(1, Math.max(0, opts.cropX));
