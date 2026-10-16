@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { getSignedMediaUrl } from '@/lib/s3';
 import { generateServerThumbnail, isHomeSection } from '@/lib/homeSectionVideos';
 
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // included, in display order per section. Adds short-lived signed preview URLs:
 // the bucket is private, so the stored URLs don't load directly in a browser.
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'homeVideos');
   if (error) return error;
   try {
     const rows = await prisma.homeSectionVideo.findMany({
@@ -33,7 +33,7 @@ export async function GET(request: Request) {
 // POST /api/dashboard/home-videos — create a video. The files are uploaded
 // first (see ./upload-url and ./upload); this only records their URLs.
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'homeVideos');
   if (error) return error;
   try {
     const { section, title, description, videoUrl, thumbnailUrl } = await request.json();

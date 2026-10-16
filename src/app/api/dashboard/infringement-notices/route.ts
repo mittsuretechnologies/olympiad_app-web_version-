@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from './auth';
+import { requireInfringementAdmin } from './auth';
 import type { StoredNoticeFile } from '@/lib/infringementFiles';
 import { COPYRIGHT_DISABLED } from '@/lib/copyright';
 import { NOTICE_VIDEO_SELECT, reviewDueWhere, withUploaders } from '@/lib/infringementNotices';
@@ -11,7 +11,7 @@ const STATUSES = ['PENDING', 'CONTENT_REMOVED', 'REJECTED'];
 
 // GET /api/dashboard/infringement-notices?status=PENDING|CONTENT_REMOVED|REJECTED|REVIEW_DUE — SuperAdmin only.
 export async function GET(request: Request) {
-  if (!requireSuperAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+  if (!await requireInfringementAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {
     const status = new URL(request.url).searchParams.get('status');

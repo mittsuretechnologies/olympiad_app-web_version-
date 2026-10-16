@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, ['uploaders.register', 'uploaders.view', 'credentials.uploaders']);
   if (error) return error;
   try {
     const uploaders = await prisma.uploader.findMany({
@@ -47,7 +47,7 @@ function generateUsername(name: string, uploaderId: string): string {
 }
 
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, ['uploaders.register', 'uploaders.view', 'credentials.uploaders']);
   if (error) return error;
   try {
     const body = await request.json();

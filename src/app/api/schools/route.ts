@@ -7,12 +7,12 @@ import { buildOlympiadCode, olympiadPrefixForCrm } from '@/lib/olympiadIdFormat'
 import { crmIdProblem } from '@/lib/schoolCrm';
 import { sendSchoolCredentialsEmail } from '@/lib/mailer';
 import { stateNameToCode } from '@/lib/indianStateCodes';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
 import { recordAccessLog } from '@/lib/audit-log';
 
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, ['schools.register', 'schools.bulk', 'schools.view']);
   if (error) return error;
   try {
     // Paginated: ?page=1&pageSize=25&q=<name | School ID | CRM ID>
@@ -84,7 +84,7 @@ function generateUsername(schoolName: string, schoolId: string): string {
 }
 
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, ['schools.register', 'schools.bulk', 'schools.view']);
   if (error) return error;
   try {
     const body = await request.json();

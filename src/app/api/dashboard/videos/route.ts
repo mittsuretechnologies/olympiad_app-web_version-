@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole, requireModule } from '@/lib/auth-guard';
+import { requireRole, requireModule, requireAdmin } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 import { createNotification } from '@/lib/notifications';
 import { ensureSchoolAccount } from '@/lib/schoolAccount';
@@ -246,7 +246,7 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'moderation.pending');
   if (error) return error;
 
   try {
@@ -328,13 +328,13 @@ async function slotTakenBySibling(appUserId: string, videoId: string, slot: 'A' 
 }
 
 /**
- * SuperAdmin override: send an approved or rejected video back to the Pending
+ * Admin (SuperAdmin / MasterAdmin) override: send an approved or rejected video back to the Pending
  * queue so it can be decided afresh. Quality and rejection reason are cleared
  * since both belong to the decision being undone. Single video only.
  */
 async function moveToPending(payload: { id: string; role: string; name?: string; email?: string }, videoId: unknown, expected: string) {
-  if (payload.role !== 'SUPERADMIN') {
-    return NextResponse.json({ message: 'Only a SuperAdmin can move a video back to Pending.' }, { status: 403 });
+  if (payload.role !== 'SUPERADMIN' && payload.role !== 'MASTER_ADMIN') {
+    return NextResponse.json({ message: 'Only an admin can move a video back to Pending.' }, { status: 403 });
   }
   if (typeof videoId !== 'string' || !videoId) {
     return NextResponse.json({ message: 'videoId required' }, { status: 400 });
@@ -394,10 +394,10 @@ async function moveToPending(payload: { id: string; role: string; name?: string;
 }
 
 export async function POST(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
   if (error) return error;
 
-  const moduleCheck = await requireModule(payload, 'moderation.pending');
+  const moduleCheck = await requireModule(payload, 'moderation.pending', request);
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
@@ -427,9 +427,9 @@ export async function POST(request: Request) {
     }
 
     // Pulling back an already-approved video (Approved → Rejected) is a
-    // SuperAdmin-only override; moderators can only decide pending videos.
-    if (expected === 'APPROVED' && status === 'REJECTED' && payload!.role !== 'SUPERADMIN') {
-      return NextResponse.json({ message: 'Only a SuperAdmin can reject an already-approved video.' }, { status: 403 });
+    // admin-only (SuperAdmin / MasterAdmin) override; moderators can only decide pending videos.
+    if (expected === 'APPROVED' && status === 'REJECTED' && payload!.role !== 'SUPERADMIN' && payload!.role !== 'MASTER_ADMIN') {
+      return NextResponse.json({ message: 'Only an admin can reject an already-approved video.' }, { status: 403 });
     }
 
     const actor = {
@@ -609,10 +609,10 @@ export async function POST(request: Request) {
 const MAX_CAPTION_LENGTH = 500;
 
 export async function PATCH(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
   if (error) return error;
 
-  const moduleCheck = await requireModule(payload, 'moderation.pending');
+  const moduleCheck = await requireModule(payload, 'moderation.pending', request);
   if (moduleCheck.error) return moduleCheck.error;
 
   try {

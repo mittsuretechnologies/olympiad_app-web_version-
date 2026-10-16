@@ -1,26 +1,19 @@
 import { NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { requireAdmin } from '@/lib/auth-guard';
 import { prisma } from '@/lib/prisma';
-import { getJwtSecret } from '@/lib/jwt-secret';
 import { recordAccessLog } from '@/lib/audit-log';
 
 export const dynamic = 'force-dynamic';
 
-function requireSuperAdmin(request: Request) {
-  const auth = request.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  if (!token) return null;
-  try {
-    const payload = jwt.verify(token, getJwtSecret()) as any;
-    return payload?.role === 'SUPERADMIN' ? payload : null;
-  } catch {
-    return null;
-  }
+// SuperAdmin, or a MasterAdmin granted the Support module.
+async function requireAdminAccess(request: Request) {
+  const { payload } = await requireAdmin(request, 'support');
+  return payload ?? null;
 }
 
-// GET /api/dashboard/support-tickets?status=OPEN|RESOLVED — list all Help & Support queries. SuperAdmin only.
+// GET /api/dashboard/support-tickets?status=OPEN|RESOLVED — list all Help & Support queries. SuperAdmin or a granted MasterAdmin.
 export async function GET(request: Request) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireAdminAccess(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {

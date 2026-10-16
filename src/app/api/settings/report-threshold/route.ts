@@ -1,32 +1,25 @@
 import { NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { requireAdmin } from '@/lib/auth-guard';
 import { getReportThreshold, setReportThreshold } from '@/lib/reportSettings';
-import { getJwtSecret } from '@/lib/jwt-secret';
 
-function requireSuperAdmin(request: Request) {
-  const auth = request.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  if (!token) return null;
-  try {
-    const payload = jwt.verify(token, getJwtSecret()) as any;
-    return payload?.role === 'SUPERADMIN' ? payload : null;
-  } catch {
-    return null;
-  }
+// SuperAdmin, or a MasterAdmin granted the Reported Videos module.
+async function requireAdminAccess(request: Request) {
+  const { payload } = await requireAdmin(request, 'moderation.reported');
+  return payload ?? null;
 }
 
-// GET — current report threshold (SuperAdmin only)
+// GET — current report threshold (SuperAdmin / granted MasterAdmin)
 export async function GET(request: Request) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireAdminAccess(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   const threshold = await getReportThreshold();
   return NextResponse.json({ threshold });
 }
 
-// POST — update the report threshold (SuperAdmin only)
+// POST — update the report threshold (SuperAdmin / granted MasterAdmin)
 export async function POST(request: Request) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireAdminAccess(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {

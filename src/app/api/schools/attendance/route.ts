@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 
 // Aggregate attendance status across every school with an exam date, for the
 // SuperAdmin attendance-reports dashboard: how many students are registered,
 // how many have been marked, and whether the school has confirmed & sent.
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'schools.attendance');
   if (error) return error;
 
   try {

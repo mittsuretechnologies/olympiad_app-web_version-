@@ -8,9 +8,9 @@ import { notifySchool, TICKET_MAIL_SELECT } from '@/lib/schoolSupportNotify';
 export const dynamic = 'force-dynamic';
 
 async function guard(request: Request) {
-  const { payload, error } = requireRole(request, ['SUPERADMIN', 'MODERATOR']);
+  const { payload, error } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
   if (error) return { error };
-  const moduleCheck = await requireModule(payload, 'support');
+  const moduleCheck = await requireModule(payload, 'support', request);
   if (moduleCheck.error) return { error: moduleCheck.error };
   return { payload };
 }

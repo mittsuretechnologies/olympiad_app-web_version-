@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
 
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
   if (error) return error;
-  const moduleCheck = await requireModule(payload, 'reports.olympiad');
+  const moduleCheck = await requireModule(payload, 'reports.olympiad', request);
   if (moduleCheck.error) return moduleCheck.error;
   try {
     // Web students with 2 approved evaluation videos

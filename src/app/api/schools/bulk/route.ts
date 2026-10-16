@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { stateNameToCode } from '@/lib/indianStateCodes';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { olympiadPrefixForCrm } from '@/lib/olympiadIdFormat';
 import { crmIdProblem } from '@/lib/schoolCrm';
 
@@ -34,7 +34,7 @@ function generateUsername(schoolName: string, schoolId: string): string {
 }
 
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, ['schools.bulk', 'schools.view']);
   if (error) return error;
   try {
     const { schools } = await request.json();

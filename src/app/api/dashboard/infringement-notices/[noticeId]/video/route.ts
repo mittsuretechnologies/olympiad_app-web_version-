@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { recordAuditLog } from '@/lib/audit-log';
-import { requireSuperAdmin } from '../../auth';
+import { requireInfringementAdmin } from '../../auth';
 import { videoIdCandidates } from '@/lib/copyright';
 import { NOTICE_VIDEO_SELECT, withUploaders } from '@/lib/infringementNotices';
 
@@ -21,14 +21,14 @@ async function resolveVideo(input: unknown) {
 
 // GET /api/dashboard/infringement-notices/:noticeId/video?q=<id or link> — preview before linking.
 export async function GET(request: Request) {
-  if (!requireSuperAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+  if (!await requireInfringementAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   const { video, error } = await resolveVideo(new URL(request.url).searchParams.get('q'));
   return error ?? NextResponse.json({ video });
 }
 
 // POST /api/dashboard/infringement-notices/:noticeId/video — body: { video: <id or link> }
 export async function POST(request: Request, { params }: { params: Promise<{ noticeId: string }> }) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireInfringementAdmin(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {
@@ -61,7 +61,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ not
 
 // DELETE /api/dashboard/infringement-notices/:noticeId/video — unlink.
 export async function DELETE(request: Request, { params }: { params: Promise<{ noticeId: string }> }) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireInfringementAdmin(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {

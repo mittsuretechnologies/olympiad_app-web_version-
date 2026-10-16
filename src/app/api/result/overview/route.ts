@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import {
   KOSH_KEYS, KOSH_LABELS, KOSH_MAX_SCORE, VIDEO_MAX_SCORE, REQUIRED_VIDEOS,
   koshScoresFromVideos, koshPercent, koshGrade, combineKoshPercent,
@@ -11,7 +11,7 @@ import { getLatestExamResults } from '@/lib/scanner-exam';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'result');
   if (error) return error;
   try {
     // Which set of exam marks drives the kosha %/holistic score — AI's own

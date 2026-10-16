@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireSuperAdmin } from '../auth';
+import { requireInfringementAdmin } from '../auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -8,7 +8,7 @@ const STATUSES = ['PENDING', 'CONTENT_REMOVED', 'REJECTED'];
 
 // PATCH /api/dashboard/infringement-notices/:noticeId — body: { status?, adminNotes? }
 export async function PATCH(request: Request, { params }: { params: Promise<{ noticeId: string }> }) {
-  if (!requireSuperAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+  if (!await requireInfringementAdmin(request)) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   try {
     const { noticeId } = await params;

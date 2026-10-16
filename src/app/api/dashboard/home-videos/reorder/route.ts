@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { isHomeSection } from '@/lib/homeSectionVideos';
 
 // POST /api/dashboard/home-videos/reorder
@@ -8,7 +8,7 @@ import { isHomeSection } from '@/lib/homeSectionVideos';
 // video ids in display order. Each row's `order` becomes its index. Scoped to
 // one section so a reorder can never move a video between sections.
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'homeVideos');
   if (error) return error;
   try {
     const { section, order } = await request.json();

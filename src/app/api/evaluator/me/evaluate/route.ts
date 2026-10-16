@@ -20,11 +20,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
     }
 
-    if (!['EVALUATOR', 'SUPERADMIN'].includes(payload?.role) || !payload?.id) {
+    if (!['EVALUATOR', 'SUPERADMIN', 'MASTER_ADMIN'].includes(payload?.role) || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
 
-    const moduleCheck = await requireModule(payload, 'evaluator.content');
+    const moduleCheck = await requireModule(payload, 'evaluator.content', request);
     if (moduleCheck.error) return moduleCheck.error;
 
     let evaluatorId = payload.id;
@@ -52,6 +52,22 @@ export async function POST(request: Request) {
           }
         });
         evaluatorId = shadow.id;
+      }
+    } else if (payload.role === 'MASTER_ADMIN') {
+      // Same shadow-evaluator idea as SuperAdmin, matched by id only so a
+      // MasterAdmin can never land on a real evaluator's row by sharing an email.
+      const existingEvaluator = await prisma.talentEvaluator.findUnique({ where: { id: payload.id } });
+      if (!existingEvaluator) {
+        await prisma.talentEvaluator.create({
+          data: {
+            id: payload.id,
+            evaluatorId: `MADMIN_${payload.id.slice(0, 8).toUpperCase()}`,
+            name: payload.name || 'Master Admin',
+            email: payload.username,
+            password: 'shadow_password_not_used_directly',
+            isActive: true,
+          }
+        });
       }
     }
 
@@ -85,7 +101,7 @@ export async function POST(request: Request) {
     const existing = video.evaluations[0] || null;
     if (existing) {
       const isOwner = existing.evaluatorId === payload.id;
-      if (payload.role !== 'SUPERADMIN' && !isOwner) {
+      if (payload.role === 'EVALUATOR' && !isOwner) {
         return NextResponse.json({ message: 'This video has already been evaluated by another evaluator' }, { status: 409 });
       }
       if (existing.isPublished) {

@@ -15,6 +15,20 @@ export function isTokenExpired(token: string): boolean {
   }
 }
 
+// The unverified `role` claim — for choosing what UI to show only. SuperAdmin
+// and MasterAdmin both sign in under the 'token' key, so its presence alone no
+// longer tells them apart.
+export function tokenRole(token: string | null): string | null {
+  const parts = (token || '').split('.');
+  if (parts.length !== 3) return null;
+  try {
+    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+    return typeof payload?.role === 'string' ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 export function clearSchoolSession() {
   sessionStorage.removeItem('schoolToken');
   sessionStorage.removeItem('schoolUser');

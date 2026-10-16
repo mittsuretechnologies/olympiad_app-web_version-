@@ -6,7 +6,7 @@ import { Readable } from 'stream';
 import os from 'os';
 import path from 'path';
 import { randomUUID } from 'crypto';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { s3Enabled, uploadLargeFileToS3, videoContentType } from '@/lib/s3';
 import { safeVideoExt } from '@/lib/homeSectionVideos';
 
@@ -22,7 +22,7 @@ export const maxDuration = 3600;
 // configured, or kept under public/uploads/home-videos otherwise. Excluded from
 // src/middleware.ts for the same reason (middleware would buffer the body).
 export async function POST(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'homeVideos');
   if (error) return error;
 
   let tmpPath: string | null = null;

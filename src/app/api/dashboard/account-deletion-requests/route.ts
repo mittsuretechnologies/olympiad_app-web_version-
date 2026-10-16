@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
 
 // GET /api/dashboard/account-deletion-requests
@@ -10,7 +10,7 @@ import { recordAccessLog } from '@/lib/audit-log';
 // AppUser row entirely (see the [id] route), and this row cascades away
 // with it — there is nothing left to list.
 export async function GET(request: Request) {
-  const { error, payload } = requireRole(request, ['SUPERADMIN']);
+  const { error, payload } = await requireAdmin(request, 'deletionRequests');
   if (error) return error;
 
   try {

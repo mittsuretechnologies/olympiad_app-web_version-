@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth-guard';
 
 // GET — returns global role perms + individual perms
 export async function GET(request: Request) {
-  const { error } = requireRole(request, ['SUPERADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
+  const { error } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
   if (error) return error;
   try {
     const [global, individual] = await Promise.all([
@@ -14,6 +14,7 @@ export async function GET(request: Request) {
           reviewer: { select: { id: true, name: true, reviewerId: true } },
           evaluator: { select: { id: true, name: true, evaluatorId: true } },
           moderator: { select: { id: true, name: true, moderatorId: true } },
+          masterAdmin: { select: { id: true, name: true, username: true } },
         },
       }),
     ]);

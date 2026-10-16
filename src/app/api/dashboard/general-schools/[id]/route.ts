@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 import { recordAuditLog } from '@/lib/audit-log';
 import { createNotification } from '@/lib/notifications';
 import { GENERAL_SCHOOL_AGREEMENT_ROLE } from '@/lib/generalSchool';
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 //       its videos from every feed and search (see lib/videoVisibility.ts).
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'generalSchools');
   if (error) return error;
 
   try {
@@ -64,7 +64,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 }
 
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  const { payload, error } = requireRole(request, ['SUPERADMIN']);
+  const { payload, error } = await requireAdmin(request, 'generalSchools');
   if (error) return error;
 
   try {

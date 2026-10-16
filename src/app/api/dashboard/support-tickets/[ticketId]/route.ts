@@ -1,20 +1,13 @@
 import { NextResponse } from 'next/server';
-import jwt from 'jsonwebtoken';
+import { requireAdmin } from '@/lib/auth-guard';
 import { prisma } from '@/lib/prisma';
-import { getJwtSecret } from '@/lib/jwt-secret';
 
 export const dynamic = 'force-dynamic';
 
-function requireSuperAdmin(request: Request) {
-  const auth = request.headers.get('authorization') || '';
-  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-  if (!token) return null;
-  try {
-    const payload = jwt.verify(token, getJwtSecret()) as any;
-    return payload?.role === 'SUPERADMIN' ? payload : null;
-  } catch {
-    return null;
-  }
+// SuperAdmin, or a MasterAdmin granted the Support module.
+async function requireAdminAccess(request: Request) {
+  const { payload } = await requireAdmin(request, 'support');
+  return payload ?? null;
 }
 
 // PATCH /api/dashboard/support-tickets/:ticketId — body: { status?: 'OPEN' | 'RESOLVED', response?: string }
@@ -22,7 +15,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ ticketId: string }> }
 ) {
-  const admin = requireSuperAdmin(request);
+  const admin = await requireAdminAccess(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
   const { ticketId } = await params;

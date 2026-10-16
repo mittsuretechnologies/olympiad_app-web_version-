@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { isMasterAdminUsername } from '@/lib/masterAdmin';
 
 export async function POST(request: Request) {
   try {
@@ -15,6 +16,27 @@ export async function POST(request: Request) {
         { message: 'Username/email and password are required' },
         { status: 400 }
       );
+    }
+
+    // 0) Try MasterAdmin (by username, always "<handle>-master@mittmee")
+    if (isMasterAdminUsername(identifier)) {
+      const master = await prisma.masterAdmin.findUnique({ where: { username: identifier.toLowerCase() } });
+      if (!master) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+      const ok = await bcrypt.compare(password, master.password);
+      if (!ok) return NextResponse.json({ message: 'Invalid credentials' }, { status: 401 });
+      if (!master.isActive) return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
+      const token = jwt.sign(
+        { id: master.id, username: master.username, email: master.email, name: master.name, role: 'MASTER_ADMIN' },
+        getJwtSecret(),
+        { expiresIn: '1d' }
+      );
+      return NextResponse.json({
+        message: 'Login successful',
+        token,
+        role: 'MASTER_ADMIN',
+        redirect: '/dashboard',
+        user: { id: master.id, username: master.username, email: master.email, name: master.name, jobTitle: master.jobTitle, avatar: master.avatar },
+      });
     }
 
     // 1) Try SuperAdmin (by email)

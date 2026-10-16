@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireAdmin } from '@/lib/auth-guard';
 
 // Update name/email and/or toggle active/inactive — only the fields present
 // in the body are changed, so a plain { isActive } toggle still works as-is.
@@ -8,7 +8,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'credentials.masterReviewers');
   if (error) return error;
   try {
     const { id } = await params;
@@ -41,7 +41,7 @@ export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = requireRole(request, ['SUPERADMIN']);
+  const { error } = await requireAdmin(request, 'credentials.masterReviewers');
   if (error) return error;
   try {
     const { id } = await params;

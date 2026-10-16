@@ -1,40 +1,35 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, Eye, EyeOff, User, Globe, Trash2 } from 'lucide-react';
+import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, Eye, EyeOff, User, Globe, Trash2, Lock, Pencil } from 'lucide-react';
+import { modulesForRole, readOnlyMarker, type PermissionModule, type PermissionRole, type PermissionSubItem } from '@/lib/permission-modules';
 
-type RoleKey = 'EVALUATOR' | 'MODERATOR';
+type RoleKey = PermissionRole;
 type ViewMode = 'global' | 'individual';
 
-interface SubItem { key: string; label: string; }
-interface Module { key: string; label: string; subItems: SubItem[]; }
-
-const MODULES: Module[] = [
-  { key: 'schools', label: 'Schools', subItems: [{ key: 'schools.register', label: 'Register School' }, { key: 'schools.bulk', label: 'Bulk Upload' }, { key: 'schools.view', label: 'View / Edit Schools' }] },
-  { key: 'moderation', label: 'Moderation', subItems: [{ key: 'moderation.pending', label: 'Pending Approvals' }, { key: 'moderation.reported', label: 'Reported Videos' }, { key: 'moderation.moderators', label: 'Create Moderator' }] },
-  { key: 'support', label: 'Support', subItems: [] },
-  { key: 'uploaders', label: 'Uploaders', subItems: [{ key: 'uploaders.register', label: 'Register Uploader' }, { key: 'uploaders.view', label: 'View / Manage Uploaders' }] },
-  { key: 'credentials', label: 'Credentials', subItems: [{ key: 'credentials.schools', label: 'School Credentials' }, { key: 'credentials.uploaders', label: 'Uploader Credentials' }, { key: 'credentials.students', label: 'Student Credentials' }, { key: 'credentials.reviewers', label: 'Reviewer Credentials' }, { key: 'credentials.masterReviewers', label: 'Master Reviewer Credentials' }, { key: 'credentials.evaluators', label: 'Evaluator Credentials' }] },
-  { key: 'evaluator', label: 'Evaluator', subItems: [{ key: 'evaluator.manage', label: 'Manage Evaluators' }, { key: 'evaluator.content', label: 'Evaluate Content' }, { key: 'evaluator.history', label: 'Evaluation History' }] },
-  { key: 'reports', label: 'Reports', subItems: [{ key: 'reports.students', label: 'Student Report' }, { key: 'reports.olympiad', label: 'Olympiad Completions' }, { key: 'reports.evaluation-progress', label: 'Evaluation Progress' }, { key: 'reports.schools', label: 'School Report' }, { key: 'reports.appusers', label: 'App Users' }, { key: 'reports.hashtag', label: 'Hashtag Campaign' }] },
-];
+type Module = PermissionModule;
+type SubItem = PermissionSubItem;
 
 const ROLES: { key: RoleKey; label: string }[] = [
+  { key: 'MASTER_ADMIN', label: 'Master Admin' },
   { key: 'EVALUATOR', label: 'Evaluator' },
   { key: 'MODERATOR', label: 'Moderator' },
 ];
 
 const roleLabel = (role: RoleKey) => ROLES.find(r => r.key === role)?.label || role;
 
-interface Member { id: string; name: string; evaluatorId?: string; moderatorId?: string; }
-interface IndividualPerm { memberId: string; allowedModules: string[]; evaluator?: Member; moderator?: Member; }
+interface Member { id: string; name: string; evaluatorId?: string; moderatorId?: string; username?: string; }
+interface IndividualPerm { memberId: string; allowedModules: string[]; evaluator?: Member; moderator?: Member; masterAdmin?: Member; }
 
 function ModuleList({
-  allowed, setAllowed, search,
+  modules, allowed, setAllowed, search, readOnlyOption = false,
 }: {
+  modules: Module[];
   allowed: string[];
   setAllowed: (next: string[]) => void;
   search: string;
+  // Master Admin only: per-module "view only" switch (stored as "ro:<key>").
+  readOnlyOption?: boolean;
 }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -42,7 +37,7 @@ function ModuleList({
 
   const toggleModule = (mod: Module) => {
     const isOn = allowed.includes(mod.key);
-    if (isOn) setAllowed(allowed.filter(k => k !== mod.key && !mod.subItems.some(s => s.key === k)));
+    if (isOn) setAllowed(allowed.filter(k => k !== mod.key && k !== readOnlyMarker(mod.key) && !mod.subItems.some(s => s.key === k)));
     else { const toAdd = [mod.key, ...mod.subItems.map(s => s.key)].filter(k => !allowed.includes(k)); setAllowed([...allowed, ...toAdd]); }
   };
 
@@ -51,15 +46,20 @@ function ModuleList({
     if (isOn) {
       const next = allowed.filter(k => k !== sub.key);
       const anyLeft = mod.subItems.some(s => s.key !== sub.key && next.includes(s.key));
-      setAllowed(anyLeft ? next : next.filter(k => k !== mod.key));
+      setAllowed(anyLeft ? next : next.filter(k => k !== mod.key && k !== readOnlyMarker(mod.key)));
     } else {
       setAllowed([...allowed, sub.key, ...(!allowed.includes(mod.key) ? [mod.key] : [])]);
     }
   };
 
+  const toggleReadOnly = (mod: Module) => {
+    const marker = readOnlyMarker(mod.key);
+    setAllowed(allowed.includes(marker) ? allowed.filter(k => k !== marker) : [...allowed, marker]);
+  };
+
   const filtered = search.trim()
-    ? MODULES.filter(m => m.label.toLowerCase().includes(search.toLowerCase()) || m.subItems.some(s => s.label.toLowerCase().includes(search.toLowerCase())))
-    : MODULES;
+    ? modules.filter(m => m.label.toLowerCase().includes(search.toLowerCase()) || m.subItems.some(s => s.label.toLowerCase().includes(search.toLowerCase())))
+    : modules;
 
   return (
     <div className="divide-y divide-gray-50">
@@ -67,6 +67,7 @@ function ModuleList({
         const isOn = allowed.includes(mod.key);
         const isExpanded = expanded.has(mod.key);
         const enabledSubCount = mod.subItems.filter(s => allowed.includes(s.key)).length;
+        const isReadOnly = allowed.includes(readOnlyMarker(mod.key));
         return (
           <div key={mod.key}>
             <div className={`flex items-center gap-4 px-5 py-4 transition-colors ${isOn ? 'bg-white' : 'bg-gray-50/50'}`}>
@@ -79,6 +80,13 @@ function ModuleList({
                   <p className="text-[11px] text-gray-400 mt-0.5">{isOn ? `${enabledSubCount}/${mod.subItems.length} sub-items enabled` : 'Disabled'}</p>
                 )}
               </div>
+              {readOnlyOption && isOn && (
+                <button onClick={() => toggleReadOnly(mod)}
+                  title={isReadOnly ? 'Sirf dekh sakte hain — click karke full access do' : 'Dekh aur badal sakte hain — click karke read only karo'}
+                  className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-colors ${isReadOnly ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' : 'bg-green-50 border-green-200 text-green-700 hover:bg-green-100'}`}>
+                  {isReadOnly ? <><Lock size={11} /> Read only</> : <><Pencil size={11} /> Full access</>}
+                </button>
+              )}
               {mod.subItems.length > 0 && (
                 <button onClick={() => toggleExpand(mod.key)} className="p-1.5 text-gray-300 hover:text-gray-500 transition-colors">
                   <ChevronDown size={14} className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
@@ -122,11 +130,12 @@ function authHeaders(): Record<string, string> {
 
 export default function PermissionControlPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('global');
-  const [activeRole, setActiveRole] = useState<RoleKey>('EVALUATOR');
-  const [globalPerms, setGlobalPerms] = useState<Record<RoleKey, string[]>>({ EVALUATOR: [], MODERATOR: [] });
+  const [activeRole, setActiveRole] = useState<RoleKey>('MASTER_ADMIN');
+  const [globalPerms, setGlobalPerms] = useState<Record<RoleKey, string[]>>({ MASTER_ADMIN: [], EVALUATOR: [], MODERATOR: [] });
   const [individualPerms, setIndividualPerms] = useState<IndividualPerm[]>([]);
   const [evaluators, setEvaluators] = useState<Member[]>([]);
   const [moderators, setModerators] = useState<Member[]>([]);
+  const [masterAdmins, setMasterAdmins] = useState<Member[]>([]);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
   const [individualAllowed, setIndividualAllowed] = useState<string[]>([]);
   const [hasIndividual, setHasIndividual] = useState(false);
@@ -141,10 +150,12 @@ export default function PermissionControlPage() {
       fetch('/api/settings/role-permissions', { headers: authHeaders() }).then(r => r.json()),
       fetch('/api/credentials/evaluators', { headers: authHeaders() }).then(r => r.json()),
       fetch('/api/credentials/moderators', { headers: authHeaders() }).then(r => r.json()),
-    ]).then(([permsData, evlData, modData]) => {
+      fetch('/api/master-admins', { headers: authHeaders() }).then(r => r.json()),
+    ]).then(([permsData, evlData, modData, masterData]) => {
       if (permsData.global) {
-        const map: Record<RoleKey, string[]> = { EVALUATOR: [], MODERATOR: [] };
+        const map: Record<RoleKey, string[]> = { MASTER_ADMIN: [], EVALUATOR: [], MODERATOR: [] };
         permsData.global.forEach((p: { role: string; allowedModules: string[] }) => {
+          if (p.role === 'MASTER_ADMIN') map.MASTER_ADMIN = p.allowedModules;
           if (p.role === 'EVALUATOR') map.EVALUATOR = p.allowedModules;
           if (p.role === 'MODERATOR') map.MODERATOR = p.allowedModules;
         });
@@ -153,10 +164,12 @@ export default function PermissionControlPage() {
       }
       if (Array.isArray(evlData)) setEvaluators(evlData.map((e: any) => ({ id: e.id, name: e.name, evaluatorId: e.evaluatorId })));
       if (Array.isArray(modData)) setModerators(modData.map((m: any) => ({ id: m.id, name: m.name, moderatorId: m.moderatorId })));
+      if (Array.isArray(masterData)) setMasterAdmins(masterData.map((m: any) => ({ id: m.id, name: m.name, username: m.username })));
     }).finally(() => setLoading(false));
   }, []);
 
-  const members = activeRole === 'EVALUATOR' ? evaluators : moderators;
+  const members = activeRole === 'MASTER_ADMIN' ? masterAdmins : activeRole === 'EVALUATOR' ? evaluators : moderators;
+  const modules = modulesForRole(activeRole);
 
   const selectMember = (m: Member) => {
     setSelectedMember(m);
@@ -175,7 +188,7 @@ export default function PermissionControlPage() {
 
   const enableAll = (allowed: string[], setAllowed: (v: string[]) => void) => {
     const all: string[] = [];
-    MODULES.forEach(m => { all.push(m.key); m.subItems.forEach(s => all.push(s.key)); });
+    modules.forEach(m => { all.push(m.key); m.subItems.forEach(s => all.push(s.key)); });
     setAllowed(all);
   };
 
@@ -225,7 +238,7 @@ export default function PermissionControlPage() {
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
   };
 
-  const activeCount = MODULES.filter(m => (viewMode === 'global' ? globalPerms[activeRole] : individualAllowed).includes(m.key)).length;
+  const activeCount = modules.filter(m => (viewMode === 'global' ? globalPerms[activeRole] : individualAllowed).includes(m.key)).length;
 
   return (
     <div className="space-y-5 max-w-3xl">
@@ -236,7 +249,7 @@ export default function PermissionControlPage() {
         </div>
         <div className="flex items-center gap-1.5 bg-blue-50 border border-blue-100 rounded-xl px-3 py-1.5">
           <div className="w-2 h-2 rounded-full bg-[#004f9f]" />
-          <span className="text-xs font-bold text-[#004f9f]">{activeCount}/{MODULES.length} Modules Active</span>
+          <span className="text-xs font-bold text-[#004f9f]">{activeCount}/{modules.length} Modules Active</span>
         </div>
       </div>
 
@@ -286,7 +299,7 @@ export default function PermissionControlPage() {
                     <div className="min-w-0 flex-1">
                       <p className={`text-xs font-bold truncate ${isSelected ? 'text-white' : 'text-gray-800'}`}>{m.name}</p>
                       <p className={`text-[10px] font-mono ${isSelected ? 'text-white/70' : 'text-gray-400'}`}>
-                        {m.evaluatorId || m.moderatorId}
+                        {m.evaluatorId || m.moderatorId || m.username}
                       </p>
                     </div>
                     {hasOverride && (
@@ -308,7 +321,7 @@ export default function PermissionControlPage() {
           <span>
             {hasIndividual
               ? `${selectedMember.name} has a custom override — changes here will update their individual settings.`
-              : `Showing global defaults for ${activeRole}. Save to create an individual override for ${selectedMember.name}.`}
+              : `Showing global defaults for ${roleLabel(activeRole)}. Save to create an individual override for ${selectedMember.name}.`}
           </span>
           {hasIndividual && (
             <button onClick={handleRemoveIndividual} disabled={saving}
@@ -360,12 +373,14 @@ export default function PermissionControlPage() {
             <div className="py-20 flex justify-center"><Loader2 className="w-5 h-5 animate-spin text-gray-300" /></div>
           ) : viewMode === 'global' ? (
             <ModuleList
+              modules={modules}
+              readOnlyOption={activeRole === 'MASTER_ADMIN'}
               allowed={globalPerms[activeRole]}
               setAllowed={v => setGlobalPerms(p => ({ ...p, [activeRole]: v }))}
               search={search}
             />
           ) : (
-            <ModuleList allowed={individualAllowed} setAllowed={setIndividualAllowed} search={search} />
+            <ModuleList modules={modules} readOnlyOption={activeRole === 'MASTER_ADMIN'} allowed={individualAllowed} setAllowed={setIndividualAllowed} search={search} />
           )}
 
           {(error || success) && (

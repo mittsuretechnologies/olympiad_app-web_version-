@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { isTokenExpired } from '@/lib/session-token';
+import { isTokenExpired, tokenRole } from '@/lib/session-token';
 import { DASHBOARD_TOKEN_KEYS, clearDashboardSession } from '@/lib/swr';
 import TermsAcceptanceModal from '@/components/TermsAcceptanceModal';
 import {
@@ -48,7 +48,11 @@ import {
   BookOpen,
 } from 'lucide-react';
 
-type Role = 'SUPERADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
+type Role = 'SUPERADMIN' | 'MASTER_ADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
+
+const ROLE_LABELS: Record<Role, string> = {
+  SUPERADMIN: 'Super Admin', MASTER_ADMIN: 'Master Admin', REVIEWER: 'Reviewer', EVALUATOR: 'Evaluator', MODERATOR: 'Moderator',
+};
 type Section = 'schools' | 'credentials' | 'moderation' | 'reports' | 'evaluator' | 'result' | 'settings' | null;
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -82,7 +86,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
 
     let detectedRole: Role = 'SUPERADMIN';
-    if (reviewerToken && !token) detectedRole = 'REVIEWER';
+    if (token && tokenRole(token) === 'MASTER_ADMIN') detectedRole = 'MASTER_ADMIN';
+    else if (reviewerToken && !token) detectedRole = 'REVIEWER';
     else if (evaluatorToken && !token) detectedRole = 'EVALUATOR';
     else if (moderatorToken && !token) detectedRole = 'MODERATOR';
 
@@ -93,16 +98,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     const evaluatorData = sessionStorage.getItem('evaluatorData');
     const moderatorData = sessionStorage.getItem('moderatorData');
     try {
-      if (detectedRole === 'SUPERADMIN' && adminData) setCurrentUser(JSON.parse(adminData));
+      if ((detectedRole === 'SUPERADMIN' || detectedRole === 'MASTER_ADMIN') && adminData) setCurrentUser(JSON.parse(adminData));
       else if (detectedRole === 'REVIEWER' && reviewerData) setCurrentUser(JSON.parse(reviewerData));
       else if (detectedRole === 'EVALUATOR' && evaluatorData) setCurrentUser(JSON.parse(evaluatorData));
       else if (detectedRole === 'MODERATOR' && moderatorData) setCurrentUser(JSON.parse(moderatorData));
     } catch { /* ignore */ }
 
     if (detectedRole !== 'SUPERADMIN') {
+      // null means "everything" — show nothing until the real grants load.
+      setAllowedModules([]);
       // get memberId from stored token data
       let memberId: string | null = null;
       try {
+        if (detectedRole === 'MASTER_ADMIN' && adminData) memberId = JSON.parse(adminData).id;
         if (detectedRole === 'REVIEWER' && reviewerData) memberId = JSON.parse(reviewerData).id;
         if (detectedRole === 'EVALUATOR' && evaluatorData) memberId = JSON.parse(evaluatorData).id;
         if (detectedRole === 'MODERATOR' && moderatorData) memberId = JSON.parse(moderatorData).id;
@@ -144,12 +152,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [reviewDueCount, setReviewDueCount] = useState(0);
   useEffect(() => {
     const token = sessionStorage.getItem('token');
-    if (role !== 'SUPERADMIN' || !token) return;
+    if (!token || !(role === 'SUPERADMIN' || (role === 'MASTER_ADMIN' && allowedModules?.includes('infringement')))) return;
     fetch('/api/dashboard/infringement-notices?status=REVIEW_DUE', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => (r.ok ? r.json() : null))
       .then(data => setReviewDueCount(data?.counts?.REVIEW_DUE ?? 0))
       .catch(() => { /* badge only */ });
-  }, [role, pathname]);
+  }, [role, pathname, allowedModules]);
 
   const canSee = (moduleKey: string) => {
     if (allowedModules === null) return true;
@@ -160,6 +168,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (allowedModules === null) return true;
     return allowedModules.includes(subKey);
   };
+
+  // Sections that used to be SuperAdmin-only: SuperAdmin always, MasterAdmin
+  // when granted the module in Permission Control, nobody else.
+  const canSeeAdmin = (moduleKey: string) =>
+    role === 'SUPERADMIN' || (role === 'MASTER_ADMIN' && canSee(moduleKey));
 
   const sectionForPath = (p: string): Section => {
     if (p.startsWith('/dashboard/schools')) return 'schools';
@@ -427,7 +440,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Result — only superadmin */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('result') && (
               <div>
                 <button onClick={() => toggleSection('result')}
                   className={sectionBtnClass(pathname.startsWith('/dashboard/result'))}>
@@ -465,7 +478,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Banners — only superadmin */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('banners') && (
               <Link href="/dashboard/banners"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/banners') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <ImageIcon size={20} />
@@ -476,7 +489,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* App Carousel — only superadmin. Separate from Banners above:
                 that one is the public landing page, this one is the mobile
                 app's home screen. */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('appCarousel') && (
               <Link href="/dashboard/app-carousel"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/app-carousel') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <GalleryHorizontal size={20} />
@@ -486,7 +499,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Learning & Parenting — only superadmin. Curated videos for the
                 app home screen's Learning and Parenting rows. */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('homeVideos') && (
               <Link href="/dashboard/home-videos"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/home-videos') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <GraduationCap size={20} />
@@ -495,7 +508,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Download Videos — only superadmin. Original files of uploaded videos. */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('videoDownloads') && (
               <Link href="/dashboard/video-downloads"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/video-downloads') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <Download size={20} />
@@ -504,7 +517,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Activity Log — only superadmin */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('activityLog') && (
               <Link href="/dashboard/activity-log"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/activity-log') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <History size={20} />
@@ -513,7 +526,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Account Deletion Requests — only superadmin, only they can approve wiping a student's account */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('deletionRequests') && (
               <Link href="/dashboard/account-deletion-requests"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/account-deletion-requests') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <UserX size={20} />
@@ -522,7 +535,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Agreements — legal acceptance register, superadmin only */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('agreements') && (
               <Link href="/dashboard/agreements"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/agreements') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <FileSignature size={20} />
@@ -531,7 +544,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* General Schools — schools that signed up in the app themselves, superadmin only */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('generalSchools') && (
               <Link href="/dashboard/general-schools"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/general-schools') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <School size={20} />
@@ -540,7 +553,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             )}
 
             {/* Report Infringement — copyright/trademark notices from mittmee.com, superadmin only */}
-            {role === 'SUPERADMIN' && (
+            {canSeeAdmin('infringement') && (
               <Link href="/dashboard/infringement-notices"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/infringement-notices') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <ShieldAlert size={20} />
@@ -583,6 +596,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
+                    <Link href="/dashboard/settings/master-admins" className={subItemClass(pathname === '/dashboard/settings/master-admins')}>
+                      <span>Master Admins</span>
+                    </Link>
                     <Link href="/dashboard/settings/permission-control" className={subItemClass(pathname === '/dashboard/settings/permission-control')}>
                       <span>Permission Control</span>
                     </Link>
@@ -603,7 +619,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 </div>
                 <div className="min-w-0">
                   <p className="text-white font-bold text-xs leading-tight truncate">{currentUser?.name || role}</p>
-                  <p className="text-white/50 text-[10px] truncate">{role}</p>
+                  <p className="text-white/50 text-[10px] truncate">{ROLE_LABELS[role]}</p>
                 </div>
                 <div className="ml-auto flex-shrink-0">
                   <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />

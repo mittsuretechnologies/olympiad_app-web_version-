@@ -12,7 +12,7 @@ function requireModerationAccess(request: Request) {
   if (!token) return null;
   try {
     const payload = jwt.verify(token, getJwtSecret()) as any;
-    return ['SUPERADMIN', 'MODERATOR'].includes(payload?.role) ? payload : null;
+    return ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR'].includes(payload?.role) ? payload : null;
   } catch {
     return null;
   }
@@ -26,7 +26,7 @@ export async function GET(
   const admin = requireModerationAccess(request);
   if (!admin) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
 
-  const moduleCheck = await requireModule(admin, 'moderation.reported');
+  const moduleCheck = await requireModule(admin, 'moderation.reported', request);
   if (moduleCheck.error) return moduleCheck.error;
 
   const { videoId } = await params;
