@@ -91,10 +91,10 @@ export async function GET(request: NextRequest) {
     const appUsers = appUserIds.length
       ? await prisma.appUser.findMany({
           where:  { id: { in: appUserIds } },
-          select: { id: true, userId: true, avatarUrl: true },
+          select: { id: true, userId: true, avatarUrl: true, schoolRefId: true },
         })
       : [];
-    const appUserMap = new Map(appUsers.map(u => [u.id, u]));
+    const appUserMap = new Map(appUsers.map(({ schoolRefId, ...u }) => [u.id, { ...u, isOlympiadSchool: !!schoolRefId }]));
 
     // This response previously had no isLiked field, so every shared video always
     // rendered as unliked in the conversation player regardless of the real Like row.

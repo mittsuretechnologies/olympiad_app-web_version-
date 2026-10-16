@@ -275,7 +275,7 @@ export async function GET(request: NextRequest) {
     const appUsersRaw = appUserIds.length > 0
       ? await prisma.appUser.findMany({
           where:  { id: { in: appUserIds } },
-          select: { id: true, userId: true, avatarUrl: true, olympiadId: true },
+          select: { id: true, userId: true, avatarUrl: true, olympiadId: true, schoolRefId: true },
         })
       : [];
     const appUserMap = new Map(appUsersRaw.map(u => [u.id, u]));
@@ -333,6 +333,8 @@ export async function GET(request: NextRequest) {
           id:        appUserRaw.id,
           userId:    appUserRaw.userId,
           avatarUrl: appUserRaw.avatarUrl,
+          // The uploader is an Olympiad school's own account — the app shows a "Verified School" pill.
+          isOlympiadSchool: !!appUserRaw.schoolRefId,
         } : null,
       };
     });

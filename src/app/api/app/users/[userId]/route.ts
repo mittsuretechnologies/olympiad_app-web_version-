@@ -152,6 +152,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         // The olympiad ID doubles as a claim code elsewhere (see update-olympiad-id) —
         // only the account owner should ever see their own raw code.
         olympiadId:    isOwnProfile ? target.olympiadId : null,
+        // Safe to show everyone: says they're an Olympiad student without revealing the code.
+        isOlympiadStudent: !!target.olympiadId,
         isPrivate:     target.isPrivate,
         studentName,
         accountType:   target.accountType,

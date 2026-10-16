@@ -93,6 +93,38 @@ export async function notifyFollowAccepted({
   });
 }
 
+// A video went live — tell everyone who follows its uploader. Called at
+// approval time (not upload time): a freshly uploaded video is PENDING and
+// invisible to followers until a moderator approves it, so notifying earlier
+// would link them to something they can't open. One row per follower, one per
+// video — the caller guards against re-notifying on a repeat approval.
+export async function notifyFollowersOfNewVideo({
+  uploaderId, videoId, uploaderUserId,
+}: { uploaderId: string; videoId: string; uploaderUserId: string }) {
+  try {
+    const follows = await prisma.follow.findMany({
+      where:  { followingId: uploaderId },
+      select: { followerId: true },
+    });
+    if (follows.length === 0) return;
+
+    await prisma.notification.createMany({
+      data: follows.map(f => ({
+        userId:  f.followerId,
+        type:    'NEW_VIDEO',
+        title:   'New Video',
+        message: `${uploaderUserId} uploaded a new video`,
+        videoId,
+        actorId: uploaderId,
+        count: 1,
+        recentActorIds: [uploaderId],
+      })),
+    });
+  } catch (error) {
+    console.error('Failed to notify followers of new video:', error);
+  }
+}
+
 function formatLikeMessage(firstActorUserId: string, count: number): string {
   if (count <= 1) return `${firstActorUserId} starred your video`;
   if (count === 2) return `${firstActorUserId} and 1 other starred your video`;
