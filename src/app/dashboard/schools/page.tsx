@@ -130,6 +130,11 @@ export default function SchoolsPage() {
   const [sendBusy, setSendBusy] = useState(false);
   const [sendResult, setSendResult] = useState<string | null>(null);
   const [allocError, setAllocError] = useState<string | null>(null);
+  // Unallotted IDs ticked for deletion (see DELETE /api/schools/[id]/olympiad-ids).
+  const [selectedCodes, setSelectedCodes] = useState<Set<string>>(new Set());
+  const [lastClickedCode, setLastClickedCode] = useState<string | null>(null);
+  const [deleteIdsBusy, setDeleteIdsBusy] = useState(false);
+  const [deleteIdsError, setDeleteIdsError] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -261,6 +266,9 @@ export default function SchoolsPage() {
     setShowAllocateForm(false);
     setAllocError(null);
     setAllocClasses([{ classCode: '', className: '', count: 10 }]);
+    setSelectedCodes(new Set());
+    setLastClickedCode(null);
+    setDeleteIdsError(null);
     setAllocLoading(true);
 
     try {
@@ -282,8 +290,75 @@ export default function SchoolsPage() {
       const res = await fetch(`/api/schools/${schoolId}/olympiad-ids`, { headers: authHeaders() });
       const data = await res.json();
       setAllocations(Array.isArray(data) ? data : []);
+      setSelectedCodes(new Set());
+      setLastClickedCode(null);
     } finally {
       setAllocLoading(false);
+    }
+  };
+
+  // Shift-click ticks every unallotted ID between the last click and this one,
+  // so trimming a class by 20 IDs doesn't take 20 clicks.
+  const toggleCodeSelection = (code: string, shiftKey: boolean) => {
+    const ordered = groupAllocationsByClass(allocations).flatMap((g) => g.items).filter((a) => !a.inUse);
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      const select = !prev.has(code);
+      const from = shiftKey && lastClickedCode ? ordered.findIndex((a) => a.code === lastClickedCode) : -1;
+      const to = ordered.findIndex((a) => a.code === code);
+      if (from !== -1 && to !== -1) {
+        const [lo, hi] = from < to ? [from, to] : [to, from];
+        for (const a of ordered.slice(lo, hi + 1)) {
+          if (select) next.add(a.code); else next.delete(a.code);
+        }
+      } else if (select) next.add(code);
+      else next.delete(code);
+      return next;
+    });
+    setLastClickedCode(code);
+  };
+
+  const toggleClassSelection = (items: any[]) => {
+    const unused = items.filter((a) => !a.inUse).map((a) => a.code);
+    setSelectedCodes((prev) => {
+      const next = new Set(prev);
+      const allSelected = unused.length > 0 && unused.every((c) => prev.has(c));
+      for (const c of unused) {
+        if (allSelected) next.delete(c); else next.add(c);
+      }
+      return next;
+    });
+  };
+
+  const handleDeleteIds = async () => {
+    if (!viewSchool || selectedCodes.size === 0) return;
+    const codes = [...selectedCodes];
+    const sentCount = allocations.filter((a) => selectedCodes.has(a.code) && a.sentAt).length;
+    const warning = sentCount > 0
+      ? `\n\n${sentCount} of these were already sent to the school and will disappear from its portal.`
+      : '';
+    if (!confirm(`Permanently delete ${codes.length} unallotted Olympiad ID(s) from ${viewSchool.name}? This cannot be undone.${warning}`)) return;
+
+    setDeleteIdsBusy(true);
+    setDeleteIdsError(null);
+    try {
+      const res = await fetch(`/api/schools/${viewSchool.id}/olympiad-ids`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+        body: JSON.stringify({ codes }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setDeleteIdsError(data.message || 'Failed to delete IDs');
+      } else {
+        setSendResult(`${data.deleted} unallotted ID(s) deleted.`);
+        setTimeout(() => setSendResult(null), 4000);
+      }
+      refreshAllocations(viewSchool.id);
+    } catch {
+      setDeleteIdsError('Network error while deleting IDs');
+    } finally {
+      setDeleteIdsBusy(false);
     }
   };
 
@@ -1198,6 +1273,16 @@ export default function SchoolsPage() {
                   )}
                 </div>
                 <div className="flex gap-2 flex-wrap">
+                  {selectedCodes.size > 0 && (
+                    <button
+                      onClick={handleDeleteIds}
+                      disabled={deleteIdsBusy}
+                      className="inline-flex items-center gap-1.5 bg-red-700 text-white px-3 py-1.5 text-xs font-semibold hover:bg-red-800 transition-colors disabled:opacity-50"
+                    >
+                      <Trash className="w-3.5 h-3.5" />
+                      {deleteIdsBusy ? 'Deleting...' : `Delete Selected (${selectedCodes.size})`}
+                    </button>
+                  )}
                   {allocations.length > 0 && allocations.some((a) => !a.sentAt) && (
                     <button
                       onClick={handleSendIds}
@@ -1235,6 +1320,18 @@ export default function SchoolsPage() {
                 <div className="bg-green-50 border border-green-300 text-green-800 text-xs px-3 py-2 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" /> {sendResult}
                 </div>
+              )}
+
+              {deleteIdsError && (
+                <div className="bg-red-50 border border-red-300 text-red-800 text-xs px-3 py-2 flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4" /> {deleteIdsError}
+                </div>
+              )}
+
+              {allocations.some((a) => !a.inUse) && (
+                <p className="text-[11px] text-gray-600">
+                  Tick unallotted IDs to delete them (shift-click to select a range). IDs already allotted to a student are locked.
+                </p>
               )}
 
               {/* Allocation form */}
@@ -1378,6 +1475,7 @@ export default function SchoolsPage() {
                   <table className="w-full text-sm">
                     <thead className="bg-[#E8EAF6] sticky top-0">
                       <tr className="border-b-2 border-[#06013E] text-[#004f9f]">
+                        <th className="px-2 py-2 border-r border-gray-300 w-8" aria-label="Select" />
                         <th className="px-3 py-2 text-left text-xs font-bold uppercase border-r border-gray-300 w-12">
                           #
                         </th>
@@ -1395,13 +1493,13 @@ export default function SchoolsPage() {
                     <tbody>
                       {allocLoading ? (
                         <tr>
-                          <td colSpan={4} className="py-8 text-center">
+                          <td colSpan={5} className="py-8 text-center">
                             <Loader2 className="w-5 h-5 animate-spin mx-auto text-[#004f9f]" />
                           </td>
                         </tr>
                       ) : allocations.length === 0 ? (
                         <tr>
-                          <td colSpan={4} className="py-8 text-center text-gray-500 text-sm">
+                          <td colSpan={5} className="py-8 text-center text-gray-500 text-sm">
                             No Olympiad IDs allocated yet. Click "Allocate New IDs" to generate.
                           </td>
                         </tr>
@@ -1409,12 +1507,24 @@ export default function SchoolsPage() {
                         groupAllocationsByClass(allocations).map(({ className, items }) => (
                           <Fragment key={className || 'no-class'}>
                           <tr className="bg-[#004f9f]/10 border-b border-[#004f9f]/30">
+                            <td className="px-2 py-1.5 border-r border-gray-200 text-center">
+                              {items.some((a) => !a.inUse) && (
+                                <input
+                                  type="checkbox"
+                                  checked={items.filter((a) => !a.inUse).every((a) => selectedCodes.has(a.code))}
+                                  onChange={() => toggleClassSelection(items)}
+                                  title={`Select all unallotted ${className || ''} IDs`}
+                                  className="accent-red-700"
+                                />
+                              )}
+                            </td>
                             <td colSpan={4} className="px-3 py-1.5 text-xs font-bold uppercase text-[#004f9f]">
                               {className || 'No class'}
                               <span className="ml-2 font-semibold normal-case text-gray-600">
                                 {items.length} {items.length === 1 ? 'ID' : 'IDs'}
                                 {' · '}Sent: <span className="text-green-700">{items.filter((a) => a.sentAt).length}</span>
                                 {' · '}Pending: <span className="text-orange-700">{items.filter((a) => !a.sentAt).length}</span>
+                                {' · '}Allotted: <span className="text-[#004f9f]">{items.filter((a) => a.inUse).length}</span>
                               </span>
                             </td>
                           </tr>
@@ -1425,11 +1535,29 @@ export default function SchoolsPage() {
                               idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'
                             }`}
                           >
+                            <td className="px-2 py-2 border-r border-gray-200 text-center">
+                              {a.inUse ? (
+                                <span title="Allotted to a student — cannot be deleted" className="text-gray-400 text-[10px]">—</span>
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  checked={selectedCodes.has(a.code)}
+                                  onChange={() => {}}
+                                  onClick={(e) => toggleCodeSelection(a.code, e.shiftKey)}
+                                  className="accent-red-700"
+                                />
+                              )}
+                            </td>
                             <td className="px-3 py-2 border-r border-gray-200 text-gray-700 text-xs">
                               {idx + 1}
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200 font-mono font-semibold text-[#004f9f]">
                               {a.code}
+                              {a.inUse && (
+                                <span className="ml-2 inline-block px-1.5 py-0.5 text-[9px] font-bold uppercase font-sans bg-blue-100 text-blue-800 border border-blue-300">
+                                  Allotted
+                                </span>
+                              )}
                             </td>
                             <td className="px-3 py-2 border-r border-gray-200">
                               {a.sentAt ? (
