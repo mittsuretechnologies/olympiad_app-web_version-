@@ -17,6 +17,7 @@ function getViewerIdFromToken(request: NextRequest): string | null {
 }
 
 const ROW_LIMIT = 15;
+const OLYMPIAD_ROW_LIMIT = 100;
 
 type RawVideo = {
   id: string;
@@ -147,7 +148,7 @@ export async function GET(request: NextRequest) {
     // moderator rated High quality at approval.
     const trendingWhere = { ...baseWhere, quality: 'HIGH' };
 
-    const [trendingViews, newReleases, categories, mittfest] = await Promise.all([
+    const [trendingViews, newReleases, categories, mittfest, olympiad] = await Promise.all([
       // Most-viewed High-quality videos based on VideoView rows recorded in the last 7 days.
       prisma.videoView.groupBy({
         by: ['videoId'],
@@ -172,6 +173,15 @@ export async function GET(request: NextRequest) {
       prisma.video.findMany({
         take: ROW_LIMIT,
         where: { ...baseWhere, isMittfest: true },
+        orderBy: { createdAt: 'desc' },
+        select: VIDEO_SELECT,
+      }),
+      // Olympiad — students' competition uploads (isEvaluation). visibilityWhere
+      // already hides private ones from everyone but their owner. A larger cap
+      // than other rows: this row is meant to show every Olympiad video.
+      prisma.video.findMany({
+        take: OLYMPIAD_ROW_LIMIT,
+        where: { ...baseWhere, isEvaluation: true },
         orderBy: { createdAt: 'desc' },
         select: VIDEO_SELECT,
       }),
@@ -223,17 +233,21 @@ export async function GET(request: NextRequest) {
     );
 
     const effectiveUserId = viewerId ?? userId;
-    const [trending, releases, mittfestVideos, ...categoryRows] = await Promise.all([
+    const [trending, releases, mittfestVideos, olympiadVideos, ...categoryRows] = await Promise.all([
       hydrate(trendingRaw, effectiveUserId),
       hydrate(newReleases, effectiveUserId),
       hydrate(mittfest, effectiveUserId),
+      hydrate(olympiad, effectiveUserId),
       ...categoryRowsRaw.map(rows => hydrate(rows, effectiveUserId)),
     ]);
 
     // MittFest sits first: the client builds its hero carousel from the
     // 'trending' row (by key, not position) and renders these rows beneath it,
     // so being first here puts MittFest directly under the carousel.
+    // Olympiad first of all: the current app renders it directly under the
+    // carousel, above MittFest; older app builds show it as their first row.
     const rows = [
+      { key: 'olympiad', title: 'Olympiad', videos: olympiadVideos },
       { key: 'mittfest', title: 'MittFest', videos: mittfestVideos },
       { key: 'trending', title: 'Most Watched This Week', videos: trending },
       { key: 'new', title: 'New Releases', videos: releases },
