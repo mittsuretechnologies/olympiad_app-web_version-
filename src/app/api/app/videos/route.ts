@@ -9,6 +9,7 @@ import {
   OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import {
@@ -92,7 +93,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Pick a valid School Activity type.' }, { status: 400 });
       }
       // Same auto hashtags student videos get (state, district, school name; an
-      // Olympiad school also carries its school code).
+      // Olympiad school also carries its CRM ID).
       schoolAutoTags.push(...school.autoTags);
     } else if (isSchoolActivity(category)) {
       // School Activity belongs to schools. Enforced here, not just hidden in
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
         where: { code: olympiadCode },
         include: {
-          school: { select: { name: true, state: true, district: true, schoolId: true } },
+          school: { select: { name: true, state: true, district: true, olympiadId: true } },
         },
       });
 
@@ -142,10 +143,7 @@ export async function POST(request: Request) {
 
       // Build school auto-tags from the allocation's school
       const school = allocation.school;
-      if (school?.state)    schoolAutoTags.push(school.state.replace(/\s+/g, ''));
-      if (school?.district) schoolAutoTags.push(school.district.replace(/\s+/g, ''));
-      if (school?.name)     schoolAutoTags.push(school.name.replace(/\s+/g, ''));
-      if (school?.schoolId) schoolAutoTags.push(school.schoolId);
+      schoolAutoTags.push(...buildSchoolAutoTags(school));
     }
 
     const uploaderType = isSchoolAccount ? UPLOADER_SCHOOL_OWN : olympiadCode ? 'STUDENT' : 'VIEWER';
@@ -190,7 +188,11 @@ export async function POST(request: Request) {
     const userTags: string[] = tags
       ? tags.split(',').map((t: string) => t.trim()).filter(Boolean)
       : [];
-    const mergedTags = [...new Set([...schoolAutoTags, ...userTags])].join(',');
+    // An Olympiad video also carries its main category (e.g. #TalentPerformance).
+    const mergedTags = mergeTags(
+      [...schoolAutoTags, finalIsEvaluation ? mainCategoryTag(category, subCategory) : null],
+      userTags,
+    );
 
     // A "#mittfest" hashtag counts as an entry too, exactly like ticking the
     // MittFest checkbox — see src/lib/mittfest.ts.

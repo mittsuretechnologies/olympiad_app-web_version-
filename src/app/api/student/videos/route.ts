@@ -3,6 +3,7 @@ import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { schoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 const JWT_SECRET = getJwtSecret();
@@ -47,26 +48,27 @@ export async function POST(request: Request) {
         allocation: {
           include: {
             school: {
-              select: { name: true, city: true, district: true, state: true, schoolId: true },
+              select: { name: true, city: true, district: true, state: true, olympiadId: true },
             },
           },
         },
       },
     });
 
-    // Build auto hashtags from school location — sanitize to single words, no spaces
+    // Auto hashtags from the school (state, district, name, CRM ID); an
+    // Olympiad video also carries its main category.
     const school = studentRecord?.allocation?.school;
-    const autoTags: string[] = [];
-    if (school?.state)    autoTags.push(school.state.replace(/\s+/g, ''));
-    if (school?.district) autoTags.push(school.district.replace(/\s+/g, ''));
-    if (school?.name)     autoTags.push(school.name.replace(/\s+/g, ''));
-    if (school?.schoolId) autoTags.push(school.schoolId);
+    const finalIsEvaluation = isEvaluation !== undefined ? Boolean(isEvaluation) : false;
+    const autoTags = [
+      ...schoolAutoTags(school),
+      finalIsEvaluation ? mainCategoryTag(category, subCategory) : null,
+    ];
 
     // Merge user-supplied tags with auto-generated school tags (dedup)
     const userTags: string[] = tags
       ? tags.split(',').map((t: string) => t.trim()).filter(Boolean)
       : [];
-    const mergedTags = [...new Set([...autoTags, ...userTags])].join(',');
+    const mergedTags = mergeTags(autoTags, userTags);
 
     const newVideo = await prisma.video.create({
       data: {
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
         subCategory,
         tags: mergedTags,
         isPublic:    isPublic    !== undefined ? Boolean(isPublic)    : true,
-        isEvaluation: isEvaluation !== undefined ? Boolean(isEvaluation) : false,
+        isEvaluation: finalIsEvaluation,
         // This form has no MittFest checkbox, so the hashtag is the only way in.
         isMittfest: hasMittfestTag(userTags),
         status: 'PENDING',

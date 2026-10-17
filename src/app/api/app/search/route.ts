@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
 import { schoolAccountIds } from '@/lib/schoolAccount';
+import { schoolTagWhere } from '@/lib/videoAutoTags';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 const JWT_SECRET = getJwtSecret();
@@ -96,7 +97,7 @@ async function searchSchools(q: string, offset = 0, pageSize = USERS_PAGE_SIZE) 
   const withExtra = await prisma.school.findMany({
     // A school the Super Admin switched off is not discoverable.
     where:  { name: { contains: q, mode: 'insensitive' }, isActive: true },
-    select: { id: true, schoolId: true, name: true, username: true, city: true, state: true },
+    select: { id: true, schoolId: true, olympiadId: true, name: true, username: true, city: true, state: true },
     // Stable order so paging by offset never repeats or skips a school.
     orderBy: [{ name: 'asc' }, { id: 'asc' }],
     skip: offset,
@@ -108,7 +109,7 @@ async function searchSchools(q: string, offset = 0, pageSize = USERS_PAGE_SIZE) 
   const schoolVideosCounts = await Promise.all(
     schoolsRaw.map(sc =>
       prisma.video.count({
-        where: { tags: { contains: sc.schoolId, mode: 'insensitive' }, status: 'APPROVED', isPublic: true },
+        where: { ...schoolTagWhere(sc), status: 'APPROVED', isPublic: true },
       })
     )
   );
@@ -117,7 +118,7 @@ async function searchSchools(q: string, offset = 0, pageSize = USERS_PAGE_SIZE) 
   const accountIds = await schoolAccountIds(schoolsRaw);
 
   return {
-    schools: schoolsRaw.map(({ username: _username, ...sc }, i) => ({
+    schools: schoolsRaw.map(({ username: _username, olympiadId: _crm, ...sc }, i) => ({
       ...sc, videoCount: schoolVideosCounts[i], appUserId: accountIds.get(sc.id) ?? null,
     })),
     hasMore,

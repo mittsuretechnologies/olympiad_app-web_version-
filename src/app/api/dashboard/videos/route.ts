@@ -6,6 +6,46 @@ import { createNotification, notifyFollowersOfNewVideo } from '@/lib/notificatio
 import { ensureSchoolAccount } from '@/lib/schoolAccount';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 import { CLEAR_CLAIM, claimFreeFor, claimIsLive } from '@/lib/videoClaim';
+import { mergeTags, schoolAutoTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
+import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
+import { captionTagsAbuseMessage } from '@/lib/profanity';
+
+const TAG_SCHOOL_SELECT = { name: true, state: true, district: true, olympiadId: true } as const;
+
+// The student's school, through their web Student row or their app account's
+// Olympiad ID. A school's own uploads and ordinary viewers have none, so their
+// tags stay fully editable.
+async function schoolTagsForVideo(video: { studentId: string | null; appUserId: string | null }): Promise<string[]> {
+  if (video.studentId) {
+    const student = await prisma.student.findUnique({
+      where: { id: video.studentId },
+      select: { allocation: { select: { school: { select: TAG_SCHOOL_SELECT } } } },
+    });
+    return schoolAutoTags(student?.allocation?.school);
+  }
+  if (video.appUserId) {
+    const user = await prisma.appUser.findUnique({ where: { id: video.appUserId }, select: { olympiadId: true } });
+    if (!user?.olympiadId) return [];
+    const allocation = await prisma.olympiadIdAllocation.findUnique({
+      where: { code: user.olympiadId },
+      select: { school: { select: TAG_SCHOOL_SELECT } },
+    });
+    return schoolAutoTags(allocation?.school);
+  }
+  return [];
+}
+
+// Default tags (school + current main category) always lead and can't be
+// dropped; a main-category tag left over from an older category is replaced.
+async function tagsWithDefaults(
+  video: { studentId: string | null; appUserId: string | null; isEvaluation: boolean; category: string | null; subCategory: string | null },
+  tags: string[],
+): Promise<string> {
+  const defaults = videoDefaultTags(await schoolTagsForVideo(video), video);
+  return mergeTags(defaults, video.isEvaluation ? withoutCategoryTags(tags) : tags);
+}
+
+const splitTags = (tags: string | null) => (tags || '').split(',').map(t => t.trim()).filter(Boolean);
 
 export const dynamic = 'force-dynamic';
 
@@ -151,7 +191,7 @@ export async function GET(request: Request) {
     // ── Build where clause ────────────────────────────────────────────────────
     const where: Record<string, any> = { deletedAt: null };
     if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) where.status = status;
-    if (category) where.subCategory = category;
+    if (category) where.subCategory = { equals: category, mode: 'insensitive' };
     if (uploaderT && ['STUDENT', 'VIEWER'].includes(uploaderT)) where.uploaderType = uploaderT;
 
     const videos = await prisma.video.findMany({
@@ -164,7 +204,7 @@ export async function GET(request: Request) {
             allocation: {
               include: {
                 school: {
-                  select: { name: true, city: true, district: true, state: true },
+                  select: { name: true, city: true, district: true, state: true, olympiadId: true },
                 },
               },
             },
@@ -196,7 +236,7 @@ export async function GET(request: Request) {
           select: {
             code: true,
             assignedName: true,
-            school: { select: { name: true, city: true, district: true, state: true } },
+            school: { select: { name: true, city: true, district: true, state: true, olympiadId: true } },
           },
         })
       : [];
@@ -212,12 +252,19 @@ export async function GET(request: Request) {
     }));
 
     // ── Normalise URLs ────────────────────────────────────────────────────────
-    let normalized = (videos ?? []).map(v => ({
-      ...v,
-      videoUrl:     v.videoUrl,
-      thumbnailUrl: v.thumbnailUrl,
-      appUser: v.appUserId ? (appUserMap[v.appUserId] ?? null) : null,
-    }));
+    // schoolTags: the default tags the moderation page shows locked (see
+    // schoolTagsForVideo, which the tag save uses).
+    let normalized = (videos ?? []).map(v => {
+      const appUser = v.appUserId ? (appUserMap[v.appUserId] ?? null) : null;
+      const school = v.student?.allocation?.school ?? (v.studentId ? null : appUser?.school) ?? null;
+      return {
+        ...v,
+        videoUrl:     v.videoUrl,
+        thumbnailUrl: v.thumbnailUrl,
+        appUser,
+        schoolTags: schoolAutoTags(school),
+      };
+    });
 
     // ── Client-side search filter (name / olympiadCode / caption) ─────────────
     if (search) {
@@ -490,7 +537,7 @@ export async function POST(request: Request) {
       where: { id: videoId },
       select: {
         status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true, uploadedBySchoolId: true,
-        caption: true, category: true, subCategory: true, isPublic: true, olympiadVisibility: true,
+        caption: true, category: true, subCategory: true, isPublic: true, olympiadVisibility: true, tags: true,
         _count: { select: { evaluations: true } },
       },
     });
@@ -565,7 +612,16 @@ export async function POST(request: Request) {
       return moderationConflict(videoId, payload!.id);
     }
 
-    const video = await prisma.video.findUniqueOrThrow({ where: { id: videoId } });
+    let video = await prisma.video.findUniqueOrThrow({ where: { id: videoId } });
+
+    // A new main category brings its own default tag (e.g. #TalentPerformance
+    // → #RhymesSpeech).
+    if (recategorizing && video.isEvaluation) {
+      const tags = await tagsWithDefaults(video, splitTags(video.tags));
+      if (tags !== (video.tags || '')) {
+        video = await prisma.video.update({ where: { id: videoId }, data: { tags: tags || null } });
+      }
+    }
 
     await recordAuditLog({
       ...actor,
@@ -586,8 +642,8 @@ export async function POST(request: Request) {
         action: 'VIDEO_RECATEGORIZED',
         entityType: 'Video',
         entityId: videoId,
-        previousValue: { category: before?.category ?? null, subCategory: before?.subCategory ?? null },
-        newValue: { category: video.category, subCategory: video.subCategory },
+        previousValue: { category: before?.category ?? null, subCategory: before?.subCategory ?? null, tags: before?.tags ?? null },
+        newValue: { category: video.category, subCategory: video.subCategory, tags: video.tags },
         reason: null,
       });
     }
@@ -619,7 +675,6 @@ export async function POST(request: Request) {
 // Approved/Rejected) it's currently sitting in, without that edit accidentally
 // changing its moderation status. Send `tags` or `caption` (one per request).
 
-const MAX_CAPTION_LENGTH = 500;
 
 export async function PATCH(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
@@ -638,6 +693,9 @@ export async function PATCH(request: Request) {
       if (trimmed.length > MAX_CAPTION_LENGTH) {
         return NextResponse.json({ message: `Caption can be at most ${MAX_CAPTION_LENGTH} characters.` }, { status: 400 });
       }
+      // Same abuse check the app runs on a caption.
+      const captionAbuse = captionTagsAbuseMessage(trimmed, undefined);
+      if (captionAbuse) return NextResponse.json({ message: captionAbuse }, { status: 422 });
 
       const before = await prisma.video.findUnique({ where: { id: videoId }, select: { caption: true } });
       if (!before) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
@@ -667,19 +725,55 @@ export async function PATCH(request: Request) {
 
     // Normalize: dedupe, strip empties/# prefixes and surrounding whitespace,
     // same comma-separated shape the rest of the app already stores in tags.
+    // Cleaned the way the app cleans a hashtag (no #, spaces or commas).
     const normalizedTags = [...new Set(
-      tags.split(',').map(t => t.trim().replace(/^#/, '')).filter(Boolean)
+      tags.split(',').map(cleanHashtag).filter(Boolean)
     )].join(',');
 
     const before = await prisma.video.findUnique({
       where: { id: videoId },
-      select: { tags: true },
+      select: { tags: true, isMittfest: true, studentId: true, appUserId: true, isEvaluation: true, category: true, subCategory: true },
     });
     if (!before) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
 
+    // Default tags are put back by tagsWithDefaults below, so they never count
+    // as something a moderator added.
+    const finalTags = await tagsWithDefaults(before, splitTags(normalizedTags));
+    const defaults = new Set(
+      videoDefaultTags(await schoolTagsForVideo(before), before).map(t => t.toLowerCase())
+    );
+
+    // Same limits as the app: at most 30 hashtags besides the default ones, and
+    // a newly added one must pass the abuse check.
+    const previous = new Set(splitTags(before.tags).map(t => t.toLowerCase()));
+    const ownTags = splitTags(finalTags).filter(t => !defaults.has(t.toLowerCase()));
+    if (ownTags.length > MAX_CUSTOM_TAGS && ownTags.length > [...previous].filter(t => !defaults.has(t)).length) {
+      return NextResponse.json({ message: `Max ${MAX_CUSTOM_TAGS} hashtags.` }, { status: 400 });
+    }
+    const newTags = ownTags.filter(t => !previous.has(t.toLowerCase()));
+    const abuse = newTags.length ? captionTagsAbuseMessage(undefined, newTags.join(',')) : null;
+    if (abuse) return NextResponse.json({ message: abuse }, { status: 422 });
+
+    // Moderators may only remove hashtags; adding (or renaming, which is an
+    // add) is for admins. #mittfest counts as existing on a MittFest video
+    // because the moderation page shows it as a chip even when it isn't stored.
+    if (payload!.role === 'MODERATOR') {
+      const existing = new Set(
+        (before.tags || '').split(',').map(t => t.trim().replace(/^#/, '').toLowerCase()).filter(Boolean)
+      );
+      if (before.isMittfest) existing.add('mittfest');
+      const added = splitTags(finalTags).filter(t => !existing.has(t.toLowerCase()) && !defaults.has(t.toLowerCase()));
+      if (added.length > 0) {
+        return NextResponse.json(
+          { message: `Moderators can remove hashtags but not add them: ${added.map(t => `#${t}`).join(', ')}` },
+          { status: 403 }
+        );
+      }
+    }
+
     const video = await prisma.video.update({
       where: { id: videoId },
-      data: { tags: normalizedTags || null },
+      data: { tags: finalTags || null },
       select: { id: true, tags: true },
     });
 

@@ -4,16 +4,37 @@ import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Upload, Video, X, CheckCircle2, AlertCircle, User, Music, Palette,
-  ChevronDown, Lock, RefreshCw, Globe, EyeOff,
+  ChevronDown, Lock, RefreshCw, Globe, EyeOff, Mic, School, Sparkles, Hash, Plus, Info, Crop,
 } from 'lucide-react';
-import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, getCatBSubs } from '@/lib/olympiad-categories';
+import VideoCropModal from './VideoCropModal';
+import { OLYMPIAD_CAT_A_OPTIONS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, getCatBSubs } from '@/lib/olympiad-categories';
+import { SCHOOL_CATEGORY_GROUPS } from '@/lib/schoolUploadCategories';
+import { schoolAutoTags, mainCategoryTag } from '@/lib/videoAutoTags';
+import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, MAX_VIDEO_SECONDS, VIDEO_TOO_LONG_MESSAGE, cleanHashtag } from '@/lib/uploadRules';
+
+// Same policy pages the app links to from its upload screen (PolicyLinks.js).
+const POLICY_SITE = 'https://www.mittmee.com';
 import { clearSchoolSession } from '@/lib/session-token';
-import { CARD, CARD_HEADER, CARD_TITLE, STACK, INPUT, LABEL, FOCUS, BTN_PRIMARY, avatarTint } from '../ui';
+import { CARD, CARD_HEADER, CARD_TITLE, STACK, INPUT, FOCUS, BTN_PRIMARY, avatarTint } from '../ui';
 import { PageHeader, StatusBadge, Avatar, ProgressBar } from '../components';
 
 type Student = { id: string; name: string; olympiadCode: string; className: string | null; classCode: string | null; source?: string };
 type UploadState = 'idle' | 'uploading' | 'saving' | 'done' | 'error';
 type Slots = { slotA: boolean; slotB: boolean; rejectedA: boolean; rejectedB: boolean; approvedCount: number };
+// 'student' = a student's Olympiad video; 'own' = the school's own video (same
+// choice as the app's "For a student" / "Our own video").
+type Mode = 'student' | 'own';
+
+// The school's own-video categories, same as the app (lib/schoolUploadCategories).
+const OWN_ICONS: Record<string, typeof Music> = {
+  'Talent Performance': Sparkles,
+  Rhymes: Music,
+  'Speech & Presentation': Mic,
+  'School Activity': School,
+};
+const OWN_CATEGORIES = SCHOOL_CATEGORY_GROUPS.map(g => ({
+  label: g.label, value: g.label, icon: OWN_ICONS[g.label] ?? Palette, subCategories: [...g.subs],
+}));
 
 /** Card section wrapper — every form group on this page uses the same chrome. */
 function Section({ title, required, children, muted }: {
@@ -32,11 +53,15 @@ function Section({ title, required, children, muted }: {
 }
 
 export default function UploadVideoPage() {
+  const [mode, setMode]                       = useState<Mode>('student');
+  const isOwn = mode === 'own';
   const [students, setStudents]               = useState<Student[]>([]);
   const [loadingStudents, setLoadingStudents] = useState(true);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [studentSearch, setStudentSearch]     = useState('');
   const [showDropdown, setShowDropdown]       = useState(false);
+  // Class filter in the student picker, like the app's class chips.
+  const [studentClass, setStudentClass]       = useState('ALL');
 
   const [slots, setSlots]           = useState<Slots | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
@@ -47,13 +72,20 @@ export default function UploadVideoPage() {
 
   const [category, setCategory]     = useState('');
   const [subCategory, setSubCategory] = useState('');
-  const [customTalent, setCustomTalent] = useState('');
   const [caption, setCaption]       = useState('');
+  const [tags, setTags]             = useState<string[]>([]);
+  const [tagInput, setTagInput]     = useState('');
+  // The school's own hashtags (state, district, name, CRM ID), added to every
+  // upload by the server — shown here like the app's "Auto-added" list.
+  const [schoolTags, setSchoolTags] = useState<string[]>([]);
 
   const [isPublic, setIsPublic] = useState(true);
   const [isMittfest, setIsMittfest] = useState(false);
-  const [autoCrop, setAutoCrop] = useState(false);
-  const [aspectMismatch, setAspectMismatch] = useState(false);
+  // Same as the app: a landscape video opens the crop screen; cropX is the
+  // chosen position (0 = left edge, 1 = right edge), or null for the full video.
+  const [isLandscape, setIsLandscape] = useState(false);
+  const [cropX, setCropX]             = useState<number | null>(null);
+  const [cropOpen, setCropOpen]       = useState(false);
 
   const [uploadState, setUploadState] = useState<UploadState>('idle');
   const [progress, setProgress]     = useState(0);
@@ -63,6 +95,13 @@ export default function UploadVideoPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') || '' : '';
+
+  useEffect(() => {
+    fetch('/api/school/me/profile', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : null)
+      .then(p => { if (p) setSchoolTags(schoolAutoTags(p)); })
+      .catch(() => {});
+  }, [token]);
 
   useEffect(() => {
     fetch('/api/school/me/upload-students', { headers: { Authorization: `Bearer ${token}` } })
@@ -82,20 +121,26 @@ export default function UploadVideoPage() {
       .then(data => { if (data) setSlots(data); })
       .finally(() => setSlotsLoading(false));
     // Reset category when student changes
-    setCategory(''); setSubCategory(''); setCustomTalent('');
+    setCategory(''); setSubCategory('');
   }, [selectedStudent, token]);
 
   const filtered = students.filter(s =>
-    s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
-    s.olympiadCode.toLowerCase().includes(studentSearch.toLowerCase())
+    (studentClass === 'ALL' || s.classCode === studentClass) && (
+      s.name.toLowerCase().includes(studentSearch.toLowerCase()) ||
+      s.olympiadCode.toLowerCase().includes(studentSearch.toLowerCase())
+    )
   );
+  // Class chips: only shown when the school has students in two or more classes.
+  const studentClasses = [...new Map(
+    students.filter(s => s.classCode).map(s => [s.classCode as string, s.className || (s.classCode as string)])
+  ).entries()];
 
   const CATEGORIES = [
     {
       label: OLYMPIAD_CAT_A_LABEL,
       value: OLYMPIAD_CAT_A_LABEL,
       icon: Music,
-      subCategories: OLYMPIAD_CAT_A_SUBS,
+      subCategories: OLYMPIAD_CAT_A_OPTIONS,
     },
     {
       label: selectedStudent?.classCode === 'U' ? 'Speech / Talent' : OLYMPIAD_CAT_B_LABEL,
@@ -105,18 +150,20 @@ export default function UploadVideoPage() {
     },
   ];
 
-  const selectedCat = CATEGORIES.find(c => c.value === category);
+  const categories = isOwn ? OWN_CATEGORIES : CATEGORIES;
+  const selectedCat = categories.find(c => c.value === category);
 
   // Category depends on the student's class (Cat B list differs by classCode),
   // so block selection until a student is chosen and their class has loaded.
-  const canPickCategory = !!selectedStudent && !slotsLoading;
+  // The school's own video needs no student.
+  const canPickCategory = isOwn || (!!selectedStudent && !slotsLoading);
 
   // Both Olympiad categories are used (submitted or approved): a school can only
   // upload a student's Olympiad videos, so there is nothing left to upload.
-  const bothFilled = slots !== null && slots.slotA && slots.slotB;
+  const bothFilled = !isOwn && slots !== null && slots.slotA && slots.slotB;
 
   const getCatStatus = (catValue: string) => {
-    if (!slots) return 'available';
+    if (isOwn || !slots) return 'available';
     const isA = catValue === OLYMPIAD_CAT_A_LABEL;
     const filled = isA ? slots.slotA : slots.slotB;
     const rejected = isA ? slots.rejectedA : slots.rejectedB;
@@ -125,28 +172,72 @@ export default function UploadVideoPage() {
     return 'available';
   };
 
-  const RATIO_TOLERANCE = 0.04;
+  // Auto tags the server will add: the school's, plus the main category on a
+  // student's Olympiad video (see lib/videoAutoTags).
+  const autoTags = [
+    ...schoolTags,
+    ...(!isOwn && category ? [mainCategoryTag(category, subCategory)].filter((t): t is string => !!t) : []),
+  ];
+
+  // Same pre-check the app runs (/api/app/check-text): an abusive caption or
+  // hashtag is caught now, not after the video uploads. The save route checks
+  // again, so a network error here lets the text through.
+  async function textAllowed(texts: string[], field: 'caption' | 'hashtag') {
+    try {
+      const res = await fetch('/api/app/check-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ texts, field }),
+      });
+      const data = await res.json();
+      if (res.ok && data.ok === false) {
+        setErrorMsg(data.message || 'This contains words that are not allowed.');
+        return false;
+      }
+    } catch { /* the server re-checks on save */ }
+    return true;
+  }
+
+  async function addTag() {
+    const raw = cleanHashtag(tagInput);
+    if (!raw) return;
+    const lower = raw.toLowerCase();
+    if (tags.some(t => t.toLowerCase() === lower) || autoTags.some(t => t.toLowerCase() === lower)) { setTagInput(''); return; }
+    if (tags.length >= MAX_CUSTOM_TAGS) { setErrorMsg(`Max ${MAX_CUSTOM_TAGS} hashtags.`); return; }
+    if (!(await textAllowed([raw], 'hashtag'))) { setTagInput(''); return; }
+    setErrorMsg('');
+    setTags(prev => [...prev, raw]);
+    setTagInput('');
+  }
+
+  function clearVideo() {
+    setVideoFile(null); setVideoPreview(null);
+    setIsLandscape(false); setCropX(null); setCropOpen(false);
+  }
 
   function handleFile(file: File) {
-    if (!file.type.startsWith('video/')) { setErrorMsg('Please select a valid video file.'); return; }
+    // Any video is accepted, whatever its length, shape or format. Some formats
+    // (e.g. .mkv) reach the browser with no type, so the extension counts too.
+    const looksLikeVideo = file.type.startsWith('video/')
+      || /\.(mp4|m4v|mov|avi|mkv|webm|3gp|3g2|wmv|flv|mpe?g|ts|mts|m2ts|ogv)$/i.test(file.name);
+    if (!looksLikeVideo) { setErrorMsg('Please select a video file.'); return; }
     setErrorMsg('');
-    setAutoCrop(false);
-    setAspectMismatch(false);
+    setIsLandscape(false); setCropX(null); setCropOpen(false);
 
-    // Quick client-side pre-check for duration + aspect ratio so schools get
-    // instant feedback instead of waiting for the upload round-trip to fail.
+    // A landscape video opens the crop screen straight away, as in the app.
     const url = URL.createObjectURL(file);
     const probe = document.createElement('video');
     probe.preload = 'metadata';
     probe.onloadedmetadata = () => {
-      if (probe.duration > 120) {
-        setErrorMsg(`Video is ${Math.ceil(probe.duration)}s long — it must be 2 minutes or shorter.`);
+      // Same 2-minute limit and message as the app's video picker.
+      if (probe.duration > MAX_VIDEO_SECONDS) {
+        setErrorMsg(VIDEO_TOO_LONG_MESSAGE);
         URL.revokeObjectURL(url);
         return;
       }
-      const ratio = probe.videoWidth / probe.videoHeight;
-      const isPortrait916 = Math.abs(ratio - 9 / 16) <= RATIO_TOLERANCE;
-      setAspectMismatch(!isPortrait916);
+      const landscape = !!(probe.videoWidth && probe.videoHeight && probe.videoWidth > probe.videoHeight * 1.05);
+      setIsLandscape(landscape);
+      setCropOpen(landscape);
       setVideoFile(file);
       setVideoPreview(url);
     };
@@ -157,9 +248,6 @@ export default function UploadVideoPage() {
     };
     probe.src = url;
   }
-
-  const isCustomTalent = subCategory === 'Any Other Special Talent' || subCategory === 'Any Other';
-  const finalSubCategory = isCustomTalent ? customTalent.trim() : subCategory;
 
   // Reads the body exactly once — calling res.json() in both the error and the
   // success path throws "body stream already read" and hides the real error.
@@ -177,27 +265,21 @@ export default function UploadVideoPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedStudent || !videoFile || !category || !subCategory) {
+    if ((!isOwn && !selectedStudent) || !videoFile || !category || !subCategory) {
       setErrorMsg('Please fill all required fields and select a video.');
       return;
     }
-    if (isCustomTalent && !customTalent.trim()) {
-      setErrorMsg('Please enter the topic.');
-      return;
-    }
-    if (aspectMismatch && !autoCrop) {
-      setErrorMsg('This video is not in 9:16 format. Enable auto-crop above, or choose a portrait video.');
-      return;
-    }
     setErrorMsg('');
+    if (caption.trim() && !(await textAllowed([caption], 'caption'))) return;
     setUploadState('uploading');
     setProgress(15);
 
     try {
       const fd = new FormData();
       fd.append('video', videoFile);
-      fd.append('studentId', selectedStudent.id);
-      fd.append('autoCrop', String(autoCrop));
+      if (isOwn) fd.append('own', 'true');
+      else fd.append('studentId', selectedStudent!.id);
+      if (cropX !== null) fd.append('cropX', String(cropX));
 
       const upRes = await fetch('/api/school/me/upload-video', {
         method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
@@ -208,11 +290,17 @@ export default function UploadVideoPage() {
       setUploadState('saving');
       setProgress(80);
 
-      const metaRes = await fetch('/api/school/me/videos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ studentId: selectedStudent.id, videoUrl, thumbnailUrl, caption, category, subCategory: finalSubCategory, isPublic, isMittfest }),
-      });
+      const metaRes = isOwn
+        ? await fetch('/api/school/me/own-videos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ videoUrl, thumbnailUrl, caption, category, subCategory, tags: tags.join(',') }),
+          })
+        : await fetch('/api/school/me/videos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ studentId: selectedStudent!.id, videoUrl, thumbnailUrl, caption, category, subCategory, tags: tags.join(','), isPublic, isMittfest }),
+          });
       setProgress(100);
       const saved = await readJson(metaRes, 'Save failed');
       setLastVideoMeta({ isEvaluation: saved.isEvaluation, category: saved.category, subCategory: saved.subCategory });
@@ -225,8 +313,10 @@ export default function UploadVideoPage() {
 
   function reset() {
     setSelectedStudent(null); setStudentSearch(''); setVideoFile(null); setVideoPreview(null);
-    setCategory(''); setSubCategory(''); setCustomTalent(''); setCaption(''); setIsPublic(true); setIsMittfest(false);
-    setAutoCrop(false); setAspectMismatch(false);
+    setCategory(''); setSubCategory(''); setCaption(''); setIsPublic(true); setIsMittfest(false);
+    setTags([]); setTagInput('');
+    setIsLandscape(false); setCropX(null); setCropOpen(false);
+    setStudentClass('ALL');
     setUploadState('idle'); setProgress(0); setErrorMsg(''); setLastVideoMeta(null);
     setSlots(null);
   }
@@ -241,17 +331,21 @@ export default function UploadVideoPage() {
           </div>
           <h2 className="text-[17px] font-semibold text-[#0F1B2D]">Video uploaded</h2>
           <p className="mt-1 text-[12.5px] text-[#677285]">
-            For <span className="font-medium text-[#475265]">{selectedStudent?.name}</span>
+            {isOwn
+              ? <>Your school&apos;s video</>
+              : <>For <span className="font-medium text-[#475265]">{selectedStudent?.name}</span></>}
             {lastVideoMeta?.subCategory ? ` · ${lastVideoMeta.subCategory}` : ''}
           </p>
 
           <div className="mx-auto mt-5 rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] p-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-[#677285]">Video type</p>
             <p className="mt-1 text-[14px] font-semibold text-[#0F1B2D]">
-              Olympiad evaluation
+              {isOwn ? 'School video' : 'Olympiad evaluation'}
             </p>
             <p className="mx-auto mt-1.5 max-w-[260px] text-[12px] leading-relaxed text-[#475265]">
-              This video will be reviewed and scored as an olympiad participation entry.
+              {isOwn
+                ? 'Once approved, it shows on your school\'s profile in the Mittmee app.'
+                : 'This video will be reviewed and scored as an olympiad participation entry.'}
             </p>
           </div>
 
@@ -265,9 +359,39 @@ export default function UploadVideoPage() {
   /* — Main — */
   return (
     <div className={STACK}>
-      {/* The 9:16 / 2-minute limits are stated inside the drop zone where they
-          are acted on, so they are not repeated in a hover-only subtitle. */}
-      <PageHeader icon={Upload} title="Upload Student Video" />
+      {/* What the upload accepts is stated inside the drop zone where it is
+          acted on, so it is not repeated in a hover-only subtitle. */}
+      <PageHeader icon={Upload} title="Upload Video" />
+
+      {/* Upload for a student (Olympiad) or the school's own video. */}
+      <div className="inline-flex rounded-lg border border-[#E6E8EC] bg-white p-1" role="tablist" aria-label="Who is this video for">
+        {([
+          { key: 'student', label: 'For a student', icon: User },
+          { key: 'own',     label: 'Our own video', icon: School },
+        ] as const).map(opt => {
+          const Icon = opt.icon;
+          const active = mode === opt.key;
+          return (
+            <button
+              key={opt.key}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              disabled={uploadState === 'uploading' || uploadState === 'saving'}
+              onClick={() => {
+                if (active) return;
+                setMode(opt.key);
+                setCategory(''); setSubCategory(''); setErrorMsg('');
+              }}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12.5px] font-semibold transition-colors ${FOCUS} ${
+                active ? 'bg-[#1559C7] text-white' : 'text-[#475265] hover:bg-[#F8F9FB]'
+              }`}
+            >
+              <Icon className="h-3.5 w-3.5" /> {opt.label}
+            </button>
+          );
+        })}
+      </div>
 
       <form onSubmit={handleSubmit}>
         <div className="grid grid-cols-1 gap-3 xl:grid-cols-5">
@@ -275,7 +399,18 @@ export default function UploadVideoPage() {
           {/* — LEFT column (3/5) — */}
           <div className="space-y-3 xl:col-span-3">
 
+            {/* Same notice the app shows on a non-Olympiad upload */}
+            {isOwn && (
+              <p className="flex items-start gap-2 rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] px-3.5 py-2.5 text-[12px] leading-relaxed text-[#475265]">
+                <Info className="mt-0.5 h-3.5 w-3.5 flex-shrink-0 text-[#677285]" />
+                <span>
+                  This platform is for children aged <span className="font-semibold">4 to 14 years</span>. Please ensure the performer is within this age group before uploading.
+                </span>
+              </p>
+            )}
+
             {/* Student selector */}
+            {!isOwn && (
             <Section title="Select student" required>
               {loadingStudents ? (
                 <div className="h-10 animate-pulse rounded-lg bg-[#EEF0F3]" />
@@ -323,16 +458,37 @@ export default function UploadVideoPage() {
                   {showDropdown && (
                     <div className="absolute left-0 right-0 top-full z-30 mt-1.5 overflow-hidden rounded-lg border border-[#E6E8EC] bg-white shadow-[0_8px_24px_rgba(15,27,45,0.12)]">
                       <div className="border-b border-[#EEF0F3] p-2">
+                        <p className="mb-1.5 px-0.5 text-[11px] text-[#677285]">{students.length} registered</p>
                         <input
                           autoFocus type="text" placeholder="Search name or ID…"
                           aria-label="Search students"
                           value={studentSearch} onChange={e => setStudentSearch(e.target.value)}
                           className={INPUT}
                         />
+                        {studentClasses.length >= 2 && (
+                          <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Filter by class">
+                            {[['ALL', 'All classes'] as [string, string], ...studentClasses].map(([code, name]) => {
+                              const on = studentClass === code;
+                              return (
+                                <button
+                                  key={code}
+                                  type="button"
+                                  onClick={() => setStudentClass(code)}
+                                  aria-pressed={on}
+                                  className={`rounded-full border px-2.5 py-1 text-[11.5px] font-semibold transition-colors ${FOCUS} ${
+                                    on ? 'border-[#1559C7] bg-[#1559C7] text-white' : 'border-[#E6E8EC] text-[#475265] hover:bg-[#F8F9FB]'
+                                  }`}
+                                >
+                                  {name}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
                       </div>
                       <div className="max-h-60 overflow-y-auto">
                         {filtered.length === 0 ? (
-                          <p className="py-5 text-center text-[12.5px] text-[#677285]">No students found</p>
+                          <p className="py-5 text-center text-[12.5px] text-[#677285]">No student matches your search.</p>
                         ) : filtered.map((s, i) => (
                           <button
                             key={s.id} type="button"
@@ -384,21 +540,39 @@ export default function UploadVideoPage() {
                 </div>
               )}
             </Section>
+            )}
 
             {/* Video drop zone */}
             <Section title="Video file" required>
               {videoPreview ? (
                 <div className="space-y-2.5">
                   <div className="relative overflow-hidden rounded-lg bg-[#0B1B33]">
-                    <video src={videoPreview} controls className="max-h-64 w-full object-contain" />
+                    {/* A chosen crop is previewed as it will look: the 9:16 part only. */}
+                    {cropX !== null ? (
+                      <div className="mx-auto aspect-[9/16] max-h-64">
+                        <video src={videoPreview} controls className="h-full w-full object-cover" style={{ objectPosition: `${cropX * 100}% 50%` }} />
+                      </div>
+                    ) : (
+                      <video src={videoPreview} controls className="max-h-64 w-full object-contain" />
+                    )}
                     <button
                       type="button"
                       aria-label="Remove video"
-                      onClick={() => { setVideoFile(null); setVideoPreview(null); setAspectMismatch(false); setAutoCrop(false); }}
+                      onClick={clearVideo}
                       className="absolute right-2 top-2 rounded-lg bg-black/60 p-1.5 text-white transition-colors hover:bg-black/80"
                     >
                       <X className="h-4 w-4" />
                     </button>
+                    {isLandscape && (
+                      <button
+                        type="button"
+                        onClick={() => setCropOpen(true)}
+                        disabled={uploadState === 'uploading' || uploadState === 'saving'}
+                        className="absolute bottom-2 right-2 flex items-center gap-1 rounded-lg bg-black/60 px-2 py-1 text-[11.5px] font-semibold text-white transition-colors hover:bg-black/80"
+                      >
+                        <Crop className="h-3.5 w-3.5" /> {cropX !== null ? 'Cropped' : 'Crop'}
+                      </button>
+                    )}
                   </div>
 
                   <p className="flex items-center gap-1.5 text-[12px] text-[#475265]">
@@ -409,21 +583,14 @@ export default function UploadVideoPage() {
                     </span>
                   </p>
 
-                  {aspectMismatch && (
-                    <p className="flex items-start gap-2 rounded-lg bg-[#B42323]/[0.08] px-3 py-2.5 text-[12px] text-[#B42323]">
-                      <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
-                      This video is not in 9:16 (portrait) format. Enable auto-crop below, or upload a portrait video.
+                  {isLandscape && (
+                    <p className="flex items-start gap-2 text-[12px] text-[#677285]">
+                      <Crop className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                      {cropX !== null
+                        ? 'Will be cropped to portrait (9:16) after upload.'
+                        : 'Landscape video — it will be uploaded in full. Use Crop to fit the portrait screen.'}
                     </p>
                   )}
-
-                  <label className="flex cursor-pointer items-center gap-2 text-[12px] text-[#475265]">
-                    <input
-                      type="checkbox" checked={autoCrop}
-                      onChange={e => setAutoCrop(e.target.checked)}
-                      className="h-3.5 w-3.5 rounded accent-[#1559C7]"
-                    />
-                    Auto-crop to 9:16 if not already portrait
-                  </label>
                 </div>
               ) : (
                 <div
@@ -444,9 +611,9 @@ export default function UploadVideoPage() {
                     {dragOver ? 'Drop it here' : 'Click to select or drag & drop'}
                   </p>
                   <p className="mt-1 text-[11.5px] text-[#677285]">
-                    MP4, MOV, AVI · 9:16 portrait · Max 2 min · Auto-compressed above 150 MB
+                    Any video format · Max 2 min · Landscape videos can be cropped to portrait · Large files are compressed automatically
                   </p>
-                  <input ref={fileInputRef} type="file" accept="video/*" className="hidden"
+                  <input ref={fileInputRef} type="file" accept="video/*,.mkv,.avi,.wmv,.flv,.mts,.m2ts,.3gp" className="hidden"
                     onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />
                 </div>
               )}
@@ -458,24 +625,90 @@ export default function UploadVideoPage() {
                 value={caption} onChange={e => setCaption(e.target.value)}
                 placeholder="Add a description for this video…"
                 aria-label="Video caption"
+                maxLength={MAX_CAPTION_LENGTH}
                 rows={3}
                 className={`${INPUT} resize-none`}
               />
+            </Section>
+
+            {/* Hashtags — same as the app: the auto-added ones, then custom ones */}
+            <Section title="Hashtags">
+              {autoTags.length > 0 && (
+                !isOwn && !isPublic ? (
+                  <p className="mb-2.5 flex items-center gap-1.5 text-[11.5px] text-[#677285]">
+                    <Lock className="h-3 w-3 flex-shrink-0" />
+                    School tags are hidden from public but still tracked in the background.
+                  </p>
+                ) : (
+                  <div className="mb-2.5">
+                    <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[#677285]">Auto-added from your school</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {autoTags.map(tag => (
+                        <span key={tag} className="inline-flex items-center gap-1 rounded-md bg-[#EEF0F3] px-2 py-1 text-[11.5px] font-medium text-[#475265]">
+                          <School className="h-3 w-3 text-[#98A1B2]" /> #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
+              <div className="flex gap-1.5">
+                <div className="relative flex-1">
+                  <Hash className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#98A1B2]" />
+                  <input
+                    type="text"
+                    value={tagInput}
+                    onChange={e => setTagInput(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(); } }}
+                    placeholder="Add a custom hashtag"
+                    aria-label="Add a custom hashtag"
+                    className={`${INPUT} !pl-8`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addTag}
+                  disabled={!tagInput.trim()}
+                  aria-label="Add hashtag"
+                  className={`flex items-center justify-center rounded-lg bg-[#1559C7] px-3 text-white transition-colors hover:bg-[#124BA8] disabled:opacity-40 ${FOCUS}`}
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
+              </div>
+              {tags.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {tags.map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => setTags(prev => prev.filter(t => t !== tag))}
+                      aria-label={`Remove #${tag}`}
+                      className={`inline-flex items-center gap-1 rounded-md border border-[#1559C7]/30 bg-[#1559C7]/[0.06] px-2 py-1 text-[11.5px] font-medium text-[#1559C7] hover:bg-[#1559C7]/[0.12] ${FOCUS}`}
+                    >
+                      #{tag} <X className="h-3 w-3" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </Section>
           </div>
 
           {/* — RIGHT column (2/5) — */}
           <div className="space-y-3 xl:col-span-2">
 
-            {/* Visibility */}
+            {/* Visibility — a student's Olympiad video only; the app offers no
+                choice on the school's own video (it is always public). */}
+            {!isOwn && (
             <Section title="Visibility">
-              <p className="mb-2 text-[11.5px] leading-relaxed text-[#677285]">
-                Choose now. It cannot be changed after the video is uploaded.
-              </p>
+              {!isOwn && (
+                <p className="mb-2 text-[11.5px] leading-relaxed text-[#677285]">
+                  Choose now. It cannot be changed after the video is uploaded.
+                </p>
+              )}
               <div className="space-y-1.5">
                 {[
-                  { val: true,  icon: Globe,  label: 'Public',  desc: 'Anyone on Mittmee can see this video' },
-                  { val: false, icon: EyeOff, label: 'Private', desc: 'Only the student and reviewers can see this' },
+                  { val: true,  icon: Globe,  label: 'Public',  desc: isOwn ? "Follows your school profile's privacy settings" : 'Anyone on Mittmee can see this video' },
+                  { val: false, icon: EyeOff, label: 'Private', desc: isOwn ? 'Only your school and the Super Admin can see this' : 'Only the student and reviewers can see this' },
                 ].map(opt => {
                   const Icon = opt.icon;
                   const active = isPublic === opt.val;
@@ -506,8 +739,10 @@ export default function UploadVideoPage() {
                 })}
               </div>
             </Section>
+            )}
 
-            {/* MittFest - optional, on the student's behalf */}
+            {/* MittFest - optional, on the student's behalf; not on the school's own video */}
+            {!isOwn && (
             <Section title="MittFest">
               <label className="flex cursor-pointer items-start gap-2.5 text-[12.5px] text-[#475265]">
                 <input
@@ -521,6 +756,7 @@ export default function UploadVideoPage() {
                 </span>
               </label>
             </Section>
+            )}
 
             {/* Nothing left to upload for this student */}
             {bothFilled && (
@@ -543,7 +779,7 @@ export default function UploadVideoPage() {
                 </p>
               )}
               <div className="space-y-1.5">
-                {CATEGORIES.map(cat => {
+                {categories.map(cat => {
                   const Icon = cat.icon;
                   const isSelected = category === cat.value;
                   const status = getCatStatus(cat.value);
@@ -560,7 +796,7 @@ export default function UploadVideoPage() {
                       onClick={() => {
                         if (isDisabled) return;
                         setCategory(isSelected ? '' : cat.value);
-                        setSubCategory(''); setCustomTalent('');
+                        setSubCategory('');
                       }}
                       className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2.5 text-left transition-colors ${FOCUS} ${
                         isFilled
@@ -602,10 +838,9 @@ export default function UploadVideoPage() {
                   {selectedCat.subCategories.map(sub => (
                     <button
                       key={sub} type="button"
-                      onClick={() => {
-                        setSubCategory(sub);
-                        if (sub !== 'Any Other Special Talent' && sub !== 'Any Other') setCustomTalent('');
-                      }}
+                      // As in the app, every option ("Other", "Any Other" too) is
+                      // saved by its own label; nothing is typed in.
+                      onClick={() => setSubCategory(sub)}
                       aria-pressed={subCategory === sub}
                       className={`rounded-lg border px-2.5 py-1.5 text-[12px] font-medium transition-colors ${FOCUS} ${
                         subCategory === sub
@@ -617,23 +852,6 @@ export default function UploadVideoPage() {
                     </button>
                   ))}
                 </div>
-
-                {isCustomTalent && (
-                  <div className="mt-2.5">
-                    <label htmlFor="custom-talent" className={LABEL}>
-                      {subCategory === 'Any Other' ? 'Topic' : 'Talent name'} <span className="text-[#B42323]">*</span>
-                    </label>
-                    <input
-                      id="custom-talent"
-                      type="text"
-                      value={customTalent}
-                      onChange={e => setCustomTalent(e.target.value)}
-                      placeholder={subCategory === 'Any Other' ? 'Enter the topic…' : 'Enter the talent name…'}
-                      autoFocus
-                      className={INPUT}
-                    />
-                  </div>
-                )}
               </Section>
             )}
 
@@ -671,7 +889,25 @@ export default function UploadVideoPage() {
         </div>
       </form>
 
+      {/* The two policies that govern uploads, as on the app's upload screen —
+          at the very bottom of the page. */}
+      <p className="border-t border-[#E6E8EC] pt-3 text-center text-[11.5px] leading-relaxed text-[#677285]">
+        Before you upload, please read our{' '}
+        <a href={`${POLICY_SITE}/community-guidelines`} target="_blank" rel="noopener noreferrer" className="font-medium text-[#1559C7] hover:underline">Community Guidelines</a>
+        {' and '}
+        <a href={`${POLICY_SITE}/infringement-policy`} target="_blank" rel="noopener noreferrer" className="font-medium text-[#1559C7] hover:underline">Infringement Policy</a>.
+      </p>
+
       {showDropdown && <div className="fixed inset-0 z-20 cursor-default" onClick={() => setShowDropdown(false)} />}
+
+      {cropOpen && videoPreview && (
+        <VideoCropModal
+          src={videoPreview}
+          initialX={cropX ?? 0.5}
+          onCrop={x => { setCropX(x); setCropOpen(false); }}
+          onKeepFull={() => { setCropX(null); setCropOpen(false); }}
+        />
+      )}
     </div>
   );
 }
