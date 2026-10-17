@@ -8,8 +8,13 @@ import {
   Eye, Globe, Lock, Award, RefreshCw, Trash2, RotateCcw,
   Search, Filter, ChevronDown, X, Copy, Check,
 } from 'lucide-react';
-import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
+import {
+  OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_OPTIONS, OLYMPIAD_CAT_B_OPTIONS,
+  OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL,
+} from '@/lib/olympiad-categories';
+import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
 import { CLAIM_RENEW_MS, claimIsLive } from '@/lib/videoClaim';
+import { mergeTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,6 +26,8 @@ interface Video {
   category: string;
   subCategory: string;
   tags: string;
+  /** The student's school tags (state, district, name, CRM ID), from the API. */
+  schoolTags?: string[];
   isPublic: boolean;
   isEvaluation: boolean;
   isMittfest: boolean;
@@ -110,6 +117,35 @@ function displayTags(video: { tags: string; isMittfest: boolean }): string[] {
   return list;
 }
 
+// Sub-category options for the recategorize dropdown: the app's list, plus the
+// video's current value when it is a retired spelling not in that list.
+function withCurrent(options: string[], current: string | null | undefined): string[] {
+  return current && !options.includes(current) ? [...options, current] : options;
+}
+
+// Default tags (school + main category) are added by the server on every save
+// and follow the video's category, so the preview shows them locked and the
+// editable list holds only the rest. Pass the category being picked in the
+// preview to see the tag it will get.
+function defaultTagsOf(video: Video, category?: string, subCategory?: string): string[] {
+  return videoDefaultTags(video.schoolTags ?? [], {
+    isEvaluation: video.isEvaluation,
+    category: category ?? video.category,
+    subCategory: subCategory ?? video.subCategory,
+  });
+}
+
+function editableTags(video: Video): string[] {
+  const defaults = new Set(defaultTagsOf(video).map(t => t.toLowerCase()));
+  const own = displayTags(video).filter(t => !defaults.has(t.toLowerCase()));
+  return video.isEvaluation ? withoutCategoryTags(own) : own;
+}
+
+/** Every tag the video ends up with, defaults first — for the card. */
+function allTags(video: Video): string[] {
+  return mergeTags(defaultTagsOf(video), editableTags(video)).split(',').filter(Boolean);
+}
+
 // App upload categories for general users with a single sub-option each. The
 // recategorise dropdowns only know the Olympiad A/B lists, so these stay read-only.
 const GENERAL_ONLY_CATEGORIES = ['Learning', 'Parenting', 'Others'];
@@ -160,6 +196,13 @@ function isSuperAdmin(): boolean {
   return !!sessionStorage.getItem('token');
 }
 
+// Same detection as dashboard/layout.tsx. Moderators can only remove hashtags,
+// not add them (the PATCH endpoint enforces this too); admins can do both.
+function isModerator(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !!sessionStorage.getItem('moderatorToken') && !sessionStorage.getItem('token');
+}
+
 /** The signed-in staff member's id, read from their token — used to tell
  *  their own review claims apart from other moderators'. */
 function myUserId(): string | null {
@@ -183,6 +226,7 @@ export default function VideoModerationPage() {
   // Approved → Rejected and Approved/Rejected → Pending are SuperAdmin-only
   // overrides (enforced by the API too).
   const [canUnapprove] = useState(isSuperAdmin);
+  const [canAddTags] = useState(() => !isModerator());
   const [myId] = useState(myUserId);
 
   // ── Tab & Filters ─────────────────────────────────────────────────────────
@@ -351,7 +395,7 @@ export default function VideoModerationPage() {
     setEditedSubCat(video.subCategory || '');
     setEditedCat(normalizeCat(video));
     setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null);
-    setEditedTags(displayTags(video));
+    setEditedTags(editableTags(video));
     setEditedCaption(video.caption || '');
     setTagInput('');
   };
@@ -418,9 +462,14 @@ export default function VideoModerationPage() {
         }),
       });
       if (res.ok) {
+        // The new category swaps the video's category tag on the server.
+        const body = await res.json().catch(() => null);
         mutate(cur => cur ? {
           ...cur,
-          videos: cur.videos.map(v => v.id === video.id ? { ...v, category: categoryOverride, subCategory: subCategoryOverride, quality: qualityOverride ?? v.quality } : v),
+          videos: cur.videos.map(v => v.id === video.id ? {
+            ...v, category: categoryOverride, subCategory: subCategoryOverride, quality: qualityOverride ?? v.quality,
+            tags: body?.video?.tags ?? v.tags,
+          } : v),
         } : cur, { revalidate: false });
         setPreviewVideo(null);
       } else {
@@ -470,7 +519,7 @@ export default function VideoModerationPage() {
           videos: cur.videos.map(v => v.id === video.id ? { ...v, tags: newTags } : v),
         } : cur, { revalidate: false });
         setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, tags: newTags } : cur);
-        setEditedTags(newTags ? newTags.split(',').map(t => t.trim()).filter(Boolean) : []);
+        setEditedTags(editableTags({ ...video, tags: newTags }));
       } else {
         const body = await res.json().catch(() => null);
         alert(body?.message || 'Failed to update tags');
@@ -503,9 +552,14 @@ export default function VideoModerationPage() {
     } finally { setSavingCaption(false); }
   };
 
+  // Same cleaning and 30-tag limit as the app's hashtag box.
   const addTagFromInput = () => {
-    const cleaned = tagInput.trim().replace(/^#/, '').replace(/,/g, '');
+    const cleaned = cleanHashtag(tagInput);
     if (!cleaned) return;
+    if (editedTags.length >= MAX_CUSTOM_TAGS && !editedTags.some(t => t.toLowerCase() === cleaned.toLowerCase())) {
+      alert(`Max ${MAX_CUSTOM_TAGS} hashtags.`);
+      return;
+    }
     setEditedTags(prev => prev.some(t => t.toLowerCase() === cleaned.toLowerCase()) ? prev : [...prev, cleaned]);
     setTagInput('');
   };
@@ -756,10 +810,10 @@ export default function VideoModerationPage() {
                 >
                   <option value="">All categories</option>
                   <optgroup label={OLYMPIAD_CAT_A_LABEL}>
-                    {OLYMPIAD_CAT_A_SUBS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {OLYMPIAD_CAT_A_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                   <optgroup label={OLYMPIAD_CAT_B_LABEL}>
-                    {OLYMPIAD_CAT_B_SUBS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {OLYMPIAD_CAT_B_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                   <optgroup label="General uploads">
                     {GENERAL_ONLY_CATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
@@ -870,7 +924,7 @@ export default function VideoModerationPage() {
             {videos.map((video) => {
               const school    = video.student?.allocation?.school;
               const busy      = processingId === video.id;
-              const tagList   = displayTags(video);
+              const tagList   = allTags(video);
               const isChecked = selected.has(video.id);
               const catBadge  = getCategoryLabel(video.subCategory);
               const isStudent = isStudentVideo(video);
@@ -1123,8 +1177,10 @@ export default function VideoModerationPage() {
       {/* ── Preview modal ────────────────────────────────────────────────────── */}
       {previewVideo && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewVideo(null)}>
-          <div className="bg-[#0f0f0f] rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl" onClick={e => e.stopPropagation()}>
-            <div className="bg-black flex items-center justify-center relative" style={{ maxHeight: 340 }}>
+          {/* Capped at the screen height: the video stays put and the details
+              below scroll, so a tall card never runs off the top of the screen. */}
+          <div className="bg-[#0f0f0f] rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl max-h-[calc(100dvh-2rem)] flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="bg-black flex items-center justify-center relative shrink-0" style={{ maxHeight: 340 }}>
               <video src={previewVideo.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full max-h-[340px] object-contain" />
               <button onClick={() => setPreviewVideo(null)}
                 className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 flex items-center justify-center transition-colors">
@@ -1132,7 +1188,7 @@ export default function VideoModerationPage() {
               </button>
             </div>
 
-            <div className="p-4 space-y-3">
+            <div className="p-4 space-y-3 overflow-y-auto min-h-0">
 
               {/* Category + date row */}
               <div className="flex items-center justify-between">
@@ -1146,7 +1202,7 @@ export default function VideoModerationPage() {
                         onChange={e => {
                           const cat = e.target.value;
                           setEditedCat(cat);
-                          const subs = cat === OLYMPIAD_CAT_A_LABEL ? OLYMPIAD_CAT_A_SUBS : OLYMPIAD_CAT_B_SUBS;
+                          const subs = cat === OLYMPIAD_CAT_A_LABEL ? OLYMPIAD_CAT_A_OPTIONS : OLYMPIAD_CAT_B_OPTIONS;
                           if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0]);
                         }}
                         className="text-[11px] font-black text-amber-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-300"
@@ -1159,7 +1215,9 @@ export default function VideoModerationPage() {
                         onChange={e => setEditedSubCat(e.target.value)}
                         className="text-[11px] font-black text-blue-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300"
                       >
-                        {(editedCat === OLYMPIAD_CAT_B_LABEL ? OLYMPIAD_CAT_B_SUBS : OLYMPIAD_CAT_A_SUBS)
+                        {/* The app's options, plus the video's own value if it is an
+                            older spelling, so the dropdown shows what is saved. */}
+                        {withCurrent(editedCat === OLYMPIAD_CAT_B_LABEL ? OLYMPIAD_CAT_B_OPTIONS : OLYMPIAD_CAT_A_OPTIONS, previewVideo.subCategory)
                           .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
                       </select>
                     </>
@@ -1209,7 +1267,7 @@ export default function VideoModerationPage() {
                   <textarea
                     value={editedCaption}
                     onChange={e => setEditedCaption(e.target.value)}
-                    maxLength={500}
+                    maxLength={MAX_CAPTION_LENGTH}
                     rows={2}
                     placeholder="Add a caption…"
                     className="w-full text-sm font-semibold text-white bg-white/10 border border-white/20 rounded-xl px-3 py-2 resize-none placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-300"
@@ -1235,6 +1293,15 @@ export default function VideoModerationPage() {
               {!previewVideo.deletedAt && (
                 <div className="space-y-1.5">
                   <div className="flex flex-wrap gap-1.5">
+                    {/* Default tags — added automatically, can't be removed; the
+                        category one follows the category picked above. */}
+                    {defaultTagsOf(previewVideo, editedCat || undefined, editedSubCat || undefined).map(tag => (
+                      <span key={`default-${tag}`} title="Default tag — added automatically"
+                        className="flex items-center gap-1 text-[11px] font-bold text-amber-200 bg-amber-500/15 border border-amber-400/25 px-2 py-1 rounded-lg">
+                        <Lock size={9} className="opacity-70" />
+                        #{tag}
+                      </span>
+                    ))}
                     {editedTags.map((tag, i) => (
                       <span key={i} className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-indigo-500/15 border border-indigo-400/20 px-2 py-1 rounded-lg">
                         #{tag}
@@ -1243,25 +1310,33 @@ export default function VideoModerationPage() {
                         </button>
                       </span>
                     ))}
-                    {editedTags.length === 0 && (
+                    {editedTags.length === 0 && defaultTagsOf(previewVideo).length === 0 && (
                       <span className="text-[11px] text-white/30 italic">No hashtags</span>
                     )}
                   </div>
                   <div className="flex gap-1.5">
-                    <input
-                      type="text"
-                      value={tagInput}
-                      onChange={e => setTagInput(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTagFromInput(); } }}
-                      placeholder="Add hashtag…"
-                      className="flex-1 min-w-0 text-[11px] bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                    />
-                    <button type="button" onClick={addTagFromInput} disabled={!tagInput.trim()}
-                      className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[11px] font-bold hover:bg-white/15 disabled:opacity-30 transition-colors">
-                      Add
-                    </button>
+                    {canAddTags ? (
+                      <>
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={e => setTagInput(e.target.value)}
+                          onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTagFromInput(); } }}
+                          placeholder="Add hashtag…"
+                          className="flex-1 min-w-0 text-[11px] bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                        />
+                        <button type="button" onClick={addTagFromInput} disabled={!tagInput.trim()}
+                          className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[11px] font-bold hover:bg-white/15 disabled:opacity-30 transition-colors">
+                          Add
+                        </button>
+                      </>
+                    ) : (
+                      <span className="flex-1 min-w-0 self-center text-[10px] text-white/40 italic">
+                        Moderators can remove hashtags (✕) but not add new ones.
+                      </span>
+                    )}
                     {(() => {
-                      const currentTags = previewVideo.tags ? previewVideo.tags.split(',').map(t => t.trim()).filter(Boolean) : [];
+                      const currentTags = editableTags(previewVideo);
                       const changed = currentTags.length !== editedTags.length || currentTags.some(t => !editedTags.includes(t));
                       return changed && (
                         <button type="button" onClick={() => saveTags(previewVideo, editedTags)} disabled={savingTags}

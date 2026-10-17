@@ -3,6 +3,7 @@ import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { schoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { olympiadSlotOf, resolveSchoolStudent, slotsForStudent } from '@/lib/olympiadSlots';
 
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
 
     const schoolRow = await prisma.school.findUnique({
       where: { id: school.id },
-      select: { id: true, name: true, city: true, district: true, state: true, schoolId: true, isActive: true },
+      select: { id: true, name: true, city: true, district: true, state: true, olympiadId: true, isActive: true },
     });
     if (!schoolRow || !schoolRow.isActive) {
       return NextResponse.json({ error: 'This school account is not active.' }, { status: 403 });
@@ -91,7 +92,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const mergedTags = buildTags(schoolRow, tags);
+    // Always an Olympiad video here, so it carries its main category too.
+    const mergedTags = mergeTags([...schoolAutoTags(schoolRow), mainCategoryTag(category, subCategory)], tags);
 
     // The video belongs to the student's web record if they have one, else to
     // their app account (same split the web form has always used).
@@ -124,16 +126,6 @@ export async function POST(request: Request) {
     console.error('School videos POST error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
-
-function buildTags(schoolInfo: any, tags?: string): string {
-  const autoTags: string[] = [];
-  if (schoolInfo?.state)    autoTags.push(schoolInfo.state.replace(/\s+/g, ''));
-  if (schoolInfo?.district) autoTags.push(schoolInfo.district.replace(/\s+/g, ''));
-  if (schoolInfo?.name)     autoTags.push(schoolInfo.name.replace(/\s+/g, ''));
-  if (schoolInfo?.schoolId) autoTags.push(schoolInfo.schoolId);
-  const userTags = tags ? tags.split(',').map((t: string) => t.trim()).filter(Boolean) : [];
-  return [...new Set([...autoTags, ...userTags])].join(',');
 }
 
 // GET — list videos uploaded by this school

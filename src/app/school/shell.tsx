@@ -6,7 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, Menu, X,
-  ClipboardList, UserCheck, LifeBuoy, type LucideIcon,
+  ClipboardList, UserCheck, LifeBuoy, BarChart3, type LucideIcon,
 } from 'lucide-react';
 import { initialsOf } from './ui';
 import { jakarta } from './fonts';
@@ -37,6 +37,7 @@ const NAV: { label?: string; items: NavItem[] }[] = [
     items: [
       { name: 'Student Videos', href: '/school/student-videos', icon: Clapperboard },
       { name: 'Upload Video', href: '/school/upload-video', icon: UploadCloud },
+      { name: 'Upload Status', href: '/school/upload-status', icon: BarChart3 },
     ],
   },
   { label: 'School', items: [{ name: 'School Profile', href: '/school/profile', icon: School }] },

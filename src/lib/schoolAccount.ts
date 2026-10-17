@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { schoolAutoTags } from '@/lib/videoAutoTags';
 import { SCHOOL_AGREEMENT_KEY, SCHOOL_AGREEMENT_VERSION } from '@/lib/agreements/school-onboarding';
 import { ACCOUNT_TYPE_SCHOOL, currentGeneralSchoolAcceptance, getGeneralSchoolForUser } from '@/lib/generalSchool';
 
@@ -140,16 +141,13 @@ export async function getSchoolIdentity(appUserId: string): Promise<SchoolIdenti
   if (user.schoolRefId) {
     const school = await prisma.school.findUnique({
       where: { id: user.schoolRefId },
-      select: { id: true, schoolId: true, name: true, state: true, district: true, isActive: true },
+      select: { id: true, olympiadId: true, name: true, state: true, district: true, isActive: true },
     });
     if (!school) return null;
     const accepted = await currentOlympiadSchoolAcceptance(school.id);
-    const autoTags: string[] = [];
-    if (school.state)    autoTags.push(squash(school.state));
-    if (school.district) autoTags.push(squash(school.district));
-    autoTags.push(squash(school.name));
-    // The school code is what the "videos from this school" counts match on.
-    autoTags.push(school.schoolId);
+    // The CRM ID tag is what the "videos from this school" counts match on
+    // (see schoolTagWhere in lib/videoAutoTags).
+    const autoTags = schoolAutoTags(school);
     return {
       kind: 'OLYMPIAD', schoolRowId: school.id, name: school.name, state: school.state,
       district: school.district, isActive: school.isActive, agreementAccepted: Boolean(accepted), autoTags,

@@ -18,33 +18,16 @@ export const ACCOUNT_TYPE_SCHOOL = 'SCHOOL';
 /** uploaderType stored on a General School's own videos. */
 export const UPLOADER_SCHOOL_OWN = 'SCHOOL_OWN';
 
-export const SCHOOL_ACTIVITY_CATEGORY = 'School Activity';
-
-/**
- * Categories a school account may upload into. Same as a general user's
- * Talent / Rhymes / Speech groups plus School Activity; Learning, Parenting
- * and Others are not offered to schools.
- */
-export const SCHOOL_UPLOAD_CATEGORIES = [
-  'Talent Performance',
-  'Rhymes',
-  'Speech & Presentation',
+// The school upload categories live in a client-safe file so the school
+// portal's upload page can use the same list; re-exported here for the server.
+// Same as a general user's Talent / Rhymes / Speech groups plus School
+// Activity; Learning, Parenting and Others are not offered to schools.
+export {
   SCHOOL_ACTIVITY_CATEGORY,
-] as const;
-
-/** The only sub-categories School Activity accepts. */
-export const SCHOOL_ACTIVITY_SUBS = [
-  'Annual Day',
-  'Sports Day',
-  'Classroom Activity',
-  'Festival Celebration',
-  'Competition',
-  'Field Trip',
-  'Other',
-] as const;
-
-export const isSchoolActivity = (category: unknown) =>
-  typeof category === 'string' && category.trim().toLowerCase() === SCHOOL_ACTIVITY_CATEGORY.toLowerCase();
+  SCHOOL_UPLOAD_CATEGORIES,
+  SCHOOL_ACTIVITY_SUBS,
+  isSchoolActivity,
+} from '@/lib/schoolUploadCategories';
 
 /**
  * The school's current acceptance: its newest unrevoked row for the current
