@@ -602,6 +602,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Link href="/dashboard/settings/permission-control" className={subItemClass(pathname === '/dashboard/settings/permission-control')}>
                       <span>Permission Control</span>
                     </Link>
+                    <Link href="/dashboard/settings/app-version" className={subItemClass(pathname === '/dashboard/settings/app-version')}>
+                      <span>App Version</span>
+                    </Link>
                   </div>
                   </div>
                 </div>
