@@ -23,6 +23,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   { key: 'result', label: 'Result', subItems: [], adminOnly: true },
   { key: 'banners', label: 'Banners', subItems: [], adminOnly: true },
   { key: 'appCarousel', label: 'App Carousel', subItems: [], adminOnly: true },
+  { key: 'appTheme', label: 'App Theme & Festivals', subItems: [], adminOnly: true },
   { key: 'homeVideos', label: 'Learning & Parenting', subItems: [], adminOnly: true },
   { key: 'videoDownloads', label: 'Download Videos', subItems: [], adminOnly: true },
   { key: 'activityLog', label: 'Activity Log', subItems: [], adminOnly: true },

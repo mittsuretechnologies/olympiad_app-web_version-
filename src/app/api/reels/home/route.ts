@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { getLiveTheme } from '@/lib/appTheme';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -148,6 +149,28 @@ export async function GET(request: NextRequest) {
     // moderator rated High quality at approval.
     const trendingWhere = { ...baseWhere, quality: 'HIGH' };
 
+    // Admin-managed carousel slides for the app home screen. Independent of
+    // visibility/approval rules — they're artwork, not user content — so
+    // started now and awaited later, in parallel with the video queries. An
+    // empty result is normal and means the app keeps its original behaviour
+    // of building the carousel purely from the most-watched videos.
+    // All-year slides (themeId null) always; festival slides only while their
+    // AppTheme is the live one, and in front of the all-year ones.
+    const appBannersPromise = getLiveTheme()
+      .catch(() => null)
+      .then((live) => {
+        const liveId = live?.theme?.id ?? null;
+        return prisma.appBannerSlide.findMany({
+          where: { isActive: true, OR: [{ themeId: null }, ...(liveId ? [{ themeId: liveId }] : [])] },
+          orderBy: { order: 'asc' },
+          select: { id: true, image: true, alt: true, title: true, tag: true, linkUrl: true, themeId: true, bgColor: true },
+        });
+      })
+      .then((list) => [...list.filter((b) => b.themeId), ...list.filter((b) => !b.themeId)]
+        .map((b) => ({ id: b.id, image: b.image, alt: b.alt, title: b.title, tag: b.tag, linkUrl: b.linkUrl, bgColor: b.bgColor })))
+      // Slides are decoration: a failure here must not take the feed down.
+      .catch((e) => { console.error('home feed: app banners failed:', e); return []; });
+
     const [trendingViews, newReleases, categories, mittfest, olympiad] = await Promise.all([
       // Most-viewed High-quality videos based on VideoView rows recorded in the last 7 days.
       prisma.videoView.groupBy({
@@ -187,16 +210,7 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    // Admin-managed carousel slides for the app home screen. Fetched
-    // separately from the video rows because they're independent of
-    // visibility/approval rules — they're artwork, not user content. An empty
-    // result is normal and means the app keeps its original behaviour of
-    // building the carousel purely from the most-watched videos.
-    const appBanners = await prisma.appBannerSlide.findMany({
-      where: { isActive: true },
-      orderBy: { order: 'asc' },
-      select: { id: true, image: true, alt: true, title: true, tag: true, linkUrl: true },
-    });
+    const appBanners = await appBannersPromise;
 
     const trendingIds = trendingViews.map(t => t.videoId);
     const trendingVideosRaw = trendingIds.length > 0

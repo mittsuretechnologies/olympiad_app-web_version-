@@ -19,7 +19,7 @@ export async function POST(request: Request) {
   const { error } = await requireAdmin(request, 'appCarousel');
   if (error) return error;
   try {
-    const { image, alt, title, tag, linkUrl } = await request.json();
+    const { image, alt, title, tag, linkUrl, themeId, bgColor } = await request.json();
     if (!image?.trim()) {
       return NextResponse.json({ message: 'Image is required' }, { status: 400 });
     }
@@ -34,6 +34,10 @@ export async function POST(request: Request) {
         title: title?.trim() || '',
         tag: tag?.trim() || '',
         linkUrl: linkUrl?.trim() || '',
+        // Festival slide (shown only while that theme is live); empty = all year.
+        themeId: typeof themeId === 'string' && themeId ? themeId : null,
+        // Festive band colour while this slide is showing; '' = theme default.
+        bgColor: typeof bgColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(bgColor) ? bgColor : '',
         order: nextOrder,
       },
     });

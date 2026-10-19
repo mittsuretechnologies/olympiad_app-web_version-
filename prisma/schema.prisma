@@ -1069,10 +1069,43 @@ model AppBannerSlide {
   linkUrl   String   @default("")
   order     Int      @default(0)
   isActive  Boolean  @default(true)
+  // Festival slide: shown only while this AppTheme is the live one. Null =
+  // shown all year (every slide that existed before themes).
+  themeId   String?
+  theme     AppTheme? @relation(fields: [themeId], references: [id], onDelete: SetNull)
+  // Colour of the festive band behind the carousel while this slide is on
+  // screen (Amazon-style). Empty = the theme's own band colour.
+  bgColor   String   @default("")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([isActive, order])
+  @@index([themeId])
+  @@schema("public")
+}
+
+// SuperAdmin-managed look of the mobile app home screen (festival themes:
+// Diwali, Holi, Christmas, …). At most one is "live" at a time — the enabled
+// theme whose window contains now, highest priority first (see
+// src/lib/appTheme.ts). No live theme = the app's built-in look.
+//
+// Everything visual lives in `config` (validated + normalised by
+// appThemeConfigSchema) so new knobs can be added without a migration, and
+// older app builds simply ignore keys they don't know.
+model AppTheme {
+  id        String           @id @default(uuid())
+  name      String
+  isActive  Boolean          @default(false)
+  // Null start = live as soon as enabled; null end = until disabled.
+  startsAt  DateTime?
+  endsAt    DateTime?
+  priority  Int              @default(0)
+  config    Json
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  banners   AppBannerSlide[]
+
+  @@index([isActive, startsAt, endsAt])
   @@schema("public")
 }
 
