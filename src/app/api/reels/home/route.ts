@@ -22,6 +22,7 @@ const OLYMPIAD_ROW_LIMIT = 100;
 type RawVideo = {
   id: string;
   videoUrl: string;
+  hlsUrl: string | null;
   thumbnailUrl: string | null;
   caption: string | null;
   category: string | null;
@@ -43,6 +44,7 @@ type RawVideo = {
 const VIDEO_SELECT = {
   id: true,
   videoUrl: true,
+  hlsUrl: true,
   thumbnailUrl: true,
   caption: true,
   category: true,
@@ -103,6 +105,7 @@ async function hydrate(items: RawVideo[], effectiveUserId?: string) {
     return {
       id: v.id,
       videoUrl: v.videoUrl,
+      hlsUrl: v.hlsUrl,
       thumbnailUrl: v.thumbnailUrl,
       caption: v.caption,
       category: v.category,

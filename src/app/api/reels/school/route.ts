@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
       },
       orderBy: { createdAt: 'desc' },
       select: {
-        id: true, videoUrl: true, thumbnailUrl: true,
+        id: true, videoUrl: true, hlsUrl: true, thumbnailUrl: true,
         caption: true, category: true, subCategory: true,
         likesCount: true, viewsCount: true, createdAt: true,
         appUserId: true, isEvaluation: true, olympiadVisibility: true,
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
           },
           orderBy: { createdAt: 'desc' },
           select: {
-            id: true, videoUrl: true, thumbnailUrl: true,
+            id: true, videoUrl: true, hlsUrl: true, thumbnailUrl: true,
             caption: true, category: true, subCategory: true,
             likesCount: true, viewsCount: true, createdAt: true,
             appUserId: true, isEvaluation: true, olympiadVisibility: true,
@@ -121,6 +121,7 @@ export async function GET(request: NextRequest) {
       return {
         id:           v.id,
         videoUrl:     v.videoUrl,
+        hlsUrl:       v.hlsUrl,
         thumbnailUrl: v.thumbnailUrl,
         caption:      v.caption,
         category:     v.category,

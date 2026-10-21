@@ -300,6 +300,10 @@ model Video {
   // when uploaderType = "SCHOOL"). Moderation results are notified to it too.
   uploadedBySchoolId String?
   videoUrl           String
+  // Adaptive-quality (HLS) copy of videoUrl: link to its master.m3u8, made in
+  // the background by scripts/hls-worker.mjs. Null until converted — the app
+  // then plays videoUrl as before. Only app builds with HLS support read it.
+  hlsUrl             String?
   thumbnailUrl       String?
   caption            String?
   category           String?

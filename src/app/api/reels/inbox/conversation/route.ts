@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
           select: {
             id:           true,
             videoUrl:     true,
+            hlsUrl:       true,
             thumbnailUrl: true,
             caption:      true,
             category:     true,

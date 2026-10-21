@@ -147,7 +147,7 @@ async function searchVideos(q: string, appUserId: string, cursor: string | undef
     prisma.video.findMany({
       where,
       select: {
-        id: true, appUserId: true, videoUrl: true, thumbnailUrl: true,
+        id: true, appUserId: true, videoUrl: true, hlsUrl: true, thumbnailUrl: true,
         caption: true, category: true, subCategory: true, tags: true,
         likesCount: true, viewsCount: true, createdAt: true,
         student: {
