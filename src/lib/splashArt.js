@@ -192,33 +192,6 @@ const blob = (cx, cy, R, c, o) => {
   return `<path d="${d}Z" fill="${c}" fill-opacity="${o ?? 0.85}"/>${dots}`;
 };
 
-const crescent = (x, y, r, c) =>
-  `<path d="M${x},${y - r} A${r},${r} 0 1,0 ${x},${y + r} A${n(r * 1.25)},${n(r * 1.25)} 0 0,1 ${x},${y - r} Z" fill="${c}"/>`;
-
-function fanoos(x, len, c) {
-  const y = len;
-  return `<line x1="${x}" y1="0" x2="${x}" y2="${y}" stroke="#C9A227" stroke-width="1.3"/>`
-    + `<circle cx="${x}" cy="${y + 26}" r="30" fill="url(#glow)"/>`
-    + `<polygon points="${x},${y} ${x + 12},${y + 10} ${x - 12},${y + 10}" fill="#C9A227"/>`
-    + `<path d="M${x - 12},${y + 10} L${x + 12},${y + 10} L${x + 10},${y + 40} Q${x},${y + 48} ${x - 10},${y + 40} Z" fill="${c}"/>`
-    + `<path d="M${x - 6},${y + 16} L${x + 6},${y + 16} L${x + 5},${y + 36} Q${x},${y + 40} ${x - 5},${y + 36} Z" fill="#FFE066"/>`
-    + `<circle cx="${x}" cy="${y + 50}" r="3" fill="#C9A227"/>`;
-}
-
-function mosque(base, c) {
-  return `<g fill="${c}">`
-    + `<rect x="100" y="${base - 70}" width="160" height="70"/>`
-    + `<path d="M120,${base - 70} Q180,${base - 160} 240,${base - 70} Z"/>`
-    + `<rect x="177" y="${base - 178}" width="6" height="22"/>`
-    + `<path d="M70,${base - 50} Q92,${base - 98} 114,${base - 50} Z"/><rect x="70" y="${base - 50}" width="44" height="50"/>`
-    + `<path d="M246,${base - 50} Q268,${base - 98} 290,${base - 50} Z"/><rect x="246" y="${base - 50}" width="44" height="50"/>`
-    + `<rect x="40" y="${base - 150}" width="16" height="150"/><path d="M36,${base - 150} L48,${base - 176} L60,${base - 150} Z"/>`
-    + `<rect x="304" y="${base - 150}" width="16" height="150"/><path d="M300,${base - 150} L312,${base - 176} L324,${base - 150} Z"/>`
-    + '</g>'
-    + `<path d="M162,${base} L162,${base - 34} Q180,${base - 54} 198,${base - 34} L198,${base} Z" fill="#FFE066" fill-opacity="0.85"/>`
-    + crescent(180, base - 186, 8, '#FFD43B');
-}
-
 function modak(x, y, s) {
   return `<path d="M${x},${n(y - 34 * s)} C${n(x + 6 * s)},${n(y - 22 * s)} ${n(x + 22 * s)},${n(y - 10 * s)} ${n(x + 20 * s)},${y} L${n(x - 20 * s)},${y} C${n(x - 22 * s)},${n(y - 10 * s)} ${n(x - 6 * s)},${n(y - 22 * s)} ${x},${n(y - 34 * s)} Z" fill="#FFF4E6"/>`
     + [-12, -6, 0, 6, 12].map((d) => `<path d="M${x},${n(y - 32 * s)} Q${n(x + d * 1.2 * s)},${n(y - 14 * s)} ${n(x + d * 1.4 * s)},${y}" stroke="#E8C9A0" stroke-width="1.2" fill="none"/>`).join('');
@@ -455,7 +428,6 @@ const HEADER_ART = {
   'new-year': hdr(burst(220, 42, 20, '#FFD43B') + burst(254, 74, 13, '#F06595') + burst(192, 82, 9, '#74C0FC')),
   national: hdr(`<g opacity="0.55">${chakra(232, 56, 18, '#FFFFFF')}</g>` + '<path d="M186,92 C206,84 240,100 262,88" stroke="#FFFFFF" stroke-opacity="0.4" stroke-width="3" stroke-linecap="round" fill="none"/>'),
   holi: hdr(blob(224, 36, 8, '#FCC419', 0.8) + blob(246, 76, 6, '#51CF66', 0.75) + blob(200, 80, 5, '#339AF0', 0.75) + blob(196, 24, 4, '#845EF7', 0.75)),
-  eid: hdr(crescent(226, 48, 16, '#FFD43B') + star(244, 32, 4, 1.7, '#FFD43B') + star(206, 80, 3, 1.4, '#FFFFFF', 0.8) + at(258, 0, 0.36, fanoos(0, 20, '#C9A227')), glowDef('glow', '#FFE066')),
   ganesh: hdr(miniToran(['#FF922B', '#E03131', '#FCC419']) + at(228, 108, 0.62, lotus(0, 0, 1))),
   rakhi: hdr('<path d="M182,58 Q226,92 268,54" stroke="#FFD43B" stroke-width="3" fill="none"/><path d="M182,63 Q226,97 268,59" stroke="#E03131" stroke-width="1.5" fill="none"/>' + mandala(226, 78, 15, ['#FAB005', '#E64980', '#7048E8', '#FFFFFF'])),
   sankranti: hdr(sun(250, 30, 9, '#FFD43B') + manjha(214, 70, 360, 110) + kite(214, 46, 0.55, '#E64980', '#FFD43B', -14) + kite(186, 82, 0.34, '#4C6EF5', '#FFFFFF', 12), glowDef('sunglow', '#FFE066')),
@@ -517,11 +489,6 @@ function build() {
       name: 'Holi — colour splashes', emoji: '🎨',
       top: svg(TOP, blob(40, 30, 46, '#F06595') + blob(150, -6, 40, '#FCC419') + blob(260, 26, 50, '#845EF7') + blob(345, 110, 34, '#51CF66') + blob(10, 140, 26, '#339AF0')),
       bottom: svg(BOTTOM, blob(30, 220, 60, '#51CF66') + blob(130, 240, 56, '#FF6B6B') + blob(240, 226, 62, '#339AF0') + blob(340, 210, 48, '#FCC419') + blob(190, 150, 22, '#F06595', 0.7)),
-    },
-    eid: {
-      name: 'Eid — lanterns, moon & mosque', emoji: '🌙',
-      top: svg(TOP, fanoos(50, 40, '#2B8A3E') + fanoos(120, 70, '#C9A227') + fanoos(240, 70, '#C9A227') + fanoos(310, 40, '#2B8A3E') + crescent(180, 60, 26, '#FFD43B') + star(206, 40, 6, 2.5, '#FFD43B') + star(150, 100, 4, 1.8, '#FFFFFF', 0.8) + star(270, 140, 4, 1.8, '#FFFFFF', 0.8), glowDef('glow', '#FFE066')),
-      bottom: svg(BOTTOM, mosque(240, '#1C8A66') + star(40, 40, 4, 1.8, '#FFFFFF', 0.7) + star(330, 30, 5, 2, '#FFFFFF', 0.7)),
     },
     ganesh: {
       name: 'Ganesh Chaturthi — marigold, lotus & modak', emoji: '🌺',

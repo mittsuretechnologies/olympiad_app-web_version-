@@ -139,22 +139,6 @@ const BASE_PRESETS: ThemePreset[] = [
     },
   },
   {
-    id: 'eid', name: 'Eid', emoji: '🌙',
-    config: {
-      colors: { accent: '#2B8A3E', divider: ['#2B8A3E', '#F59F00', '#2B8A3E'] },
-      header: { tagline: 'Eid Mubarak from Mittmee 🌙', taglineIcon: 'moon' },
-      hero: {
-        colors: ['#0B4F3C', '#2B8A3E'], textTone: 'light', kicker: 'EID', title: 'Mubarak', emoji: '🌙',
-        textColor: '#FFD43B', tilesTitle: 'Festive Picks',
-        tiles: [
-          { label: 'Naats & Songs', emoji: '🎶', linkUrl: search('song'), color: '#EBFBEE' },
-          { label: 'Calligraphy', emoji: '✒️', linkUrl: search('calligraphy'), color: '#FFF9DB' },
-          { label: 'Upload Yours', emoji: '📹', linkUrl: UPLOAD, color: '#FFFFFF' },
-        ],
-      },
-    },
-  },
-  {
     id: 'ganesh', name: 'Ganesh Chaturthi', emoji: '🌺',
     config: {
       colors: { accent: '#E8590C', divider: ['#E03131', '#F76707', '#FAB005', '#F76707', '#E03131'] },
@@ -314,11 +298,6 @@ const SPLASH: Record<string, SplashInput> = {
     enabled: true, art: 'holi', bg: ['#F06595', '#845EF7', '#339AF0'], textColor: '#FFFFFF',
     kicker: 'HAPPY', title: 'Holi', subtitle: 'Play with colours, share your talent',
     decor: ['ellipse', '🎨', '💦'], decorColors: ['#FCC419', '#51CF66', '#FFFFFF', '#FF8787'], animation: 'pop',
-  },
-  eid: {
-    enabled: true, art: 'eid', bg: ['#0B4F3C', '#0A3A2D', '#062219'], textColor: '#FFD43B',
-    kicker: 'EID', title: 'Mubarak', subtitle: 'Wishing you joy and peace',
-    decor: ['moon', 'star', '✨'], decorColors: ['#FFD43B', '#FFFFFF'], animation: 'fade',
   },
   ganesh: {
     enabled: true, art: 'ganesh', bg: ['#FF922B', '#F76707', '#C92A2A'], textColor: '#FFFFFF',
