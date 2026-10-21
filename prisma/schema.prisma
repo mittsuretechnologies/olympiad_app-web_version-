@@ -535,6 +535,30 @@ model VideoView {
   @@schema("public")
 }
 
+// One foreground session of the mobile app (POST /api/app/usage), for
+// Reports → User Activity: how long people use the app, daily traffic, peak
+// hours. appUserId is null for sessions before login (guests). Not a relation
+// on purpose — usage history must not block deleting an account.
+model AppUsageSession {
+  id            String   @id @default(uuid())
+  deviceId      String
+  sessionId     String
+  appUserId     String?
+  platform      String
+  appVersion    String?
+  startedAt     DateTime
+  endedAt       DateTime
+  activeSeconds Int
+  idleSeconds   Int
+  endReason     String
+  receivedAt    DateTime @default(now())
+
+  @@unique([deviceId, sessionId])
+  @@index([startedAt])
+  @@index([appUserId, startedAt])
+  @@schema("public")
+}
+
 model AppUser {
   id                     String          @id @default(uuid())
   userId                 String          @unique

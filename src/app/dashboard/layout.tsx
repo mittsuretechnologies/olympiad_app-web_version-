@@ -268,7 +268,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Evaluation Progress',    href: '/dashboard/reports/evaluation-progress',        icon: ClipboardCheck },
     { name: 'School Report',          href: '/dashboard/reports/schools',                    icon: Building2 },
     { name: 'App Users',              href: '/dashboard/app-users',                          icon: Smartphone },
-    { name: 'Student Activity',       href: '/dashboard/student-activity',                   icon: Clock },
+    { name: 'User Activity',          href: '/dashboard/student-activity',                   icon: Clock },
     { name: 'Hashtag Campaign',       href: '/dashboard/reports/hashtag-campaign',           icon: Hash },
   ];
 
