@@ -3,9 +3,10 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { withLoginRateLimit } from '@/lib/loginRateLimit';
 import { isMasterAdminUsername } from '@/lib/masterAdmin';
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const body = await request.json();
     const identifier: string = (body.identifier ?? body.email ?? body.username ?? '').trim();
@@ -167,3 +168,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const POST = withLoginRateLimit(handlePost);

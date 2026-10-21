@@ -4,9 +4,10 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { viewerOtpStore } from '@/lib/viewerOtpStore';
 import { sendOtpEmail } from '@/lib/mailer';
+import { withLoginRateLimit } from '@/lib/loginRateLimit';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const { email, password } = await request.json();
 
@@ -70,3 +71,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const POST = withLoginRateLimit(handlePost);

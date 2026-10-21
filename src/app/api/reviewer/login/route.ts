@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { withLoginRateLimit } from '@/lib/loginRateLimit';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const { reviewerId, password } = await request.json();
     if (!reviewerId || !password)
@@ -36,3 +37,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: e.message }, { status: 500 });
   }
 }
+
+export const POST = withLoginRateLimit(handlePost);

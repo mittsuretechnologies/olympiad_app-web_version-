@@ -2,9 +2,10 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { withLoginRateLimit } from '@/lib/loginRateLimit';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const { username, password } = await request.json();
     if (!username || !password) {
@@ -44,3 +45,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const POST = withLoginRateLimit(handlePost);

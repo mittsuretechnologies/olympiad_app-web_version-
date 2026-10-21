@@ -4,9 +4,10 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
+import { withLoginRateLimit } from '@/lib/loginRateLimit';
 import { ensureSchoolAccount, currentOlympiadSchoolAcceptance, signSchoolToken } from '@/lib/schoolAccount';
 
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const { userId, password } = await request.json();
 
@@ -244,3 +245,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const POST = withLoginRateLimit(handlePost);

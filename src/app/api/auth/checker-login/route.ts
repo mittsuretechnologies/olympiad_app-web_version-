@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { withLoginRateLimit } from '@/lib/loginRateLimit';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 /**
@@ -24,7 +25,7 @@ import { getJwtSecret } from '@/lib/jwt-secret';
  * checker's jwt.py reads and maps via _ROLE_MAP. Keep this contract in sync with
  * services/api/app/auth/jwt.py in the olympiad-checker repo.
  */
-export async function POST(request: Request) {
+async function handlePost(request: Request) {
   try {
     const body = await request.json();
     const identifier: string = (body.identifier ?? body.email ?? body.username ?? '').trim();
@@ -124,3 +125,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });
   }
 }
+
+export const POST = withLoginRateLimit(handlePost);
