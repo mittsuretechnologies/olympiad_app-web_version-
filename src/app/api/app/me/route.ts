@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getLinkedSchoolForUser } from '@/lib/schoolMembers';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { signAppUserToken } from '@/lib/appUserToken';
 import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
 import { currentOlympiadSchoolAcceptance, signSchoolToken } from '@/lib/schoolAccount';
 
@@ -139,7 +140,12 @@ export async function GET(request: Request) {
 
     // schoolRefId is internal; the app only needs to know the kind (schoolProfile.kind).
     const { schoolRefId: _schoolRefId, ...publicUser } = user;
-    return NextResponse.json({ user: { ...publicUser, schoolProfile }, school, schoolLinkType, studentName, classCode, className, ...(schoolToken ? { schoolToken } : {}) });
+    // A token from before app sessions stopped expiring (it carries `exp`) is
+    // swapped for a permanent one, so phones logged in earlier never hit the
+    // old 30-day logout. The app saves `token` whenever /me sends one.
+    const renewed = appUser.exp ? signAppUserToken({ id: user.id, userId: user.userId }) : null;
+
+    return NextResponse.json({ user: { ...publicUser, schoolProfile }, school, schoolLinkType, studentName, classCode, className, ...(schoolToken ? { schoolToken } : {}), ...(renewed ? { token: renewed } : {}) });
   } catch (error: any) {
     console.error('app/me error:', error);
     return NextResponse.json({ message: 'Internal server error' }, { status: 500 });

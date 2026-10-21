@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { getJwtSecret } from '@/lib/jwt-secret';
+import { signAppUserToken } from '@/lib/appUserToken';
 import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
 import { ensureSchoolAccount, currentOlympiadSchoolAcceptance, signSchoolToken } from '@/lib/schoolAccount';
 
@@ -110,11 +109,7 @@ export async function POST(request: Request) {
       await prisma.appUser.update({ where: { id: account.id }, data: { lastLoginAt: new Date() } });
       const accepted = await currentOlympiadSchoolAcceptance(olympiadSchool.id);
 
-      const token = jwt.sign(
-        { id: account.id, userId: account.userId, role: 'APP_USER' },
-        getJwtSecret(),
-        { expiresIn: '30d' },
-      );
+      const token = signAppUserToken(account);
 
       return NextResponse.json({
         message: 'Login successful',
@@ -191,11 +186,7 @@ export async function POST(request: Request) {
       data:  { lastLoginAt: new Date(), deletionRequestedAt: null },
     });
 
-    const token = jwt.sign(
-      { id: user.id, userId: user.userId, role: 'APP_USER' },
-      getJwtSecret(),
-      { expiresIn: '30d' }
-    );
+    const token = signAppUserToken(user);
 
     // Resolve student name and school from olympiadId allocation
     let studentName: string | null = null;
