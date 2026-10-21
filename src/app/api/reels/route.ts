@@ -115,6 +115,7 @@ export async function GET(request: NextRequest) {
     const baseSelect = {
       id:           true,
       videoUrl:     true,
+      hlsUrl:       true,
       thumbnailUrl: true,
       caption:      true,
       category:     true,
@@ -302,6 +303,7 @@ export async function GET(request: NextRequest) {
       return {
         id:           v.id,
         videoUrl:     v.videoUrl,
+        hlsUrl:       v.hlsUrl,
         thumbnailUrl: v.thumbnailUrl,
         caption:      v.caption,
         category:     v.category,

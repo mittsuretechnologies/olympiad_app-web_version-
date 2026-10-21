@@ -106,6 +106,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
         select: {
           id:          true,
           videoUrl:    true,
+          hlsUrl:      true,
           thumbnailUrl: true,
           caption:     true,
           tags:        true,
@@ -176,6 +177,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ user
       videos: videos.map(v => ({
         id:           v.id,
         videoUrl:     v.videoUrl,
+        hlsUrl:       v.hlsUrl,
         thumbnailUrl: v.thumbnailUrl,
         caption:      v.caption,
         tags:         v.tags,
