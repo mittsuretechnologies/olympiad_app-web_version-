@@ -15,6 +15,10 @@ import { normalizeThemeConfig, type AppThemeConfig } from '@/lib/appThemeConfig'
 // invalidateLiveTheme() so changes show up on this instance immediately.
 
 const CACHE_MS = 30_000;
+// Bump when the theme payload gains fields (festive top, splash, artwork …).
+// It's part of the ETag, so phones holding an older copy re-download once
+// instead of being told "unchanged" and never seeing the new fields.
+const CONFIG_FORMAT = 'v4-splash-art';
 
 export interface PublicTheme {
   id: string;
@@ -69,11 +73,9 @@ export function toPublicTheme(row: {
   // Copied: on a bad row normalizeThemeConfig returns the shared defaults object.
   const config = structuredClone(normalizeThemeConfig(row.config));
   if (forApp) {
-    config.header.artUrl = portableUrl(config.header.artUrl);
     config.greeting.imageUrl = portableUrl(config.greeting.imageUrl);
     config.background.imageUrl = portableUrl(config.background.imageUrl);
-    config.hero.mastheadUrl = portableUrl(config.hero.mastheadUrl);
-    for (const t of config.hero.tiles) t.imageUrl = portableUrl(t.imageUrl);
+    config.splash.imageUrl = portableUrl(config.splash.imageUrl);
   }
   return {
     id: row.id,
@@ -108,7 +110,7 @@ async function resolve(now: Date): Promise<LiveTheme> {
   const next = candidates.length ? new Date(Math.min(...candidates.map((d) => d.getTime()))) : null;
   const theme = live ? toPublicTheme(live, { forApp: true }) : null;
   const etag = `"${createHash('sha1')
-    .update(`${theme?.id ?? 'none'}|${theme?.updatedAt ?? ''}|${next?.toISOString() ?? ''}`)
+    .update(`${CONFIG_FORMAT}|${theme?.id ?? 'none'}|${theme?.updatedAt ?? ''}|${next?.toISOString() ?? ''}`)
     .digest('base64url')}"`;
 
   return { theme, nextChangeAt: next?.toISOString() ?? null, etag };

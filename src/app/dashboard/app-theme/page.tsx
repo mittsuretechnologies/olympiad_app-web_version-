@@ -10,6 +10,11 @@ import {
   appThemeConfigSchema, DEFAULT_THEME_CONFIG, THEME_PRESETS, THEME_ICONS, SECTION_LABELS, APP_LINK_SCREENS,
   type AppThemeConfig,
 } from '@/lib/appThemeConfig';
+import { SPLASH_ART, SPLASH_ART_IDS } from '@/lib/splashArt';
+import {
+  generateCustomTheme, surpriseCustom, CUSTOM_DEFAULTS, CUSTOM_STYLES, CUSTOM_SWATCHES,
+  type CustomFestivalInput,
+} from '@/lib/appThemeGenerator';
 
 // SuperAdmin → App Theme & Festivals. Each theme is a scheduled look for the
 // mobile app home screen. The app picks up the live one on its next launch /
@@ -96,6 +101,7 @@ export default function AppThemePage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
   const [editing, setEditing] = useState<Partial<ThemeRow> | null>(null);
+  const [startCustom, setStartCustom] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -144,10 +150,16 @@ export default function AppThemePage() {
           <h1 className="text-2xl font-medium text-[#004f9f]">App Theme &amp; Festivals</h1>
           <p className="text-xs text-gray-400 mt-0.5">Change the look of the mobile app home screen for festivals — no app update needed</p>
         </div>
-        <button onClick={() => setEditing({})}
-          className="inline-flex items-center gap-2 bg-[#004f9f] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003d7a] transition-colors">
-          <Plus size={15} /> New Theme
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => { setStartCustom(true); setEditing({}); }}
+            className="inline-flex items-center gap-2 border border-[#004f9f] text-[#004f9f] px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#004f9f]/5 transition-colors">
+            <Sparkles size={15} /> Custom Festival
+          </button>
+          <button onClick={() => { setStartCustom(false); setEditing({}); }}
+            className="inline-flex items-center gap-2 bg-[#004f9f] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003d7a] transition-colors">
+            <Plus size={15} /> New Theme
+          </button>
+        </div>
       </div>
 
       <div className={`flex items-start gap-2.5 rounded-xl border px-4 py-3 text-xs ${live ? 'bg-green-50 border-green-100 text-green-800' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
@@ -174,9 +186,13 @@ export default function AppThemePage() {
           <div className="py-16 text-center space-y-3">
             <p className="text-gray-400 text-sm">No themes yet. Start from a festival:</p>
             <div className="flex flex-wrap justify-center gap-2 px-6">
-              {THEME_PRESETS.filter((p) => p.id !== 'classic').map((p) => (
+              <button onClick={() => { setStartCustom(true); setEditing({}); }}
+                className="px-3 py-1.5 rounded-full border border-dashed border-[#004f9f] text-xs font-bold text-[#004f9f] hover:bg-[#004f9f]/5">
+                ✨ Custom festival
+              </button>
+              {THEME_PRESETS.map((p) => (
                 <button key={p.id}
-                  onClick={() => setEditing({ name: p.name, config: appThemeConfigSchema.parse(p.config) })}
+                  onClick={() => { setStartCustom(false); setEditing({ name: p.name, config: appThemeConfigSchema.parse(p.config) }); }}
                   className="px-3 py-1.5 rounded-full border border-gray-200 text-xs font-semibold text-gray-600 hover:border-[#004f9f] hover:text-[#004f9f]">
                   {p.emoji} {p.name}
                 </button>
@@ -231,8 +247,9 @@ export default function AppThemePage() {
       {editing && (
         <ThemeEditor
           initial={editing}
-          onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); }}
+          startCustom={startCustom}
+          onClose={() => { setEditing(null); setStartCustom(false); }}
+          onSaved={() => { setEditing(null); setStartCustom(false); load(); }}
         />
       )}
     </div>
@@ -243,6 +260,7 @@ export default function AppThemePage() {
 const TABS = [
   { key: 'basics', label: 'Schedule' },
   { key: 'hero', label: 'Festive top' },
+  { key: 'splash', label: 'Splash screen' },
   { key: 'colors', label: 'Page look' },
   { key: 'header', label: 'Header' },
   { key: 'decor', label: 'Decorations' },
@@ -250,8 +268,8 @@ const TABS = [
 ] as const;
 type TabKey = (typeof TABS)[number]['key'];
 
-function ThemeEditor({ initial, onClose, onSaved }: {
-  initial: Partial<ThemeRow>; onClose: () => void; onSaved: () => void;
+function ThemeEditor({ initial, startCustom, onClose, onSaved }: {
+  initial: Partial<ThemeRow>; startCustom?: boolean; onClose: () => void; onSaved: () => void;
 }) {
   const isEdit = !!initial.id;
   const [tab, setTab] = useState<TabKey>('basics');
@@ -261,10 +279,13 @@ function ThemeEditor({ initial, onClose, onSaved }: {
   const [endsAt, setEndsAt] = useState(toLocalInput(initial.endsAt ?? null));
   const [priority, setPriority] = useState(initial.priority ?? 0);
   const [config, setConfig] = useState<AppThemeConfig>(
-    initial.config ? appThemeConfigSchema.parse(initial.config) : DEFAULT_THEME_CONFIG,
+    initial.config ? appThemeConfigSchema.parse(initial.config)
+      : startCustom ? appThemeConfigSchema.parse(generateCustomTheme(CUSTOM_DEFAULTS)) : DEFAULT_THEME_CONFIG,
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [showCustom, setShowCustom] = useState(!!startCustom);
+  const [custom, setCustom] = useState<CustomFestivalInput>(CUSTOM_DEFAULTS);
 
   const set = <K extends Exclude<keyof AppThemeConfig, 'sections'>>(key: K, patch: Partial<AppThemeConfig[K]>) =>
     setConfig((c) => ({ ...c, [key]: { ...c[key], ...patch } }));
@@ -324,13 +345,28 @@ function ThemeEditor({ initial, onClose, onSaved }: {
                 <Sparkles size={11} /> Start from a festival preset
               </p>
               <div className="flex flex-wrap gap-1.5">
+                <button onClick={() => setShowCustom((v) => !v)}
+                  className={`px-2.5 py-1 rounded-full border border-dashed text-[11px] font-bold ${showCustom ? 'border-[#004f9f] bg-[#004f9f] text-white' : 'border-[#004f9f] text-[#004f9f] hover:bg-[#004f9f]/5'}`}>
+                  ✨ Custom festival
+                </button>
                 {THEME_PRESETS.map((p) => (
-                  <button key={p.id} onClick={() => applyPreset(p.id)}
+                  <button key={p.id} onClick={() => { setShowCustom(false); applyPreset(p.id); }}
                     className="px-2.5 py-1 rounded-full border border-gray-200 text-[11px] font-semibold text-gray-600 hover:border-[#004f9f] hover:text-[#004f9f]">
                     {p.emoji} {p.name}
                   </button>
                 ))}
               </div>
+              {showCustom && (
+                <CustomFestivalPanel
+                  value={custom}
+                  onChange={(next) => {
+                    setCustom(next);
+                    setConfig(appThemeConfigSchema.parse(generateCustomTheme(next)));
+                    if (next.name.trim()) setName(next.name.trim());
+                  }}
+                  onClose={() => setShowCustom(false)}
+                />
+              )}
             </div>
 
             <div className="flex gap-1 border-b border-gray-100 overflow-x-auto">
@@ -364,6 +400,10 @@ function ThemeEditor({ initial, onClose, onSaved }: {
                   </Field>
                 </div>
               </div>
+            )}
+
+            {tab === 'splash' && (
+              <SplashEditor value={config.splash} onChange={(patch) => set('splash', patch)} />
             )}
 
             {tab === 'hero' && (
@@ -424,9 +464,6 @@ function ThemeEditor({ initial, onClose, onSaved }: {
                 <Field label="Tagline icon">
                   <IconPicker value={config.header.taglineIcon} onChange={(taglineIcon) => set('header', { taglineIcon })} />
                 </Field>
-                <Field label="Header art (optional)" hint="Small transparent PNG shown on the header's right, e.g. diyas or a Santa hat">
-                  <ImageInput value={config.header.artUrl} onChange={(artUrl) => set('header', { artUrl })} />
-                </Field>
               </div>
             )}
 
@@ -472,7 +509,7 @@ function ThemeEditor({ initial, onClose, onSaved }: {
           {/* ── Preview ── */}
           <div className="hidden lg:flex flex-col items-center bg-gray-50 border-l border-gray-100 p-5 min-h-0 overflow-y-auto">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-3 flex items-center gap-1.5"><Smartphone size={11} /> Live preview</p>
-            <PhonePreview config={config} />
+            {tab === 'splash' ? <SplashPreview splash={config.splash} /> : <PhonePreview config={config} />}
             <p className="text-[10px] text-gray-400 mt-3 text-center">Approximate — the app draws the real icons and fonts.</p>
           </div>
         </div>
@@ -559,6 +596,92 @@ function PaletteField({ label, value, min, max, onChange }: {
         <div className="h-2 rounded-full mt-2" style={{ background: `linear-gradient(90deg, ${value.join(', ')})` }} />
       )}
     </Field>
+  );
+}
+
+// "Custom festival": a few answers → a whole generated theme, applied live to
+// the preview. Everything stays editable in the tabs afterwards.
+function CustomFestivalPanel({ value: v, onChange, onClose }: {
+  value: CustomFestivalInput; onChange: (v: CustomFestivalInput) => void; onClose: () => void;
+}) {
+  const up = (patch: Partial<CustomFestivalInput>) => onChange({ ...v, ...patch });
+  return (
+    <div className="mt-3 rounded-xl border border-[#004f9f]/20 bg-[#004f9f]/[0.03] p-3 space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-bold text-[#004f9f]">✨ Generate a theme for any festival</p>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={() => onChange(surpriseCustom(v, SPLASH_ART_IDS))}
+            className="px-2.5 py-1 rounded-full border border-gray-200 bg-white text-[11px] font-semibold text-gray-600 hover:border-[#004f9f] hover:text-[#004f9f]">
+            🎲 Surprise me
+          </button>
+          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
+        </div>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-[1fr_110px_90px] gap-3">
+        <Field label="Festival name">
+          <input value={v.name} maxLength={28} onChange={(e) => up({ name: e.target.value })} placeholder="e.g. Lohri, Pongal, Annual Day" className={INPUT} />
+        </Field>
+        <Field label="Small line">
+          <input value={v.kicker} maxLength={24} onChange={(e) => up({ kicker: e.target.value.toUpperCase() })} placeholder="HAPPY" className={INPUT} />
+        </Field>
+        <Field label="Emoji">
+          <input value={v.emoji} maxLength={16} onChange={(e) => up({ emoji: e.target.value })} placeholder="🔥" className={`${INPUT} text-center`} />
+        </Field>
+      </div>
+      <Field label="Festival colour">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {CUSTOM_SWATCHES.map((c) => (
+            <button key={c} type="button" onClick={() => up({ color: c })} title={c}
+              className={`w-7 h-7 rounded-full border-2 ${v.color.toUpperCase() === c ? 'border-gray-900 scale-110' : 'border-white shadow'}`}
+              style={{ background: c }} />
+          ))}
+          <span className="mx-1 h-5 w-px bg-gray-200" />
+          <ColorInput value={v.color} onChange={(color) => up({ color })} />
+        </div>
+      </Field>
+      <Field label="Style">
+        <div className="grid grid-cols-3 gap-2">
+          {CUSTOM_STYLES.map(([k, label, hint]) => (
+            <button key={k} type="button" onClick={() => up({ style: k })}
+              className={`text-left px-3 py-2 rounded-lg border bg-white ${v.style === k ? 'border-[#004f9f] ring-1 ring-[#004f9f]/30' : 'border-gray-200 hover:bg-gray-50'}`}>
+              <span className={`block text-xs font-semibold ${v.style === k ? 'text-[#004f9f]' : 'text-gray-600'}`}>{label}</span>
+              <span className="block text-[10px] text-gray-400 mt-0.5">{hint}</span>
+            </button>
+          ))}
+        </div>
+      </Field>
+      <Field label="Artwork" hint="Drawn on the splash screen and behind the home header.">
+        <div className="grid grid-cols-3 sm:grid-cols-4 gap-1.5">
+          <button type="button" onClick={() => up({ art: 'none' })}
+            className={`h-12 rounded-lg border-2 text-[10px] font-semibold bg-white ${v.art === 'none' ? 'border-[#004f9f] text-[#004f9f]' : 'border-gray-200 text-gray-400'}`}>
+            None
+          </button>
+          {SPLASH_ART_IDS.map((id) => {
+            const a = ART[id]!;
+            return (
+              <button key={id} type="button" title={a.name} onClick={() => up({ art: id })}
+                className={`relative h-12 rounded-lg border-2 overflow-hidden ${v.art === id ? 'border-[#004f9f] ring-2 ring-[#004f9f]/30' : 'border-gray-200 hover:border-gray-300'}`}
+                style={{ background: v.color }}>
+                <img src={svgUri(a.header)} alt="" className="absolute inset-0 w-full h-full object-cover object-bottom" />
+                <span className="absolute left-1 bottom-1 bg-black/45 text-white text-[9px] font-semibold px-1 rounded">{a.emoji} {a.name.split(' — ')[0]}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Field>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Festive tiles (search words)" hint="Comma-separated, up to 5 — e.g. bhangra, songs, kites">
+          <input value={v.tiles} maxLength={120} onChange={(e) => up({ tiles: e.target.value })} className={INPUT} />
+        </Field>
+        <Field label="Splash line (optional)">
+          <input value={v.subtitle} maxLength={80} onChange={(e) => up({ subtitle: e.target.value })} placeholder={`Celebrate ${v.name || 'the festival'} with your talent`} className={INPUT} />
+        </Field>
+      </div>
+      <p className="text-[10px] text-gray-400">
+        Builds the festive top, header decoration, tagline, splash screen, stripes and decorations together. Fine-tune anything in the tabs below —
+        but changing this panel again regenerates the theme. Festive tiles start switched off (Festive top tab).
+      </p>
+    </div>
   );
 }
 
@@ -658,9 +781,9 @@ function IconPicker({ value, onChange }: { value: string; onChange: (v: string) 
   );
 }
 
-function DecorPicker({ value, onChange }: { value: string[]; onChange: (v: string[]) => void }) {
+function DecorPicker({ value, onChange, max = 8 }: { value: string[]; onChange: (v: string[]) => void; max?: number }) {
   const [emoji, setEmoji] = useState('');
-  const full = value.length >= 8;
+  const full = value.length >= max;
   const add = (v: string) => { if (!full && v && !value.includes(v)) onChange([...value, v]); };
   return (
     <div className="space-y-2">
@@ -717,15 +840,29 @@ function HeroEditor({ value: h, onChange }: { value: Hero; onChange: (patch: Par
             <Segmented value={h.textTone} onChange={(textTone) => onChange({ textTone })}
               options={[['dark', 'Dark text', 'For light / bright bands'], ['light', 'White text', 'For deep / dark bands']]} />
           </Field>
+          <Field label="Header decoration" hint="Drawn behind the logo and buttons: faint rangoli corners plus the festival's motif. Built in — no upload.">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              <button type="button" onClick={() => onChange({ headerArt: 'none' })}
+                className={`h-14 rounded-lg border-2 text-[11px] font-semibold ${h.headerArt === 'none' ? 'border-[#004f9f] text-[#004f9f] bg-[#004f9f]/5' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}>
+                None (plain colour)
+              </button>
+              {SPLASH_ART_IDS.map((id) => {
+                const a = ART[id]!;
+                return (
+                  <button key={id} type="button" title={a.name} onClick={() => onChange({ headerArt: id })}
+                    className={`relative h-14 rounded-lg border-2 overflow-hidden ${h.headerArt === id ? 'border-[#004f9f] ring-2 ring-[#004f9f]/30' : 'border-gray-200 hover:border-gray-300'}`}
+                    style={{ background: h.colors[0] }}>
+                    <img src={svgUri(a.header)} alt="" className="absolute inset-0 w-full h-full object-cover object-bottom" />
+                    <span className="absolute left-1 bottom-1 bg-black/45 text-white text-[9px] font-semibold px-1 rounded">{a.emoji} {a.name.split(' — ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
           <Toggle checked={h.bunting} onChange={(bunting) => onChange({ bunting })} label="Festive flags (bunting) under the header — uses the stripe colours from Page look" />
 
           <div className="rounded-xl border border-gray-100 p-3 space-y-3">
             <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Masthead</p>
-            <Field label="Artwork (optional)" hint="A wide transparent PNG, e.g. 1080 × 360 — diyas, a Durga face, rangoli. Replaces the title below.">
-              <ImageInput value={h.mastheadUrl} onChange={(mastheadUrl) => onChange({ mastheadUrl })} />
-            </Field>
-            {!h.mastheadUrl && (
-              <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Field label="Small line"><input value={h.kicker} maxLength={24} onChange={(e) => onChange({ kicker: e.target.value.toUpperCase() })} placeholder="CELEBRATE" className={INPUT} /></Field>
                   <Field label="Big title"><input value={h.title} maxLength={28} onChange={(e) => onChange({ title: e.target.value })} placeholder="Navratri" className={INPUT} /></Field>
@@ -734,8 +871,6 @@ function HeroEditor({ value: h, onChange }: { value: Hero; onChange: (patch: Par
                   <Field label="Emoji either side"><input value={h.emoji} maxLength={16} onChange={(e) => onChange({ emoji: e.target.value })} placeholder="🪔" className={INPUT} /></Field>
                   <Field label="Title colour"><ColorInput value={h.textColor} onChange={(textColor) => onChange({ textColor })} /></Field>
                 </div>
-              </>
-            )}
           </div>
 
           <div className="rounded-xl border border-gray-100 p-3 space-y-3">
@@ -759,14 +894,11 @@ function HeroEditor({ value: h, onChange }: { value: Hero; onChange: (patch: Par
                   <ColorInput value={t.color} onChange={(color) => setTile(i, { color })} />
                   <button onClick={() => onChange({ tiles: h.tiles.filter((_, j) => j !== i) })} className="text-gray-300 hover:text-red-500"><Trash2 size={14} /></button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  <LinkInput value={t.linkUrl} onChange={(linkUrl) => setTile(i, { linkUrl })} />
-                  <ImageInput value={t.imageUrl} onChange={(imageUrl) => setTile(i, { imageUrl })} />
-                </div>
+                <LinkInput value={t.linkUrl} onChange={(linkUrl) => setTile(i, { linkUrl })} />
               </div>
             ))}
             {h.tiles.length < 8 && (
-              <button onClick={() => onChange({ tiles: [...h.tiles, { label: '', emoji: '✨', imageUrl: '', linkUrl: '', color: '#FFF4E6' }] })}
+              <button onClick={() => onChange({ tiles: [...h.tiles, { label: '', emoji: '✨', linkUrl: '', color: '#FFF4E6' }] })}
                 className="w-full py-2 rounded-lg border border-dashed border-gray-300 text-xs font-semibold text-gray-500 hover:text-[#004f9f] hover:border-[#004f9f] flex items-center justify-center gap-1.5">
                 <Plus size={13} /> Add tile
               </button>
@@ -833,13 +965,20 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
   }, [c.decor.density]);
   const h = c.hero;
   const hero = h.enabled;
-  const page = c.colors.bg[0];
+  // Same flow as the app: page tinted with the festival colour, band fading
+  // deep → soft → light, ending on a lace edge in the page colour.
+  const page = hero ? mixHex(h.colors[1], '#FFFFFF', 0.7) : c.colors.bg[0];
+  const pageBg = hero
+    ? `linear-gradient(180deg, ${page}, ${mixHex(h.colors[1], '#FFFDF8', 0.88)}, ${c.colors.bg[2] ?? c.colors.bg[1]})`
+    : `linear-gradient(135deg, ${c.colors.bg.join(', ')})`;
   const onBandText = hero && h.textTone === 'light';
+  // Same as the app: white on dark bands, a deep shade of the band on light ones.
+  const ink = onBandText ? '#FFFFFF' : mixHex(h.colors[0], '#1A0A00', 0.72);
   const flags = c.colors.divider;
 
   return (
     <div className="relative w-[300px] h-[600px] rounded-[38px] border-[10px] border-gray-900 shadow-xl overflow-hidden shrink-0"
-      style={{ background: `linear-gradient(135deg, ${c.colors.bg.join(', ')})` }}>
+      style={{ background: pageBg }}>
       <style>{`@keyframes mmFall { from { transform: translateY(-30px) rotate(0deg); } to { transform: translateY(620px) rotate(200deg); } }
         .mm-noscroll::-webkit-scrollbar { display: none; }`}</style>
 
@@ -867,15 +1006,22 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
 
       <div className="mm-noscroll absolute inset-0 overflow-y-auto" style={{ scrollbarWidth: 'none' }}>
         {/* ── Top: header, bunting, masthead, carousel — on the band when festive ── */}
-        <div className="relative">
+        <div className={`relative ${hero ? 'pb-4' : ''}`}>
           {hero && (
-            <div className="absolute inset-x-0 top-0 bottom-[22px]"
-              style={{ background: `linear-gradient(180deg, ${h.colors[0]} 0%, ${h.colors[0]} 28%, ${h.colors[1]} 72%, ${page} 100%)` }} />
+            <>
+              {/* Same as the app: solid band, then it melts to transparent and
+                  spills past the carousel into the page — no edge. */}
+              <div className="absolute inset-x-0 top-0 -bottom-16 pointer-events-none"
+                style={{ background: `linear-gradient(180deg, ${h.colors[0]} 0%, ${h.colors[0]} 22%, ${h.colors[1]} 58%, ${hexAlpha(h.colors[1], 0.55)} 74%, ${hexAlpha(h.colors[1], 0.18)} 88%, ${hexAlpha(h.colors[1], 0)} 100%)` }} />
+            </>
           )}
 
           {/* header */}
           <div className={`relative z-20 px-4 pt-6 pb-3 overflow-hidden ${hero ? '' : 'shadow-sm'}`}
             style={{ background: hero ? 'transparent' : `linear-gradient(135deg, ${c.colors.header.join(', ')})` }}>
+            {hero && ART[h.headerArt] && (
+              <img src={svgUri(ART[h.headerArt]!.header)} alt="" className="absolute inset-0 w-full h-full object-cover object-bottom" />
+            )}
             {!hero && <>
               <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full blur-2xl" style={{ background: c.colors.glow[0], opacity: 0.22 }} />
               <div className="absolute -top-12 -right-12 w-32 h-32 rounded-full blur-2xl" style={{ background: c.colors.glow[1], opacity: 0.25 }} />
@@ -885,10 +1031,10 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
                 <div className="w-7 h-7 rounded-full bg-white border-2 flex items-center justify-center text-[10px] font-black" style={{ borderColor: c.colors.primary, color: c.colors.brand[0] }}>m</div>
                 <div>
                   <p className="text-base font-black leading-none tracking-tight">
-                    <span style={{ color: onBandText ? '#fff' : c.colors.brand[0] }}>mitt</span>
-                    <span style={{ color: onBandText ? '#fff' : c.colors.brand[1] }}>mee</span>
+                    <span style={{ color: hero ? ink : c.colors.brand[0] }}>mitt</span>
+                    <span style={{ color: hero ? ink : c.colors.brand[1] }}>mee</span>
                   </p>
-                  <p className="text-[8px] font-bold mt-0.5" style={{ color: hero ? (onBandText ? 'rgba(255,255,255,.85)' : 'rgba(36,30,24,.68)') : c.colors.primary }}>{c.header.subtitle}</p>
+                  <p className="text-[8px] font-bold mt-0.5" style={{ color: hero ? ink : c.colors.primary, opacity: hero ? 0.82 : 1 }}>{c.header.subtitle}</p>
                 </div>
               </div>
               <div className="flex gap-1.5">
@@ -896,15 +1042,14 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
                 <span className="w-7 h-7 rounded-full bg-white border border-black/5 flex items-center justify-center text-[11px]">💬</span>
               </div>
             </div>
-            <div className="relative flex items-end justify-between mt-2 gap-2">
-              {c.header.tagline && !hero && (
-                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[7.5px] font-extrabold uppercase tracking-wide max-w-[190px] truncate"
+            {c.header.tagline && (
+              <div className="relative flex mt-2">
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[7.5px] font-extrabold uppercase tracking-wide min-w-0 max-w-[210px]"
                   style={{ background: c.colors.accent, color: c.colors.accentText }}>
                   <span>{glyph(c.header.taglineIcon)}</span><span className="truncate">{c.header.tagline}</span>
                 </span>
-              )}
-              {c.header.artUrl && <img src={c.header.artUrl} alt="" className="h-9 w-16 object-contain" />}
-            </div>
+              </div>
+            )}
             {!hero && (
               <div className="absolute left-0 right-0 bottom-0 h-[3px]" style={{ background: `linear-gradient(90deg, transparent, ${c.colors.divider.join(', ')}, transparent)` }} />
             )}
@@ -912,6 +1057,7 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
 
           {hero && (
             <div className="relative">
+              <img src={svgUri(ARCH_SVG)} alt="" className="absolute left-0 top-0 w-full opacity-90 pointer-events-none" />
               {h.bunting && (
                 <div className="relative h-3">
                   <div className="absolute inset-x-0 top-0 h-px bg-black/20" />
@@ -925,9 +1071,7 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
                   </div>
                 </div>
               )}
-              {h.mastheadUrl ? (
-                <img src={h.mastheadUrl} alt="" className="w-full max-h-[110px] object-contain mt-1" />
-              ) : (h.title || h.kicker) ? (
+              {(h.title || h.kicker) ? (
                 <div className="flex items-center justify-center gap-2 px-4 pt-1 pb-2">
                   {h.emoji && <span className="text-2xl">{h.emoji}</span>}
                   <div className="text-center min-w-0" style={{ color: h.textColor }}>
@@ -967,8 +1111,7 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
                   style={{ background: t.color }}>
                   <p className={`text-[8.5px] font-extrabold text-center leading-tight px-1 line-clamp-2 ${isLightHex(t.color) ? 'text-gray-900' : 'text-white'}`}>{t.label}</p>
                   <div className="relative flex-1 w-full flex items-center justify-center">
-                    {t.imageUrl ? <img src={t.imageUrl} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                      : <span className="text-[28px]">{t.emoji || '✨'}</span>}
+                    <span className="text-[28px]">{t.emoji || '✨'}</span>
                   </div>
                 </div>
               ))}
@@ -995,4 +1138,220 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
 function isLightHex(hex: string) {
   const n = parseInt(hex.slice(1, 7), 16);
   return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.62;
+}
+
+// ── Splash screen ─────────────────────────────────────────────────────────────
+type Splash = AppThemeConfig['splash'];
+
+function Choice<T extends string>({ value, onChange, options }: { value: T; onChange: (v: T) => void; options: [T, string][] }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map(([k, label]) => (
+        <button key={k} type="button" onClick={() => onChange(k)}
+          className={`px-3 py-1.5 rounded-lg border text-xs font-semibold ${value === k ? 'border-[#004f9f] bg-[#004f9f]/5 text-[#004f9f]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function SplashEditor({ value: sp, onChange }: { value: Splash; onChange: (patch: Partial<Splash>) => void }) {
+  return (
+    <div className="space-y-4">
+      <Toggle checked={sp.enabled} onChange={(enabled) => onChange({ enabled })} label="Show a special splash screen when the app opens" />
+      <p className="text-[11px] text-gray-400 -mt-2">
+        Replaces the usual Mittmee opening screen while this theme is live. So the app never waits for the internet at startup,
+        phones show it from their <strong>next</strong> app open after it goes live. The phone&apos;s own plain launch screen (a split second
+        before this) can only change with an app update.
+      </p>
+      {sp.enabled && (
+        <>
+          <PaletteField label="Background (1 colour, or a 2–3 colour gradient)" value={sp.bg} min={1} max={3} onChange={(bg) => onChange({ bg })} />
+
+          <Field label="Artwork" hint="Ready-made festival drawings — a decoration at the top and a scene at the bottom. Built into the app: no upload, works offline.">
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+              <button type="button" onClick={() => onChange({ art: 'none' })}
+                className={`h-28 rounded-lg border-2 flex items-center justify-center text-[11px] font-semibold ${sp.art === 'none' ? 'border-[#004f9f] text-[#004f9f] bg-[#004f9f]/5' : 'border-gray-200 text-gray-400 hover:bg-gray-50'}`}>
+                No artwork
+              </button>
+              {SPLASH_ART_IDS.map((id) => {
+                const a = ART[id]!;
+                const bgCss = `linear-gradient(135deg, ${(sp.bg.length === 1 ? [sp.bg[0], sp.bg[0]] : sp.bg).join(', ')})`;
+                return (
+                  <button key={id} type="button" title={a.name} onClick={() => onChange({ art: id })}
+                    className={`relative h-28 rounded-lg border-2 overflow-hidden ${sp.art === id ? 'border-[#004f9f] ring-2 ring-[#004f9f]/30' : 'border-gray-200 hover:border-gray-300'}`}
+                    style={{ background: bgCss }}>
+                    <img src={svgUri(a.top)} alt="" className="absolute top-0 left-0 w-full" />
+                    <img src={svgUri(a.bottom)} alt="" className="absolute bottom-0 left-0 w-full" />
+                    <span className="absolute inset-x-0 bottom-0 bg-black/45 text-white text-[9px] font-semibold py-0.5 truncate px-1">{a.emoji} {a.name.split(' — ')[0]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </Field>
+
+          <div className="rounded-xl border border-gray-100 p-3 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Poster (optional)</p>
+            <Field label="Full-screen picture" hint="Portrait works best, e.g. 1080 × 1920. Shown over the background; text and logo sit on top.">
+              <ImageInput value={sp.imageUrl} onChange={(imageUrl) => onChange({ imageUrl })} />
+            </Field>
+            {sp.imageUrl && (
+              <Segmented value={sp.imageFit} onChange={(imageFit) => onChange({ imageFit })}
+                options={[['cover', 'Fill the screen', 'Edges may be cropped'], ['contain', 'Show whole picture', 'Background shows around it']]} />
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <Field label="Logo">
+              <Choice value={sp.logo} onChange={(logo) => onChange({ logo })} options={[['center', 'Centre'], ['top', 'Top'], ['hidden', 'Hidden']]} />
+            </Field>
+            {sp.logo !== 'hidden' && (
+              <Field label="Logo size">
+                <Choice value={sp.logoSize} onChange={(logoSize) => onChange({ logoSize })} options={[['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']]} />
+              </Field>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-gray-100 p-3 space-y-3">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Text</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Field label="Small line"><input value={sp.kicker} maxLength={24} onChange={(e) => onChange({ kicker: e.target.value.toUpperCase() })} placeholder="HAPPY" className={INPUT} /></Field>
+              <Field label="Big title"><input value={sp.title} maxLength={28} onChange={(e) => onChange({ title: e.target.value })} placeholder="Diwali" className={INPUT} /></Field>
+            </div>
+            <Field label="Message"><input value={sp.subtitle} maxLength={80} onChange={(e) => onChange({ subtitle: e.target.value })} placeholder="Light up your talent this festive season" className={INPUT} /></Field>
+            <Field label="Text colour"><ColorInput value={sp.textColor} onChange={(textColor) => onChange({ textColor })} /></Field>
+          </div>
+
+          <Field label="Animation">
+            <Choice value={sp.animation} onChange={(animation) => onChange({ animation })}
+              options={[['pop', 'Pop'], ['fade', 'Fade'], ['slide', 'Slide up'], ['zoom', 'Zoom in']]} />
+          </Field>
+
+          <Field label="Falling decorations (optional)" hint="Up to 6 — pick icons or type emoji. Empty = none.">
+            <DecorPicker value={sp.decor} onChange={(decor) => onChange({ decor })} max={6} />
+          </Field>
+          {sp.decor.length > 0 && (
+            <PaletteField label="Decoration colours (icons only — emoji keep their own)" value={sp.decorColors} min={0} max={6} onChange={(decorColors) => onChange({ decorColors })} />
+          )}
+
+          <Field label={`Shown for ${(sp.durationMs / 1000).toFixed(1)} seconds`} hint="The usual splash is 2.6 s. Keep it short — people are waiting to get in.">
+            <input type="range" min={1200} max={5000} step={100} value={sp.durationMs}
+              onChange={(e) => onChange({ durationMs: Number(e.target.value) })} className="w-full" />
+          </Field>
+          <Toggle checked={sp.skippable} onChange={(skippable) => onChange({ skippable })} label="Show a “Skip” button" />
+        </>
+      )}
+    </div>
+  );
+}
+
+// Inline SVG (splashArt.js) as an <img> source — isolates each drawing's ids.
+// splashArt.js is plain JS; TypeScript infers its exact keys, so index it via this.
+type ArtTemplate = { name: string; emoji: string; top: string; bottom: string; header: string };
+// (`header` is attached to every template after it's built, so TS can't see it.)
+const ART = SPLASH_ART as unknown as Record<string, ArtTemplate | undefined>;
+
+const svgUri = (s: string) => `data:image/svg+xml;utf8,${encodeURIComponent(s)}`;
+
+const SPLASH_KEYFRAMES = `@keyframes mmFall { from { transform: translateY(-30px) rotate(0deg); } to { transform: translateY(620px) rotate(200deg); } }
+@keyframes mmPop { from { opacity: 0; transform: scale(.72); } to { opacity: 1; transform: scale(1); } }
+@keyframes mmFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes mmSlide { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }
+@keyframes mmZoom { from { opacity: 0; transform: scale(1.35); } to { opacity: 1; transform: scale(1); } }
+@keyframes mmText { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes mmArtTop { from { opacity: 0; transform: translateY(-24px); } to { opacity: 1; transform: none; } }
+@keyframes mmArtBottom { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: none; } }`;
+
+function SplashPreview({ splash: sp }: { splash: Splash }) {
+  const [run, setRun] = useState(0);   // bump to replay the entry animation
+  const parts = useMemo(() => Array.from({ length: 14 }, (_, i) => ({
+    left: (i * 37 + 11) % 96, dur: 7 + ((i * 53) % 7), delay: -((i * 29) % 11), size: 12 + ((i * 7) % 8),
+  })), []);
+  if (!sp.enabled) {
+    return (
+      <div className="w-[300px] h-[600px] rounded-[38px] border-[10px] border-gray-900 shadow-xl flex flex-col items-center justify-center gap-3 bg-[#FBF6EE] text-center px-6 shrink-0">
+        <img src="/mittmee-icon.jpeg" alt="" className="w-24 h-24 rounded-full border-2 border-[#3E82E0] shadow-lg object-contain bg-white" />
+        <p className="text-[11px] text-gray-400">Splash is off — the app shows its usual Mittmee splash.</p>
+      </div>
+    );
+  }
+  const bg = sp.bg.length === 1 ? [sp.bg[0], sp.bg[0]] : sp.bg;
+  const logoPx = { small: 66, medium: 96, large: 120 }[sp.logoSize];
+  const enter = {
+    pop: 'mmPop .7s cubic-bezier(.34,1.56,.64,1) both',
+    fade: 'mmFade .5s ease both',
+    slide: 'mmSlide .5s ease both',
+    zoom: 'mmZoom .5s ease both',
+  }[sp.animation];
+  const hasText = !!(sp.kicker || sp.title || sp.subtitle);
+  const justify = sp.logo === 'top' ? 'justify-start pt-24' : sp.imageUrl && hasText ? 'justify-end pb-16' : 'justify-center';
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <div key={run} className="relative w-[300px] h-[600px] rounded-[38px] border-[10px] border-gray-900 shadow-xl overflow-hidden shrink-0"
+        style={{ background: `linear-gradient(135deg, ${bg.join(', ')})` }}>
+        <style>{SPLASH_KEYFRAMES}</style>
+        {sp.imageUrl && <img src={sp.imageUrl} alt="" className={`absolute inset-0 w-full h-full ${sp.imageFit === 'cover' ? 'object-cover' : 'object-contain'}`} />}
+        {sp.imageUrl && hasText && (
+          <div className="absolute inset-0" style={{ background: 'linear-gradient(180deg, transparent 35%, rgba(0,0,0,.25) 65%, rgba(0,0,0,.6))' }} />
+        )}
+        {ART[sp.art] && (
+          <>
+            <img src={svgUri(ART[sp.art]!.top)} alt="" className="absolute top-0 left-0 w-full" style={{ animation: 'mmArtTop .65s ease both' }} />
+            <img src={svgUri(ART[sp.art]!.bottom)} alt="" className="absolute bottom-0 left-0 w-full" style={{ animation: 'mmArtBottom .65s ease both' }} />
+          </>
+        )}
+        {sp.decor.length > 0 && parts.map((p, i) => (
+          <span key={i} className="absolute top-0 pointer-events-none"
+            style={{
+              left: `${p.left}%`, fontSize: p.size, opacity: 0.8,
+              color: sp.decorColors.length ? sp.decorColors[i % sp.decorColors.length] : '#fff',
+              animation: `mmFall ${p.dur}s linear ${p.delay}s infinite`,
+            }}>
+            {glyph(sp.decor[i % sp.decor.length])}
+          </span>
+        ))}
+        <div className={`relative h-full flex flex-col items-center gap-4 px-6 ${justify}`}>
+          {sp.logo !== 'hidden' && (
+            <img src="/mittmee-icon.jpeg" alt="" className="rounded-full bg-white object-contain shadow-xl"
+              style={{ width: logoPx, height: logoPx, animation: enter }} />
+          )}
+          {hasText && (
+            <div className="text-center" style={{ color: sp.textColor, animation: `mmText .45s ease ${sp.animation === 'pop' ? '.7s' : '.5s'} both` }}>
+              {sp.kicker && <p className="text-[10px] font-extrabold tracking-[0.35em]">✦ {sp.kicker} ✦</p>}
+              {sp.title && (
+                <p className="text-[38px] leading-tight italic font-bold truncate max-w-[250px]"
+                  style={{ fontFamily: 'Georgia, serif', textShadow: '0 2px 6px rgba(0,0,0,.2)' }}>{sp.title}</p>
+              )}
+              {sp.subtitle && <p className="text-[12px] font-semibold opacity-90 mt-1 line-clamp-2">{sp.subtitle}</p>}
+            </div>
+          )}
+        </div>
+        {sp.skippable && (
+          <span className="absolute top-8 right-4 px-2.5 py-0.5 rounded-full border text-[10px] font-extrabold bg-white/15"
+            style={{ color: sp.textColor, borderColor: `${sp.textColor.slice(0, 7)}66` }}>Skip ›</span>
+        )}
+      </div>
+      <button type="button" onClick={() => setRun((n) => n + 1)} className="text-[11px] font-semibold text-[#004f9f] hover:underline">↻ Replay animation</button>
+    </div>
+  );
+}
+
+// ── Festive-top ornaments (same drawings as the app's FestiveTop.js) ──────────
+function mixHex(a: string, b: string, t: number) {
+  const pa = parseInt(a.slice(1, 7), 16), pb = parseInt(b.slice(1, 7), 16);
+  const m = (sh: number) => Math.round(((pa >> sh) & 255) + ((((pb >> sh) & 255) - ((pa >> sh) & 255)) * t));
+  return `#${[16, 8, 0].map((sh) => m(sh).toString(16).padStart(2, '0')).join('')}`;
+}
+
+const ARCH_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 150">'
+  + '<path d="M14,150 V82 C14,58 40,48 78,44 C120,40 150,30 166,14 Q174,6 180,0 Q186,6 194,14 C210,30 240,40 282,44 C320,48 346,58 346,82 V150" fill="#FFF" fill-opacity="0.12" stroke="#FFF" stroke-opacity="0.55" stroke-width="2"/>'
+  + '<path d="M28,150 V86 C28,66 50,58 84,55 C124,51 152,41 168,26 Q176,19 180,14 Q184,19 192,26 C208,41 236,51 276,55 C310,58 332,66 332,86 V150" fill="none" stroke="#FFF" stroke-opacity="0.3" stroke-width="1.4" stroke-dasharray="2 4"/>'
+  + '<circle cx="180" cy="22" r="3" fill="#FFF" fill-opacity="0.8"/>'
+  + '<line x1="78" y1="44" x2="78" y2="68" stroke="#FFF" stroke-opacity="0.5"/><path d="M72,76 Q78,62 84,76 Z" fill="#FFF" fill-opacity="0.6"/>'
+  + '<line x1="282" y1="44" x2="282" y2="68" stroke="#FFF" stroke-opacity="0.5"/><path d="M276,76 Q282,62 288,76 Z" fill="#FFF" fill-opacity="0.6"/></svg>';
+
+function hexAlpha(hex: string, a: number) {
+  const n = parseInt(hex.slice(1, 7), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
 }

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SPLASH_ART_IDS } from '@/lib/splashArt';
 
 // Shape of AppTheme.config — the SuperAdmin-controlled look of the mobile app
 // home screen. Client-safe (no prisma): the dashboard editor imports the same
@@ -93,7 +94,6 @@ export const appThemeConfigSchema = z.object({
     subtitle: z.string().trim().max(40).default('Talent & Olympiad Hub'),
     tagline: z.string().trim().max(60).default("India's Most Trusted Olympiad Platform"),
     taglineIcon: icon.default('shield-checkmark'),
-    artUrl: imageUrl.default(''),                                        // small festive art, header right
   }).default({}),
   // No longer shown by the app (the festival carousel slide was removed);
   // kept so themes saved with it still validate.
@@ -137,22 +137,49 @@ export const appThemeConfigSchema = z.object({
     colors: palette(2, 2).default(['#FF8A1F', '#FFC078']),               // band: top, bottom (before the fade)
     followSlides: z.boolean().default(true),                             // band takes each slide's colour while swiping
     textTone: z.enum(['dark', 'light']).default('dark'),                 // header text on the band
-    mastheadUrl: imageUrl.default(''),                                   // wide artwork; replaces the text masthead
     kicker: z.string().trim().max(24).default(''),                       // small spaced caps, e.g. CELEBRATE
     title: z.string().trim().max(28).default(''),                        // big festive word, e.g. Navratri
     emoji: z.string().trim().max(16).default(''),                        // either side of the title
     textColor: hex.default('#FFFFFF'),
     bunting: z.boolean().default(true),                                  // little festive flags under the header
+    // Festival decoration behind the header (src/lib/splashArt.js — same ids
+    // as the splash artwork). 'none' = plain band colour.
+    headerArt: z.string().default('none')
+      .refine((v) => v === 'none' || SPLASH_ART_IDS.includes(v), 'Unknown header decoration'),
     // Festive shortcut tiles are off unless switched on — presets fill them in.
     showTiles: z.boolean().default(false),
     tilesTitle: z.string().trim().max(30).default(''),                   // e.g. Festive Picks
     tiles: z.array(z.object({
       label: z.string().trim().min(1, 'Tile needs a label').max(24),
       emoji: z.string().trim().max(16).default(''),
-      imageUrl: imageUrl.default(''),
       linkUrl: linkUrl.default(''),
       color: hex.default('#FFFFFF'),
     })).max(8).default([]),
+  }).default({}),
+  // Splash screen shown when the app opens (the animated one after the
+  // phone's own launch screen). The app shows the splash it saved on the
+  // PREVIOUS run — it never waits for the network at startup — so a change
+  // reaches a phone on its next launch. Off = the built-in Mittmee splash.
+  splash: z.object({
+    enabled: z.boolean().default(false),
+    bg: palette(1, 3).default(['#FBF6EE', '#FFF8F0', '#F3EEE3']),        // gradient (or one solid colour)
+    // Built-in festival artwork (src/lib/splashArt.js): a top decoration and a
+    // bottom scene drawn by the app — no upload needed. 'none' = no artwork.
+    art: z.string().default('none')
+      .refine((v) => v === 'none' || SPLASH_ART_IDS.includes(v), 'Unknown artwork'),
+    imageUrl: imageUrl.default(''),                                      // full-screen poster (optional)
+    imageFit: z.enum(['cover', 'contain']).default('cover'),
+    logo: z.enum(['center', 'top', 'hidden']).default('center'),
+    logoSize: z.enum(['small', 'medium', 'large']).default('medium'),
+    kicker: z.string().trim().max(24).default(''),                       // small spaced caps, e.g. HAPPY
+    title: z.string().trim().max(28).default(''),                        // big festive word, e.g. Diwali
+    subtitle: z.string().trim().max(80).default(''),
+    textColor: hex.default('#241E18'),
+    animation: z.enum(['pop', 'fade', 'slide', 'zoom']).default('pop'),
+    decor: z.array(decorItem).max(6).default([]),                       // falling icons/emoji; empty = none
+    decorColors: z.array(hex).max(6).default([]),
+    durationMs: z.number().int().min(1200).max(5000).default(2600),
+    skippable: z.boolean().default(false),
   }).default({}),
   sections: sectionsSchema,
 });
