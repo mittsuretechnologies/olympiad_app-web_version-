@@ -22,7 +22,7 @@
 //   2. encodes 360p / 540p / 720p renditions (never above the source), 4-second
 //      pieces, plus a master.m3u8 that lists them
 //   3. verifies the result (every rendition present, same length)
-//   4. uploads the folder next to the MP4 as <name>_hls/ — inside the uploader's
+//   4. uploads the folder next to the MP4 as <name>_hls/<id>/ — inside the uploader's
 //      own folder, so account deletion removes it with everything else
 //   5. checks master.m3u8 is reachable, then sets Video.hlsUrl
 // videoUrl is never changed: the dashboard, downloads, share pages and older
@@ -140,8 +140,12 @@ async function probe(file) {
 
 const even = (n) => Math.max(2, Math.round(n / 2) * 2);
 
-/** The renditions to make for a source of this size, smallest first. */
-function ladderFor(width, height) {
+/**
+ * The renditions to make for a source of this size and bitrate, smallest first.
+ * No rendition may be heavier than the source itself: re-encoding cannot add
+ * detail, so a 550 kbps upload gets ~600 kbps at most, not 2.2 Mbps.
+ */
+function ladderFor(width, height, srcKbps) {
   const short = Math.min(width, height), long = Math.max(width, height);
   const rungs = LADDER.filter((r) => r.short <= short + 8);
   if (!rungs.length) rungs.push({ ...LADDER[0], short: even(short) });
@@ -153,11 +157,15 @@ function ladderFor(width, height) {
     const f = (short - top.short) / (next.short - top.short);
     rungs.push({ short: even(short), kbps: Math.round(top.kbps + f * (next.kbps - top.kbps)), max: Math.round(top.max + f * (next.max - top.max)) });
   }
-  return rungs.map((r) => {
+  const cap = Math.max(300, Math.round(srcKbps));
+  const capped = rungs.map((r) => {
     const s = Math.min(r.short, even(short));
     const l = even((long * s) / short);
-    return { ...r, w: width <= height ? s : l, h: width <= height ? l : s };
+    return { ...r, kbps: Math.min(r.kbps, cap), max: Math.min(r.max, cap), w: width <= height ? s : l, h: width <= height ? l : s };
   });
+  // A middle rendition only helps if it is clearly lighter than the top one.
+  const topR = capped[capped.length - 1];
+  return capped.filter((r, i) => i === 0 || r === topR || r.kbps <= topR.kbps * 0.75);
 }
 
 function locateKey(url) {
@@ -183,7 +191,8 @@ async function download(url, dest) {
 async function encodeHls(input, outDir) {
   const meta = await probe(input);
   if (!meta.duration) throw new Error('could not read the length');
-  const rungs = ladderFor(meta.width, meta.height);
+  const srcKbps = (statSync(input).size * 8) / meta.duration / 1000;
+  const rungs = ladderFor(meta.width, meta.height, srcKbps);
   try {
     await encodeOnce(input, outDir, rungs, meta.hasAudio);
   } catch (e) {
@@ -199,6 +208,11 @@ async function encodeHls(input, outDir) {
     } finally { rmSync(fixed, { force: true }); }
   }
   await verify(outDir, rungs, meta);
+  writeRealBandwidth(outDir, rungs);
+  // Safety net: the best rendition must not be much heavier than the MP4 the
+  // app plays today, or HLS would make the reel slower, not faster.
+  const topBytes = listFiles(path.join(outDir, `v${rungs.length - 1}`)).reduce((s, f) => s + f.size, 0);
+  if (topBytes > statSync(input).size * 1.3) throw new Error(`HLS top quality ${mb(topBytes)} MB is heavier than the MP4 ${mb(statSync(input).size)} MB`);
   return { meta, rungs };
 }
 
@@ -209,11 +223,13 @@ async function encodeOnce(input, outDirNative, rungs, hasAudio) {
   const scales = rungs.map((r, i) => `[s${i}]scale=${r.w}:${r.h}[o${i}]`);
   const args = ['-i', input, '-filter_complex', [split, ...scales].join(';')];
   rungs.forEach((r, i) => {
-    args.push('-map', `[o${i}]`, `-b:v:${i}`, `${r.kbps}k`, `-maxrate:v:${i}`, `${r.max}k`, `-bufsize:v:${i}`, `${r.max * 2}k`);
+    // Quality-based (CRF) with a ceiling: simple scenes stay small, busy
+    // scenes are held to the rung's maximum.
+    args.push('-map', `[o${i}]`, `-maxrate:v:${i}`, `${r.max}k`, `-bufsize:v:${i}`, `${r.max * 2}k`);
   });
   if (hasAudio) rungs.forEach(() => args.push('-map', '0:a:0'));
   args.push(
-    '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'main', '-pix_fmt', 'yuv420p',
+    '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'main', '-pix_fmt', 'yuv420p', '-crf', '25',
     // A keyframe every 2 s in every rendition, so the player can switch quality
     // at any piece boundary.
     '-force_key_frames', 'expr:gte(t,n_forced*2)', '-sc_threshold', '0',
@@ -244,6 +260,31 @@ async function verify(outDir, rungs, meta) {
   }
   const first = await probe(path.join(outDir, 'v0', 'seg_000.ts'));
   if (meta.hasAudio && !first.hasAudio) throw new Error('audio lost');
+}
+
+// ffmpeg fills BANDWIDTH in from the bitrate ceiling, which with CRF is far
+// above what the pieces really need (and can be equal for two renditions).
+// Players pick a rendition by BANDWIDTH, so write the measured values: the
+// peak piece bitrate (as the HLS spec requires) and the average.
+function writeRealBandwidth(outDir, rungs) {
+  const masterPath = path.join(outDir, 'master.m3u8');
+  let master = readFileSync(masterPath, 'utf8');
+  rungs.forEach((_, i) => {
+    const dir = path.join(outDir, `v${i}`);
+    const text = readFileSync(path.join(dir, 'index.m3u8'), 'utf8');
+    const pieces = [...text.matchAll(/#EXTINF:([\d.]+),\s*\n([^\n#]+)/g)].map((m) => ({ secs: parseFloat(m[1]), bytes: statSync(path.join(dir, m[2].trim())).size }));
+    const peak = Math.max(...pieces.map((p) => (p.bytes * 8) / Math.max(p.secs, 0.5)));
+    const avg = (pieces.reduce((s, p) => s + p.bytes, 0) * 8) / pieces.reduce((s, p) => s + p.secs, 0);
+    let n = -1;
+    master = master.replace(/#EXT-X-STREAM-INF:([^\n]*)\n(v(\d+)\/index\.m3u8)/g, (all, attrs, uri, idx) => {
+      if (Number(idx) !== i) return all;
+      n++;
+      const rest = attrs.replace(/(^|,)(AVERAGE-)?BANDWIDTH=\d+/g, '').replace(/^,/, '');
+      return `#EXT-X-STREAM-INF:BANDWIDTH=${Math.round(peak)},AVERAGE-BANDWIDTH=${Math.round(avg)},${rest}\n${uri}`;
+    });
+    if (n !== 0) throw new Error(`master.m3u8: rendition ${i} not found`);
+  });
+  writeFileSync(masterPath, master);
 }
 
 function listFiles(dir, prefix = '') {
@@ -304,7 +345,9 @@ async function processOne(v) {
     const { meta, rungs } = await encodeHls(src, out);
     const t1 = Date.now();
 
-    const keyPrefix = loc.key.replace(/\.[a-z0-9]+$/i, '') + '_hls/';
+    // A new folder per conversion: files are cached as immutable, so a re-run
+    // must never reuse a path CloudFront may still hold an older copy of.
+    const keyPrefix = `${loc.key.replace(/\.[a-z0-9]+$/i, '')}_hls/${Date.now().toString(36)}/`;
     const bytes = await uploadFolder(out, keyPrefix);
     const hlsUrl = `${loc.base}/${keyPrefix}master.m3u8`;
     const reach = await fetch(hlsUrl, { method: 'HEAD' });
