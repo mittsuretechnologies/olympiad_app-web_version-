@@ -530,6 +530,8 @@ model VideoView {
 
   @@index([videoId])
   @@index([videoId, sessionId])
+  // Home feed "Most watched this week" counts views by date range.
+  @@index([createdAt, videoId])
   @@schema("public")
 }
 

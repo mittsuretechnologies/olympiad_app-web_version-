@@ -178,7 +178,7 @@ export const appThemeConfigSchema = z.object({
     animation: z.enum(['pop', 'fade', 'slide', 'zoom']).default('pop'),
     decor: z.array(decorItem).max(6).default([]),                       // falling icons/emoji; empty = none
     decorColors: z.array(hex).max(6).default([]),
-    durationMs: z.number().int().min(1200).max(5000).default(2600),
+    durationMs: z.number().int().min(1200).max(5000).default(1800),        // editor offers up to 3.5 s
     skippable: z.boolean().default(false),
   }).default({}),
   sections: sectionsSchema,

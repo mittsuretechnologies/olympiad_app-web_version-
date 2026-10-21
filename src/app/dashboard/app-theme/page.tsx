@@ -1235,8 +1235,8 @@ function SplashEditor({ value: sp, onChange }: { value: Splash; onChange: (patch
             <PaletteField label="Decoration colours (icons only — emoji keep their own)" value={sp.decorColors} min={0} max={6} onChange={(decorColors) => onChange({ decorColors })} />
           )}
 
-          <Field label={`Shown for ${(sp.durationMs / 1000).toFixed(1)} seconds`} hint="The usual splash is 2.6 s. Keep it short — people are waiting to get in.">
-            <input type="range" min={1200} max={5000} step={100} value={sp.durationMs}
+          <Field label={`Shown for ${(sp.durationMs / 1000).toFixed(1)} seconds`} hint="The usual splash is 1.8 s. Keep it short — people are waiting to get in.">
+            <input type="range" min={1200} max={3500} step={100} value={Math.min(sp.durationMs, 3500)}
               onChange={(e) => onChange({ durationMs: Number(e.target.value) })} className="w-full" />
           </Field>
           <Toggle checked={sp.skippable} onChange={(skippable) => onChange({ skippable })} label="Show a “Skip” button" />
