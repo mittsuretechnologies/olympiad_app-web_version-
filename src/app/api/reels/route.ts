@@ -232,6 +232,27 @@ export async function GET(request: NextRequest) {
         return { video: v, tier, rank: seededRank(seed!, v.id) };
       });
 
+      // Already-watched local videos drop out of the front: any school / city /
+      // state video this phone viewed BEFORE this feed-open started (the app
+      // sends its view session id and that moment) moves into the shuffled
+      // "everyone else" group, so the unseen local ones lead. Only views from
+      // before the open count — views made while scrolling must not reorder
+      // later pages of the same open (that would repeat or skip videos).
+      const sessionId  = searchParams.get('sessionId');
+      const seenBefore = Number(searchParams.get('seenBefore'));
+      if (viewerSchool && sessionId && seenBefore > 0) {
+        const localIds = tiered.filter(t => t.tier !== TIER_OTHER).map(t => t.video.id);
+        if (localIds.length > 0) {
+          const seenRows = await prisma.videoView.findMany({
+            where:    { sessionId, videoId: { in: localIds }, createdAt: { lt: new Date(seenBefore) } },
+            select:   { videoId: true },
+            distinct: ['videoId'],
+          });
+          const seen = new Set(seenRows.map(r => r.videoId));
+          for (const t of tiered) if (seen.has(t.video.id)) t.tier = TIER_OTHER;
+        }
+      }
+
       tiered.sort((a, b) => (a.tier - b.tier) || (a.rank - b.rank));
 
       const sorted  = tiered.map(t => t.video);
