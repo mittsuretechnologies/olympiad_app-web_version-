@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { getLiveTheme } from '@/lib/appTheme';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -69,22 +70,23 @@ const VIDEO_SELECT = {
 // `effectiveUserId` should be the JWT-derived viewerId whenever available — trusting
 // the client-supplied query param alone lets isLiked desync from the real Like rows.
 async function hydrate(items: RawVideo[], effectiveUserId?: string) {
-  let likedIds: Set<string> = new Set();
-  if (effectiveUserId && items.length > 0) {
-    const userLikes = await prisma.like.findMany({
-      where: { userId: effectiveUserId, videoId: { in: items.map(v => v.id) } },
-      select: { videoId: true },
-    });
-    likedIds = new Set(userLikes.map(l => l.videoId));
-  }
-
+  // Likes and uploaders don't depend on each other — fetched together.
   const appUserIds = [...new Set(items.map(v => v.appUserId).filter(Boolean))] as string[];
-  const appUsersRaw = appUserIds.length > 0
-    ? await prisma.appUser.findMany({
-        where: { id: { in: appUserIds } },
-        select: { id: true, userId: true, avatarUrl: true, olympiadId: true, schoolRefId: true },
-      })
-    : [];
+  const [userLikes, appUsersRaw] = await Promise.all([
+    effectiveUserId && items.length > 0
+      ? prisma.like.findMany({
+          where: { userId: effectiveUserId, videoId: { in: [...new Set(items.map(v => v.id))] } },
+          select: { videoId: true },
+        })
+      : Promise.resolve([] as { videoId: string }[]),
+    appUserIds.length > 0
+      ? prisma.appUser.findMany({
+          where: { id: { in: appUserIds } },
+          select: { id: true, userId: true, avatarUrl: true, olympiadId: true, schoolRefId: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const likedIds = new Set(userLikes.map(l => l.videoId));
   const appUserMap = new Map(appUsersRaw.map(u => [u.id, u]));
 
   const olympiadCodes = [...new Set(appUsersRaw.map(u => u.olympiadId).filter(Boolean))] as string[];
@@ -151,6 +153,28 @@ export async function GET(request: NextRequest) {
     // moderator rated High quality at approval.
     const trendingWhere = { ...baseWhere, quality: 'HIGH' };
 
+    // Admin-managed carousel slides for the app home screen. Independent of
+    // visibility/approval rules — they're artwork, not user content — so
+    // started now and awaited later, in parallel with the video queries. An
+    // empty result is normal and means the app keeps its original behaviour
+    // of building the carousel purely from the most-watched videos.
+    // All-year slides (themeId null) always; festival slides only while their
+    // AppTheme is the live one, and in front of the all-year ones.
+    const appBannersPromise = getLiveTheme()
+      .catch(() => null)
+      .then((live) => {
+        const liveId = live?.theme?.id ?? null;
+        return prisma.appBannerSlide.findMany({
+          where: { isActive: true, OR: [{ themeId: null }, ...(liveId ? [{ themeId: liveId }] : [])] },
+          orderBy: { order: 'asc' },
+          select: { id: true, image: true, alt: true, title: true, tag: true, linkUrl: true, themeId: true, bgColor: true },
+        });
+      })
+      .then((list) => [...list.filter((b) => b.themeId), ...list.filter((b) => !b.themeId)]
+        .map((b) => ({ id: b.id, image: b.image, alt: b.alt, title: b.title, tag: b.tag, linkUrl: b.linkUrl, bgColor: b.bgColor })))
+      // Slides are decoration: a failure here must not take the feed down.
+      .catch((e) => { console.error('home feed: app banners failed:', e); return []; });
+
     const [trendingViews, newReleases, categories, mittfest, olympiad] = await Promise.all([
       // Most-viewed High-quality videos based on VideoView rows recorded in the last 7 days.
       prisma.videoView.groupBy({
@@ -190,59 +214,53 @@ export async function GET(request: NextRequest) {
       }),
     ]);
 
-    // Admin-managed carousel slides for the app home screen. Fetched
-    // separately from the video rows because they're independent of
-    // visibility/approval rules — they're artwork, not user content. An empty
-    // result is normal and means the app keeps its original behaviour of
-    // building the carousel purely from the most-watched videos.
-    const appBanners = await prisma.appBannerSlide.findMany({
-      where: { isActive: true },
-      orderBy: { order: 'asc' },
-      select: { id: true, image: true, alt: true, title: true, tag: true, linkUrl: true },
-    });
-
     const trendingIds = trendingViews.map(t => t.videoId);
-    const trendingVideosRaw = trendingIds.length > 0
-      ? await prisma.video.findMany({
-          where: { id: { in: trendingIds }, ...trendingWhere },
-          select: VIDEO_SELECT,
-        })
-      : [];
-    // Re-sort to match the view-count ranking (findMany with `in` doesn't preserve order).
-    const trendingOrder = new Map(trendingIds.map((id, i) => [id, i]));
-    trendingVideosRaw.sort((a, b) => (trendingOrder.get(a.id) ?? 0) - (trendingOrder.get(b.id) ?? 0));
-
-    // Fallback: if no High-quality video has been viewed in 7 days, use all-time viewsCount so the row isn't empty.
-    let trendingRaw = trendingVideosRaw;
-    if (trendingRaw.length === 0) {
-      trendingRaw = await prisma.video.findMany({
-        take: ROW_LIMIT,
-        where: trendingWhere,
-        orderBy: { viewsCount: 'desc' },
-        select: VIDEO_SELECT,
-      });
-    }
-
     const categoryNames = categories.map(c => c.category).filter(Boolean) as string[];
-    const categoryRowsRaw = await Promise.all(
-      categoryNames.map(name =>
-        prisma.video.findMany({
+
+    // Second round, all at once: the trending videos (with their fallback),
+    // every category row, and the carousel slides.
+    const [trendingRaw, categoryRowsRaw, appBanners] = await Promise.all([
+      (async () => {
+        const found = trendingIds.length > 0
+          ? await prisma.video.findMany({
+              where: { id: { in: trendingIds }, ...trendingWhere },
+              select: VIDEO_SELECT,
+            })
+          : [];
+        // Re-sort to match the view-count ranking (findMany with `in` doesn't preserve order).
+        const trendingOrder = new Map(trendingIds.map((id, i) => [id, i]));
+        found.sort((a, b) => (trendingOrder.get(a.id) ?? 0) - (trendingOrder.get(b.id) ?? 0));
+        if (found.length > 0) return found;
+        // Fallback: if no High-quality video has been viewed in 7 days, use all-time viewsCount so the row isn't empty.
+        return prisma.video.findMany({
           take: ROW_LIMIT,
-          where: { ...baseWhere, category: name },
+          where: trendingWhere,
           orderBy: { viewsCount: 'desc' },
           select: VIDEO_SELECT,
-        })
-      )
-    );
-
-    const effectiveUserId = viewerId ?? userId;
-    const [trending, releases, mittfestVideos, olympiadVideos, ...categoryRows] = await Promise.all([
-      hydrate(trendingRaw, effectiveUserId),
-      hydrate(newReleases, effectiveUserId),
-      hydrate(mittfest, effectiveUserId),
-      hydrate(olympiad, effectiveUserId),
-      ...categoryRowsRaw.map(rows => hydrate(rows, effectiveUserId)),
+        });
+      })(),
+      Promise.all(
+        categoryNames.map(name =>
+          prisma.video.findMany({
+            take: ROW_LIMIT,
+            where: { ...baseWhere, category: name },
+            orderBy: { viewsCount: 'desc' },
+            select: VIDEO_SELECT,
+          })
+        )
+      ),
+      appBannersPromise,
     ]);
+
+    // One hydrate for every row together — 3 queries in total instead of 3
+    // per row — then split back into the rows (a video in several rows is
+    // looked up once).
+    const effectiveUserId = viewerId ?? userId;
+    const rawRows: RawVideo[][] = [trendingRaw, newReleases, mittfest, olympiad, ...categoryRowsRaw];
+    const unique = [...new Map(rawRows.flat().map(v => [v.id, v])).values()];
+    const hydratedById = new Map((await hydrate(unique, effectiveUserId)).map(v => [v.id, v]));
+    const [trending, releases, mittfestVideos, olympiadVideos, ...categoryRows] =
+      rawRows.map(row => row.map(v => hydratedById.get(v.id)!));
 
     // MittFest sits first: the client builds its hero carousel from the
     // 'trending' row (by key, not position) and renders these rows beneath it,

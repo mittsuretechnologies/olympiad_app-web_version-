@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
 import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
-import { getJwtSecret } from '@/lib/jwt-secret';
+import { signAppUserToken } from '@/lib/appUserToken';
 import { STATES } from '@/lib/locations';
 import {
   SCHOOL_AGREEMENT_KEY,
@@ -195,11 +194,7 @@ export async function POST(request: Request) {
 
     await prisma.appOtp.delete({ where: { identifier: mobile } }).catch(() => {});
 
-    const token = jwt.sign(
-      { id: user.id, userId: user.userId, role: 'APP_USER' },
-      getJwtSecret(),
-      { expiresIn: '30d' },
-    );
+    const token = signAppUserToken(user);
 
     return NextResponse.json({
       message: 'School registered',

@@ -13,6 +13,8 @@ interface AppBanner {
   title: string;
   tag: string;
   linkUrl: string;
+  themeId: string | null;
+  bgColor: string;
   order: number;
   isActive: boolean;
   createdAt: string;
@@ -50,6 +52,11 @@ export default function AppCarouselPage() {
   const [title, setTitle] = useState('');
   const [tag, setTag] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [themeId, setThemeId] = useState('');
+  const [bgColor, setBgColor] = useState('');
+  // Festival themes, for "Show during". Needs the App Theme permission —
+  // without it the list stays empty and every slide is simply all-year.
+  const [themes, setThemes] = useState<{ id: string; name: string }[]>([]);
   const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -72,6 +79,13 @@ export default function AppCarouselPage() {
   };
 
   useEffect(load, []);
+  useEffect(() => {
+    fetch('/api/dashboard/app-themes', { headers: authHeaders() })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => setThemes(d?.themes ?? []))
+      .catch(() => {});
+  }, []);
+  const themeName = (id: string | null) => themes.find((t) => t.id === id)?.name ?? 'Festival theme';
 
   const stats = useMemo(() => ({
     total: rows.length,
@@ -87,6 +101,8 @@ export default function AppCarouselPage() {
     setTitle('');
     setTag('');
     setLinkUrl('');
+    setThemeId('');
+    setBgColor('');
     setFormError('');
   };
 
@@ -99,6 +115,8 @@ export default function AppCarouselPage() {
     setTitle(r.title);
     setTag(r.tag);
     setLinkUrl(r.linkUrl);
+    setThemeId(r.themeId ?? '');
+    setBgColor(r.bgColor ?? '');
     setFormError('');
     setShowForm(true);
   };
@@ -119,7 +137,7 @@ export default function AppCarouselPage() {
     setSubmitting(true);
     setFormError('');
     try {
-      const payload = { image, alt, title, tag, linkUrl };
+      const payload = { image, alt, title, tag, linkUrl, themeId: themeId || null, bgColor };
       const res = editingId
         ? await fetch(`/api/dashboard/app-banners/${editingId}`, {
             method: 'PATCH',
@@ -281,6 +299,11 @@ export default function AppCarouselPage() {
                     {r.title || <span className="text-gray-300 italic font-normal">No title</span>}
                   </p>
                   <div className="flex items-center gap-2 mt-0.5">
+                    {r.themeId && (
+                      <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 rounded">
+                        Only during: {themeName(r.themeId)}
+                      </span>
+                    )}
                     {r.tag && (
                       <span className="px-1.5 py-0.5 text-[10px] font-semibold bg-gray-100 text-gray-500 rounded">{r.tag}</span>
                     )}
@@ -378,8 +401,29 @@ export default function AppCarouselPage() {
               </div>
 
               <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Show during</label>
+                <select value={themeId} onChange={(e) => setThemeId(e.target.value)}
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f] bg-white">
+                  <option value="">All year</option>
+                  {themes.map((t) => <option key={t.id} value={t.id}>Only while “{t.name}” is live</option>)}
+                </select>
+                <p className="text-[10px] text-gray-400 mt-1">Festival slides appear first, and only while that theme is live (App Theme &amp; Festivals).</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Band colour behind this slide</label>
+                <div className="flex items-center gap-2">
+                  <input type="color" value={bgColor || '#FF8A1F'} onChange={(e) => setBgColor(e.target.value.toUpperCase())}
+                    className={`w-10 h-10 rounded-lg border border-gray-200 cursor-pointer p-0.5 bg-white ${bgColor ? '' : 'opacity-40'}`} />
+                  <span className="text-xs text-gray-500 font-mono">{bgColor || 'Theme default'}</span>
+                  {bgColor && <button type="button" onClick={() => setBgColor('')} className="text-xs text-red-500 hover:underline">Reset</button>}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">While a festival theme with a festive top is live, the coloured band at the top of the app changes to this colour when this slide is showing — pick the slide&apos;s main colour.</p>
+              </div>
+
+              <div>
                 <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-1.5">Link (optional)</label>
-                <input placeholder="https://… — leave blank for a non-tappable slide" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
+                <input placeholder="https://…  or  app://Upload  — blank = not tappable" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:border-[#004f9f]" />
               </div>
 

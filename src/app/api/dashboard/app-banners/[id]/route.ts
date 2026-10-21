@@ -19,6 +19,8 @@ export async function PATCH(
     if ('linkUrl' in body) data.linkUrl = String(body.linkUrl ?? '').trim();
     if ('isActive' in body) data.isActive = Boolean(body.isActive);
     if ('order' in body) data.order = Number(body.order);
+    if ('themeId' in body) data.themeId = typeof body.themeId === 'string' && body.themeId ? body.themeId : null;
+    if ('bgColor' in body) data.bgColor = typeof body.bgColor === 'string' && /^#[0-9a-fA-F]{6}$/.test(body.bgColor) ? body.bgColor : '';
 
     const updated = await prisma.appBannerSlide.update({ where: { id }, data });
     return NextResponse.json(updated);

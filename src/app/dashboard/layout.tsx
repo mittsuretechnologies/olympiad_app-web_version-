@@ -46,6 +46,7 @@ import {
   Download,
   FileSignature,
   BookOpen,
+  Palette,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'MASTER_ADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -267,7 +268,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Evaluation Progress',    href: '/dashboard/reports/evaluation-progress',        icon: ClipboardCheck },
     { name: 'School Report',          href: '/dashboard/reports/schools',                    icon: Building2 },
     { name: 'App Users',              href: '/dashboard/app-users',                          icon: Smartphone },
-    { name: 'Student Activity',       href: '/dashboard/student-activity',                   icon: Clock },
+    { name: 'User Activity',          href: '/dashboard/student-activity',                   icon: Clock },
     { name: 'Hashtag Campaign',       href: '/dashboard/reports/hashtag-campaign',           icon: Hash },
   ];
 
@@ -494,6 +495,17 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/app-carousel') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <GalleryHorizontal size={20} />
                 <span className="text-sm font-semibold">App Carousel</span>
+              </Link>
+            )}
+
+            {/* App Theme & Festivals — only superadmin. Scheduled festival
+                looks for the mobile app home screen (colours, greeting,
+                decorations, section order). */}
+            {canSeeAdmin('appTheme') && (
+              <Link href="/dashboard/app-theme"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/app-theme') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <Palette size={20} />
+                <span className="text-sm font-semibold">App Theme &amp; Festivals</span>
               </Link>
             )}
 
