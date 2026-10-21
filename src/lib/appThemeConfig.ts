@@ -39,6 +39,8 @@ export const APP_LINK_SCREENS = ['Upload', 'Search', 'Reels', 'Profile', 'MyScho
 const HEX = /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/;
 const hex = z.string().trim().regex(HEX, 'Colours must be hex, e.g. #FF9F1C');
 const palette = (min: number, max: number) => z.array(hex).min(min).max(max);
+// A colour that may be left empty ('' = use the app's own).
+const optionalHex = z.string().trim().refine((v) => v === '' || HEX.test(v), 'Colours must be hex, e.g. #FF9F1C').default('');
 
 const imageUrl = z.string().trim().max(1000)
   .refine((v) => v === '' || /^https?:\/\//i.test(v), 'Image must be an http(s) URL');
@@ -81,6 +83,10 @@ const sectionsSchema = z
 export const appThemeConfigSchema = z.object({
   colors: z.object({
     bg: palette(2, 3).default(['#FBF6EE', '#FFF8F0', '#F3EEE3']),        // page gradient
+    bgDirection: z.enum(['vertical', 'diagonal', 'horizontal']).default('diagonal'),
+    // Text on the page itself (video titles + names under the cards, section
+    // headings when those aren't set). '' = the app's own dark text.
+    text: optionalHex,
     header: palette(2, 3).default(['#FFF8F0', '#FBF6EE', '#FFF8F0']),    // sticky header gradient
     glow: palette(2, 2).default(['#3E82E0', '#F5A623']),                 // the two soft header glows
     divider: palette(2, 6).default(['#F0729A', '#F5A623', '#1FAE8E', '#3E82E0']),
@@ -89,6 +95,13 @@ export const appThemeConfigSchema = z.object({
     accent: hex.default('#F5A623'),                                      // tagline pill, carousel dot
     accentText: hex.default('#FFFFFF'),
     statusBar: z.enum(['dark', 'light']).default('dark'),
+    // Home screen sections. '' = the app's own colours (each row keeps its
+    // own icon colour); set = one colour for every section heading / chip.
+    sectionTitle: optionalHex,                                           // "Olympiad", "MittFest" … headings
+    sectionAccent: optionalHex,                                          // section icon + "See all" chip
+    // Bottom tab bar (shown on every tab). Defaults = the original look.
+    tabBar: palette(2, 2).default(['#1FAE8E', '#3E82E0']),               // bar gradient, left → right
+    tabBarIcon: hex.default('#128064'),                                  // icon in the white active pill
   }).default({}),
   header: z.object({
     subtitle: z.string().trim().max(40).default('Talent & Olympiad Hub'),
@@ -141,6 +154,13 @@ export const appThemeConfigSchema = z.object({
     title: z.string().trim().max(28).default(''),                        // big festive word, e.g. Navratri
     emoji: z.string().trim().max(16).default(''),                        // either side of the title
     textColor: hex.default('#FFFFFF'),
+    // Masthead layout. Defaults = the original: centred, emoji both sides,
+    // small line above a classic italic title.
+    emojiPlacement: z.enum(['both', 'left', 'right', 'above', 'none']).default('both'),
+    align: z.enum(['center', 'left', 'right']).default('center'),
+    titleSize: z.enum(['small', 'medium', 'large']).default('medium'),
+    titleStyle: z.enum(['classic', 'modern']).default('classic'),        // classic = italic serif, modern = bold sans
+    kickerPosition: z.enum(['above', 'below']).default('above'),
     bunting: z.boolean().default(true),                                  // little festive flags under the header
     // Festival decoration behind the header (src/lib/splashArt.js — same ids
     // as the splash artwork). 'none' = plain band colour.

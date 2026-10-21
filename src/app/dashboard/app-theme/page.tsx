@@ -12,7 +12,7 @@ import {
 } from '@/lib/appThemeConfig';
 import { SPLASH_ART, SPLASH_ART_IDS } from '@/lib/splashArt';
 import {
-  generateCustomTheme, surpriseCustom, CUSTOM_DEFAULTS, CUSTOM_STYLES, CUSTOM_SWATCHES,
+  generateCustomTheme, surpriseCustom, matchColorsToBackground, contrastRatio, CUSTOM_DEFAULTS, CUSTOM_STYLES, CUSTOM_SWATCHES,
   type CustomFestivalInput,
 } from '@/lib/appThemeGenerator';
 
@@ -416,7 +416,38 @@ function ThemeEditor({ initial, startCustom, onClose, onSaved }: {
                   These recolour the <strong>whole</strong> home page. For a festival, the <strong>Festive top</strong> tab is usually all you need —
                   leave these as they are to keep the normal Mittmee look (like Amazon or Swiggy do).
                 </p>
-                <PaletteField label="Page background (gradient)" value={config.colors.bg} min={2} max={3} onChange={(bg) => set('colors', { bg })} />
+                <div className="rounded-xl border border-gray-100 p-3 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Whole home screen background</p>
+                  <PaletteField label="Background colours (gradient — 2 or 3)" value={config.colors.bg} min={2} max={3} onChange={(bg) => set('colors', { bg })} />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Field label="Gradient direction">
+                      <Chips value={config.colors.bgDirection} onChange={(bgDirection) => set('colors', { bgDirection })}
+                        options={[['vertical', 'Top → bottom'], ['diagonal', 'Diagonal'], ['horizontal', 'Left → right']]} />
+                    </Field>
+                    <Field label="Text on the page" hint="Titles and names under the videos — empty = the app’s dark text">
+                      <OptionalColor value={config.colors.text} suggest="#FFFFFF" onChange={(text) => set('colors', { text })} />
+                    </Field>
+                  </div>
+                  <button type="button"
+                    onClick={() => set('colors', matchColorsToBackground(config.colors.bg))}
+                    className="w-full py-2 rounded-lg bg-[#004f9f] text-white text-xs font-semibold hover:bg-[#003d7a]">
+                    ✨ Match everything to this background
+                  </button>
+                  <p className="text-[10px] text-gray-400">
+                    Sets the header, text, section headings, “See all”, bottom bar, logo and status bar to fit the background
+                    (readable on light or dark). You can still change any of them below.
+                  </p>
+                  {(() => {
+                    const t = config.colors.text || '#241E18';
+                    const worst = Math.min(...config.colors.bg.map((b) => contrastRatio(t, b)));
+                    return worst < 4.5 ? (
+                      <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                        ⚠ Text is hard to read on part of this background (contrast {worst.toFixed(1)}:1, aim for 4.5+).
+                        Use colours that are all light or all dark, or press “Match everything”.
+                      </p>
+                    ) : null;
+                  })()}
+                </div>
                 <PaletteField label="Header background (gradient)" value={config.colors.header} min={2} max={3} onChange={(header) => set('colors', { header })} />
                 <PaletteField label="Header glows (left, right)" value={config.colors.glow} min={2} max={2} onChange={(glow) => set('colors', { glow })} />
                 <PaletteField label="Header bottom stripe" value={config.colors.divider} min={2} max={6} onChange={(divider) => set('colors', { divider })} />
@@ -432,6 +463,26 @@ function ThemeEditor({ initial, startCustom, onClose, onSaved }: {
                     <option value="light">Light (for dark backgrounds)</option>
                   </select>
                 </Field>
+
+                <div className="rounded-xl border border-gray-100 p-3 space-y-3">
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Home sections &amp; bottom bar</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <Field label="Section headings" hint='"Olympiad", "MittFest" … — empty = the app’s own'>
+                      <OptionalColor value={config.colors.sectionTitle} suggest="#241E18" onChange={(sectionTitle) => set('colors', { sectionTitle })} />
+                    </Field>
+                    <Field label="Section icons & “See all”" hint="Empty = each section keeps its own colour">
+                      <OptionalColor value={config.colors.sectionAccent} suggest={config.colors.accent} onChange={(sectionAccent) => set('colors', { sectionAccent })} />
+                    </Field>
+                  </div>
+                  <PaletteField label="Bottom tab bar (left → right)" value={config.colors.tabBar} min={2} max={2} onChange={(tabBar) => set('colors', { tabBar })} />
+                  <Field label="Active tab icon"><ColorInput value={config.colors.tabBarIcon} onChange={(tabBarIcon) => set('colors', { tabBarIcon })} /></Field>
+                </div>
+
+                <button type="button"
+                  onClick={() => setConfig((c) => ({ ...c, colors: DEFAULT_THEME_CONFIG.colors, background: DEFAULT_THEME_CONFIG.background }))}
+                  className="w-full py-2 rounded-lg border border-dashed border-gray-300 text-xs font-semibold text-gray-500 hover:text-[#004f9f] hover:border-[#004f9f]">
+                  ↺ Reset every colour on this tab to the original Mittmee look
+                </button>
                 <Field label="Background image (optional)" hint="Shown behind the whole home screen, under the videos">
                   <ImageInput value={config.background.imageUrl} onChange={(imageUrl) => set('background', { imageUrl })} />
                 </Field>
@@ -670,6 +721,23 @@ function CustomFestivalPanel({ value: v, onChange, onClose }: {
         </div>
       </Field>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Emoji placement (masthead)">
+          <Chips value={v.emojiPlacement} onChange={(emojiPlacement) => up({ emojiPlacement })}
+            options={[['both', 'Both sides'], ['left', 'Left'], ['right', 'Right'], ['above', 'Above'], ['none', 'None']]} />
+        </Field>
+        <Field label="Text alignment (masthead)">
+          <Chips value={v.align} onChange={(align) => up({ align })}
+            options={[['left', 'Left'], ['center', 'Centre'], ['right', 'Right']]} />
+        </Field>
+        <Field label="Floating decorations" hint="Your own emoji, up to 6 — e.g. 🔥 🪁 ✨. Blank = festival emoji + sparkles">
+          <input value={v.decor} maxLength={60} onChange={(e) => up({ decor: e.target.value })} placeholder="🔥 🪁 ✨" className={INPUT} />
+        </Field>
+        <Field label="Decorations move">
+          <Chips value={v.effect} onChange={(effect) => up({ effect })}
+            options={[['static', 'Stay still'], ['fall', 'Fall gently']]} />
+        </Field>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Festive tiles (search words)" hint="Comma-separated, up to 5 — e.g. bhangra, songs, kites">
           <input value={v.tiles} maxLength={120} onChange={(e) => up({ tiles: e.target.value })} className={INPUT} />
         </Field>
@@ -681,6 +749,43 @@ function CustomFestivalPanel({ value: v, onChange, onClose }: {
         Builds the festive top, header decoration, tagline, splash screen, stripes and decorations together. Fine-tune anything in the tabs below —
         but changing this panel again regenerates the theme. Festive tiles start switched off (Festive top tab).
       </p>
+    </div>
+  );
+}
+
+// Compact one-of-N choice (masthead layout options).
+function Chips<T extends string>({ value, onChange, options }: {
+  value: T; onChange: (v: T) => void; options: [T, string][];
+}) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {options.map(([k, label]) => (
+        <button key={k} type="button" onClick={() => onChange(k)}
+          className={`px-2.5 py-1.5 rounded-lg border text-[11px] font-semibold ${value === k ? 'border-[#004f9f] bg-[#004f9f]/5 text-[#004f9f]' : 'border-gray-200 text-gray-500 hover:bg-gray-50'}`}>
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// A colour that can be left empty ('' = the app's own colours).
+function OptionalColor({ value, suggest, onChange }: { value: string; suggest: string; onChange: (v: string) => void }) {
+  if (!value) {
+    return (
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-400 italic">App’s own colours</span>
+        <button type="button" onClick={() => onChange(suggest)}
+          className="px-2.5 py-1.5 rounded-lg border border-gray-200 text-[11px] font-semibold text-gray-600 hover:border-[#004f9f] hover:text-[#004f9f]">
+          Set a colour
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <ColorInput value={value} onChange={onChange} />
+      <button type="button" onClick={() => onChange('')} className="text-[11px] font-semibold text-gray-400 hover:text-red-500">Use app’s</button>
     </div>
   );
 }
@@ -868,8 +973,30 @@ function HeroEditor({ value: h, onChange }: { value: Hero; onChange: (patch: Par
                   <Field label="Big title"><input value={h.title} maxLength={28} onChange={(e) => onChange({ title: e.target.value })} placeholder="Navratri" className={INPUT} /></Field>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <Field label="Emoji either side"><input value={h.emoji} maxLength={16} onChange={(e) => onChange({ emoji: e.target.value })} placeholder="🪔" className={INPUT} /></Field>
+                  <Field label="Emoji"><input value={h.emoji} maxLength={16} onChange={(e) => onChange({ emoji: e.target.value })} placeholder="🪔" className={INPUT} /></Field>
                   <Field label="Title colour"><ColorInput value={h.textColor} onChange={(textColor) => onChange({ textColor })} /></Field>
+                </div>
+                <Field label="Emoji placement">
+                  <Chips value={h.emojiPlacement} onChange={(emojiPlacement) => onChange({ emojiPlacement })}
+                    options={[['both', 'Both sides'], ['left', 'Left'], ['right', 'Right'], ['above', 'Above'], ['none', 'None']]} />
+                </Field>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Field label="Text alignment">
+                    <Chips value={h.align} onChange={(align) => onChange({ align })}
+                      options={[['left', 'Left'], ['center', 'Centre'], ['right', 'Right']]} />
+                  </Field>
+                  <Field label="Small line">
+                    <Chips value={h.kickerPosition} onChange={(kickerPosition) => onChange({ kickerPosition })}
+                      options={[['above', 'Above title'], ['below', 'Below title']]} />
+                  </Field>
+                  <Field label="Title size">
+                    <Chips value={h.titleSize} onChange={(titleSize) => onChange({ titleSize })}
+                      options={[['small', 'Small'], ['medium', 'Medium'], ['large', 'Large']]} />
+                  </Field>
+                  <Field label="Title style">
+                    <Chips value={h.titleStyle} onChange={(titleStyle) => onChange({ titleStyle })}
+                      options={[['classic', 'Classic (italic)'], ['modern', 'Modern (bold)']]} />
+                  </Field>
                 </div>
           </div>
 
@@ -965,12 +1092,12 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
   }, [c.decor.density]);
   const h = c.hero;
   const hero = h.enabled;
-  // Same flow as the app: page tinted with the festival colour, band fading
-  // deep → soft → light, ending on a lace edge in the page colour.
-  const page = hero ? mixHex(h.colors[1], '#FFFFFF', 0.7) : c.colors.bg[0];
-  const pageBg = hero
-    ? `linear-gradient(180deg, ${page}, ${mixHex(h.colors[1], '#FFFDF8', 0.88)}, ${c.colors.bg[2] ?? c.colors.bg[1]})`
-    : `linear-gradient(135deg, ${c.colors.bg.join(', ')})`;
+  // Same as the app: the page background (in its direction) everywhere, with
+  // the festival's pale tint only behind the festive top, fading out below it.
+  const page = mixHex(h.colors[1], '#FFFFFF', 0.7);
+  const deg = c.colors.bgDirection === 'vertical' ? 180 : c.colors.bgDirection === 'horizontal' ? 90 : 135;
+  const pageBg = `linear-gradient(${deg}deg, ${c.colors.bg.join(', ')})`;
+  const pageText = c.colors.text || '#241E18';
   const onBandText = hero && h.textTone === 'light';
   // Same as the app: white on dark bands, a deep shade of the band on light ones.
   const ink = onBandText ? '#FFFFFF' : mixHex(h.colors[0], '#1A0A00', 0.72);
@@ -981,6 +1108,10 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
       style={{ background: pageBg }}>
       <style>{`@keyframes mmFall { from { transform: translateY(-30px) rotate(0deg); } to { transform: translateY(620px) rotate(200deg); } }
         .mm-noscroll::-webkit-scrollbar { display: none; }`}</style>
+      {hero && (
+        <div className="absolute inset-x-0 top-0 h-[70%] pointer-events-none"
+          style={{ background: `linear-gradient(180deg, ${page}, ${hexAlpha(mixHex(h.colors[1], '#FFFDF8', 0.88), 0.7)} 60%, ${hexAlpha(page, 0)})` }} />
+      )}
 
       {c.background.imageUrl && (
         <div className="absolute inset-0" style={{
@@ -1071,16 +1202,29 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
                   </div>
                 </div>
               )}
-              {(h.title || h.kicker) ? (
-                <div className="flex items-center justify-center gap-2 px-4 pt-1 pb-2">
-                  {h.emoji && <span className="text-2xl">{h.emoji}</span>}
-                  <div className="text-center min-w-0" style={{ color: h.textColor }}>
-                    {h.kicker && <p className="text-[8px] font-extrabold tracking-[0.3em]">✦ {h.kicker} ✦</p>}
-                    {h.title && <p className="text-[22px] leading-tight italic font-bold truncate" style={{ fontFamily: 'Georgia, serif', textShadow: '0 2px 4px rgba(0,0,0,.18)' }}>{h.title}</p>}
+              {(h.title || h.kicker) ? (() => {
+                // Same layout options as the app's FestiveMasthead.
+                const place = h.emoji ? h.emojiPlacement : 'none';
+                const justify = h.align === 'left' ? 'justify-start' : h.align === 'right' ? 'justify-end' : 'justify-center';
+                const textAlign = h.align === 'left' ? 'text-left' : h.align === 'right' ? 'text-right' : 'text-center';
+                const size = h.titleSize === 'small' ? 'text-[17px]' : h.titleSize === 'large' ? 'text-[27px]' : 'text-[22px]';
+                const emoji = <span className="text-2xl">{h.emoji}</span>;
+                const kicker = h.kicker && <p className="text-[8px] font-extrabold tracking-[0.3em]">✦ {h.kicker} ✦</p>;
+                const title = h.title && (
+                  <p className={`${size} leading-tight font-bold truncate ${h.titleStyle === 'modern' ? 'font-black not-italic tracking-tight' : 'italic'}`}
+                    style={{ fontFamily: h.titleStyle === 'modern' ? undefined : 'Georgia, serif', textShadow: '0 2px 4px rgba(0,0,0,.18)' }}>{h.title}</p>
+                );
+                return (
+                  <div className={`flex items-center ${justify} gap-2 px-4 pt-1 pb-2`}>
+                    {(place === 'both' || place === 'left') && emoji}
+                    <div className={`${textAlign} min-w-0`} style={{ color: h.textColor }}>
+                      {place === 'above' && <div>{emoji}</div>}
+                      {h.kickerPosition === 'below' ? <>{title}{kicker}</> : <>{kicker}{title}</>}
+                    </div>
+                    {(place === 'both' || place === 'right') && emoji}
                   </div>
-                  {h.emoji && <span className="text-2xl">{h.emoji}</span>}
-                </div>
-              ) : null}
+                );
+              })() : null}
             </div>
           )}
 
@@ -1120,16 +1264,43 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
         )}
 
         {/* ── Rows ── */}
-        <div className="relative z-10 px-3 pt-3 pb-4 space-y-3">
+        <div className="relative z-10 px-3 pt-3 pb-14 space-y-3">
           {c.sections.filter((s) => s.visible).map((s) => (
             <div key={s.key}>
-              <p className="text-[10px] font-extrabold text-gray-800 mb-1">{s.key === 'rows' ? 'Most Watched This Week' : (s.title || SECTION_LABELS[s.key])}</p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[10px] font-extrabold" style={{ color: c.colors.sectionTitle || pageText }}>
+                  {s.key === 'rows' ? 'Most Watched This Week' : (s.title || SECTION_LABELS[s.key])}
+                </p>
+                <span className="text-[7px] font-bold px-1.5 py-0.5 rounded-full border"
+                  style={c.colors.sectionAccent
+                    ? { color: c.colors.sectionAccent, background: hexAlpha(c.colors.sectionAccent, 0.12), borderColor: hexAlpha(c.colors.sectionAccent, 0.3) }
+                    : { color: '#A9740A', background: '#FFF4DC', borderColor: '#F7D9A0' }}>
+                  See all ›
+                </span>
+              </div>
               <div className="flex gap-1.5">
-                {[0, 1, 2].map((i) => <div key={i} className="w-[78px] h-[104px] rounded-lg bg-white/80 border border-black/5" />)}
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="w-[78px]">
+                    <div className="h-[104px] rounded-lg bg-white/80 border border-black/5" />
+                    <p className="text-[8px] font-extrabold mt-1 truncate" style={{ color: pageText }}>Video title</p>
+                    <p className="text-[7px] truncate" style={{ color: hexAlpha(pageText, 0.7) }}>username</p>
+                  </div>
+                ))}
               </div>
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Bottom tab bar — same colours as the app's. */}
+      <div className="absolute inset-x-0 bottom-0 z-30 h-11 flex items-center justify-around px-2"
+        style={{ background: `linear-gradient(90deg, ${c.colors.tabBar.join(', ')})` }}>
+        <span className="w-9 h-6 rounded-full bg-white flex items-center justify-center text-[11px]" style={{ color: c.colors.tabBarIcon }}>⌂</span>
+        <span className="text-white/80 text-[11px]">▷</span>
+        <span className="-mt-5 w-9 h-9 rounded-full border-[3px] border-white flex items-center justify-center text-white text-sm"
+          style={{ background: `linear-gradient(135deg, ${c.colors.tabBar.join(', ')})` }}>+</span>
+        <span className="text-white/80 text-[11px]">⌕</span>
+        <span className="text-white/80 text-[11px]">◯</span>
       </div>
     </div>
   );
