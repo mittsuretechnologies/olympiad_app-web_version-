@@ -80,6 +80,7 @@ model School {
   // The app account that stands in for this school inside the mobile app.
   appAccount    AppUser?
   supportTickets SchoolSupportTicket[]
+  evaluatorAssignments EvaluatorSchool[]
 
   @@schema("public")
 }
@@ -468,9 +469,8 @@ model TalentEvaluator {
   password             String
   plainPassword        String?
   isActive             Boolean                @default(true)
-  // Empty arrays = unrestricted (evaluator sees every region). Non-empty =
-  // evaluator only sees videos whose student's school state/district matches
-  // one of these — checked in evaluation-queue and evaluate routes.
+  // LEGACY — no longer read or written. Evaluators are now scoped by the
+  // schools in EvaluatorSchool. Columns kept so no data is dropped.
   assignedStates       String[]               @default([])
   assignedDistricts    String[]               @default([])
   // Terms & Conditions gate: shown once on first login; blocks the dashboard
@@ -481,7 +481,23 @@ model TalentEvaluator {
   updatedAt            DateTime               @updatedAt
   individualPermission IndividualPermissions?
   evaluations          VideoEvaluation[]
+  schools              EvaluatorSchool[]
 
+  @@schema("public")
+}
+
+// Which schools' videos an evaluator may score. No rows = sees nothing.
+model EvaluatorSchool {
+  id          String          @id @default(uuid())
+  evaluatorId String
+  schoolId    String
+  assignedBy  String?
+  createdAt   DateTime        @default(now())
+  evaluator   TalentEvaluator @relation(fields: [evaluatorId], references: [id], onDelete: Cascade)
+  school      School          @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([evaluatorId, schoolId])
+  @@index([schoolId])
   @@schema("public")
 }
 

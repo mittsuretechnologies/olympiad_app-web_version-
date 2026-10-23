@@ -57,6 +57,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionDef> = {
   EVALUATION_EDITED:       { label: 'Evaluation Edited',         category: 'evaluation', tone: 'warning' },
   EVALUATION_PUBLISHED:    { label: 'Result Published',          category: 'evaluation', tone: 'success' },
   EVALUATION_UNPUBLISHED:  { label: 'Result Unpublished',        category: 'evaluation', tone: 'neutral' },
+  EVALUATOR_SCHOOLS_ASSIGNED: { label: 'Evaluator Schools Assigned', category: 'evaluation', tone: 'info' },
 
   CREDENTIALS_VIEWED:      { label: 'Passwords Viewed',          category: 'credentials', tone: 'warning' },
   CREDENTIALS_SENT:        { label: 'Credentials Sent',          category: 'credentials', tone: 'info' },
@@ -67,6 +68,7 @@ export const AUDIT_ACTIONS: Record<string, AuditActionDef> = {
   ACCOUNT_DELETED:                  { label: 'Account Deleted',              category: 'accounts', tone: 'danger' },
   ACCOUNT_DELETION_REJECTED:        { label: 'Deletion Request Rejected',    category: 'accounts', tone: 'neutral' },
   CONSENT_WITHDRAWN:                { label: 'Consent Withdrawn',            category: 'accounts', tone: 'danger' },
+  EVALUATOR_TERMS_ACCEPTED: { label: 'Evaluator Terms Accepted', category: 'accounts', tone: 'success' },
   AGREEMENT_REACCEPTANCE_REQUESTED: { label: 'Agreement Re-acceptance Asked', category: 'accounts', tone: 'info' },
   GENERAL_SCHOOL_ACTIVATED:         { label: 'General School Activated',     category: 'accounts', tone: 'success' },
   GENERAL_SCHOOL_DEACTIVATED:       { label: 'General School Deactivated',   category: 'accounts', tone: 'danger' },

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { requireModule } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { assignedSchoolIds } from '@/lib/evaluatorRegion';
 
 export async function GET(request: Request) {
   try {
@@ -30,19 +31,9 @@ export async function GET(request: Request) {
     }
     const filter = isEvaluator ? { evaluatorId: payload.id } : {};
 
-    // Evaluators can be scoped to specific states by code (see TalentEvaluator
-    // .assignedStates, e.g. ["RJ", "GJ"]). Empty array = unrestricted.
-    // SuperAdmin/Reviewer always see everything (oversight roles).
-    let regionFilter: string[] | null = null;
-    if (isEvaluator) {
-      const evaluator = await prisma.talentEvaluator.findUnique({
-        where: { id: payload.id },
-        select: { assignedStates: true },
-      });
-      if (evaluator && evaluator.assignedStates.length > 0) {
-        regionFilter = evaluator.assignedStates;
-      }
-    }
+    // Evaluators only count videos from the schools assigned to them
+    // (Evaluator -> Assign Schools). SuperAdmin/Reviewer see everything.
+    const schoolFilter: Set<string> | null = isEvaluator ? new Set(await assignedSchoolIds(payload.id)) : null;
 
     // Get stats from evaluations
     const [evaluationsCount, scoreAggregates, recentEvaluations, approvedVideos] = await Promise.all([
@@ -87,13 +78,13 @@ export async function GET(request: Request) {
           id: true,
           appUserId: true,
           _count: { select: { evaluations: true } },
-          student: { select: { allocation: { select: { school: { select: { stateCode: true } } } } } },
+          student: { select: { allocation: { select: { schoolId: true } } } },
         },
       }),
     ]);
 
     let regionScopedApproved = approvedVideos;
-    if (regionFilter) {
+    if (schoolFilter) {
       const appUserIds2 = [...new Set(approvedVideos.filter(v => v.appUserId).map(v => v.appUserId!))];
       const appUsers2 = appUserIds2.length
         ? await prisma.appUser.findMany({ where: { id: { in: appUserIds2 } }, select: { id: true, olympiadId: true } })
@@ -103,21 +94,21 @@ export async function GET(request: Request) {
       const appAllocations2 = appOlympiadCodes2.length
         ? await prisma.olympiadIdAllocation.findMany({
             where: { code: { in: appOlympiadCodes2 } },
-            select: { code: true, school: { select: { stateCode: true } } },
+            select: { code: true, schoolId: true },
           })
         : [];
       const allocByCode2 = new Map(appAllocations2.map(a => [a.code, a]));
 
       regionScopedApproved = approvedVideos.filter(v => {
-        let stateCode: string | null = null;
+        let schoolId: string | null = null;
         if (v.student) {
-          stateCode = v.student.allocation?.school?.stateCode ?? null;
+          schoolId = v.student.allocation?.schoolId ?? null;
         } else if (v.appUserId) {
           const appUser = appUserById2.get(v.appUserId);
           const alloc = appUser?.olympiadId ? allocByCode2.get(appUser.olympiadId) : null;
-          stateCode = alloc?.school?.stateCode ?? null;
+          schoolId = alloc?.schoolId ?? null;
         }
-        return stateCode !== null && regionFilter!.includes(stateCode);
+        return schoolId !== null && schoolFilter.has(schoolId);
       });
     }
     const pendingQueue = regionScopedApproved.filter(v => v._count.evaluations < 1).length;

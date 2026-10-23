@@ -11,6 +11,7 @@ import {
  * Superadmin — Agreement Acceptance Register, one tab per role:
  *   Schools    — School Onboarding Agreement, with full legal metadata per row
  *   Moderators — first-login Terms & Conditions (acceptance time only)
+ *   Evaluators — Evaluator Terms & Privacy Policy (version, IP and time per acceptance)
  * CSV export with all rows is available for both.
  */
 
@@ -49,11 +50,23 @@ interface ModeratorResponse {
   page: number; pageSize: number; totalPages: number;
 }
 
-type Role = 'SCHOOL' | 'MODERATOR';
+interface EvaluatorRow {
+  evaluator: { id: string; evaluatorId: string; name: string; email: string; isActive: boolean; createdAt: string };
+  acceptance: { id: string; acceptedAt: string; documentVersion: string; ipAddress: string | null; userAgent: string | null; readCompletedAt: string | null; documentHash: string } | null;
+}
+
+interface EvaluatorResponse {
+  summary: Summary; rows: EvaluatorRow[]; total: number;
+  page: number; pageSize: number; totalPages: number;
+  currentVersion: string;
+}
+
+type Role = 'SCHOOL' | 'MODERATOR' | 'EVALUATOR';
 
 const ROLES: { key: Role; label: string; icon: typeof Users; document: string; noun: string }[] = [
   { key: 'SCHOOL', label: 'Schools', icon: Building2, document: 'School Onboarding Agreement', noun: 'schools' },
   { key: 'MODERATOR', label: 'Moderators', icon: ShieldCheck, document: 'Terms and Conditions', noun: 'moderators' },
+  { key: 'EVALUATOR', label: 'Evaluators', icon: User, document: 'Evaluator Terms & Privacy Policy', noun: 'evaluators' },
 ];
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
@@ -73,6 +86,7 @@ export default function AgreementsPage() {
   const [role, setRole] = useState<Role>('SCHOOL');
   const [data, setData] = useState<ApiResponse | null>(null);
   const [modData, setModData] = useState<ModeratorResponse | null>(null);
+  const [evalData, setEvalData] = useState<EvaluatorResponse | null>(null);
   const [status, setStatus] = useState<'loading' | 'error' | 'ok'>('loading');
   const [filter, setFilter] = useState<'all' | 'accepted' | 'pending'>('all');
   const [q, setQ] = useState('');
@@ -82,13 +96,16 @@ export default function AgreementsPage() {
   const [exporting, setExporting] = useState(false);
   // "Ask to accept again": revokes the current acceptance (kept as evidence)
   // so the school sees the agreement gate again and re-accepts.
-  const [reaccept, setReaccept] = useState<{ acceptance: Acceptance; school: SchoolRow['school'] } | null>(null);
+  const [reaccept, setReaccept] = useState<{ acceptance: { id: string; acceptedAt: string }; name: string; kind: 'school' | 'evaluator' } | null>(null);
   const [reason, setReason] = useState('');
   const [reacceptBusy, setReacceptBusy] = useState(false);
   const [reacceptError, setReacceptError] = useState('');
 
   const openReaccept = (acceptance: Acceptance, school: SchoolRow['school']) => {
-    setReason(''); setReacceptError(''); setReaccept({ acceptance, school });
+    setReason(''); setReacceptError(''); setReaccept({ acceptance, name: school.name, kind: 'school' });
+  };
+  const openReacceptEvaluator = (acceptance: { id: string; acceptedAt: string }, name: string) => {
+    setReason(''); setReacceptError(''); setReaccept({ acceptance, name, kind: 'evaluator' });
   };
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -104,7 +121,7 @@ export default function AgreementsPage() {
       const res = await fetch(`/api/dashboard/agreements?${params}`, { headers: { Authorization: `Bearer ${getToken()}` } });
       if (!res.ok) throw new Error();
       const json = await res.json();
-      if (role === 'MODERATOR') setModData(json); else setData(json);
+      if (role === 'MODERATOR') setModData(json); else if (role === 'EVALUATOR') setEvalData(json); else setData(json);
       setStatus('ok');
     } catch {
       setStatus('error');
@@ -117,7 +134,7 @@ export default function AgreementsPage() {
   };
 
   const roleMeta = ROLES.find(r => r.key === role)!;
-  const current = role === 'MODERATOR' ? modData : data;
+  const current = role === 'MODERATOR' ? modData : role === 'EVALUATOR' ? evalData : data;
 
   useEffect(() => { load(); }, [load]);
 
@@ -167,6 +184,23 @@ export default function AgreementsPage() {
         download([cols.join(','), ...lines].join('\n'), 'moderator-terms');
         return;
       }
+      if (role === 'EVALUATOR') {
+        const json: EvaluatorResponse = await res.json();
+        const cols = ['Evaluator ID', 'Name', 'Email', 'Account', 'Status', 'Version', 'Accepted At (IST)', 'IP Address', 'Browser', 'Read To End At (IST)', 'Document Fingerprint (SHA-256)'];
+        const lines = json.rows.map(({ evaluator, acceptance }) => [
+          evaluator.evaluatorId, evaluator.name, evaluator.email,
+          evaluator.isActive ? 'Active' : 'Inactive',
+          acceptance ? 'Accepted' : 'Pending',
+          acceptance?.documentVersion ?? '',
+          acceptance ? fmt(acceptance.acceptedAt) : '',
+          acceptance?.ipAddress ?? '',
+          acceptance?.userAgent ?? '',
+          acceptance?.readCompletedAt ? fmt(acceptance.readCompletedAt) : '',
+          acceptance?.documentHash ?? '',
+        ].map(quote).join(','));
+        download([cols.join(','), ...lines].join('\n'), 'evaluator-terms');
+        return;
+      }
       const json: ApiResponse = await res.json();
       const cols = ['School Code', 'School Name', 'City', 'State', 'Status', 'Version', 'Accepted At (IST)', 'Signatory', 'Designation', 'IP Address', 'Verification', 'Email Copy Sent To', 'Re-acceptance Requested At (IST)'];
       const lines = json.rows.map(({ school, acceptance, reaccept }) => [
@@ -200,7 +234,7 @@ export default function AgreementsPage() {
           <div className="min-w-0">
             <h1 className="text-[18px] font-semibold text-[#0E2A5C] leading-tight">Agreement Register</h1>
             <p className="text-[12px] text-[#6B7280] mt-0.5">
-              {roleMeta.document} — acceptance records{role === 'SCHOOL' && data ? ` · v${data.currentVersion}` : ''}
+              {roleMeta.document} — acceptance records{role === 'SCHOOL' && data ? ` · v${data.currentVersion}` : ''}{role === 'EVALUATOR' && evalData ? ` · v${evalData.currentVersion}` : ''}
             </p>
           </div>
         </div>
@@ -266,7 +300,7 @@ export default function AgreementsPage() {
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
-            placeholder={role === 'SCHOOL' ? 'Search school name, code, city…' : 'Search moderator name, ID, email…'}
+            placeholder={role === 'SCHOOL' ? 'Search school name, code, city…' : role === 'EVALUATOR' ? 'Search evaluator name, ID, email…' : 'Search moderator name, ID, email…'}
             className="w-full h-9 rounded-lg border border-[#E4E8EE] bg-white pl-8 pr-3 text-[13px] text-[#111827] placeholder:text-[#9CA3AF] focus:border-[#1559C7] focus:outline-none"
           />
         </div>
@@ -346,6 +380,68 @@ export default function AgreementsPage() {
           )}
           <p className="text-[11.5px] text-[#9CA3AF]">
             Moderators accept the Terms and Conditions once, at first login. The record holds the date and time of acceptance.
+          </p>
+        </>
+      )}
+
+      {status === 'ok' && role === 'EVALUATOR' && evalData && (
+        <>
+          {evalData.rows.length === 0 ? (
+            <div className="rounded-xl border border-[#E4E8EE] bg-white p-10 text-center text-[14px] text-[#6B7280]">
+              No evaluators match the current filter.
+            </div>
+          ) : (
+            <div className="rounded-xl border border-[#E4E8EE] bg-white overflow-x-auto">
+              <table className="w-full text-[13px] min-w-[720px]">
+                <thead>
+                  <tr className="border-b border-[#E4E8EE] bg-[#F8FAFC]">
+                    {['Evaluator', 'Email', 'Status', 'Version', 'Accepted at', 'IP address', ''].map((h, hi) => (
+                      <th key={`${h}-${hi}`} scope="col" className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#6B7280]">{h || <span className="sr-only">Actions</span>}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#F3F5F8]">
+                  {evalData.rows.map(({ evaluator, acceptance }) => (
+                    <tr key={evaluator.id} className="align-top hover:bg-[#FAFBFC] transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="font-semibold text-[#0E2A5C] leading-tight">{evaluator.name}</p>
+                        <p className="text-[11px] text-[#9CA3AF] mt-0.5">{evaluator.evaluatorId}{!evaluator.isActive && ' · Inactive'}</p>
+                      </td>
+                      <td className="px-4 py-3 text-[#6B7280] break-all">{evaluator.email}</td>
+                      <td className="px-4 py-3">
+                        {acceptance ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#047857]/[0.08] px-2 py-0.5 text-[11.5px] font-semibold text-[#047857]">
+                            <CheckCircle2 size={11} /> Accepted
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-[#B45309]/[0.08] px-2 py-0.5 text-[11.5px] font-semibold text-[#B45309]">
+                            <Clock size={11} /> Pending
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-[#6B7280]">{acceptance ? `v${acceptance.documentVersion}` : '—'}</td>
+                      <td className="px-4 py-3 text-[#6B7280]">{acceptance ? fmt(acceptance.acceptedAt) : '—'}</td>
+                      <td className="px-4 py-3 text-[#6B7280] font-mono text-[12px]">{acceptance?.ipAddress ?? '—'}</td>
+                      <td className="px-4 py-3 text-right">
+                        {acceptance && (
+                          <button
+                            onClick={() => openReacceptEvaluator(acceptance, evaluator.name)}
+                            title="Ask this evaluator to accept the Terms again"
+                            className="inline-flex items-center gap-1.5 h-8 px-2.5 rounded-lg border border-[#E4E8EE] bg-white text-[12px] font-medium text-[#B45309] hover:bg-[#B45309]/[0.06] transition-colors cursor-pointer whitespace-nowrap"
+                          >
+                            <RotateCcw size={12} /> Ask to accept again
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <p className="text-[11.5px] text-[#9CA3AF]">
+            Each acceptance is stored with the document version, a fingerprint of the exact text shown, the IP address, browser and reading time (see Export CSV).
+            When the Evaluator Terms are updated to a new version, every evaluator is asked to accept again; use "Ask to accept again" for a single evaluator.
           </p>
         </>
       )}
@@ -475,10 +571,12 @@ export default function AgreementsPage() {
                 <RotateCcw size={18} className="text-[#B45309]" />
               </div>
               <div className="min-w-0">
-                <h2 id="reaccept-title" className="text-[16px] font-semibold text-[#0E2A5C]">Ask {reaccept.school.name} to accept again?</h2>
+                <h2 id="reaccept-title" className="text-[16px] font-semibold text-[#0E2A5C]">Ask {reaccept.name} to accept again?</h2>
                 <p className="mt-1 text-[13px] leading-relaxed text-[#4B5563]">
                   Their acceptance of {fmt(reaccept.acceptance.acceptedAt)} will be marked as revoked and kept on record.
-                  The agreement screen will show again the next time the school opens the School Panel, and they must accept it again.
+                  {reaccept.kind === 'evaluator'
+                    ? ' The Evaluator Terms screen will show again the next time they open the dashboard, and they must accept it again.'
+                    : ' The agreement screen will show again the next time the school opens the School Panel, and they must accept it again.'}
                 </p>
               </div>
             </div>

@@ -3,6 +3,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { requireModule } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { assignedSchoolIds } from '@/lib/evaluatorRegion';
 
 export async function GET(request: Request) {
   try {
@@ -28,18 +29,12 @@ export async function GET(request: Request) {
       if (moduleCheck.error) return moduleCheck.error;
     }
 
-    // Evaluators can be scoped to specific states by code (see TalentEvaluator
-    // .assignedStates, e.g. ["RJ", "GJ"]). Empty array = unrestricted.
+    // Evaluators only see videos from the schools assigned to them
+    // (Evaluator -> Assign Schools). No schools = empty queue.
     // SuperAdmin/Reviewer always see everything (oversight roles).
-    let regionFilter: string[] | null = null;
+    let schoolFilter: Set<string> | null = null;
     if (payload.role === 'EVALUATOR') {
-      const evaluator = await prisma.talentEvaluator.findUnique({
-        where: { id: payload.id },
-        select: { assignedStates: true },
-      });
-      if (evaluator && evaluator.assignedStates.length > 0) {
-        regionFilter = evaluator.assignedStates;
-      }
+      schoolFilter = new Set(await assignedSchoolIds(payload.id));
     }
 
     const { searchParams } = new URL(request.url);
@@ -54,7 +49,7 @@ export async function GET(request: Request) {
         student: {
           select: {
             id: true, name: true, olympiadCode: true,
-            allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { name: true, stateCode: true } } } },
+            allocation: { select: { classCode: true, className: true, assignedName: true, school: { select: { id: true, name: true } } } },
           },
         },
         evaluations: true,
@@ -78,7 +73,7 @@ export async function GET(request: Request) {
     const allocations = olympiadCodes.length
       ? await prisma.olympiadIdAllocation.findMany({
           where: { code: { in: olympiadCodes } },
-          select: { code: true, classCode: true, className: true, assignedName: true, school: { select: { name: true, stateCode: true } } },
+          select: { code: true, classCode: true, className: true, assignedName: true, school: { select: { id: true, name: true } } },
         })
       : [];
     const allocByCode = new Map(allocations.map(a => [a.code, a]));
@@ -108,7 +103,7 @@ export async function GET(request: Request) {
       olympiadCode: string;
       className: string | null;
       schoolName: string | null;
-      schoolStateCode: string | null;
+      schoolId: string | null;
       slot: number;
       // One evaluation row per video: 5 criteria (0-4 each), one per kosha.
       existingScore: {
@@ -142,13 +137,13 @@ export async function GET(request: Request) {
         const isFullyPublished = !!anyEval?.isPublished;
 
         let studentName = '-', olympiadCode = '-', className: string | null = null, schoolName: string | null = null;
-        let schoolStateCode: string | null = null;
+        let schoolId: string | null = null;
         if (key.startsWith('s:')) {
           studentName = v.student?.allocation?.assignedName || v.student?.name || '-';
           olympiadCode = v.student?.olympiadCode || '-';
           className = v.student?.allocation?.className || v.student?.allocation?.classCode || null;
           schoolName = v.student?.allocation?.school?.name || null;
-          schoolStateCode = v.student?.allocation?.school?.stateCode || null;
+          schoolId = v.student?.allocation?.school?.id || null;
         } else {
           const u = appUserById.get(v.appUserId!);
           const alloc = u?.olympiadId ? allocByCode.get(u.olympiadId) : null;
@@ -156,7 +151,7 @@ export async function GET(request: Request) {
           olympiadCode = u?.olympiadId || '-';
           className = alloc?.className || alloc?.classCode || null;
           schoolName = alloc?.school?.name || null;
-          schoolStateCode = alloc?.school?.stateCode || null;
+          schoolId = alloc?.school?.id || null;
         }
 
         allFormatted.push({
@@ -171,7 +166,7 @@ export async function GET(request: Request) {
           olympiadCode,
           className,
           schoolName,
-          schoolStateCode,
+          schoolId,
           slot,
           existingScore,
           isFullyScored,
@@ -180,8 +175,8 @@ export async function GET(request: Request) {
       });
     }
 
-    const regionScoped = regionFilter
-      ? allFormatted.filter(v => v.schoolStateCode && regionFilter!.includes(v.schoolStateCode))
+    const regionScoped = schoolFilter
+      ? allFormatted.filter(v => v.schoolId && schoolFilter!.has(v.schoolId))
       : allFormatted;
 
     const targetFormatted = targetVideoId ? regionScoped.find(v => v.id === targetVideoId) || null : null;

@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   try {
     const evaluators = await prisma.talentEvaluator.findMany({
       orderBy: { createdAt: 'desc' },
-      select: { id: true, evaluatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true, assignedStates: true },
+      select: { id: true, evaluatorId: true, name: true, email: true, isActive: true, plainPassword: true, createdAt: true, _count: { select: { schools: true } } },
     });
     await recordAccessLog(payload, {
       action: 'CREDENTIALS_VIEWED', entityType: 'TalentEvaluator', subjectIds: evaluators.map((e) => e.id), request,
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
   const { error } = await requireAdmin(request, ['credentials.evaluators', 'evaluator.manage']);
   if (error) return error;
   try {
-    const { name, email, password, assignedStates } = await request.json();
+    const { name, email, password } = await request.json();
     if (!name?.trim() || !email?.trim() || !password?.trim())
       return NextResponse.json({ message: 'name, email and password are required' }, { status: 400 });
     if (password.length < 6)
@@ -53,13 +53,11 @@ export async function POST(request: Request) {
         email: email.trim().toLowerCase(),
         password: hash,
         plainPassword: encryptPassword(password),
-        assignedStates: Array.isArray(assignedStates) ? assignedStates.filter(Boolean) : [],
       },
     });
 
     return NextResponse.json({
       id: evaluator.id, evaluatorId: evaluator.evaluatorId, name: evaluator.name, email: evaluator.email,
-      assignedStates: evaluator.assignedStates,
     }, { status: 201 });
   } catch (e: any) {
     if (e.code === 'P2002') return NextResponse.json({ message: 'Email already registered' }, { status: 409 });

@@ -75,10 +75,15 @@ export default function TermsAcceptanceModal({
     // Content that fits without scrolling counts as read to the end.
     const p = max <= 0 ? 1 : el.scrollTop / max;
     setProgress(Math.min(1, p));
-    if (max <= 24 || el.scrollTop >= max - 24) setScrolledToEnd(true);
+    if (max <= 12 || el.scrollTop >= max - 12) setScrolledToEnd(true);
   }, []);
 
+  // Start locked whenever the popup opens, then measure.
   useEffect(() => {
+    setScrolledToEnd(false);
+    setChecked(false);
+    setProgress(0);
+    scrollRef.current?.scrollTo({ top: 0 });
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
@@ -97,6 +102,7 @@ export default function TermsAcceptanceModal({
   };
 
   const handleAccept = async () => {
+    if (!scrolledToEnd || !checked) return;
     setSubmitting(true);
     setError('');
     try {
@@ -228,7 +234,7 @@ export default function TermsAcceptanceModal({
             </button>
             <button
               type="button"
-              disabled={!checked || submitting}
+              disabled={!scrolledToEnd || !checked || submitting}
               onClick={handleAccept}
               className="inline-flex items-center justify-center gap-2 h-10 px-5 rounded-lg bg-[#052E5C] text-[13.5px] font-semibold text-white shadow-sm hover:bg-[#0A3B73] transition-colors disabled:bg-[#C5CDD8] disabled:text-white disabled:shadow-none disabled:cursor-not-allowed cursor-pointer"
             >
