@@ -1096,11 +1096,27 @@ model HomeSectionVideo {
   // Also shown as a slide in the app's home carousel (while isActive).
   inCarousel   Boolean  @default(false)
   viewsCount   Int      @default(0)
+  likesCount   Int      @default(0)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   reelShares   ReelShare[]
+  likes        HomeSectionVideoLike[]
 
   @@index([section, isActive, order])
+  @@schema("public")
+}
+
+// A user's star on a SuperAdmin Learning / Parenting video (these live in
+// HomeSectionVideo, not Video, so they can't use the Like table).
+model HomeSectionVideoLike {
+  id        String           @id @default(uuid())
+  videoId   String
+  userId    String
+  createdAt DateTime         @default(now())
+  video     HomeSectionVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, userId])
+  @@index([videoId])
   @@schema("public")
 }
 

@@ -35,9 +35,17 @@ export async function GET(request: Request) {
       orderBy: { order: 'asc' },
       select: {
         id: true, section: true, title: true, description: true,
-        videoUrl: true, thumbnailUrl: true, viewsCount: true, inCarousel: true,
+        videoUrl: true, thumbnailUrl: true, viewsCount: true, inCarousel: true, likesCount: true,
       },
     });
+    const myCuratedLikes = rows.length
+      ? await prisma.homeSectionVideoLike.findMany({
+          where: { userId: user.id, videoId: { in: rows.map((r) => r.id) } },
+          select: { videoId: true },
+        })
+      : [];
+    const curatedLikedIds = new Set(myCuratedLikes.map((l) => l.videoId));
+    const curatedRows = rows.map((r) => ({ ...r, isLiked: curatedLikedIds.has(r.id) }));
     let fromUsers: any[] = [];
     if (includeUsers) {
       const visWhere = await visibilityWhere(user.id);
@@ -94,7 +102,7 @@ export async function GET(request: Request) {
         };
       });
     }
-    const all = [...rows, ...fromUsers];
+    const all = [...curatedRows, ...fromUsers];
 
     return NextResponse.json({
       learning: all.filter((r) => r.section === 'LEARNING'),
@@ -102,8 +110,8 @@ export async function GET(request: Request) {
       // Videos the SuperAdmin picked for the home carousel. Learning first,
       // then Parenting, each in its row order. Older app builds ignore this key.
       carousel: [
-        ...rows.filter((r) => r.inCarousel && r.section === 'LEARNING'),
-        ...rows.filter((r) => r.inCarousel && r.section === 'PARENTING'),
+        ...curatedRows.filter((r) => r.inCarousel && r.section === 'LEARNING'),
+        ...curatedRows.filter((r) => r.inCarousel && r.section === 'PARENTING'),
       ],
     });
   } catch (e) {
