@@ -92,7 +92,7 @@ export async function POST(request: Request) {
     if (payload.role === 'EVALUATOR') {
       const canAccess = await evaluatorCanAccessVideo(payload.id, video);
       if (!canAccess) {
-        return NextResponse.json({ message: 'This video is outside your assigned region' }, { status: 403 });
+        return NextResponse.json({ message: 'This video is not from a school assigned to you' }, { status: 403 });
       }
     }
 

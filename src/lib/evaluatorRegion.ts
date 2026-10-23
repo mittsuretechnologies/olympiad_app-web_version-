@@ -1,24 +1,27 @@
 import { prisma } from '@/lib/prisma';
 
-// Returns true if this evaluator is allowed to score the given video, based on
-// their assignedStates (state codes, e.g. ["RJ"]). Empty array = unrestricted.
-// Looks up the video's owner's school state code via Student or AppUser.
-export async function evaluatorCanAccessVideo(evaluatorId: string, video: { studentId: string | null; appUserId: string | null }): Promise<boolean> {
-  const evaluator = await prisma.talentEvaluator.findUnique({
-    where: { id: evaluatorId },
-    select: { assignedStates: true },
+// An evaluator only sees videos from the schools assigned to them (see
+// EvaluatorSchool, managed in Evaluator -> Assign Schools). No assigned
+// schools = no videos.
+export async function assignedSchoolIds(evaluatorId: string): Promise<string[]> {
+  const rows = await prisma.evaluatorSchool.findMany({
+    where: { evaluatorId },
+    select: { schoolId: true },
   });
-  if (!evaluator) return false;
-  if (evaluator.assignedStates.length === 0) return true;
+  return rows.map(r => r.schoolId);
+}
 
-  let stateCode: string | null = null;
+// True if this evaluator may score the given video: the video owner's school
+// (via Student or AppUser -> Olympiad ID allocation) must be one of theirs.
+export async function evaluatorCanAccessVideo(evaluatorId: string, video: { studentId: string | null; appUserId: string | null }): Promise<boolean> {
+  let schoolId: string | null = null;
 
   if (video.studentId) {
     const student = await prisma.student.findUnique({
       where: { id: video.studentId },
-      select: { allocation: { select: { school: { select: { stateCode: true } } } } },
+      select: { allocation: { select: { schoolId: true } } },
     });
-    stateCode = student?.allocation?.school?.stateCode ?? null;
+    schoolId = student?.allocation?.schoolId ?? null;
   } else if (video.appUserId) {
     const appUser = await prisma.appUser.findUnique({
       where: { id: video.appUserId },
@@ -27,11 +30,16 @@ export async function evaluatorCanAccessVideo(evaluatorId: string, video: { stud
     if (appUser?.olympiadId) {
       const allocation = await prisma.olympiadIdAllocation.findUnique({
         where: { code: appUser.olympiadId },
-        select: { school: { select: { stateCode: true } } },
+        select: { schoolId: true },
       });
-      stateCode = allocation?.school?.stateCode ?? null;
+      schoolId = allocation?.schoolId ?? null;
     }
   }
 
-  return !!stateCode && evaluator.assignedStates.includes(stateCode);
+  if (!schoolId) return false;
+  const link = await prisma.evaluatorSchool.findUnique({
+    where: { evaluatorId_schoolId: { evaluatorId, schoolId } },
+    select: { id: true },
+  });
+  return !!link;
 }

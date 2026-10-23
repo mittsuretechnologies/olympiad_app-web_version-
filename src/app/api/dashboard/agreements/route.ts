@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
 import { SCHOOL_AGREEMENT_KEY, SCHOOL_AGREEMENT_VERSION } from '@/lib/agreements/school-onboarding';
+import { EVALUATOR_TERMS_KEY, EVALUATOR_TERMS_VERSION } from '@/lib/evaluatorTerms';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +11,8 @@ export const dynamic = 'force-dynamic';
 // acceptances, per role:
 //   SCHOOL    — School Onboarding Agreement (AgreementAcceptance records)
 //   MODERATOR — first-login Terms & Conditions (Moderator.termsAccepted/At)
-// Query: role (SCHOOL|MODERATOR), status (all|accepted|pending), q, page,
+//   EVALUATOR — Evaluator Terms & Privacy Policy (AgreementAcceptance records)
+// Query: role (SCHOOL|MODERATOR|EVALUATOR), status (all|accepted|pending), q, page,
 //        pageSize, all=1 (no pagination — for CSV export)
 
 type ListParams = { status: string; q: string; all: boolean; page: number; pageSize: number };
@@ -30,6 +32,7 @@ export async function GET(request: Request) {
       pageSize: Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '25', 10))),
     };
     if (role === 'MODERATOR') return NextResponse.json(await moderatorRegister(params));
+    if (role === 'EVALUATOR') return NextResponse.json(await evaluatorRegister(params));
     if (role !== 'SCHOOL') {
       return NextResponse.json({ message: `No agreement is configured for ${role} yet.` }, { status: 400 });
     }
@@ -162,6 +165,57 @@ async function moderatorRegister({ status, q, all, page, pageSize }: ListParams)
       accepted: termsAccepted,
       acceptedAt: termsAcceptedAt,
     })),
+    total: filteredTotal,
+    page: all ? 1 : page,
+    pageSize: all ? filteredTotal : pageSize,
+    totalPages: all ? 1 : Math.max(1, Math.ceil(filteredTotal / pageSize)),
+  };
+}
+
+// Evaluator Terms & Privacy Policy: one AgreementAcceptance per acceptance
+// (version, text hash, IP, browser, reading times). An evaluator counts as
+// accepted only while they hold an unrevoked record for the CURRENT version.
+async function evaluatorRegister({ status, q, all, page, pageSize }: ListParams) {
+  const acceptances = await prisma.agreementAcceptance.findMany({
+    where: { role: 'EVALUATOR', documentKey: EVALUATOR_TERMS_KEY, documentVersion: EVALUATOR_TERMS_VERSION, revokedAt: null },
+    orderBy: { acceptedAt: 'desc' },
+    select: { id: true, actorId: true, acceptedAt: true, documentVersion: true, ipAddress: true, userAgent: true, readCompletedAt: true, documentHash: true },
+  });
+  const byActor = new Map<string, (typeof acceptances)[number]>();
+  for (const a of acceptances) if (!byActor.has(a.actorId)) byActor.set(a.actorId, a);
+  const acceptedIds = [...byActor.keys()];
+
+  const search: Prisma.TalentEvaluatorWhereInput = q
+    ? { OR: [
+        { name: { contains: q, mode: 'insensitive' } },
+        { evaluatorId: { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+      ] }
+    : {};
+  const statusFilter: Prisma.TalentEvaluatorWhereInput =
+    status === 'accepted' ? { id: { in: acceptedIds } }
+    : status === 'pending' ? { id: { notIn: acceptedIds } }
+    : {};
+  const where: Prisma.TalentEvaluatorWhereInput = { AND: [search, statusFilter] };
+
+  const [total, accepted, filteredTotal, evaluators] = await Promise.all([
+    prisma.talentEvaluator.count(),
+    prisma.talentEvaluator.count({ where: { id: { in: acceptedIds } } }),
+    prisma.talentEvaluator.count({ where }),
+    prisma.talentEvaluator.findMany({
+      where,
+      orderBy: { name: 'asc' },
+      ...(all ? {} : { skip: (page - 1) * pageSize, take: pageSize }),
+      select: { id: true, evaluatorId: true, name: true, email: true, isActive: true, createdAt: true },
+    }),
+  ]);
+
+  return {
+    role: 'EVALUATOR',
+    document: 'Evaluator Terms & Privacy Policy',
+    currentVersion: EVALUATOR_TERMS_VERSION,
+    summary: { total, accepted, pending: total - accepted, orphaned: 0 },
+    rows: evaluators.map(evaluator => ({ evaluator, acceptance: byActor.get(evaluator.id) ?? null })),
     total: filteredTotal,
     page: all ? 1 : page,
     pageSize: all ? filteredTotal : pageSize,

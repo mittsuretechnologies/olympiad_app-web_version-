@@ -13,8 +13,6 @@ export async function PATCH(
     const body = await request.json();
     const data: Record<string, any> = {};
     if ('isActive' in body) data.isActive = Boolean(body.isActive);
-    if ('assignedStates' in body) data.assignedStates = Array.isArray(body.assignedStates) ? body.assignedStates.filter(Boolean) : [];
-    if ('assignedDistricts' in body) data.assignedDistricts = Array.isArray(body.assignedDistricts) ? body.assignedDistricts.filter(Boolean) : [];
     if ('name' in body) {
       if (!String(body.name).trim()) return NextResponse.json({ message: 'Name cannot be empty' }, { status: 400 });
       data.name = String(body.name).trim();
@@ -27,7 +25,7 @@ export async function PATCH(
     const updated = await prisma.talentEvaluator.update({
       where: { id },
       data,
-      select: { id: true, name: true, email: true, isActive: true, assignedStates: true, assignedDistricts: true },
+      select: { id: true, name: true, email: true, isActive: true },
     });
     return NextResponse.json(updated);
   } catch (e: any) {

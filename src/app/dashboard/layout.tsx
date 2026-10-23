@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { isTokenExpired, tokenRole } from '@/lib/session-token';
 import { DASHBOARD_TOKEN_KEYS, clearDashboardSession } from '@/lib/swr';
 import TermsAcceptanceModal from '@/components/TermsAcceptanceModal';
+import EvaluatorTermsGate from '@/components/EvaluatorTermsGate';
 import {
   School,
   LogOut,
@@ -223,10 +224,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     router.push('/login');
   };
 
-  const handleAcceptTerms = async () => {
+  // Evaluators send what they accepted (version, declarations, reading times);
+  // moderators send nothing.
+  const handleAcceptTerms = async (acceptance?: object) => {
     const res = await fetch('/api/staff/terms', {
       method: 'POST',
-      headers: termsToken ? { Authorization: `Bearer ${termsToken}` } : {},
+      headers: {
+        ...(termsToken ? { Authorization: `Bearer ${termsToken}` } : {}),
+        ...(acceptance ? { 'Content-Type': 'application/json' } : {}),
+      },
+      ...(acceptance ? { body: JSON.stringify(acceptance) } : {}),
     });
     if (!res.ok) throw new Error('Failed to save acceptance');
     setShowTermsModal(false);
@@ -258,6 +265,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const evaluatorSubItems = [
     { name: 'Manage Evaluators', href: '/dashboard/evaluator/manage',           icon: UserCheck },
+    { name: 'Assign Schools',    href: '/dashboard/evaluator/assign-schools',   icon: Building2 },
     { name: 'Evaluate Content',  href: '/dashboard/evaluator/evaluate-content', icon: Play },
     { name: 'Evaluation History', href: '/dashboard/evaluator/history',          icon: Clock },
   ];
@@ -433,7 +441,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.content', 'evaluator.history'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {evaluatorSubItems.filter((_, i) => canSeeSubItem(['evaluator.manage', 'evaluator.manage', 'evaluator.content', 'evaluator.history'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
@@ -657,7 +665,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </main>
 
       {showTermsModal && (
-        <TermsAcceptanceModal onAccept={handleAcceptTerms} onLogout={handleLogout} />
+        role === 'EVALUATOR'
+          ? <EvaluatorTermsGate onAccept={handleAcceptTerms} onLogout={handleLogout} />
+          : <TermsAcceptanceModal onAccept={handleAcceptTerms} onLogout={handleLogout} />
       )}
     </div>
   );
