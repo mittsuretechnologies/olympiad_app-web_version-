@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { videoPercent, koshScoresFromVideos, koshGrade, koshPercent, KOSH_KEYS, KOSH_MAX_SCORE, REQUIRED_VIDEOS, type CriterionScores } from '@/lib/kosh';
 import { requireModule } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { assignedSchoolIds } from '@/lib/evaluatorRegion';
 
 export async function GET(request: Request) {
   try {
@@ -29,8 +30,14 @@ export async function GET(request: Request) {
       if (moduleCheck.error) return moduleCheck.error;
     }
 
-    // Every evaluator/admin sees the full combined history for every student —
-    // scores from other evaluators on the same student's other video must not be hidden.
+    // Evaluators see only students from their assigned schools (Evaluator -> Assign Schools);
+    // SuperAdmin/Reviewer/MasterAdmin see all. Within those students, scores from other
+    // evaluators on the same student's other video must not be hidden.
+    let schoolFilter: Set<string> | null = null;
+    if (payload.role === 'EVALUATOR') {
+      schoolFilter = new Set(await assignedSchoolIds(payload.id));
+    }
+
     const evaluations = await prisma.videoEvaluation.findMany({
       include: {
         video: {
@@ -38,7 +45,7 @@ export async function GET(request: Request) {
             student: {
               select: {
                 id: true, name: true, olympiadCode: true,
-                allocation: { select: { className: true, classCode: true, assignedName: true, school: { select: { name: true } } } },
+                allocation: { select: { className: true, classCode: true, assignedName: true, school: { select: { id: true, name: true } } } },
               },
             },
           },
@@ -58,7 +65,7 @@ export async function GET(request: Request) {
     const appAllocations = appOlympiadCodes.length
       ? await prisma.olympiadIdAllocation.findMany({
           where: { code: { in: appOlympiadCodes } },
-          select: { code: true, className: true, classCode: true, assignedName: true, school: { select: { name: true } } },
+          select: { code: true, className: true, classCode: true, assignedName: true, school: { select: { id: true, name: true } } },
         })
       : [];
     const allocByCode = new Map(appAllocations.map(a => [a.code, a]));
@@ -144,6 +151,7 @@ export async function GET(request: Request) {
       let olympiadCode: string;
       let className: string | null = null;
       let schoolName: string | null = null;
+      let schoolId: string | null = null;
 
       if (v.studentId && v.student) {
         key = v.studentId;
@@ -151,6 +159,7 @@ export async function GET(request: Request) {
         olympiadCode = v.student.olympiadCode;
         className = v.student.allocation?.className || v.student.allocation?.classCode || null;
         schoolName = v.student.allocation?.school?.name || null;
+        schoolId = v.student.allocation?.school?.id || null;
       } else if (v.appUserId) {
         key = v.appUserId;
         const appUser = appUserById.get(v.appUserId);
@@ -160,9 +169,13 @@ export async function GET(request: Request) {
         olympiadCode = appUser?.olympiadId || '-';
         className = alloc?.className || alloc?.classCode || null;
         schoolName = alloc?.school?.name || null;
+        schoolId = alloc?.school?.id || null;
       } else {
         continue;
       }
+
+      // Evaluators only see students from schools assigned to them.
+      if (schoolFilter && (!schoolId || !schoolFilter.has(schoolId))) continue;
 
       if (!groupMap.has(key)) {
         groupMap.set(key, { studentKey: key, studentName, username, olympiadCode, className, schoolName, videosByVideoId: new Map() });

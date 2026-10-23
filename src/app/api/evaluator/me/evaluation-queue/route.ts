@@ -104,6 +104,7 @@ export async function GET(request: Request) {
       className: string | null;
       schoolName: string | null;
       schoolId: string | null;
+      ownerKey: string;
       slot: number;
       // One evaluation row per video: 5 criteria (0-4 each), one per kosha.
       existingScore: {
@@ -167,6 +168,7 @@ export async function GET(request: Request) {
           className,
           schoolName,
           schoolId,
+          ownerKey: key,
           slot,
           existingScore,
           isFullyScored,
@@ -179,12 +181,27 @@ export async function GET(request: Request) {
       ? allFormatted.filter(v => v.schoolId && schoolFilter!.has(v.schoolId))
       : allFormatted;
 
+    // One entry per student: every student with at least one pending video
+    // (or the requested target) is returned with ALL their videos, so the UI
+    // can show Video 1 and Video 2 side by side inside one student card.
     const targetFormatted = targetVideoId ? regionScoped.find(v => v.id === targetVideoId) || null : null;
-    const restQueue = regionScoped
-      .filter(v => v.id !== targetVideoId && !v.isFullyScored)
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    const pendingOwners = new Map<string, number>(); // ownerKey -> earliest pending createdAt
+    for (const v of regionScoped) {
+      if (v.isFullyScored && v.id !== targetVideoId) continue;
+      const t = new Date(v.createdAt).getTime();
+      const prev = pendingOwners.get(v.ownerKey);
+      if (prev === undefined || t < prev) pendingOwners.set(v.ownerKey, t);
+    }
+    if (targetFormatted) pendingOwners.set(targetFormatted.ownerKey, -Infinity);
 
-    const finalQueue = targetFormatted ? [targetFormatted, ...restQueue] : restQueue;
+    const finalQueue = regionScoped
+      .filter(v => pendingOwners.has(v.ownerKey))
+      .sort((a, b) => {
+        const d = pendingOwners.get(a.ownerKey)! - pendingOwners.get(b.ownerKey)!;
+        if (d !== 0 && !Number.isNaN(d)) return d;
+        if (a.ownerKey !== b.ownerKey) return a.ownerKey < b.ownerKey ? -1 : 1;
+        return a.slot - b.slot;
+      });
 
     return NextResponse.json(finalQueue);
   } catch (error) {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Video as VideoIcon, User, School, CheckCircle, X, Star, Loader2, LayoutGrid } from 'lucide-react';
 import { KOSH_LABELS, KOSH_CRITERIA, criterionRubric, MAX_PER_CRITERION, VIDEO_MAX_SCORE, type CriterionKey } from '@/lib/kosh';
 
@@ -26,6 +26,7 @@ interface QueueVideo {
   className: string | null;
   schoolName: string | null;
   slot: number;
+  ownerKey: string;
   existingScore: ExistingScore | null;
   isFullyScored?: boolean;
   isFullyPublished?: boolean;
@@ -71,7 +72,7 @@ export default function EvaluateContentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [loadError, setLoadError] = useState('');
-  const [columns, setColumns] = useState(3);
+  const [columns, setColumns] = useState(2);
   const [activeColor, setActiveColor] = useState('bg-blue-50');
 
   // Both TalentEvaluator and SuperAdmin accounts can submit scores.
@@ -131,6 +132,19 @@ export default function EvaluateContentPage() {
     setError('');
   };
 
+  // Group the queue into one card per student, with videos placed by slot
+  // (Video 1 left, Video 2 right) regardless of queue order.
+  const students = useMemo(() => {
+    const map = new Map<string, { ownerKey: string; studentName: string; olympiadCode: string; schoolName: string | null; slots: (QueueVideo | undefined)[] }>();
+    for (const v of queue) {
+      if (!map.has(v.ownerKey)) {
+        map.set(v.ownerKey, { ownerKey: v.ownerKey, studentName: v.studentName, olympiadCode: v.olympiadCode, schoolName: v.schoolName, slots: [undefined, undefined] });
+      }
+      map.get(v.ownerKey)!.slots[Math.min(Math.max(v.slot, 0), 1)] = v;
+    }
+    return Array.from(map.values());
+  }, [queue]);
+
   const total = scoreTotal(scores);
   const percent = scorePercent(total);
 
@@ -146,7 +160,10 @@ export default function EvaluateContentPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || 'Failed to submit');
-      setQueue(prev => prev.filter(v => v.id !== active.id));
+      // Keep the video in its student card, now marked as scored.
+      setQueue(prev => prev.map(v => v.id === active.id
+        ? { ...v, isFullyScored: true, existingScore: { ...scores, remarks: remarks || null } }
+        : v));
       setActive(null);
     } catch (e: any) {
       setError(e.message || 'Something went wrong');
@@ -166,6 +183,7 @@ export default function EvaluateContentPage() {
   };
 
   const GRID_COLS_CLASS: Record<number, string> = {
+    1: 'grid-cols-1',
     2: 'grid-cols-1 sm:grid-cols-2',
     3: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
     4: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
@@ -185,7 +203,7 @@ export default function EvaluateContentPage() {
         </div>
         <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-xl p-1">
           <LayoutGrid size={14} className="text-gray-400 ml-1.5" />
-          {[2, 3, 4, 5, 6, 7].map(n => (
+          {[1, 2, 3].map(n => (
             <button
               key={n}
               onClick={() => setColumns(n)}
@@ -223,34 +241,59 @@ export default function EvaluateContentPage() {
         </div>
       ) : (
         <div className={`grid ${GRID_COLS_CLASS[columns]} gap-4`}>
-          {queue.map((v, i) => (
-            <button key={v.id} onClick={() => openVideo(v, CARD_COLORS[i % CARD_COLORS.length])}
-              className="border border-gray-100 rounded-2xl shadow-sm overflow-hidden text-left hover:shadow-md hover:border-[#004f9f]/20 transition-all group">
-              <div className="relative aspect-video bg-gray-900 flex items-center justify-center overflow-hidden">
-                {v.thumbnailUrl ? (
-                  <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <VideoIcon className="w-8 h-8 text-white/40" />
-                )}
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-              </div>
-              <div className={`p-4 ${CARD_COLORS[i % CARD_COLORS.length]}`}>
-                <div className="flex items-center justify-between gap-2">
-                  <p className="text-xs font-bold text-[#004f9f] uppercase tracking-wide truncate">{v.category}</p>
-                  <span className="text-[10px] font-bold bg-white/70 text-gray-600 px-2 py-0.5 rounded-full flex-shrink-0">Video {v.slot + 1}</span>
-                </div>
-                <p className="text-sm text-gray-700 font-semibold truncate mt-0.5">{v.subCategory}</p>
-                <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-400">
-                  <User className="w-3 h-3" /> {v.studentName} · {v.olympiadCode}
-                </div>
-                {v.schoolName && (
-                  <div className="flex items-center gap-1.5 mt-1 text-xs text-gray-400 truncate">
-                    <School className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{v.schoolName}</span>
+          {students.map((s, i) => {
+            const color = CARD_COLORS[i % CARD_COLORS.length];
+            return (
+              <div key={s.ownerKey} className={`border border-gray-100 rounded-2xl shadow-sm overflow-hidden ${color}`}>
+                <div className="px-4 pt-3 pb-2">
+                  <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800 truncate">
+                    <User className="w-3.5 h-3.5 flex-shrink-0 text-[#004f9f]" />
+                    <span className="truncate">{s.studentName}</span>
+                    <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
                   </div>
-                )}
+                  {s.schoolName && (
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-400 truncate">
+                      <School className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{s.schoolName}</span>
+                    </div>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3 p-3 pt-1">
+                  {[0, 1].map(slot => {
+                    const v = s.slots[slot];
+                    if (!v) {
+                      return (
+                        <div key={slot} className="rounded-xl border border-dashed border-gray-300 bg-white/50 aspect-video flex flex-col items-center justify-center text-center p-2">
+                          <VideoIcon className="w-5 h-5 text-gray-300" />
+                          <p className="text-xs font-semibold text-gray-400 mt-1">Video {slot + 1} not uploaded</p>
+                        </div>
+                      );
+                    }
+                    return (
+                      <button key={v.id} onClick={() => openVideo(v, color)}
+                        className="rounded-xl overflow-hidden bg-white text-left hover:shadow-md hover:ring-1 hover:ring-[#004f9f]/30 transition-all group">
+                        <div className="relative aspect-video bg-gray-900 flex items-center justify-center overflow-hidden">
+                          {v.thumbnailUrl ? (
+                            <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <VideoIcon className="w-8 h-8 text-white/40" />
+                          )}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
+                          <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-white/80 text-gray-700 px-2 py-0.5 rounded-full">Video {slot + 1}</span>
+                          <span className={`absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isFullyScored ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {v.isFullyScored ? 'Scored' : 'Pending'}
+                          </span>
+                        </div>
+                        <div className="px-2.5 py-2">
+                          <p className="text-[11px] font-bold text-[#004f9f] uppercase tracking-wide truncate">{v.category}</p>
+                          <p className="text-xs text-gray-700 font-semibold truncate">{v.subCategory}</p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
       )}
 
