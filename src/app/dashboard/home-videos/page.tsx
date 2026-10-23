@@ -41,20 +41,44 @@ function authHeaders(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+// Abort an upload whose bytes stop moving for this long, instead of leaving
+// the progress bar stuck forever.
+const UPLOAD_STALL_MS = 45_000;
+
 /** XMLHttpRequest wrapper — fetch() can't report upload progress. */
 function xhr(
   method: string, url: string, body: XMLHttpRequestBodyInit,
   headers: Record<string, string>, onProgress: (pct: number) => void,
-): Promise<{ status: number; text: string }> {
+): Promise<{ status: number; text: string; stalled?: boolean }> {
   return new Promise((resolve) => {
     const req = new XMLHttpRequest();
+    let stalled = false;
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    // Only watches the sending phase — once every byte is sent the server may
+    // legitimately take a while (e.g. copying a large file on to S3).
+    const arm = () => {
+      clearTimeout(watchdog);
+      watchdog = setTimeout(() => { stalled = true; req.abort(); }, UPLOAD_STALL_MS);
+    };
+    const done = (status: number, text: string) => {
+      clearTimeout(watchdog);
+      resolve({ status, text, stalled });
+    };
     req.open(method, url);
     Object.entries(headers).forEach(([k, v]) => req.setRequestHeader(k, v));
-    req.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100)); };
-    req.onload = () => resolve({ status: req.status, text: req.responseText });
-    // status 0 = the request never got a response (network error, or a CORS
-    // refusal on the direct-to-S3 PUT) — the caller decides whether to fall back.
-    req.onerror = () => resolve({ status: 0, text: '' });
+    req.upload.onprogress = (e) => {
+      arm();
+      if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+    };
+    req.upload.onload = () => clearTimeout(watchdog);
+    req.onload = () => done(req.status, req.responseText);
+    // status 0 = the request never got a response (network error, a CORS
+    // refusal on the direct-to-S3 PUT, or a stall) — the caller decides
+    // whether to fall back.
+    req.onerror = () => done(0, '');
+    req.onabort = () => done(0, '');
+    req.ontimeout = () => done(0, '');
+    arm();
     req.send(body);
   });
 }
@@ -73,14 +97,15 @@ async function uploadVideo(file: File, onProgress: (pct: number) => void): Promi
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...authHeaders() },
     body: JSON.stringify({ ext }),
-  });
+    signal: AbortSignal.timeout(30_000),
+  }).catch(() => { throw new Error('Could not start the upload — the server did not respond'); });
   const presign = await presignRes.json();
   if (!presignRes.ok) throw new Error(presign.message || 'Could not start the upload');
 
   if (presign.mode === 's3') {
     const put = await xhr('PUT', presign.uploadUrl, file, { 'Content-Type': presign.contentType }, onProgress);
     if (put.status >= 200 && put.status < 300) return presign.videoUrl as string;
-    console.warn(`Direct S3 upload failed (status ${put.status}); falling back to server upload.`);
+    console.warn(`Direct S3 upload failed (status ${put.status}${put.stalled ? ', stalled' : ''}); falling back to server upload.`);
     onProgress(0);
   }
 
@@ -92,7 +117,11 @@ async function uploadVideo(file: File, onProgress: (pct: number) => void): Promi
   );
   let data: any = {};
   try { data = JSON.parse(res.text); } catch { /* non-JSON error page */ }
-  if (res.status === 0) throw new Error('Upload failed — check your connection and try again');
+  if (res.status === 0) {
+    throw new Error(res.stalled
+      ? 'Upload stopped making progress — check your connection and try again'
+      : 'Upload failed — check your connection and try again');
+  }
   if (res.status === 413) throw new Error(data.message || 'Video is too large for the server');
   if (res.status < 200 || res.status >= 300) throw new Error(data.message || `Upload failed (${res.status})`);
   return data.videoUrl as string;
