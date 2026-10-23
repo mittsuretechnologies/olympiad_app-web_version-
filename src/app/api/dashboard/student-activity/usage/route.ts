@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
 
 // GET /api/dashboard/student-activity/usage?days=1|7|30|90
+//  or ?from=YYYY-MM-DD&to=YYYY-MM-DD (custom dates, both included, max 366 days)
 // App usage for Reports → User Activity, from AppUsageSession (sent by the
 // app's usage tracker). Days and hours are India time (IST); "1" = today
 // since midnight IST. A session is counted on the day/hour it STARTED.
@@ -10,6 +11,8 @@ import { requireAdmin } from '@/lib/auth-guard';
 
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
 const ALLOWED_DAYS = new Set([1, 7, 30, 90]);
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_CUSTOM_DAYS = 366;
 
 // Midnight IST, `daysBack` days before today.
 function istMidnight(daysBack: number): Date {
@@ -24,10 +27,33 @@ export async function GET(request: Request) {
   const { error } = await requireAdmin(request, 'reports.student-activity');
   if (error) return error;
 
-  const daysParam = Number(new URL(request.url).searchParams.get('days') ?? 7);
-  const days = ALLOWED_DAYS.has(daysParam) ? daysParam : 7;
-  const from = istMidnight(days - 1);
-  const to = new Date(Date.now() + 60_000);
+  const sp = new URL(request.url).searchParams;
+  const fromParam = sp.get('from');
+  const toParam = sp.get('to');
+
+  let days: number;
+  let from: Date;
+  let to: Date;
+  if (fromParam && toParam) {
+    // Custom dates (YYYY-MM-DD, India time): from 00:00 of `from` till the end of `to`.
+    if (!DATE_RE.test(fromParam) || !DATE_RE.test(toParam)) {
+      return NextResponse.json({ message: 'Dates must look like YYYY-MM-DD' }, { status: 400 });
+    }
+    from = new Date(`${fromParam}T00:00:00+05:30`);
+    to = new Date(new Date(`${toParam}T00:00:00+05:30`).getTime() + 86_400_000);
+    days = Math.round((to.getTime() - from.getTime()) / 86_400_000);
+    if (Number.isNaN(days) || days < 1) {
+      return NextResponse.json({ message: '"To" date cannot be before "From" date' }, { status: 400 });
+    }
+    if (days > MAX_CUSTOM_DAYS) {
+      return NextResponse.json({ message: `Please pick at most ${MAX_CUSTOM_DAYS} days` }, { status: 400 });
+    }
+  } else {
+    const daysParam = Number(sp.get('days') ?? 7);
+    days = ALLOWED_DAYS.has(daysParam) ? daysParam : 7;
+    from = istMidnight(days - 1);
+    to = new Date(Date.now() + 60_000);
+  }
 
   try {
     const [totals, daily, hourly, perUser, platforms] = await Promise.all([

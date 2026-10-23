@@ -97,7 +97,24 @@ const hourLabel = (h: number) => `${h % 12 === 0 ? 12 : h % 12} ${h < 12 ? 'AM' 
 const dayLabel = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
 
 type DailyMetric = 'users' | 'minutes' | 'sessions';
-const DAILY_METRICS: [DailyMetric, string][] = [['users', 'Active users'], ['minutes', 'Time in app (min)'], ['sessions', 'Sessions']];
+const DAILY_METRICS: [DailyMetric, string][] = [['users', 'People'], ['minutes', 'Time spent (min)'], ['sessions', 'Times opened']];
+
+// YYYY-MM-DD from a Date, using the browser's local calendar day.
+const ymd = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const parseYmd = (s: string) => new Date(`${s}T00:00:00`);
+const niceDate = (s: string) => parseYmd(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+const addDays = (s: string, n: number) => { const d = parseYmd(s); d.setDate(d.getDate() + n); return ymd(d); };
+
+// Ready-made date shortcuts shown next to the date pickers.
+const QUICK_DATES: [string, () => { from: string; to: string }][] = [
+  ['Yesterday', () => { const y = addDays(ymd(new Date()), -1); return { from: y, to: y }; }],
+  ['This month', () => { const n = new Date(); return { from: ymd(new Date(n.getFullYear(), n.getMonth(), 1)), to: ymd(n) }; }],
+  ['Last month', () => {
+    const n = new Date();
+    return { from: ymd(new Date(n.getFullYear(), n.getMonth() - 1, 1)), to: ymd(new Date(n.getFullYear(), n.getMonth(), 0)) };
+  }],
+];
 
 function StatTile({ icon, label, value, sub }: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
   return (
@@ -126,14 +143,29 @@ export default function StudentActivityPage() {
   const rows = useMemo<ActivityRow[]>(() => (Array.isArray(data) ? data : []), [data]);
 
   const [days, setDays] = useState(7);
-  const { data: usage, isLoading: usageLoading, error: usageError } =
-    useSWR<UsageData>(`/api/dashboard/student-activity/usage?days=${days}`, fetcher);
+  // When set, the chosen dates are used instead of the Today / 7 days buttons.
+  const [custom, setCustom] = useState<{ from: string; to: string } | null>(null);
+  const todayStr = ymd(new Date());
+  const [fromInput, setFromInput] = useState(addDays(todayStr, -6));
+  const [toInput, setToInput] = useState(todayStr);
+  const dateError = fromInput && toInput && fromInput > toInput ? '"To" date must be after "From" date' : '';
+  const applyCustom = (r: { from: string; to: string }) => {
+    setFromInput(r.from); setToInput(r.to); setCustom(r);
+  };
+  const usageUrl = custom
+    ? `/api/dashboard/student-activity/usage?from=${custom.from}&to=${custom.to}`
+    : `/api/dashboard/student-activity/usage?days=${days}`;
+  const { data: usage, isLoading: usageLoading, error: usageError } = useSWR<UsageData>(usageUrl, fetcher);
+  // Number of days being shown (drives whether the day-by-day chart makes sense).
+  const spanDays = custom
+    ? Math.round((parseYmd(custom.to).getTime() - parseYmd(custom.from).getTime()) / 86_400_000) + 1
+    : days;
   const [dailyMetric, setDailyMetric] = useState<DailyMetric>('users');
 
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [filterActivity, setFilterActivity] = useState('All');
-  const [sortBy, setSortBy] = useState('Last active');
+  const [sortBy, setSortBy] = useState('Last login');
 
   const usageByUser = useMemo(
     () => new Map((usage?.users ?? []).map(u => [u.appUserId, u])),
@@ -151,9 +183,9 @@ export default function StudentActivityPage() {
     const list = rows.filter(r => {
       if (filterType === 'Olympiad User' && r.accountKind !== 'OLYMPIAD') return false;
       if (filterType === 'General User'  && r.accountKind !== 'GENERAL')  return false;
-      if (filterActivity === 'Active (24h)' && !isRecentlyActive(r.lastLoginAt)) return false;
+      if (filterActivity === 'Logged in last 24 hours' && !isRecentlyActive(r.lastLoginAt)) return false;
       if (filterActivity === 'Never logged in' && r.lastLoginAt) return false;
-      if (filterActivity === 'Used app in range' && !(r.type === 'APP_USER' && usageByUser.has(r.id))) return false;
+      if (filterActivity === 'Used app in selected dates' &&!(r.type === 'APP_USER' && usageByUser.has(r.id))) return false;
       if (search) {
         const q = search.toLowerCase();
         if (
@@ -165,11 +197,11 @@ export default function StudentActivityPage() {
       }
       return true;
     });
-    if (sortBy === 'Time in app') {
+    if (sortBy === 'Time spent') {
       const t = (r: ActivityRow) => (r.type === 'APP_USER' ? usageByUser.get(r.id)?.activeSeconds ?? -1 : -1);
       return [...list].sort((a, b) => t(b) - t(a));
     }
-    if (sortBy === 'Last in app') {
+    if (sortBy === 'Last used app') {
       const t = (r: ActivityRow) => {
         const u = r.type === 'APP_USER' ? usageByUser.get(r.id) : undefined;
         return u ? new Date(u.lastSeen).getTime() : -1;
@@ -216,12 +248,14 @@ export default function StudentActivityPage() {
     return { states: top(byState), cities: top(byCity) };
   }, [rows, usageByUser]);
 
-  const rangeLabel = RANGES.find(([d]) => d === days)?.[1] ?? `${days} days`;
+  const rangeLabel = custom
+    ? (custom.from === custom.to ? niceDate(custom.from) : `${niceDate(custom.from)} – ${niceDate(custom.to)}`)
+    : RANGES.find(([d]) => d === days)?.[1] ?? `${days} days`;
 
   const exportCSV = () => {
     if (filtered.length === 0) return;
-    const headers = ['#', 'Name', 'Account Type', 'Source', 'Identifier', 'Contact', 'School', 'City', 'State', 'Last Active',
-      `Time in app (${rangeLabel}, min)`, `Sessions (${rangeLabel})`, 'Last in app', 'Registered On'];
+    const headers = ['#', 'Name', 'Account Type', 'Source', 'Identifier', 'Contact', 'School', 'City', 'State', 'Last Login',
+      `Time spent (${rangeLabel}, min)`, `Times opened (${rangeLabel})`, 'Last used app', 'Registered On'];
     const csvRows = filtered.map((r, i) => {
       const u = usageOf(r);
       return [
@@ -254,7 +288,7 @@ export default function StudentActivityPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-medium text-[#004f9f]">User Activity &amp; App Usage</h1>
-          <p className="text-xs text-gray-400 mt-0.5">How long people use the app, when, and from where — plus last-active time for every account</p>
+          <p className="text-xs text-gray-400 mt-0.5">How long people use the app, at what time, and from where — plus when each person last logged in</p>
         </div>
         <button onClick={exportCSV} disabled={filtered.length === 0}
           className="inline-flex items-center gap-2 bg-[#06013E] text-white px-4 py-2.5 text-sm font-semibold hover:bg-[#09025c] transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
@@ -271,42 +305,85 @@ export default function StudentActivityPage() {
           </div>
           <div className="flex border border-gray-200">
             {RANGES.map(([d, label]) => (
-              <button key={d} onClick={() => setDays(d)}
-                className={`px-3 py-1.5 text-xs font-semibold ${days === d ? 'bg-[#06013E] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
+              <button key={d} onClick={() => { setDays(d); setCustom(null); }}
+                className={`px-3 py-1.5 text-xs font-semibold ${!custom && days === d ? 'bg-[#06013E] text-white' : 'text-gray-500 hover:bg-gray-50'}`}>
                 {label}
               </button>
             ))}
           </div>
         </div>
 
+        {/* Pick your own dates */}
+        <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap items-end gap-3">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">From date</label>
+            <input type="date" value={fromInput} max={todayStr} onChange={e => setFromInput(e.target.value)}
+              className="h-9 border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:border-[#06013E]" />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">To date</label>
+            <input type="date" value={toInput} max={todayStr} onChange={e => setToInput(e.target.value)}
+              className="h-9 border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:border-[#06013E]" />
+          </div>
+          <button onClick={() => applyCustom({ from: fromInput, to: toInput })}
+            disabled={!fromInput || !toInput || !!dateError}
+            className="h-9 px-4 bg-[#004f9f] text-white text-xs font-semibold hover:bg-[#003d7c] disabled:opacity-40 disabled:cursor-not-allowed">
+            Show data
+          </button>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[11px] text-gray-400">Quick:</span>
+            {QUICK_DATES.map(([label, get]) => (
+              <button key={label} onClick={() => applyCustom(get())}
+                className="h-7 px-2.5 border border-gray-200 text-[11px] font-semibold text-gray-500 hover:bg-gray-50">
+                {label}
+              </button>
+            ))}
+            {custom && (
+              <>
+                <button onClick={() => applyCustom({ from: addDays(custom.from, -spanDays), to: addDays(custom.to, -spanDays) })}
+                  title="Go to the earlier days"
+                  className="h-7 px-2 border border-gray-200 text-[11px] font-semibold text-gray-500 hover:bg-gray-50">← Earlier</button>
+                <button onClick={() => applyCustom({ from: addDays(custom.from, spanDays), to: addDays(custom.to, spanDays) })}
+                  disabled={custom.to >= todayStr} title="Go to the later days"
+                  className="h-7 px-2 border border-gray-200 text-[11px] font-semibold text-gray-500 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed">Later →</button>
+              </>
+            )}
+          </div>
+          {dateError && <p className="text-xs text-red-500 w-full">{dateError}</p>}
+          <p className="text-xs text-gray-400 w-full">
+            Showing: <span className="font-semibold text-gray-600">{rangeLabel}</span> (India time). Tip: click a bar in "Day-by-day usage" to see only that day.
+          </p>
+        </div>
+
         {usageError ? (
           <p className="px-5 py-10 text-center text-sm text-red-500">Could not load app usage.</p>
         ) : noUsage ? (
           <p className="px-5 py-10 text-center text-sm text-gray-400">
-            No app usage recorded for this period yet. Usage is sent by the app (new build) when it opens and when it goes to the background.
+            Nobody used the app in {rangeLabel}. Try other dates. (Usage is recorded by the new app version when it is opened and when it goes to the background.)
           </p>
         ) : (
           <div className="p-4 sm:p-5 space-y-4">
             {/* Headline numbers */}
             <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
-              <StatTile icon={<Users size={11} />} label="Active users" value={String(totals?.users ?? 0)}
-                sub={`${totals?.accounts ?? 0} logged in · ${totals?.guests ?? 0} guest devices`} />
-              <StatTile icon={<Activity size={11} />} label="Sessions" value={String(totals?.sessions ?? 0)} />
-              <StatTile icon={<Timer size={11} />} label="Total time in app" value={fmtDuration(totals?.activeSeconds ?? 0)}
-                sub={`+ ${fmtDuration(totals?.idleSeconds ?? 0)} idle`} />
-              <StatTile icon={<Clock size={11} />} label="Avg per user" value={fmtDuration((totals?.activeSeconds ?? 0) / Math.max(totals?.users ?? 0, 1))}
-                sub={days > 1 ? `over ${rangeLabel}` : 'today'} />
-              <StatTile icon={<Clock size={11} />} label="Avg session" value={fmtDuration((totals?.activeSeconds ?? 0) / Math.max(totals?.sessions ?? 0, 1))} />
-              <StatTile icon={<TrendingUp size={11} />} label="Peak hour" value={peak ? hourLabel(peak.hour) : '—'}
-                sub={peak ? `${hourLabel(peak.hour)}–${hourLabel((peak.hour + 1) % 24)} · ${peak.users} users` : undefined} />
+              <StatTile icon={<Users size={11} />} label="People who used the app" value={String(totals?.users ?? 0)}
+                sub={`${totals?.accounts ?? 0} logged in · ${totals?.guests ?? 0} without login`} />
+              <StatTile icon={<Activity size={11} />} label="Times app opened" value={String(totals?.sessions ?? 0)}
+                sub="every open = 1 time" />
+              <StatTile icon={<Timer size={11} />} label="Total time spent" value={fmtDuration(totals?.activeSeconds ?? 0)}
+                sub={`+ ${fmtDuration(totals?.idleSeconds ?? 0)} app open but not used`} />
+              <StatTile icon={<Clock size={11} />} label="Avg time per person" value={fmtDuration((totals?.activeSeconds ?? 0) / Math.max(totals?.users ?? 0, 1))}
+                sub={spanDays > 1 ? `in ${rangeLabel}` : rangeLabel} />
+              <StatTile icon={<Clock size={11} />} label="Avg time per open" value={fmtDuration((totals?.activeSeconds ?? 0) / Math.max(totals?.sessions ?? 0, 1))} />
+              <StatTile icon={<TrendingUp size={11} />} label="Busiest time" value={peak ? hourLabel(peak.hour) : '—'}
+                sub={peak ? `${hourLabel(peak.hour)}–${hourLabel((peak.hour + 1) % 24)} · ${peak.users} people` : undefined} />
             </div>
 
-            <div className={`grid grid-cols-1 ${days > 1 ? 'xl:grid-cols-2' : ''} gap-4`}>
-              {/* Daily traffic */}
-              {days > 1 && (
+            <div className={`grid grid-cols-1 ${spanDays > 1 ? 'xl:grid-cols-2' : ''} gap-4`}>
+              {/* Day-by-day usage */}
+              {spanDays > 1 && (
                 <div className="border border-gray-100 p-3">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                    <p className="text-xs font-bold text-gray-600">Daily traffic</p>
+                    <p className="text-xs font-bold text-gray-600">Day-by-day usage <span className="font-normal text-gray-400">— click a bar to see that day</span></p>
                     <div className="flex border border-gray-200">
                       {DAILY_METRICS.map(([k, label]) => (
                         <button key={k} onClick={() => setDailyMetric(k)}
@@ -326,12 +403,16 @@ export default function StudentActivityPage() {
                         content={<ChartTooltip render={(p) => (
                           <>
                             <p className="font-semibold text-gray-800 mb-0.5">{String(p.label)}</p>
-                            <p>{p.users} active users</p>
-                            <p>{fmtDuration(Number(p.activeSeconds))} in app</p>
-                            <p>{p.sessions} sessions</p>
+                            <p>{p.users} people</p>
+                            <p>{fmtDuration(Number(p.activeSeconds))} time spent</p>
+                            <p>{p.sessions} times opened</p>
                           </>
                         )} />} />
-                      <Bar dataKey={dailyMetric} fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={28} />
+                      <Bar dataKey={dailyMetric} fill={BRAND} radius={[4, 4, 0, 0]} maxBarSize={28} cursor="pointer"
+                        onClick={(d: { payload?: { day?: string }; day?: string }) => {
+                          const day = d?.payload?.day ?? d?.day;
+                          if (day) applyCustom({ from: day, to: day });
+                        }} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -340,7 +421,7 @@ export default function StudentActivityPage() {
               {/* Peak hours */}
               <div className="border border-gray-100 p-3">
                 <p className="text-xs font-bold text-gray-600 mb-2">
-                  Peak hours <span className="font-normal text-gray-400">— active users by hour of day (IST){peak ? `, busiest ${hourLabel(peak.hour)}` : ''}</span>
+                  Busy hours <span className="font-normal text-gray-400">— how many people used the app in each hour of the day (India time){peak ? `, busiest ${hourLabel(peak.hour)}` : ''}</span>
                 </p>
                 <ResponsiveContainer width="100%" height={220}>
                   <BarChart data={hourlyData} margin={{ top: 4, right: 4, left: -16, bottom: 0 }}>
@@ -351,9 +432,9 @@ export default function StudentActivityPage() {
                       content={<ChartTooltip render={(p) => (
                         <>
                           <p className="font-semibold text-gray-800 mb-0.5">{hourLabel(Number(p.hour))}–{hourLabel((Number(p.hour) + 1) % 24)}</p>
-                          <p>{p.users} active users</p>
-                          <p>{p.sessions} sessions started</p>
-                          <p>{fmtDuration(Number(p.activeSeconds))} in app</p>
+                          <p>{p.users} people</p>
+                          <p>{p.sessions} times opened</p>
+                          <p>{fmtDuration(Number(p.activeSeconds))} time spent</p>
                         </>
                       )} />} />
                     <Bar dataKey="users" radius={[4, 4, 0, 0]} maxBarSize={18}>
@@ -372,7 +453,7 @@ export default function StudentActivityPage() {
                 <div key={title} className="border border-gray-100">
                   <p className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-600 flex items-center gap-1.5">
                     <MapPin size={12} className="text-gray-400" /> {title}
-                    <span className="font-normal text-gray-400">(logged-in users, by their school)</span>
+                    <span className="font-normal text-gray-400">(logged-in people, as per their school)</span>
                   </p>
                   {list.length === 0 ? (
                     <p className="px-3 py-4 text-xs text-gray-400">No logged-in usage yet.</p>
@@ -380,8 +461,8 @@ export default function StudentActivityPage() {
                     <table className="w-full text-xs">
                       <thead><tr className="text-gray-400 text-[10px] uppercase tracking-wider">
                         <th className="text-left px-3 py-1.5 font-bold">Place</th>
-                        <th className="text-right px-3 py-1.5 font-bold">Users</th>
-                        <th className="text-right px-3 py-1.5 font-bold">Time</th>
+                        <th className="text-right px-3 py-1.5 font-bold">People</th>
+                        <th className="text-right px-3 py-1.5 font-bold">Time spent</th>
                       </tr></thead>
                       <tbody>
                         {list.map(l => (
@@ -398,13 +479,13 @@ export default function StudentActivityPage() {
               ))}
               <div className="border border-gray-100">
                 <p className="px-3 py-2 border-b border-gray-100 text-xs font-bold text-gray-600 flex items-center gap-1.5">
-                  <Smartphone size={12} className="text-gray-400" /> Devices
+                  <Smartphone size={12} className="text-gray-400" /> Phone type
                 </p>
                 <table className="w-full text-xs">
                   <thead><tr className="text-gray-400 text-[10px] uppercase tracking-wider">
-                    <th className="text-left px-3 py-1.5 font-bold">Platform</th>
-                    <th className="text-right px-3 py-1.5 font-bold">Users</th>
-                    <th className="text-right px-3 py-1.5 font-bold">Sessions</th>
+                    <th className="text-left px-3 py-1.5 font-bold">Phone</th>
+                    <th className="text-right px-3 py-1.5 font-bold">People</th>
+                    <th className="text-right px-3 py-1.5 font-bold">Times opened</th>
                   </tr></thead>
                   <tbody>
                     {(usage?.platforms ?? []).map(p => (
@@ -446,13 +527,13 @@ export default function StudentActivityPage() {
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Activity</label>
             <select value={filterActivity} onChange={e => setFilterActivity(e.target.value)} className={sel}>
-              <option>All</option><option>Active (24h)</option><option>Never logged in</option><option>Used app in range</option>
+              <option>All</option><option>Logged in last 24 hours</option><option>Never logged in</option><option>Used app in selected dates</option>
             </select>
           </div>
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sort by</label>
             <select value={sortBy} onChange={e => setSortBy(e.target.value)} className={sel}>
-              <option>Last active</option><option>Time in app</option><option>Last in app</option>
+              <option>Last login</option><option>Time spent</option><option>Last used app</option>
             </select>
           </div>
           <div className="space-y-1 md:col-span-2">
@@ -487,7 +568,7 @@ export default function StudentActivityPage() {
         <div className="flex items-center gap-3 px-6 py-3">
           <Clock size={17} className="text-green-600" />
           <span className="text-2xl font-bold text-green-700">{activeNowCount}</span>
-          <span className="text-sm text-gray-400">Active (24h)</span>
+          <span className="text-sm text-gray-400">Logged in last 24h</span>
         </div>
       </div>
 
@@ -496,7 +577,7 @@ export default function StudentActivityPage() {
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
           <p className="text-sm font-semibold text-gray-600">
             <span className="text-[#004f9f]">{filtered.length}</span> accounts
-            <span className="ml-2 text-xs font-normal text-gray-400">App usage columns cover: {rangeLabel}</span>
+            <span className="ml-2 text-xs font-normal text-gray-400">"Time Spent", "Times Opened" and "Last Used App" are for: {rangeLabel}</span>
           </p>
           {loading && <Loader2 size={14} className="animate-spin text-gray-400" />}
         </div>
@@ -510,10 +591,10 @@ export default function StudentActivityPage() {
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Identifier</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">School</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Contact</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Last Active</th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider">Time in App</th>
-                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider">Sessions</th>
-                <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Last in App</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Last Login</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider">Time Spent</th>
+                <th className="px-4 py-2.5 text-right text-[11px] font-bold uppercase tracking-wider">Times Opened</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Last Used App</th>
               </tr>
             </thead>
             <tbody>
@@ -574,7 +655,7 @@ export default function StudentActivityPage() {
                       {u ? (
                         <>
                           <span className="font-semibold text-[#004f9f]">{fmtDuration(u.activeSeconds)}</span>
-                          <span className="block text-[10px] text-gray-400">avg {fmtDuration(u.activeSeconds / Math.max(u.sessions, 1))} / session</span>
+                          <span className="block text-[10px] text-gray-400">avg {fmtDuration(u.activeSeconds / Math.max(u.sessions, 1))} per open</span>
                         </>
                       ) : <span className="text-gray-300">-</span>}
                     </td>
