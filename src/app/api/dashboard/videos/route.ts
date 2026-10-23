@@ -684,8 +684,54 @@ export async function PATCH(request: Request) {
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
-    const { videoId, tags, caption } = await request.json();
+    const { videoId, tags, caption, visibility, reason } = await request.json();
     if (!videoId) return NextResponse.json({ message: 'videoId required' }, { status: 400 });
+
+    // Visibility override — SUPERADMIN ONLY (not Master Admin, not Moderator).
+    // Flips a video between public and private whatever its status, using the
+    // same field the moderation page's Public/Private badge reads: an Olympiad
+    // video's own olympiadVisibility, any other video's isPublic.
+    if (visibility !== undefined) {
+      if (payload!.role !== 'SUPERADMIN') {
+        return NextResponse.json({ message: "Only a Super Admin can change a video's visibility." }, { status: 403 });
+      }
+      if (visibility !== 'public' && visibility !== 'private') {
+        return NextResponse.json({ message: 'visibility must be "public" or "private"' }, { status: 400 });
+      }
+      const note = typeof reason === 'string' ? reason.trim().replace(/\s+/g, ' ').slice(0, 500) || null : null;
+
+      const current = await prisma.video.findUnique({
+        where: { id: videoId },
+        select: { id: true, isEvaluation: true, isPublic: true, olympiadVisibility: true, deletedAt: true },
+      });
+      if (!current) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+      if (current.deletedAt) return NextResponse.json({ message: 'This video has been deleted.' }, { status: 409 });
+
+      const wasPublic = current.isEvaluation ? current.olympiadVisibility === 'public' : current.isPublic;
+      if (wasPublic === (visibility === 'public')) {
+        return NextResponse.json({ message: `Already ${visibility}`, video: { id: current.id, isPublic: current.isPublic, olympiadVisibility: current.olympiadVisibility } });
+      }
+
+      const video = await prisma.video.update({
+        where: { id: videoId },
+        data: current.isEvaluation ? { olympiadVisibility: visibility } : { isPublic: visibility === 'public' },
+        select: { id: true, isPublic: true, olympiadVisibility: true },
+      });
+
+      await recordAuditLog({
+        actorId: payload!.id,
+        actorRole: payload!.role,
+        actorName: payload!.name || payload!.email || null,
+        action: 'VISIBILITY_CHANGED',
+        entityType: 'Video',
+        entityId: videoId,
+        previousValue: { visibility: wasPublic ? 'public' : 'private', field: current.isEvaluation ? 'olympiadVisibility' : 'isPublic' },
+        newValue: { visibility },
+        reason: note,
+      });
+
+      return NextResponse.json({ message: `Video is now ${visibility}`, video });
+    }
 
     if (caption !== undefined) {
       if (typeof caption !== 'string') return NextResponse.json({ message: 'caption must be a string' }, { status: 400 });

@@ -7,9 +7,15 @@ import {
   type KoshKey, type CriterionScores,
 } from '@/lib/kosh';
 import { getLatestExamResults } from '@/lib/scanner-exam';
+import { normaliseQuery, schoolMatchesQuery, studentMatchesQuery } from '@/lib/resultSearch';
 
 export const dynamic = 'force-dynamic';
 
+// GET /api/result/overview
+//   (no schoolId)  every student — heavy; only the CSV export uses this.
+//   ?schoolId=CODE one school's students only (what the Result page loads when a
+//                  school is opened): its students, videos and exam results,
+//                  optionally narrowed by q (school-or-student search) and status.
 export async function GET(request: Request) {
   const { error } = await requireAdmin(request, 'result');
   if (error) return error;
@@ -20,8 +26,59 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const examSource = url.searchParams.get('examSource') === 'ai' ? 'ai' : 'manual';
 
+    // Scope to one school: everything below then loads only that school's rows.
+    const schoolCode = (url.searchParams.get('schoolId') || '').trim();
+    const q = normaliseQuery(url.searchParams.get('q'));
+    const statusParam = url.searchParams.get('status') === 'Complete' || url.searchParams.get('status') === 'Incomplete'
+      ? url.searchParams.get('status')! : '';
+    let scopeCodes: string[] | null = null;
+    let scopeSchool: { name: string; schoolId: string; city: string | null } | null = null;
+    if (schoolCode) {
+      const school = await prisma.school.findUnique({ where: { schoolId: schoolCode }, select: { id: true, name: true, schoolId: true, city: true } });
+      if (!school) return NextResponse.json([]);
+      scopeSchool = school;
+      const scopeAllocs = await prisma.olympiadIdAllocation.findMany({
+        where: { schoolId: school.id, assignedAt: { not: null } },
+        select: { code: true },
+      });
+      scopeCodes = scopeAllocs.map(a => a.code);
+    }
+
+    // Every AppUser assigned an olympiad code — not just the ones with a
+    // video — so students who only scanned an exam (or haven't done either
+    // round yet) still show up in the table, not just video-submitters.
+    const [allAppUsers, allAllocations, allWebStudents] = await Promise.all([
+      prisma.appUser.findMany({
+        where: { olympiadId: scopeCodes ? { in: scopeCodes } : { not: null } },
+        select: { id: true, userId: true, olympiadId: true, avatarUrl: true },
+      }),
+      prisma.olympiadIdAllocation.findMany({
+        where: scopeCodes ? { code: { in: scopeCodes }, assignedAt: { not: null } } : { assignedAt: { not: null } },
+        select: {
+          code: true, classCode: true, className: true, assignedName: true,
+          school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true, examDate: true } },
+        },
+      }),
+      prisma.student.findMany({
+        where: scopeCodes ? { olympiadCode: { in: scopeCodes } } : undefined,
+        select: {
+          id: true, name: true, olympiadCode: true,
+          allocation: {
+            select: {
+              classCode: true, className: true, assignedName: true,
+              school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true, examDate: true } },
+            },
+          },
+        },
+      }),
+    ]);
+    const allocByCode = new Map(allAllocations.map(a => [a.code, a]));
+
     const allVideos = await prisma.video.findMany({
-      where: { isEvaluation: true, status: 'APPROVED', deletedAt: null },
+      where: {
+        isEvaluation: true, status: 'APPROVED', deletedAt: null,
+        ...(scopeCodes ? { OR: [{ studentId: { in: allWebStudents.map(st => st.id) } }, { appUserId: { in: allAppUsers.map(u => u.id) } }] } : {}),
+      },
       include: {
         student: {
           select: {
@@ -48,34 +105,6 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'asc' },
     });
 
-    // Every AppUser assigned an olympiad code — not just the ones with a
-    // video — so students who only scanned an exam (or haven't done either
-    // round yet) still show up in the table, not just video-submitters.
-    const [allAppUsers, allAllocations, allWebStudents] = await Promise.all([
-      prisma.appUser.findMany({
-        where: { olympiadId: { not: null } },
-        select: { id: true, userId: true, olympiadId: true, avatarUrl: true },
-      }),
-      prisma.olympiadIdAllocation.findMany({
-        where: { assignedAt: { not: null } },
-        select: {
-          code: true, classCode: true, className: true, assignedName: true,
-          school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true, examDate: true } },
-        },
-      }),
-      prisma.student.findMany({
-        select: {
-          id: true, name: true, olympiadCode: true,
-          allocation: {
-            select: {
-              classCode: true, className: true, assignedName: true,
-              school: { select: { id: true, schoolId: true, name: true, city: true, state: true, district: true, examDate: true } },
-            },
-          },
-        },
-      }),
-    ]);
-    const allocByCode = new Map(allAllocations.map(a => [a.code, a]));
 
     type VideoEntry = {
       id: string;
@@ -254,6 +283,15 @@ export async function GET(request: Request) {
       if (a.status !== b.status) return a.status === 'Incomplete' ? -1 : 1;
       return (b.holisticPercent ?? -1) - (a.holisticPercent ?? -1);
     });
+
+    // Opened-school request: the same search/status rules the school list used.
+    if (scopeSchool) {
+      const schoolHit = schoolMatchesQuery(q, scopeSchool);
+      const out = result.filter(r =>
+        (schoolHit || studentMatchesQuery(q, { name: r.name, code: r.olympiadCode })) &&
+        (!statusParam || r.status === statusParam));
+      return NextResponse.json(out);
+    }
 
     return NextResponse.json(result);
   } catch (error: any) {

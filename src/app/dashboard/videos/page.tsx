@@ -203,6 +203,19 @@ function isModerator(): boolean {
   return !!sessionStorage.getItem('moderatorToken') && !sessionStorage.getItem('token');
 }
 
+/** The role in the signed-in token (SUPERADMIN, MASTER_ADMIN, MODERATOR…). */
+function myRole(): string | null {
+  if (typeof window === 'undefined') return null;
+  const token = getDashboardToken();
+  if (!token) return null;
+  try {
+    const part = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(part))?.role ?? null;
+  } catch {
+    return null;
+  }
+}
+
 /** The signed-in staff member's id, read from their token — used to tell
  *  their own review claims apart from other moderators'. */
 function myUserId(): string | null {
@@ -227,6 +240,8 @@ export default function VideoModerationPage() {
   // overrides (enforced by the API too).
   const [canUnapprove] = useState(isSuperAdmin);
   const [canAddTags] = useState(() => !isModerator());
+  // Public/Private override: Super Admin only (the API enforces it too).
+  const [canChangeVisibility] = useState(() => myRole() === 'SUPERADMIN');
   const [myId] = useState(myUserId);
 
   // ── Tab & Filters ─────────────────────────────────────────────────────────
@@ -497,6 +512,31 @@ export default function VideoModerationPage() {
         mutate();
       } else {
         await handleConflict(res, video, 'Failed to move video to Pending');
+      }
+    } finally { setProcessingId(null); }
+  };
+
+  // Super Admin: flip a video between public and private, whatever its status.
+  const changeVisibility = async (video: Video) => {
+    const isPublicNow = video.isEvaluation ? video.olympiadVisibility === 'public' : video.isPublic;
+    const next = isPublicNow ? 'private' : 'public';
+    if (!confirm(next === 'private'
+      ? 'Make this video Private? It will disappear from feeds, search and profiles for everyone except its owner.'
+      : 'Make this video Public? It will show in feeds, search and profiles again (subject to the owner\'s account privacy).')) return;
+    setProcessingId(video.id);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ videoId: video.id, visibility: next }),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok && body?.video) {
+        const patch = { isPublic: body.video.isPublic, olympiadVisibility: body.video.olympiadVisibility };
+        mutate(cur => cur ? { ...cur, videos: cur.videos.map(v => v.id === video.id ? { ...v, ...patch } : v) } : cur, { revalidate: false });
+        setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, ...patch } : cur);
+      } else {
+        alert(body?.message || 'Failed to change visibility');
       }
     } finally { setProcessingId(null); }
   };
@@ -1008,11 +1048,20 @@ export default function VideoModerationPage() {
                         // Olympiad (jury) videos carry their own public/private flag,
                         // independent of the general isPublic feed-visibility field.
                         const isVisPublic = video.isEvaluation ? video.olympiadVisibility !== 'private' : video.isPublic;
-                        return (
-                          <span className={`flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full border ml-auto ${isVisPublic ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-purple-600 bg-purple-50 border-purple-100'}`}>
-                            {isVisPublic ? <Globe size={8} /> : <Lock size={8} />}
-                            {isVisPublic ? 'Public' : 'Private'}
-                          </span>
+                        const badgeClass = `flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full border ml-auto ${isVisPublic ? 'text-emerald-600 bg-emerald-50 border-emerald-100' : 'text-purple-600 bg-purple-50 border-purple-100'}`;
+                        const label = <>{isVisPublic ? <Globe size={8} /> : <Lock size={8} />}{isVisPublic ? 'Public' : 'Private'}</>;
+                        return canChangeVisibility && !video.deletedAt ? (
+                          <button
+                            type="button"
+                            onClick={() => changeVisibility(video)}
+                            disabled={processingId === video.id}
+                            title={isVisPublic ? 'Super Admin: click to make Private' : 'Super Admin: click to make Public'}
+                            className={`${badgeClass} cursor-pointer hover:brightness-95 disabled:opacity-50`}
+                          >
+                            {label} <RotateCcw size={8} className="opacity-60" />
+                          </button>
+                        ) : (
+                          <span className={badgeClass}>{label}</span>
                         );
                       })()}
                     </div>
@@ -1479,6 +1528,16 @@ export default function VideoModerationPage() {
                     <CheckCircle size={14} /> {previewVideo.quality ? 'Save Category' : 'Set Quality & Save'}
                   </button>
                 )}
+                {canChangeVisibility && !previewVideo.deletedAt && (() => {
+                  const pub = previewVideo.isEvaluation ? previewVideo.olympiadVisibility === 'public' : previewVideo.isPublic;
+                  return (
+                    <button onClick={() => changeVisibility(previewVideo)} disabled={processingId === previewVideo.id}
+                      title="Super Admin only"
+                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
+                      {pub ? <Lock size={14} /> : <Globe size={14} />} {pub ? 'Make Private' : 'Make Public'}
+                    </button>
+                  );
+                })()}
                 {filter !== 'PENDING' && canUnapprove && !previewVideo.deletedAt && (
                   <button onClick={() => moveToPending(previewVideo)} disabled={processingId === previewVideo.id || isEvaluated(previewVideo)}
                     title={isEvaluated(previewVideo) ? 'Already evaluated by the jury — cannot be moved back' : 'Move back to Pending for re-review'}

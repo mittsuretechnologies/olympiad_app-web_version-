@@ -1,11 +1,12 @@
 'use client';
 
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import {
   Award, Loader2, Search, Download, ChevronDown, ChevronUp,
   Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock, BookOpen, Star,
+  ChevronRight, ChevronLeft, School, GraduationCap,
 } from 'lucide-react';
 import ResultPassportV2, { type PassportV2Student } from '@/components/ResultPassportV2';
 import { KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, criterionLabel, type CriterionKey } from '@/lib/kosh';
@@ -155,179 +156,16 @@ function gradeBadgeClass(grade: string) {
   return 'bg-amber-50 border-amber-200 text-amber-700';
 }
 
-export default function ResultPage() {
-  // Which set of exam marks drives Holistic %, Kosh Breakdown, and the Exam
-  // column — AI's own grading, or the human reviewer's. Manual matches what
-  // the scanner itself currently reports as the "official" score.
-  const [examSource, setExamSource] = useState<'ai' | 'manual'>('manual');
-  const { data, isLoading: loading } = useSWR<StudentResult[]>(`/api/result/overview?examSource=${examSource}`, fetcher);
-  const rows: StudentResult[] = Array.isArray(data) ? data : [];
-
-  const [search, setSearch] = useState('');
-  const [filterState, setFilterState] = useState('All');
-  const [filterSchool, setFilterSchool] = useState('All');
-  const [filterStatus, setFilterStatus] = useState('All');
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
-  const [passportFor, setPassportFor] = useState<StudentResult | null>(null);
-
-  const states = useMemo(() => ['All', ...Array.from(new Set(rows.map(r => r.state).filter(Boolean) as string[])).sort()], [rows]);
-  const schools = useMemo(() => {
-    const scoped = filterState === 'All' ? rows : rows.filter(r => r.state === filterState);
-    const unique = Array.from(new Map(scoped.map(r => [r.schoolId, r.schoolName])).entries()).filter(([id]) => id)
-      .sort((a, b) => (a[1] || '').localeCompare(b[1] || ''));
-    return [['All', 'All Schools'], ...unique] as [string, string][];
-  }, [rows, filterState]);
-
-  const activeFilterCount = [filterState, filterSchool, filterStatus].filter(v => v !== 'All').length;
-  const clearFilters = () => { setFilterState('All'); setFilterSchool('All'); setFilterStatus('All'); setSearch(''); };
-  const handleStateChange = (value: string) => {
-    setFilterState(value);
-    setFilterSchool('All');
-  };
-
-  const filtered = useMemo(() => {
-    return rows.filter(r => {
-      if (filterState !== 'All' && r.state !== filterState) return false;
-      if (filterSchool !== 'All' && r.schoolId !== filterSchool) return false;
-      if (filterStatus !== 'All' && r.status !== filterStatus) return false;
-      if (search) {
-        const q = search.toLowerCase();
-        return r.name.toLowerCase().includes(q) || r.olympiadCode.toLowerCase().includes(q) || (r.schoolName || '').toLowerCase().includes(q);
-      }
-      return true;
-    });
-  }, [rows, search, filterState, filterSchool, filterStatus]);
-
-  const totalStudents = filtered.length;
-  const totalComplete = filtered.filter(r => r.status === 'Complete').length;
-  const totalIncomplete = totalStudents - totalComplete;
-
-  const downloadCSV = () => {
-    const koshLabels = Array.from(new Set(filtered.flatMap(r => r.koshBreakdown.map(k => k.label))));
-    const header = [
-      'Name', 'Olympiad Code', 'Class', 'School', 'Exam %', 'Video Score',
-      ...koshLabels.flatMap(l => [`${l} Marks`, `${l} Grade`, `${l} Overall %`]),
-      'Holistic %', 'Status',
-    ];
-    const csvRows = filtered.map(r => {
-      const koshByLabel = new Map(r.koshBreakdown.map(k => [k.label, k]));
-      return [
-        r.name, r.olympiadCode, r.className || '-', r.schoolName || '-',
-        r.examPercentage ?? '-', `${r.videoScoreTotal}/${r.videoMaxScore}`,
-        ...koshLabels.flatMap(l => {
-          const k = koshByLabel.get(l);
-          return [
-            k && k.videoScore !== null ? `${k.videoScore}/${k.videoMaxScore}` : '-',
-            k?.grade ?? '-',
-            k?.combinedPercent ?? '-',
-          ];
-        }),
-        r.holisticPercent ?? '-', r.status,
-      ];
-    });
-    const csv = [header, ...csvRows].map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = `holistic-progress-passport-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click(); URL.revokeObjectURL(url);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-[#009846]" />
-          <p className="text-gray-500 font-medium">Loading results…</p>
-        </div>
-      </div>
-    );
-  }
-
+// The student rows (with their expandable detail and passport button) for one class.
+function StudentsTable({
+  list, expandedRow, setExpandedRow, setPassportFor,
+}: {
+  list: StudentResult[];
+  expandedRow: string | null;
+  setExpandedRow: (key: string | null) => void;
+  setPassportFor: (row: StudentResult) => void;
+}) {
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-200">
-            <Award className="text-white" size={22} />
-          </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Holistic Progress Passport</h1>
-            <p className="text-sm text-gray-400">Each kosh's % = average of exam performance and video evaluation, where both exist</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm p-1">
-            <span className="pl-2 pr-1 text-xs font-bold text-gray-400 uppercase tracking-wide">Exam Score:</span>
-            {(['manual', 'ai'] as const).map(s => (
-              <button
-                key={s}
-                onClick={() => setExamSource(s)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                  examSource === s ? 'bg-[#06013E] text-[#F5E9C8] shadow-sm' : 'text-gray-500 hover:bg-gray-50'
-                }`}
-              >
-                {s === 'manual' ? 'Manual' : 'AI'}
-              </button>
-            ))}
-          </div>
-          <button onClick={downloadCSV}
-            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md active:scale-95">
-            <Download size={16} /> Export CSV
-          </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {[
-          { label: 'Total Students', value: totalStudents, icon: <Users size={18} />, color: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-200' },
-          { label: 'Complete',       value: totalComplete, icon: <CheckCircle2 size={18} />, color: 'from-emerald-500 to-green-600', shadow: 'shadow-emerald-200' },
-          { label: 'Incomplete',     value: totalIncomplete, icon: <AlertCircle size={18} />, color: 'from-amber-400 to-orange-500', shadow: 'shadow-amber-200' },
-        ].map(c => (
-          <div key={c.label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${c.color} ${c.shadow} shadow-md flex items-center justify-center text-white`}>{c.icon}</div>
-              <span className="text-xs text-gray-400 font-semibold">{c.label}</span>
-            </div>
-            <p className="text-2xl font-extrabold text-gray-900">{c.value.toLocaleString()}</p>
-          </div>
-        ))}
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter size={16} className="text-gray-400" />
-          <span className="text-sm font-bold text-gray-700">Filters</span>
-          {activeFilterCount > 0 && (
-            <button onClick={clearFilters} className="ml-2 flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700 transition-colors">
-              <X size={14} /> Clear ({activeFilterCount})
-            </button>
-          )}
-        </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="relative col-span-2 md:col-span-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
-            <input type="text" placeholder="Search name/code…" value={search} onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none" />
-          </div>
-          <select value={filterState} onChange={e => handleStateChange(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-amber-300 outline-none">
-            {states.map(s => <option key={s} value={s}>{s === 'All' ? 'All States' : s}</option>)}
-          </select>
-          <select value={filterSchool} onChange={e => setFilterSchool(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-amber-300 outline-none">
-            {schools.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-          </select>
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-amber-300 outline-none">
-            <option value="All">All Status</option>
-            <option value="Complete">Complete</option>
-            <option value="Incomplete">Incomplete</option>
-          </select>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
             <thead>
@@ -346,10 +184,10 @@ export default function ResultPage() {
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 && (
+              {list.length === 0 && (
                 <tr><td colSpan={11} className="py-16 text-center text-gray-400 font-medium">No students found.</td></tr>
               )}
-              {filtered.map((row, idx) => {
+              {list.map((row, idx) => {
                 const isExpanded = expandedRow === row.studentKey;
                 return (
                   <Fragment key={row.studentKey}>
@@ -643,8 +481,410 @@ export default function ResultPage() {
             </tbody>
           </table>
         </div>
-        <div className="px-4 py-3 border-t border-gray-100 bg-gray-50/50 text-xs text-gray-400 font-medium">
-          Showing {filtered.length} of {rows.length} students
+  );
+}
+
+interface ClassGroup { name: string; students: StudentResult[]; complete: number; avg: number | null }
+
+// One row of the school list (the API returns just one page of these).
+interface SchoolSummary {
+  schoolId: string; name: string; city: string | null; district: string | null; state: string | null;
+  students: number; classes: number; complete: number; incomplete: number;
+}
+interface SchoolsResponse {
+  schools: SchoolSummary[]; total: number; page: number; pageSize: number; totalPages: number;
+  totals: { schools: number; students: number; complete: number; incomplete: number };
+  states: string[];
+}
+
+const average = (vals: (number | null)[]) => {
+  const nums = vals.filter((v): v is number => v !== null);
+  return nums.length ? Math.round((nums.reduce((a, b) => a + b, 0) / nums.length) * 10) / 10 : null;
+};
+
+// Classes in natural order (Class 2 before Class 10).
+function groupClasses(list: StudentResult[]): ClassGroup[] {
+  const classes = new Map<string, StudentResult[]>();
+  for (const r of list) {
+    const cn = r.className || 'No class';
+    if (!classes.has(cn)) classes.set(cn, []);
+    classes.get(cn)!.push(r);
+  }
+  return Array.from(classes.entries())
+    .sort((x, y) => x[0].localeCompare(y[0], undefined, { numeric: true, sensitivity: 'base' }))
+    .map(([name, students]) => ({
+      name, students,
+      complete: students.filter(s => s.status === 'Complete').length,
+      avg: average(students.map(s => s.holisticPercent)),
+    }));
+}
+
+function Stat({ label, value, tone = 'text-gray-900' }: { label: string; value: React.ReactNode; tone?: string }) {
+  return (
+    <div className="text-center min-w-[58px]">
+      <p className={`text-base font-black leading-tight ${tone}`}>{value}</p>
+      <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">{label}</p>
+    </div>
+  );
+}
+
+// The classes and students of ONE school. Fetched only when the school is opened,
+// so the page never loads more than the schools you actually look at.
+function SchoolStudents({
+  schoolId, examSource, q, status, expandedRow, setExpandedRow, setPassportFor, openClasses, toggleClass,
+}: {
+  schoolId: string; examSource: 'ai' | 'manual'; q: string; status: string;
+  expandedRow: string | null; setExpandedRow: (key: string | null) => void;
+  setPassportFor: (row: StudentResult) => void;
+  openClasses: Set<string>; toggleClass: (key: string) => void;
+}) {
+  const params = new URLSearchParams({ schoolId, examSource });
+  if (q) params.set('q', q);
+  if (status !== 'All') params.set('status', status);
+  const { data, error, isLoading, mutate } = useSWR<StudentResult[]>(`/api/result/overview?${params}`, fetcher);
+  const classes = useMemo(() => groupClasses(Array.isArray(data) ? data : []), [data]);
+
+  if (isLoading) {
+    return (
+      <div className="border-t border-gray-100 bg-gray-50/50 py-8 flex items-center justify-center gap-2 text-sm text-gray-400 font-medium">
+        <Loader2 className="w-4 h-4 animate-spin text-[#009846]" /> Loading students…
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="border-t border-gray-100 bg-gray-50/50 py-6 text-center text-sm text-red-500 font-medium">
+        Could not load this school.{' '}
+        <button onClick={() => mutate()} className="font-bold underline cursor-pointer">Retry</button>
+      </div>
+    );
+  }
+  if (classes.length === 0) {
+    return <div className="border-t border-gray-100 bg-gray-50/50 py-6 text-center text-sm text-gray-400 font-medium">No students match.</div>;
+  }
+
+  return (
+    <div className="border-t border-gray-100 bg-gray-50/50 p-3 space-y-2">
+      {classes.map(cg => {
+        const ck = `${schoolId}|${cg.name}`;
+        const classOpen = openClasses.has(ck);
+        return (
+          <div key={ck} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => toggleClass(ck)}
+              aria-expanded={classOpen}
+              className={`w-full flex items-center gap-3 px-3.5 py-3 text-left transition-colors cursor-pointer ${classOpen ? 'bg-blue-50/60' : 'hover:bg-gray-50'}`}
+            >
+              <ChevronRight size={16} className={`flex-shrink-0 transition-transform ${classOpen ? 'rotate-90 text-[#004f9f]' : 'text-gray-400'}`} />
+              <div className="w-8 h-8 rounded-lg bg-[#EBF3FC] text-[#004f9f] flex items-center justify-center flex-shrink-0">
+                <GraduationCap size={16} />
+              </div>
+              <p className="font-bold text-gray-800 text-[13px] flex-1 min-w-0 truncate">{cg.name}</p>
+              <div className="flex items-center gap-4 flex-shrink-0">
+                <Stat label="Students" value={cg.students.length} />
+                <span className="hidden sm:block"><Stat label="Complete" value={cg.complete} tone="text-emerald-700" /></span>
+                <span className="hidden sm:block"><Stat label="Incomplete" value={cg.students.length - cg.complete} tone="text-amber-700" /></span>
+                <Stat label="Avg" value={cg.avg !== null ? `${cg.avg}%` : '—'} tone={cg.avg !== null ? percentBandClass(cg.avg) : 'text-gray-400'} />
+              </div>
+            </button>
+            {classOpen && (
+              <div className="border-t border-gray-100">
+                <StudentsTable list={cg.students} expandedRow={expandedRow} setExpandedRow={setExpandedRow} setPassportFor={setPassportFor} />
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function ResultPage() {
+  // Which set of exam marks drives Holistic %, Kosh Breakdown, and the Exam
+  // column — AI's own grading, or the human reviewer's. Manual matches what
+  // the scanner itself currently reports as the "official" score.
+  const [examSource, setExamSource] = useState<'ai' | 'manual'>('manual');
+
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [filterState, setFilterState] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [expandedRow, setExpandedRow] = useState<string | null>(null);
+  const [passportFor, setPassportFor] = useState<StudentResult | null>(null);
+  const [openSchools, setOpenSchools] = useState<Set<string>>(new Set());
+  const [openClasses, setOpenClasses] = useState<Set<string>>(new Set());
+  const [exporting, setExporting] = useState(false);
+  const toggleIn = (setter: React.Dispatch<React.SetStateAction<Set<string>>>, key: string) =>
+    setter(prev => { const next = new Set(prev); if (next.has(key)) next.delete(key); else next.add(key); return next; });
+
+  // Search is sent to the server, so wait for a pause in typing.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 350);
+    return () => clearTimeout(t);
+  }, [search]);
+  // Back to page 1 whenever the list itself changes.
+  useEffect(() => { setPage(1); }, [debouncedSearch, filterState, filterStatus, pageSize]);
+
+  // ONE page of schools per request — the server does the filtering and counting.
+  const listParams = new URLSearchParams({ page: String(page), pageSize: String(pageSize) });
+  if (debouncedSearch) listParams.set('q', debouncedSearch);
+  if (filterState !== 'All') listParams.set('state', filterState);
+  if (filterStatus !== 'All') listParams.set('status', filterStatus);
+  const { data, error, isLoading: loading, isValidating } = useSWR<SchoolsResponse>(
+    `/api/result/overview/schools?${listParams}`, fetcher, { keepPreviousData: true },
+  );
+
+  const states = useMemo(() => ['All', ...(data?.states ?? [])], [data?.states]);
+  const schools = data?.schools ?? [];
+  const totals = data?.totals ?? { schools: 0, students: 0, complete: 0, incomplete: 0 };
+  const totalPages = data?.totalPages ?? 1;
+  const safePage = Math.min(page, totalPages);
+
+  const activeFilterCount = [filterState, filterStatus].filter(v => v !== 'All').length;
+  const clearFilters = () => { setFilterState('All'); setFilterStatus('All'); setSearch(''); };
+
+  const pageNumbers = useMemo(() => {
+    const nums: (number | '…')[] = [];
+    for (let n = 1; n <= totalPages; n++) {
+      if (n === 1 || n === totalPages || Math.abs(n - safePage) <= 1) nums.push(n);
+      else if (nums[nums.length - 1] !== '…') nums.push('…');
+    }
+    return nums;
+  }, [totalPages, safePage]);
+
+  // The CSV is the one place that still needs every student, so it loads them on click
+  // (the page itself never does) and applies the same filters on this side.
+  const downloadCSV = async () => {
+    setExporting(true);
+    try {
+      const all: StudentResult[] = await fetcher(`/api/result/overview?examSource=${examSource}`);
+      const filtered = all.filter(r => {
+        if (filterState !== 'All' && r.state !== filterState) return false;
+        if (filterStatus !== 'All' && r.status !== filterStatus) return false;
+        if (debouncedSearch) {
+          return r.name.toLowerCase().includes(debouncedSearch) || r.olympiadCode.toLowerCase().includes(debouncedSearch)
+            || (r.schoolName || '').toLowerCase().includes(debouncedSearch);
+        }
+        return true;
+      });
+      const koshLabels = Array.from(new Set(filtered.flatMap(r => r.koshBreakdown.map(k => k.label))));
+      const header = [
+        'Name', 'Olympiad Code', 'Class', 'School', 'Exam %', 'Video Score',
+        ...koshLabels.flatMap(l => [`${l} Marks`, `${l} Grade`, `${l} Overall %`]),
+        'Holistic %', 'Status',
+      ];
+      const csvRows = filtered.map(r => {
+        const koshByLabel = new Map(r.koshBreakdown.map(k => [k.label, k]));
+        return [
+          r.name, r.olympiadCode, r.className || '-', r.schoolName || '-',
+          r.examPercentage ?? '-', `${r.videoScoreTotal}/${r.videoMaxScore}`,
+          ...koshLabels.flatMap(l => {
+            const k = koshByLabel.get(l);
+            return [
+              k && k.videoScore !== null ? `${k.videoScore}/${k.videoMaxScore}` : '-',
+              k?.grade ?? '-',
+              k?.combinedPercent ?? '-',
+            ];
+          }),
+          r.holisticPercent ?? '-', r.status,
+        ];
+      });
+      const csv = [header, ...csvRows].map(row => row.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `holistic-progress-passport-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+    } catch {
+      alert('Export failed. Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-10 h-10 animate-spin text-[#009846]" />
+          <p className="text-gray-500 font-medium">Loading schools…</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 pb-8">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-200">
+            <Award className="text-white" size={22} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-extrabold text-gray-900">Holistic Progress Passport</h1>
+            <p className="text-sm text-gray-400">Each kosh's % = average of exam performance and video evaluation, where both exist</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm p-1">
+            <span className="pl-2 pr-1 text-xs font-bold text-gray-400 uppercase tracking-wide">Exam Score:</span>
+            {(['manual', 'ai'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setExamSource(s)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  examSource === s ? 'bg-[#06013E] text-[#F5E9C8] shadow-sm' : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {s === 'manual' ? 'Manual' : 'AI'}
+              </button>
+            ))}
+          </div>
+          <button onClick={downloadCSV} disabled={exporting}
+            className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md active:scale-95 disabled:opacity-60">
+            {exporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />} Export CSV
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: 'Schools', value: totals.schools, icon: <School size={18} />, color: 'from-violet-500 to-purple-600', shadow: 'shadow-violet-200' },
+          { label: 'Total Students', value: totals.students, icon: <Users size={18} />, color: 'from-blue-500 to-indigo-600', shadow: 'shadow-blue-200' },
+          { label: 'Complete',       value: totals.complete, icon: <CheckCircle2 size={18} />, color: 'from-emerald-500 to-green-600', shadow: 'shadow-emerald-200' },
+          { label: 'Incomplete',     value: totals.incomplete, icon: <AlertCircle size={18} />, color: 'from-amber-400 to-orange-500', shadow: 'shadow-amber-200' },
+        ].map(c => (
+          <div key={c.label} className="bg-white rounded-2xl border border-gray-100 p-4 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-center gap-2 mb-2">
+              <div className={`w-8 h-8 rounded-xl bg-gradient-to-br ${c.color} ${c.shadow} shadow-md flex items-center justify-center text-white`}>{c.icon}</div>
+              <span className="text-xs text-gray-400 font-semibold">{c.label}</span>
+            </div>
+            <p className="text-2xl font-extrabold text-gray-900">{c.value.toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={16} className="text-gray-400" />
+          <span className="text-sm font-bold text-gray-700">Filters</span>
+          {isValidating && <Loader2 size={14} className="animate-spin text-gray-300" />}
+          {activeFilterCount > 0 && (
+            <button onClick={clearFilters} className="ml-2 flex items-center gap-1 text-xs font-bold text-red-500 hover:text-red-700 transition-colors">
+              <X size={14} /> Clear ({activeFilterCount})
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+          <div className="relative col-span-2 md:col-span-1">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-300" />
+            <input type="text" placeholder="Search school, student name or code…" value={search} onChange={e => setSearch(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none" />
+          </div>
+          <select value={filterState} onChange={e => setFilterState(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-amber-300 outline-none">
+            {states.map(s => <option key={s} value={s}>{s === 'All' ? 'All States' : s}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
+            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-amber-300 outline-none">
+            <option value="All">All Status</option>
+            <option value="Complete">Complete</option>
+            <option value="Incomplete">Incomplete</option>
+          </select>
+        </div>
+      </div>
+
+      <div className={`space-y-3 transition-opacity ${isValidating ? 'opacity-70' : ''}`}>
+        {error && (
+          <div className="bg-white rounded-2xl border border-red-100 shadow-sm py-10 text-center text-red-500 font-medium">Could not load schools. Please refresh.</div>
+        )}
+        {!error && schools.length === 0 && (
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm py-16 text-center text-gray-400 font-medium">No schools found.</div>
+        )}
+        {schools.map(sc => {
+          const schoolOpen = openSchools.has(sc.schoolId);
+          return (
+            <div key={sc.schoolId} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleIn(setOpenSchools, sc.schoolId)}
+                aria-expanded={schoolOpen}
+                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors cursor-pointer ${schoolOpen ? 'bg-amber-50/60' : 'hover:bg-gray-50'}`}
+              >
+                <ChevronRight size={18} className={`flex-shrink-0 transition-transform ${schoolOpen ? 'rotate-90 text-amber-500' : 'text-gray-400'}`} />
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-200">
+                  <School size={18} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="font-extrabold text-gray-900 text-[14px] truncate">{sc.name}</p>
+                  <p className="text-[11px] text-gray-400 font-medium truncate">
+                    {[sc.schoolId, sc.city, sc.district, sc.state].filter(Boolean).join(' · ') || '—'}
+                  </p>
+                  <p className="sm:hidden mt-0.5 text-[11px] font-semibold text-gray-500">
+                    {sc.classes} classes · {sc.students} students · {sc.complete} complete
+                  </p>
+                </div>
+                <div className="hidden sm:flex items-center gap-4 flex-shrink-0">
+                  <Stat label="Classes" value={sc.classes} />
+                  <Stat label="Students" value={sc.students} />
+                  <Stat label="Complete" value={sc.complete} tone="text-emerald-700" />
+                  <Stat label="Incomplete" value={sc.incomplete} tone="text-amber-700" />
+                </div>
+              </button>
+
+              {schoolOpen && (
+                <SchoolStudents
+                  schoolId={sc.schoolId}
+                  examSource={examSource}
+                  q={debouncedSearch}
+                  status={filterStatus}
+                  expandedRow={expandedRow}
+                  setExpandedRow={setExpandedRow}
+                  setPassportFor={setPassportFor}
+                  openClasses={openClasses}
+                  toggleClass={key => toggleIn(setOpenClasses, key)}
+                />
+              )}
+            </div>
+          );
+        })}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-1">
+          <p className="text-xs text-gray-400 font-medium">
+            Schools {schools.length === 0 ? 0 : (safePage - 1) * pageSize + 1}–{(safePage - 1) * pageSize + schools.length} of {(data?.total ?? 0).toLocaleString()}
+            {' · '}{totals.students.toLocaleString()} students
+          </p>
+          {schools.length > 0 && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="flex items-center gap-1.5 text-xs text-gray-500 font-semibold">
+                Per page
+                <select value={pageSize} onChange={e => setPageSize(Number(e.target.value))}
+                  className="px-2 py-1 rounded-lg border border-gray-200 text-xs text-gray-700 bg-white outline-none focus:ring-2 focus:ring-amber-300">
+                  {[10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+              </label>
+              <nav aria-label="School pages" className="flex items-center gap-1">
+                <button onClick={() => setPage(safePage - 1)} disabled={safePage <= 1} aria-label="Previous page"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                  <ChevronLeft size={15} />
+                </button>
+                {pageNumbers.map((n, i) => n === '…' ? (
+                  <span key={`gap-${i}`} className="px-1 text-xs text-gray-400">…</span>
+                ) : (
+                  <button key={n} onClick={() => setPage(n)} aria-current={n === safePage ? 'page' : undefined}
+                    className={`min-w-8 h-8 px-2 rounded-lg border text-xs font-bold cursor-pointer ${n === safePage ? 'bg-[#06013E] text-[#F5E9C8] border-[#06013E]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'}`}>
+                    {n}
+                  </button>
+                ))}
+                <button onClick={() => setPage(safePage + 1)} disabled={safePage >= totalPages} aria-label="Next page"
+                  className="w-8 h-8 flex items-center justify-center rounded-lg border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer">
+                  <ChevronRight size={15} />
+                </button>
+              </nav>
+            </div>
+          )}
         </div>
       </div>
 
