@@ -34,9 +34,21 @@ export async function GET(
       where:  { id, deletedAt: null },
       select: { id: true },
     });
-    if (!video) return NextResponse.json({ error: 'Video not found' }, { status: 404 });
+    // A SuperAdmin Learning / Parenting video keeps its stars in its own table.
+    const curated = video ? null : await prisma.homeSectionVideo.findUnique({ where: { id }, select: { id: true } });
+    if (!video && !curated) return NextResponse.json({ error: 'Video not found' }, { status: 404 });
 
-    const likesRaw = await prisma.like.findMany({
+    const likeArgs = {
+      where:   { videoId: id },
+      select:  { id: true, userId: true, createdAt: true },
+      orderBy: { createdAt: 'desc' as const },
+      take:    limit + 1,
+      cursor:  cursor ? { id: cursor } : undefined,
+      skip:    cursor ? 1 : 0,
+    };
+    const likesRaw = curated
+      ? await prisma.homeSectionVideoLike.findMany(likeArgs)
+      : await prisma.like.findMany({
       where:   { videoId: id },
       select:  { id: true, userId: true, createdAt: true },
       orderBy: { createdAt: 'desc' },

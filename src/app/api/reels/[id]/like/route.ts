@@ -39,7 +39,29 @@ export async function POST(
       select: { id: true, likesCount: true, appUserId: true },
     });
     if (!video) {
-      return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+      // Not a user video: it may be a SuperAdmin Learning / Parenting video.
+      const curated = await prisma.homeSectionVideo.findFirst({
+        where: { id: videoId, isActive: true },
+        select: { id: true },
+      });
+      if (!curated) {
+        return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+      }
+      const key = { videoId_userId: { videoId, userId } };
+      const had = await prisma.homeSectionVideoLike.findUnique({ where: key });
+      if (had) {
+        await prisma.$transaction([
+          prisma.homeSectionVideoLike.delete({ where: key }),
+          prisma.homeSectionVideo.update({ where: { id: videoId }, data: { likesCount: { decrement: 1 } } }),
+        ]);
+      } else {
+        await prisma.$transaction([
+          prisma.homeSectionVideoLike.create({ data: { videoId, userId } }),
+          prisma.homeSectionVideo.update({ where: { id: videoId }, data: { likesCount: { increment: 1 } } }),
+        ]);
+      }
+      const after = await prisma.homeSectionVideo.findUnique({ where: { id: videoId }, select: { likesCount: true } });
+      return NextResponse.json({ liked: !had, likesCount: Math.max(0, after?.likesCount ?? 0) });
     }
 
     // Check if already liked
