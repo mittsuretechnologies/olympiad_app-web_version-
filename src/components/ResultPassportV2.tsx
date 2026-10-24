@@ -152,20 +152,6 @@ function developmentStage(cls: string | null): string | null {
   return `${cls}/${stage} Stage`;
 }
 
-// No date of birth is collected anywhere, so the passport shows the age band
-// the student's class corresponds to under NEP 2020 / ECCE norms (Nursery 3+,
-// LKG 4+, UKG 5+, Class 1 at 6+) rather than leaving the field blank.
-function ageFromClass(cls: string | null): string | null {
-  if (!cls) return null;
-  const c = cls.trim().toLowerCase();
-  if (/play|^pg$|pre-?nursery/.test(c)) return '2–3 Years';
-  if (/nursery/.test(c)) return '3–4 Years';
-  if (/lkg|lower|kg ?1|junior kg/.test(c)) return '4–5 Years';
-  if (/ukg|upper|kg ?2|senior kg/.test(c)) return '5–6 Years';
-  const n = Number(c.match(/\d+/)?.[0]);
-  return n ? `${n + 5}–${n + 6} Years` : null;
-}
-
 const formatAssessmentDate = (iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }) : null;
 
@@ -233,10 +219,14 @@ function PageNo({ n }: { n: number }) {
 
 /* ── Pages ──────────────────────────────────────────────────── */
 
+// p02 artwork is 1118px wide; the Age row sits 117px between the Name and
+// Development Stage dividers, which is how far the lower rows move up.
+const K = PW / 1118;
+const AGE_ROW_SHIFT = 117 * K;
+
 function IdCardPage({ s }: { s: PassportV2Student }) {
   const values: [number, string][] = [
     [165.5, s.name.toUpperCase()],
-    [203.75, ageFromClass(s.className) || '—'],
     [242.25, developmentStage(s.className) || '—'],
     [282.5, s.schoolName || '—'],
     [324.25, s.olympiadCode],
@@ -257,8 +247,16 @@ function IdCardPage({ s }: { s: PassportV2Student }) {
           <span style={{ fontFamily: COND, fontWeight: 700, fontSize: 34, color: NAVY, opacity: 0.55 }}>{initials}</span>
         )}
       </div>
+      {/* The Age row is baked into the page artwork: blank it and its follow-on rows,
+          then redraw those rows from the artwork shifted up into the gap. */}
+      <div className="absolute" style={{ left: 470 * K, top: 522 * K, width: 470 * K, height: 703 * K, background: '#F6EBD1' }} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/passport/p02.webp" alt="" draggable={false} className="absolute select-none" style={{
+        left: 0, top: 0, width: PW, height: PH, transform: `translateY(${-AGE_ROW_SHIFT}px)`,
+        clipPath: `inset(${640 * K}px ${PW - 940 * K}px ${PH - 1225 * K}px ${470 * K}px)`,
+      }} />
       {values.map(([y, v], i) => (
-        <Txt key={i} x={198} y={y} size={11.6} family={COND} weight={700} max={142}>{v}</Txt>
+        <Txt key={i} x={198} y={i === 0 ? y : y - AGE_ROW_SHIFT} size={11.6} family={COND} weight={700} max={142}>{v}</Txt>
       ))}
     </Canvas>
   );
@@ -310,6 +308,33 @@ function WrittenRoundPage({ questions, part, pageNo }: { questions: PassportExam
   );
 }
 
+// "Lights, Camera, Action!" and Binku are part of the p06 artwork and crowd the
+// video lines, so redraw that artwork smaller: blank the original, then paint a
+// scaled, clipped copy of the page anchored at its top-right corner.
+// Numbers below are pixels of the 1118px-wide artwork, converted to points.
+function BinkuSmaller() {
+  const k = PW / 1118;
+  const SCALE = 0.72;
+  const [ax, ay] = [1078 * k, 60 * k];
+  const box = (x1: number, y1: number, x2: number, y2: number, background: string) => (
+    <div className="absolute" style={{ left: x1 * k, top: y1 * k, width: (x2 - x1) * k, height: (y2 - y1) * k, background }} />
+  );
+  const clip = [[560, 182], [850, 182], [850, 60], [1078, 60], [1078, 445], [560, 445]]
+    .map(([x, y]) => `${x * k}px ${y * k}px`).join(', ');
+  return (
+    <>
+      {box(850, 60, 1078, 445, '#F6EBD1')}
+      {box(560, 182, 850, 445, '#F6EBD1')}
+      {box(850, 90, 935, 178, '#9A8450')}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/passport/p06.webp" alt="" draggable={false} className="absolute select-none" style={{
+        left: 0, top: 0, width: PW, height: PH,
+        transformOrigin: `${ax}px ${ay}px`, transform: `translateY(${45 * k}px) scale(${SCALE})`, clipPath: `polygon(${clip})`,
+      }} />
+    </>
+  );
+}
+
 function TalentRoundPage({ s, pageNo, level }: { s: PassportV2Student; pageNo: number; level: Grade | null }) {
   const videos = [...s.videos].sort((a, b) => a.slot - b.slot).slice(0, 2);
   const lines = geometry.talent.rowLines;
@@ -318,6 +343,7 @@ function TalentRoundPage({ s, pageNo, level }: { s: PassportV2Student; pageNo: n
   const order = ['ANNAMAYA', 'PRANAMAYA', 'MANOMAYA', 'VIJNANAMAYA', 'ANANDAMAYA'];
   return (
     <Canvas bg="p06">
+      <BinkuSmaller />
       {[0, 1].map(i => (
         <Txt key={i} x={59.5} y={i === 0 ? 94.5 : 130.5} size={12.3} weight={500} max={150}>
           Video {i + 1}: {videos[i] ? (videos[i].category || videos[i].subCategory || 'Talent Performance') : 'Not submitted'}

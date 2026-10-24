@@ -6,10 +6,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import {
   LogOut, Contact, LayoutDashboard, Users, School, UploadCloud, Clapperboard, Menu, X,
-  ClipboardList, UserCheck, LifeBuoy, BarChart3, type LucideIcon,
+  ClipboardList, UserCheck, LifeBuoy, BarChart3, Award, type LucideIcon,
 } from 'lucide-react';
 import { initialsOf } from './ui';
 import { jakarta } from './fonts';
+// import NotificationBell from './NotificationBell';
 
 /**
  * School Panel frame: a light sidebar grouped by task, a slim top bar with
@@ -30,6 +31,7 @@ const NAV: { label?: string; items: NavItem[] }[] = [
       { name: 'My Students', href: '/school/registered-students', icon: Users },
       { name: 'Student Requests', href: '/school/student-requests', icon: UserCheck },
       { name: 'Student Report', href: '/school/reports', icon: ClipboardList },
+      { name: 'Student Passports', href: '/school/passports', icon: Award },
     ],
   },
   {
@@ -112,9 +114,12 @@ export default function SchoolShell({
           <Image src="/mittmee-icon.jpeg" alt="" width={26} height={26} className="rounded-md" priority />
           <Wordmark size={15} />
         </div>
-        <span className="ml-auto flex h-8 w-8 items-center justify-center rounded-full bg-[#0B1B33] text-[11px] font-semibold text-white">
-          {initials}
-        </span>
+        <div className="ml-auto flex items-center gap-2">
+          {/* <NotificationBell /> */}
+          <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0B1B33] text-[11px] font-semibold text-white">
+            {initials}
+          </span>
+        </div>
       </header>
 
       {/* Drawer backdrop */}
@@ -212,6 +217,10 @@ export default function SchoolShell({
 
       {/* Main */}
       <div className="min-h-screen pt-14 lg:ml-[256px] lg:pt-0">
+        {/* Desktop top bar: just the bell, right-aligned (mobile has it in the header) */}
+        <div className="mx-auto hidden max-w-[1440px] justify-end px-6 pt-3 lg:flex">
+          {/* <NotificationBell /> */}
+        </div>
         <main className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-5">{children}</main>
       </div>
     </div>

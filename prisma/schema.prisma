@@ -81,6 +81,8 @@ model School {
   appAccount    AppUser?
   supportTickets SchoolSupportTicket[]
   evaluatorAssignments EvaluatorSchool[]
+  passportRelease PassportRelease?
+  notifications SchoolNotification[]
 
   @@schema("public")
 }
@@ -1216,5 +1218,42 @@ model SchoolSupportMessage {
   ticket      SchoolSupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
 
   @@index([ticketId, createdAt])
+  @@schema("public")
+}
+
+// SuperAdmin releasing a school's students' Holistic Progress Passports to the
+// school. One row per school; the row existing means "released" (deleting it
+// withdraws them). The school's "Student Passports" page shows nothing until then.
+model PassportRelease {
+  id         String   @id @default(uuid())
+  schoolId   String   @unique
+  school     School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  releasedAt DateTime @default(now())
+  releasedBy String?
+
+  @@schema("public")
+}
+
+// A message in a school's School Panel bell: written by the system (passports
+// released, new Olympiad IDs) or sent by SuperAdmin. One row per school, so a
+// broadcast is one row for each school it reached and each school's read state
+// is its own.
+model SchoolNotification {
+  id        String    @id @default(uuid())
+  schoolId  String
+  school    School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  // PASSPORTS_RELEASED | OLYMPIAD_IDS_ADDED | ANNOUNCEMENT
+  type      String
+  title     String
+  message   String
+  // Page inside the School Panel the notification opens, e.g. "/school/passports".
+  link      String?
+  readAt    DateTime?
+  // SuperAdmin/MasterAdmin id for ANNOUNCEMENT; null for system notifications.
+  createdBy String?
+  createdAt DateTime  @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([schoolId, readAt])
   @@schema("public")
 }

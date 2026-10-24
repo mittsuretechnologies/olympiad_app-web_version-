@@ -2,11 +2,11 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { fetcher, authFetch } from '@/lib/swr';
 import {
   Award, Loader2, Search, Download, ChevronDown, ChevronUp,
   Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock, BookOpen, Star,
-  ChevronRight, ChevronLeft, School, GraduationCap,
+  ChevronRight, ChevronLeft, School, GraduationCap, Send, Undo2,
 } from 'lucide-react';
 import ResultPassportV2, { type PassportV2Student } from '@/components/ResultPassportV2';
 import { KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, criterionLabel, type CriterionKey } from '@/lib/kosh';
@@ -490,6 +490,7 @@ interface ClassGroup { name: string; students: StudentResult[]; complete: number
 interface SchoolSummary {
   schoolId: string; name: string; city: string | null; district: string | null; state: string | null;
   students: number; classes: number; complete: number; incomplete: number;
+  passportReleasedAt: string | null;
 }
 interface SchoolsResponse {
   schools: SchoolSummary[]; total: number; page: number; pageSize: number; totalPages: number;
@@ -633,7 +634,7 @@ export default function ResultPage() {
   if (debouncedSearch) listParams.set('q', debouncedSearch);
   if (filterState !== 'All') listParams.set('state', filterState);
   if (filterStatus !== 'All') listParams.set('status', filterStatus);
-  const { data, error, isLoading: loading, isValidating } = useSWR<SchoolsResponse>(
+  const { data, error, isLoading: loading, isValidating, mutate: mutateSchools } = useSWR<SchoolsResponse>(
     `/api/result/overview/schools?${listParams}`, fetcher, { keepPreviousData: true },
   );
 
@@ -644,6 +645,33 @@ export default function ResultPage() {
   const safePage = Math.min(page, totalPages);
 
   const activeFilterCount = [filterState, filterStatus].filter(v => v !== 'All').length;
+  // Release (or withdraw) a school's student passports: the school's own
+  // "Student Passports" page shows nothing until this is done.
+  const [releasing, setReleasing] = useState<string | null>(null);
+  const togglePassportRelease = async (sc: SchoolSummary) => {
+    const releasing_ = !sc.passportReleasedAt;
+    const ok = window.confirm(releasing_
+      ? `Release passports to ${sc.name}?
+
+${sc.complete} completed passport${sc.complete === 1 ? '' : 's'} will become visible to the school (${sc.incomplete} not ready yet).`
+      : `Withdraw passports from ${sc.name}? The school will no longer be able to see them.`);
+    if (!ok) return;
+    setReleasing(sc.schoolId);
+    try {
+      const res = await authFetch('/api/result/passport-release', {
+        method: releasing_ ? 'POST' : 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ schoolId: sc.schoolId }),
+      });
+      if (!res.ok) throw new Error();
+      await mutateSchools();
+    } catch {
+      alert(releasing_ ? 'Could not release passports. Please try again.' : 'Could not withdraw passports. Please try again.');
+    } finally {
+      setReleasing(null);
+    }
+  };
+
   const clearFilters = () => { setFilterState('All'); setFilterStatus('All'); setSearch(''); };
 
   const pageNumbers = useMemo(() => {
@@ -808,11 +836,12 @@ export default function ResultPage() {
           const schoolOpen = openSchools.has(sc.schoolId);
           return (
             <div key={sc.schoolId} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className={`flex items-center ${schoolOpen ? 'bg-amber-50/60' : 'hover:bg-gray-50'} transition-colors`}>
               <button
                 type="button"
                 onClick={() => toggleIn(setOpenSchools, sc.schoolId)}
                 aria-expanded={schoolOpen}
-                className={`w-full flex items-center gap-3 px-4 py-3.5 text-left transition-colors cursor-pointer ${schoolOpen ? 'bg-amber-50/60' : 'hover:bg-gray-50'}`}
+                className="flex-1 min-w-0 flex items-center gap-3 px-4 py-3.5 text-left cursor-pointer"
               >
                 <ChevronRight size={18} className={`flex-shrink-0 transition-transform ${schoolOpen ? 'rotate-90 text-amber-500' : 'text-gray-400'}`} />
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center flex-shrink-0 shadow-md shadow-violet-200">
@@ -834,6 +863,28 @@ export default function ResultPage() {
                   <Stat label="Incomplete" value={sc.incomplete} tone="text-amber-700" />
                 </div>
               </button>
+              <div className="flex-shrink-0 pr-4 flex flex-col items-end gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => togglePassportRelease(sc)}
+                  disabled={releasing === sc.schoolId || (!sc.passportReleasedAt && sc.complete === 0)}
+                  title={!sc.passportReleasedAt && sc.complete === 0 ? 'No completed passports to release yet' : undefined}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap ${
+                    sc.passportReleasedAt
+                      ? 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+                      : 'bg-[#06013E] text-[#F5E9C8] hover:bg-[#0a0258] shadow-sm'
+                  }`}
+                >
+                  {releasing === sc.schoolId ? <Loader2 size={12} className="animate-spin" /> : sc.passportReleasedAt ? <Undo2 size={12} /> : <Send size={12} />}
+                  {sc.passportReleasedAt ? 'Withdraw' : 'Release to school'}
+                </button>
+                {sc.passportReleasedAt && (
+                  <span className="text-[10px] font-semibold text-emerald-700">
+                    Released {new Date(sc.passportReleasedAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </span>
+                )}
+              </div>
+              </div>
 
               {schoolOpen && (
                 <SchoolStudents
