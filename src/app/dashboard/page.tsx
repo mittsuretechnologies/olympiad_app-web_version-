@@ -315,6 +315,214 @@ function AdminRoleBadge() {
   );
 }
 
+const PANEL_FONT = { fontFamily: 'var(--font-poppins), Poppins, sans-serif', color: '#212529' } as const;
+
+// Shared shell for every panel below the KPI tiles — same radius, border,
+// font and header treatment as the KPI cards so the page reads as one system.
+function Panel({
+  title, subtitle, icon: Icon, action, className = '', children,
+}: {
+  title: string;
+  subtitle?: string;
+  icon: any;
+  action?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col overflow-hidden ${className}`} style={PANEL_FONT}>
+      <header className="px-5 py-4 border-b border-slate-100 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-9 h-9 rounded-full bg-slate-50 border border-slate-200 flex items-center justify-center flex-shrink-0">
+            <Icon size={17} className="text-red-600" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-[15px] font-semibold leading-tight truncate">{title}</h2>
+            {subtitle && <p className="text-xs text-slate-500 mt-0.5 truncate">{subtitle}</p>}
+          </div>
+        </div>
+        {action && <div className="flex items-center gap-2 flex-shrink-0">{action}</div>}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+function PanelLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="inline-flex items-center gap-1 rounded-md px-2.5 py-1.5 text-xs font-semibold text-[#004f9f] hover:bg-[#004f9f]/5 transition-colors">
+      {children} <ArrowRight size={12} />
+    </Link>
+  );
+}
+
+function Chip({ tone, children }: { tone: 'good' | 'warning' | 'bad' | 'default'; children: React.ReactNode }) {
+  const cls = tone === 'good' ? 'bg-emerald-50 text-emerald-700'
+    : tone === 'warning' ? 'bg-orange-50 text-orange-600'
+    : tone === 'bad' ? 'bg-red-50 text-red-600'
+    : 'bg-slate-100 text-slate-600';
+  return <span className={`inline-flex items-center rounded-md px-2.5 py-1 text-[12px] font-semibold whitespace-nowrap ${cls}`}>{children}</span>;
+}
+
+function SkeletonRows({ n = 4 }: { n?: number }) {
+  return (
+    <div className="divide-y divide-slate-100">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} className="px-5 py-3.5 flex items-center gap-3">
+          <div className="w-9 h-9 bg-slate-100 rounded-full animate-pulse" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-40 bg-slate-100 animate-pulse rounded" />
+            <div className="h-2.5 w-24 bg-slate-100 animate-pulse rounded" />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon, text }: { icon: any; text: string }) {
+  return (
+    <div className="px-5 py-10 flex flex-col items-center gap-2 text-slate-400">
+      <Icon size={26} strokeWidth={1.5} />
+      <p className="text-sm text-slate-500">{text}</p>
+    </div>
+  );
+}
+
+// Rotating header colours for upcoming dates so each day reads as its own block.
+const EXAM_DATE_TONES = [
+  'bg-blue-50 text-blue-800 border-blue-100',
+  'bg-violet-50 text-violet-800 border-violet-100',
+  'bg-amber-50 text-amber-800 border-amber-100',
+  'bg-rose-50 text-rose-800 border-rose-100',
+  'bg-teal-50 text-teal-800 border-teal-100',
+];
+
+// Schools sitting their exam today, followed by upcoming exam dates in order.
+function ExamScheduleCard() {
+  const [schools, setSchools] = useState<{ id: string; name: string; schoolId: string; city: string | null; state: string | null; examDate: string }[]>([]);
+  const [today, setToday] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('token') || '';
+    fetch('/api/dashboard/exam-schedule', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) { setSchools(d.schools); setToday(d.today); } })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const todayCount = schools.filter(s => s.examDate === today).length;
+  const fmt = (d: string) => new Date(`${d}T00:00:00`).toLocaleDateString('en-IN', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+
+  // Group by date; the API already returns them soonest-first.
+  const groups: { date: string; items: typeof schools }[] = [];
+  for (const sc of schools) {
+    const last = groups[groups.length - 1];
+    if (last && last.date === sc.examDate) last.items.push(sc);
+    else groups.push({ date: sc.examDate, items: [sc] });
+  }
+
+  return (
+    <Panel
+      title="Exam Schedule"
+      subtitle="Today first, then upcoming dates"
+      icon={Calendar}
+      action={!loading && (<><Chip tone="good">Today : {todayCount}</Chip><Chip tone="default">Upcoming : {schools.length - todayCount}</Chip></>)}
+    >
+      <div className="max-h-[380px] overflow-y-auto">
+        {loading ? <SkeletonRows n={3} /> : !groups.length ? (
+          <EmptyState icon={Calendar} text="No exams scheduled for today or later." />
+        ) : (
+          groups.map((g, gi) => {
+            const isToday = g.date === today;
+            const tone = isToday ? 'bg-green-600 text-white border-green-700' : EXAM_DATE_TONES[gi % EXAM_DATE_TONES.length];
+            return (
+              <div key={g.date}>
+                <div className={`sticky top-0 z-10 px-5 py-2 text-[11px] font-bold uppercase tracking-wider flex items-center justify-between border-y first:border-t-0 ${tone}`}>
+                  <span>{isToday ? `Today · ${fmt(g.date)}` : fmt(g.date)}</span>
+                  <span>{g.items.length} {g.items.length === 1 ? 'school' : 'schools'}</span>
+                </div>
+                <div className="divide-y divide-slate-100">
+                  {g.items.map(sc => (
+                    <Link key={sc.id} href="/dashboard/schools" className="px-5 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                      <div className="w-9 h-9 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                        {sc.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold truncate">{sc.name}</p>
+                        <p className="text-xs text-slate-500 truncate">{sc.schoolId}{sc.city ? ` · ${sc.city}` : ''}{sc.state ? `, ${sc.state}` : ''}</p>
+                      </div>
+                      <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </Panel>
+  );
+}
+
+// Today's exam schools and whether each has sent its attendance report.
+function TodayAttendanceCard() {
+  const [schools, setSchools] = useState<{ id: string; name: string; schoolId: string; city: string | null; state: string | null; submittedAt: string | null; present: number; absent: number }[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const token = sessionStorage.getItem('token') || '';
+    fetch('/api/dashboard/today-attendance', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (d) setSchools(d.schools); })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const sent = schools.filter(s => s.submittedAt).length;
+
+  return (
+    <Panel
+      title="Today's Attendance Reports"
+      subtitle="Schools with an exam today"
+      icon={CheckCircle2}
+      action={!loading && (<><Chip tone="good">Sent : {sent}</Chip><Chip tone="warning">Pending : {schools.length - sent}</Chip></>)}
+    >
+      <div className="max-h-[380px] overflow-y-auto divide-y divide-slate-100">
+        {loading ? <SkeletonRows n={3} /> : !schools.length ? (
+          <EmptyState icon={CheckCircle2} text="No school has its exam today." />
+        ) : (
+          schools.map(sc => (
+            <Link key={sc.id} href="/dashboard/schools/attendance" className="px-5 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+              <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${sc.submittedAt ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-500'}`}>
+                {sc.submittedAt ? <CheckCircle2 size={16} /> : <Clock size={16} />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold truncate">{sc.name}</p>
+                <p className="text-xs text-slate-500 truncate">{sc.schoolId}{sc.city ? ` · ${sc.city}` : ''}{sc.state ? `, ${sc.state}` : ''}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <Chip tone={sc.submittedAt ? 'good' : 'warning'}>{sc.submittedAt ? 'Report sent' : 'Not sent yet'}</Chip>
+                <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
+                  {sc.submittedAt ? `${new Date(sc.submittedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })} · ` : ''}
+                  P {sc.present} · A {sc.absent}
+                </p>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+      {!loading && schools.length > 0 && (
+        <footer className="px-5 py-2.5 border-t border-slate-100 bg-slate-50/60 text-right">
+          <PanelLink href="/dashboard/schools/attendance">View all attendance reports</PanelLink>
+        </footer>
+      )}
+    </Panel>
+  );
+}
+
 function SuperAdminDashboard() {
   const [data, setData] = useState<Overview | null>(null);
   const [loading, setLoading] = useState(true);
@@ -472,212 +680,166 @@ function SuperAdminDashboard() {
       </div>
 
       {/* Current Year Monthly Reports */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-6">
-        <h2 className="text-base font-bold text-slate-900 mb-4">Current Year Monthly Reports</h2>
-        <ResponsiveContainer width="100%" height={340}>
-          <LineChart data={data?.monthlyTrend ?? []} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-            <CartesianGrid vertical={false} stroke="#e1e0d9" />
-            <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#898781' }} axisLine={{ stroke: '#c3c2b7' }} tickLine={false} />
-            <YAxis tick={{ fontSize: 12, fill: '#898781' }} axisLine={false} tickLine={false} ticks={trendTicks} domain={[0, trendTicks[trendTicks.length - 1]]} />
-            <Tooltip content={<TrendTooltip />} />
-            <Legend wrapperStyle={{ fontSize: 13, paddingTop: 12 }} iconType="circle" />
-            <Line type="monotone" dataKey="schools" name="Schools" stroke="#2a78d6" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-            <Line type="monotone" dataKey="schoolStudents" name="School Students" stroke="#1baf7a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-            <Line type="monotone" dataKey="appUsers" name="App Users" stroke="#eb6834" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div>
-        {/* Video Moderation Summary */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <PlaySquare size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Video Moderation</h2>
-            </div>
-            <Link href="/dashboard/videos" className="text-[10px] font-bold text-black hover:text-[#004f9f] hover:underline uppercase tracking-wider flex items-center gap-1">
-              Review Now <ChevronRight size={10} />
-            </Link>
-          </div>
-          <div className="p-4 sm:p-5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {moderationCards.map(m => {
-              const Icon = m.icon;
-              return (
-                <div key={m.label} className={`${m.bg} rounded-lg p-4 flex flex-col gap-2 shadow-md border border-black/5`}>
-                  <Icon size={18} className={m.color} />
-                  {loading ? (
-                    <div className="h-7 w-10 bg-white/60 animate-pulse rounded" />
-                  ) : (
-                    <span className={`text-2xl font-black ${m.color}`}>{m.value}</span>
-                  )}
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-black">{m.label}</span>
-                </div>
-              );
-            })}
-          </div>
+      <Panel title="Current Year Monthly Reports" subtitle={`Schools, students and app users registered per month in ${new Date().getFullYear()}`} icon={Activity}>
+        <div className="p-5">
+          <ResponsiveContainer width="100%" height={340}>
+            <LineChart data={data?.monthlyTrend ?? []} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+              <CartesianGrid vertical={false} stroke="#eef0f3" />
+              <XAxis dataKey="month" tick={{ fontSize: 12, fill: '#898781' }} axisLine={{ stroke: '#d9dce1' }} tickLine={false} />
+              <YAxis tick={{ fontSize: 12, fill: '#898781' }} axisLine={false} tickLine={false} ticks={trendTicks} domain={[0, trendTicks[trendTicks.length - 1]]} />
+              <Tooltip content={<TrendTooltip />} />
+              <Legend wrapperStyle={{ fontSize: 13, paddingTop: 12 }} iconType="circle" />
+              <Line type="monotone" dataKey="schools" name="Schools" stroke="#2a78d6" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="schoolStudents" name="School Students" stroke="#1baf7a" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+              <Line type="monotone" dataKey="appUsers" name="App Users" stroke="#eb6834" strokeWidth={2} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
+      </Panel>
+
+      {/* Exam schedule + today's attendance reports */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <ExamScheduleCard />
+        <TodayAttendanceCard />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      {/* Video Moderation Summary */}
+      <Panel title="Video Moderation" subtitle="Status of all submitted videos" icon={PlaySquare} action={<PanelLink href="/dashboard/videos">Review now</PanelLink>}>
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {moderationCards.map(m => {
+            const Icon = m.icon;
+            return (
+              <div key={m.label} className={`${m.bg} rounded-xl border border-slate-200 px-4 py-3.5 flex items-center gap-3`}>
+                <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center flex-shrink-0">
+                  <Icon size={17} className={m.color} />
+                </div>
+                <div>
+                  {loading ? (
+                    <div className="h-6 w-10 bg-white/70 animate-pulse rounded" />
+                  ) : (
+                    <p className="text-2xl leading-none font-bold text-[#052E5C] tabular-nums">{m.value.toLocaleString('en-IN')}</p>
+                  )}
+                  <p className="text-xs font-medium text-slate-600 mt-1">{m.label}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Panel>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Top Schools */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BarChart2 size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Top Schools by Registrations</h2>
-            </div>
-            <Link href="/dashboard/schools" className="text-[10px] font-bold text-black hover:text-[#004f9f] hover:underline uppercase tracking-wider flex items-center gap-1">
-              All Schools <ChevronRight size={10} />
-            </Link>
-          </div>
-          <div className="p-5 space-y-3">
+        <Panel className="lg:col-span-2" title="Top Schools by Registrations" subtitle="Registered students vs allocated IDs" icon={BarChart2} action={<PanelLink href="/dashboard/schools">All schools</PanelLink>}>
+          <div className="px-5 py-4 space-y-4">
             {loading ? (
               Array.from({ length: 5 }).map((_, i) => (
-                <div key={i} className="space-y-1.5">
-                  <div className="h-3 w-32 bg-gray-100 animate-pulse rounded" />
-                  <div className="h-2 w-full bg-gray-100 animate-pulse rounded-full" />
+                <div key={i} className="space-y-2">
+                  <div className="h-3 w-40 bg-slate-100 animate-pulse rounded" />
+                  <div className="h-2 w-full bg-slate-100 animate-pulse rounded-full" />
                 </div>
               ))
             ) : !data?.topSchools?.length ? (
-              <p className="text-sm text-black text-center py-6">No school data available yet.</p>
+              <EmptyState icon={BarChart2} text="No school data available yet." />
             ) : (
-              data.topSchools.map(school => (
-                <div key={school.id}>
-                  <div className="flex justify-between items-center mb-1">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xs font-bold text-[#1F2937] truncate">{school.name}</span>
-                      <span className="text-[10px] text-black flex-shrink-0">{school.registered}/{school.allocated}</span>
+              data.topSchools.map((school, i) => {
+                const bar = school.rate === 100 ? 'bg-emerald-500' : school.rate >= 50 ? 'bg-blue-500' : 'bg-orange-400';
+                return (
+                  <div key={school.id} className="flex items-center gap-3">
+                    <span className="w-7 h-7 rounded-full bg-slate-100 text-slate-600 text-xs font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-baseline justify-between gap-3 mb-1.5">
+                        <p className="text-sm font-semibold truncate">{school.name}</p>
+                        <p className="text-xs text-slate-500 flex-shrink-0 tabular-nums">{school.registered.toLocaleString('en-IN')} / {school.allocated.toLocaleString('en-IN')}</p>
+                      </div>
+                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full transition-all duration-700 ${bar}`} style={{ width: `${school.rate}%` }} />
+                      </div>
                     </div>
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0 ${
-                      school.rate === 100 ? 'bg-green-100 text-green-700' :
-                      school.rate >= 50 ? 'bg-blue-100 text-blue-700' :
-                      'bg-orange-100 text-orange-700'
-                    }`}>{school.rate}%</span>
+                    <Chip tone={school.rate === 100 ? 'good' : school.rate >= 50 ? 'default' : 'warning'}>{school.rate}%</Chip>
                   </div>
-                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all duration-700 ${
-                        school.rate === 100 ? 'bg-green-500' : school.rate >= 50 ? 'bg-blue-500' : 'bg-orange-400'
-                      }`}
-                      style={{ width: `${school.rate}%` }}
-                    />
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
-        </div>
+        </Panel>
 
-        {/* Quick Links */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
-            <KeyRound size={14} className="text-[#1F2937]" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Quick Actions</h2>
-          </div>
+        {/* Quick Actions */}
+        <Panel title="Quick Actions" subtitle="Jump to common tasks" icon={KeyRound}>
           <div className="p-4 grid grid-cols-2 gap-3">
             {[
-              { label: 'Register School', icon: School, href: '/dashboard/schools/register' },
-              { label: 'Moderation', icon: PlaySquare, href: '/dashboard/videos' },
-              { label: 'Credentials', icon: KeyRound, href: '/dashboard/credentials/schools' },
-              { label: 'Reports', icon: BarChart2, href: '/dashboard/reports/schools' },
+              { label: 'Register School', icon: School, href: '/dashboard/schools/register', tint: 'bg-blue-50/70' },
+              { label: 'Moderation', icon: PlaySquare, href: '/dashboard/videos', tint: 'bg-rose-50/70' },
+              { label: 'Credentials', icon: KeyRound, href: '/dashboard/credentials/schools', tint: 'bg-amber-50/70' },
+              { label: 'Reports', icon: BarChart2, href: '/dashboard/reports/schools', tint: 'bg-teal-50/70' },
             ].map(a => {
               const Icon = a.icon;
               return (
                 <Link key={a.href} href={a.href}
-                  className="bg-gray-50 hover:bg-gray-100 border border-transparent hover:border-gray-200 rounded-lg p-4 transition-all flex flex-col gap-2">
-                  <Icon size={16} className="text-black" />
-                  <p className="text-xs font-bold text-[#1F2937]">{a.label}</p>
+                  className={`${a.tint} rounded-xl border border-slate-200 p-4 flex flex-col gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all`}>
+                  <div className="w-9 h-9 rounded-full bg-white shadow-sm flex items-center justify-center">
+                    <Icon size={17} className="text-red-600" />
+                  </div>
+                  <p className="text-sm font-semibold">{a.label}</p>
                 </Link>
               );
             })}
           </div>
-        </div>
+        </Panel>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Recent Registrations */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Activity size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Recent Registrations</h2>
-            </div>
-            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-          </div>
-          <div className="divide-y divide-gray-50">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="px-5 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full animate-pulse" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-32 bg-gray-100 animate-pulse rounded" />
-                    <div className="h-2 w-20 bg-gray-100 animate-pulse rounded" />
-                  </div>
-                </div>
-              ))
-            ) : !data?.recentStudents?.length ? (
-              <div className="px-5 py-8 text-center text-black text-sm">No registrations yet.</div>
-            ) : (
-              data.recentStudents.map(stu => (
-                <div key={stu.id} className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
-                  <div className="w-8 h-8 rounded-full bg-[#052E5C] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
+        <Panel title="Recent Registrations" subtitle="Latest students to register" icon={Activity}
+          action={<span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />}>
+          {loading ? <SkeletonRows n={4} /> : !data?.recentStudents?.length ? (
+            <EmptyState icon={Users} text="No registrations yet." />
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {data.recentStudents.map(stu => (
+                <div key={stu.id} className="px-5 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                  <div className="w-9 h-9 rounded-full bg-[#052E5C] text-white flex items-center justify-center text-xs font-bold flex-shrink-0">
                     {stu.name.charAt(0).toUpperCase()}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#1F2937] truncate">{stu.name}</p>
-                    <p className="text-[10px] text-black truncate">{stu.olympiadCode} Â· {stu.schoolName}</p>
+                    <p className="text-sm font-semibold truncate">{stu.name}</p>
+                    <p className="text-xs text-slate-500 truncate">{stu.olympiadCode} · {stu.schoolName}</p>
                   </div>
-                  <span className="text-[10px] text-black flex-shrink-0">{new Date(stu.createdAt).toLocaleDateString('en-IN')}</span>
+                  <span className="text-xs text-slate-500 flex-shrink-0 tabular-nums">{new Date(stu.createdAt).toLocaleDateString('en-IN')}</span>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+              ))}
+            </div>
+          )}
+        </Panel>
 
         {/* Recent Video Uploads */}
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BookOpen size={14} className="text-[#1F2937]" />
-              <h2 className="text-xs font-bold uppercase tracking-widest text-[#1F2937]">Recent Video Uploads</h2>
-            </div>
-            <Link href="/dashboard/videos" className="text-[10px] font-bold text-black hover:text-[#004f9f] hover:underline uppercase tracking-wider flex items-center gap-1">
-              View All <ChevronRight size={10} />
-            </Link>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {loading ? (
-              Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="px-5 py-3 flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gray-100 rounded-full animate-pulse" />
-                  <div className="flex-1 space-y-1.5">
-                    <div className="h-3 w-32 bg-gray-100 animate-pulse rounded" />
-                    <div className="h-2 w-20 bg-gray-100 animate-pulse rounded" />
-                  </div>
-                </div>
-              ))
-            ) : !data?.recentVideos?.length ? (
-              <div className="px-5 py-8 text-center text-black text-sm">No video uploads yet.</div>
-            ) : (
-              data.recentVideos.map(v => (
-                <div key={v.id} className="px-5 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    v.status === 'APPROVED' ? 'bg-green-100 text-green-600' :
-                    v.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-orange-100 text-orange-600'
+        <Panel title="Recent Video Uploads" subtitle="Latest submissions across all sources" icon={BookOpen} action={<PanelLink href="/dashboard/videos">View all</PanelLink>}>
+          {loading ? <SkeletonRows n={4} /> : !data?.recentVideos?.length ? (
+            <EmptyState icon={PlaySquare} text="No video uploads yet." />
+          ) : (
+            <div className="divide-y divide-slate-100">
+              {data.recentVideos.map(v => (
+                <div key={v.id} className="px-5 py-3 flex items-center gap-3 hover:bg-slate-50 transition-colors">
+                  <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${
+                    v.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' :
+                    v.status === 'REJECTED' ? 'bg-red-50 text-red-600' : 'bg-orange-50 text-orange-500'
                   }`}>
-                    <PlaySquare size={14} />
+                    <PlaySquare size={16} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-[#1F2937] truncate">{v.studentName || v.uploaderType}</p>
-                    <p className="text-[10px] text-black truncate">{v.caption || 'No caption'}</p>
+                    <p className="text-sm font-semibold truncate">{v.studentName || v.uploaderType}</p>
+                    <p className="text-xs text-slate-500 truncate">{v.caption || 'No caption'}</p>
                   </div>
-                  <span className="text-[10px] text-black flex-shrink-0">{new Date(v.createdAt).toLocaleDateString('en-IN')}</span>
+                  <div className="text-right flex-shrink-0">
+                    <Chip tone={v.status === 'APPROVED' ? 'good' : v.status === 'REJECTED' ? 'bad' : 'warning'}>
+                      {v.status.charAt(0) + v.status.slice(1).toLowerCase()}
+                    </Chip>
+                    <p className="text-[11px] text-slate-500 mt-1 tabular-nums">{new Date(v.createdAt).toLocaleDateString('en-IN')}</p>
+                  </div>
                 </div>
-              ))
-            )}
-          </div>
-        </div>
+              ))}
+            </div>
+          )}
+        </Panel>
       </div>
     </div>
   );

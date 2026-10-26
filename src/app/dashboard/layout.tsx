@@ -35,6 +35,7 @@ import {
   Award,
   Flag,
   LifeBuoy,
+  Bell,
   ShieldAlert,
   History,
   UserX,
@@ -603,6 +604,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span className="text-sm font-semibold">School Support</span>
               </Link>
             )}
+
+            {/* School Notifications (switched off for now):
+            {canSee('schools') && (
+              <Link href="/dashboard/school-notifications"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/school-notifications') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <Bell size={20} />
+                <span className="text-sm font-semibold">School Notifications</span>
+              </Link>
+            )}
+            */}
 
             {/* Settings — only superadmin */}
             {role === 'SUPERADMIN' && (

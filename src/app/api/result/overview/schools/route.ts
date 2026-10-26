@@ -88,12 +88,24 @@ export async function GET(request: Request) {
       agg.set(sc.id, cur);
     }
 
+    // Which of these schools have had their passports released. Tolerates the
+    // PassportRelease table not existing yet, so this page keeps working until
+    // the migration has been applied.
+    const releasedAt = new Map<string, Date>();
+    try {
+      const releases = await prisma.passportRelease.findMany({ select: { schoolId: true, releasedAt: true } });
+      for (const r of releases) releasedAt.set(r.schoolId, r.releasedAt);
+    } catch (err) {
+      console.warn('result/overview/schools: PassportRelease unavailable', err);
+    }
+
     const rows = Array.from(agg.entries())
       .map(([id, a]) => {
         const sc = schoolById.get(id)!;
         return {
           schoolId: sc.schoolId, name: sc.name, city: sc.city, district: sc.district, state: sc.state,
           students: a.students, classes: a.classes.size, complete: a.complete, incomplete: a.students - a.complete,
+          passportReleasedAt: releasedAt.get(id) ?? null,
         };
       })
       .sort((x, y) => x.name.localeCompare(y.name));
