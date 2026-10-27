@@ -283,6 +283,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   const resultSubItems = [
     { name: 'Result List',    href: '/dashboard/result',           icon: Trophy },
+    { name: 'School Toppers', href: '/dashboard/result/school-toppers', icon: Trophy },
+    { name: 'District Level', href: '/dashboard/result/district-forward', icon: Trophy },
   ];
 
   const subItemClass = (isActive: boolean) =>
@@ -623,7 +625,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="flex items-center gap-3"><Settings size={20} /><span className="text-sm font-semibold">Settings</span></div>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${settingsOpen ? 'rotate-180' : ''}`} />
                 </button>
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${settingsOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${settingsOpen ? 'max-h-52 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
@@ -635,6 +637,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     </Link>
                     <Link href="/dashboard/settings/app-version" className={subItemClass(pathname === '/dashboard/settings/app-version')}>
                       <span>App Version</span>
+                    </Link>
+                    <Link href="/dashboard/settings/daily-report" className={subItemClass(pathname === '/dashboard/settings/daily-report')}>
+                      <span>Daily Report</span>
                     </Link>
                   </div>
                   </div>
