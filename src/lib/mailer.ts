@@ -938,6 +938,83 @@ export async function sendAgreementCopyEmail(data: AgreementCopyMail): Promise<v
   });
 }
 
+/* ── Daily video report (internal) ───────────────────────────────────────── */
+
+export interface DailyVideoReportMail {
+  to: string[];
+  /** "26 Oct 2026" and "6:00 PM", already formatted in IST. */
+  dateLabel: string;
+  timeLabel: string;
+  total: number;
+  today: number;
+  approved: number;
+  rejected: number;
+  pending: number;
+  /** Upload date-time of each pending video, oldest first, formatted in IST. */
+  pendingUploadedAt: string[];
+}
+
+/** Plain-text body in the exact format the team forwards, so it can be copy-pasted as is. */
+export function renderDailyVideoReportText(d: DailyVideoReportMail): string {
+  const pendingLines = d.pendingUploadedAt.length
+    ? d.pendingUploadedAt.map((t, i) => `  ${i + 1}. ${t}`).join('\n')
+    : '  None';
+  return (
+    `Daily report of Mittmee videos\n` +
+    `${d.dateLabel}, data as of ${d.timeLabel} IST\n\n` +
+    `Total videos received: ${d.total}\n` +
+    `Today videos received: ${d.today}\n` +
+    `Total approved videos: ${d.approved}\n` +
+    `Total rejected videos: ${d.rejected}\n` +
+    `Total pending videos: ${d.pending}\n` +
+    `* Pending videos uploaded on:\n${pendingLines}\n\n` +
+    `Updated`
+  );
+}
+
+export async function sendDailyVideoReportEmail(d: DailyVideoReportMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const rows: [string, number][] = [
+    ['Total videos received', d.total],
+    ['Today videos received', d.today],
+    ['Total approved videos', d.approved],
+    ['Total rejected videos', d.rejected],
+    ['Total pending videos', d.pending],
+  ];
+
+  const html = renderEmailShell({
+    title: `Daily report of Mittmee videos — ${d.dateLabel}`,
+    body: `
+      <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">Daily report of Mittmee videos</p>
+      <p style="margin:0 0 14px;font-size:13px;color:#5A6B80;">${escapeHtml(d.dateLabel)}, data as of ${escapeHtml(d.timeLabel)} IST</p>
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+             style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 16px;">
+        ${rows.map(([k, v], i) => `<tr>
+          <td style="${i < rows.length - 1 ? 'border-bottom:1px solid #E4ECF7;' : ''}background:#F4F8FE;padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:12.5px;font-weight:bold;color:#1552B6;">${escapeHtml(k)}</td>
+          <td style="${i < rows.length - 1 ? 'border-bottom:1px solid #E4ECF7;' : ''}padding:8px 12px;font-family:Arial,Helvetica,sans-serif;font-size:15px;font-weight:bold;color:#0B2A5C;">${v}</td>
+        </tr>`).join('')}
+      </table>
+      <p style="margin:0 0 6px;font-weight:bold;color:#0B2A5C;">Pending videos uploaded on</p>
+      ${d.pendingUploadedAt.length
+        ? `<ol style="margin:0 0 16px;padding-left:20px;">${d.pendingUploadedAt.map(t => `<li>${escapeHtml(t)}</li>`).join('')}</ol>`
+        : `<p style="margin:0 0 16px;">None</p>`}
+      <p style="margin:0 0 6px;font-size:12.5px;color:#5A6B80;">Copy-paste version:</p>
+      <pre style="margin:0;font-family:Consolas,'Courier New',monospace;font-size:12.5px;white-space:pre-wrap;background:#F4F8FE;border:1px solid #E4ECF7;border-radius:8px;padding:10px 12px;color:#0B2A5C;">${escapeHtml(renderDailyVideoReportText(d))}</pre>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: d.to,
+    subject: `Daily report of Mittmee videos — ${d.dateLabel}`,
+    html,
+    attachments: emailAttachments(),
+    text: renderDailyVideoReportText(d),
+  });
+}
+
 /* ── School Panel Help & Support ─────────────────────────────────────────── */
 
 /** Inbox the support team watches for new school requests and replies. */
