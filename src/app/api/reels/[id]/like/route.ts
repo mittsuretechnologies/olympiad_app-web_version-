@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { notifyVideoLiked } from '@/lib/notifications';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordCoinEvent } from '@/lib/coins/tasks';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -96,6 +97,8 @@ export async function POST(
         where:  { id: videoId },
         select: { likesCount: true },
       });
+
+      void recordCoinEvent(userId, 'LIKE_VIDEO').catch(() => {});
 
       if (video.appUserId && video.appUserId !== userId) {
         const liker = await prisma.appUser.findUnique({ where: { id: userId }, select: { userId: true } });

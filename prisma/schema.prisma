@@ -650,6 +650,19 @@ model AppUser {
   schoolRefId            String?         @unique
   schoolRef              School?         @relation(fields: [schoolRefId], references: [id], onDelete: Cascade)
 
+  // Coins & rewards (see lib/coins). referralCode is created lazily the first
+  // time the user opens Refer & Earn; referredById is set at signup when a
+  // valid code was entered. Both optional so older app builds keep working.
+  referralCode           String?         @unique
+  referredById           String?
+  coinWallet             CoinWallet?
+  coinTransactions       CoinTransaction[]
+  coinCheckins           CoinCheckin[]
+  coinTaskProgress       CoinTaskProgress[]
+  coinRedemptions        CoinRedemption[]
+  referralsMade          Referral[]      @relation("ReferralReferrer")
+  referralReceived       Referral?       @relation("ReferralReferee")
+
   @@index([email])
   @@index([mobile])
   @@index([deletionRequestedAt])
@@ -1258,6 +1271,226 @@ model SchoolNotification {
   @@index([schoolId, readAt])
   @@schema("public")
 }
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Coins & rewards. Global knobs (₹ per coin, caps, referral rules, feature
+// switches) live as JSON in AppSetting key "coins.config" — see lib/coins/config.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// One row per user. Balance is a cache of SUM(CoinTransaction.amount); every
+// change goes through lib/coins/ledger so the two can never drift. The streak
+// state lives here too so a check-in touches a single row.
+model CoinWallet {
+  id              String   @id @default(uuid())
+  appUserId       String   @unique
+  balance         Int      @default(0)
+  lifetimeEarned  Int      @default(0)
+  lifetimeSpent   Int      @default(0)
+  currentStreak   Int      @default(0)
+  longestStreak   Int      @default(0)
+  // Position inside the streak ladder (1..cycle length); 0 = never checked in.
+  cycleDay        Int      @default(0)
+  cyclesCompleted Int      @default(0)
+  // Asia/Kolkata calendar day of the last check-in, "YYYY-MM-DD".
+  lastCheckinDate String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  appUser         AppUser  @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@map("CoinWalletV2")
+  @@schema("public")
+}
+
+// Append-only. amount is signed; idempotencyKey makes every credit/debit
+// safe to retry (a repeated request finds the key and changes nothing).
+model CoinTransaction {
+  id             String   @id @default(uuid())
+  appUserId      String
+  amount         Int
+  // CHECKIN | TASK | REFERRAL_REFERRER | REFERRAL_REFEREE | REFERRAL_MILESTONE
+  // | GAME | REDEEM | REFUND | ADMIN_ADJUST
+  type           String
+  sourceType     String?
+  sourceId       String?
+  idempotencyKey String   @unique
+  balanceAfter   Int
+  // ₹ per coin when this row was written, so history keeps its value.
+  inrPerCoin     Float?
+  note           String?
+  meta           Json?
+  createdAt      DateTime @default(now())
+  appUser        AppUser  @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@index([appUserId, createdAt(sort: Desc)])
+  @@index([type, createdAt])
+  @@index([createdAt])
+  @@map("CoinTransactionV2")
+  @@schema("public")
+}
+
+// The streak ladder: coins for day N of the cycle. The cycle length is the
+// highest day. Fully admin-editable.
+model CoinStreakDay {
+  day     Int     @id
+  coins   Int
+  isBonus Boolean @default(false)
+  label   String?
+
+  @@schema("public")
+}
+
+model CoinCheckin {
+  id        String   @id @default(uuid())
+  appUserId String
+  dateKey   String
+  cycleDay  Int
+  streak    Int
+  coins     Int
+  createdAt DateTime @default(now())
+  appUser   AppUser  @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@unique([appUserId, dateKey])
+  @@schema("public")
+}
+
+model CoinTask {
+  id          String    @id @default(uuid())
+  title       String
+  description String?
+  icon        String?
+  // OPEN_APP | WATCH_VIDEO | LIKE_VIDEO | FOLLOW | UPLOAD_VIDEO | SHARE | PLAY_GAME | CUSTOM
+  eventType   String
+  target      Int       @default(1)
+  coins       Int
+  // DAILY | WEEKLY | ONCE
+  frequency   String    @default("DAILY")
+  active      Boolean   @default(true)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  sortOrder   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  progress    CoinTaskProgress[]
+
+  @@index([active, eventType])
+  @@map("CoinTaskV2")
+  @@schema("public")
+}
+
+model CoinTaskProgress {
+  id        String    @id @default(uuid())
+  appUserId String
+  taskId    String
+  // "2026-10-27" (daily), "2026-W44" (weekly) or "ONCE".
+  periodKey String
+  progress  Int       @default(0)
+  claimedAt DateTime?
+  appUser   AppUser   @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  task      CoinTask  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([appUserId, taskId, periodKey])
+  @@index([appUserId, periodKey])
+  @@schema("public")
+}
+
+model Referral {
+  id            String    @id @default(uuid())
+  referrerId    String
+  refereeId     String    @unique
+  code          String
+  // PENDING (waiting to qualify) | REWARDED | REJECTED
+  status        String    @default("PENDING")
+  rejectReason  String?
+  deviceId      String?
+  ip            String?
+  referrerCoins Int?
+  refereeCoins  Int?
+  createdAt     DateTime  @default(now())
+  rewardedAt    DateTime?
+  referrer      AppUser   @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee       AppUser   @relation("ReferralReferee", fields: [refereeId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId, status])
+  @@index([deviceId])
+  @@index([status, createdAt])
+  @@schema("public")
+}
+
+model CoinReward {
+  id           String    @id @default(uuid())
+  title        String
+  description  String?
+  imageUrl     String?
+  // COUPON (a code from the uploaded pool is handed out instantly) |
+  // MANUAL (admin fulfils it, e.g. gift card or donation)
+  kind         String    @default("COUPON")
+  costCoins    Int
+  // MANUAL only: remaining units; null = unlimited. COUPON stock = unused codes.
+  stock        Int?
+  // 0 = unlimited
+  perUserLimit Int       @default(0)
+  startsAt     DateTime?
+  endsAt       DateTime?
+  active       Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  terms        String?
+  instructions String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  codes        CoinRewardCode[]
+  redemptions  CoinRedemption[]
+
+  @@index([active, sortOrder])
+  @@map("CoinRewardV2")
+  @@schema("public")
+}
+
+model CoinRewardCode {
+  id           String     @id @default(uuid())
+  rewardId     String
+  code         String
+  redemptionId String?    @unique
+  createdAt    DateTime   @default(now())
+  reward       CoinReward @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+
+  @@unique([rewardId, code])
+  @@index([rewardId, redemptionId])
+  @@schema("public")
+}
+
+model CoinRedemption {
+  id         String     @id @default(uuid())
+  appUserId  String
+  rewardId   String
+  coinsSpent Int
+  // PENDING | FULFILLED | CANCELLED
+  status     String     @default("FULFILLED")
+  code       String?
+  adminNote  String?
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  appUser    AppUser    @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+  reward     CoinReward @relation(fields: [rewardId], references: [id])
+
+  @@index([appUserId, createdAt(sort: Desc)])
+  @@index([status, createdAt])
+  @@index([rewardId])
+  @@schema("public")
+}
+
+// Coins for playing a game. Games never credit coins themselves: they report a
+// result and the server applies these rules and caps.
+model CoinGameRule {
+  gameKey        String   @id
+  title          String
+  active         Boolean  @default(true)
+  maxPlaysPerDay Int      @default(5)
+  maxCoinsPerDay Int      @default(50)
+  minSeconds     Int      @default(0)
+  // [{ "minScore": 0, "coins": 1 }, { "minScore": 50, "coins": 3 }] - highest matching band wins
+  bands          Json
+  updatedAt      DateTime @updatedAt
 
 // A student SuperAdmin has forwarded to the district level: they were among
 // those on the top 10 distinct holistic percentages across all schools. One row

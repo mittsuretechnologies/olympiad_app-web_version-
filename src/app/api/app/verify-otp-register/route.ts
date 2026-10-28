@@ -6,6 +6,7 @@ import { generateUserId } from '@/lib/generateUserId';
 import { signAppUserToken } from '@/lib/appUserToken';
 import { encryptPassword } from '@/lib/password-crypto';
 import { recordConsent } from '@/lib/consent';
+import { attachReferral, ensureReferralCode } from '@/lib/coins/referral';
 
 const MAX_APP_OTP_ATTEMPTS = 5;
 
@@ -186,10 +187,28 @@ export async function POST(request: Request) {
 
     await prisma.appOtp.delete({ where: { identifier: lookupId } }).catch(() => {});
 
+    // Optional referral code from the signup screen. A bad code must never
+    // cost anyone their account, so attachReferral swallows its own errors.
+    let referral: { attached: boolean; reason?: string } | undefined;
+    console.log('[coins] signup referral code received:', body.referralCode ? String(body.referralCode) : '(none)');
+    if (body.referralCode) {
+      referral = await attachReferral({
+        refereeId: user.id,
+        code: body.referralCode,
+        deviceId: body.deviceId,
+        mobile,
+        ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? null,
+      }).catch(() => ({ attached: false, reason: 'ERROR' }));
+      if (!referral.attached) console.log('[coins] referral not applied:', referral.reason);
+    }
+    // The new user gets their own invite code straight away.
+    void ensureReferralCode(user.id).catch(() => {});
+
     const token = signAppUserToken(user);
 
     return NextResponse.json({
       message: 'Registration successful',
+      referral,
       token,
       user: {
         id: user.id,
