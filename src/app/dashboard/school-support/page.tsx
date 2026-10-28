@@ -124,10 +124,7 @@ function SchoolSupportInbox() {
       {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="flex items-center gap-2 text-2xl font-medium text-[#004f9f]">
-            <LifeBuoy size={22} /> School Support
-          </h1>
-          <p className="text-xs text-gray-500">Requests raised by schools from the School Panel. Replies appear in the school&apos;s panel and are emailed to them.</p>
+          <h1 className="text-2xl font-medium text-[#004f9f]">School Support</h1>
         </div>
         <button onClick={() => mutate()} className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-600 hover:bg-gray-50">
           <RefreshCw size={13} /> Refresh

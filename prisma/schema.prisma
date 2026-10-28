@@ -83,6 +83,7 @@ model School {
   evaluatorAssignments EvaluatorSchool[]
   passportRelease PassportRelease?
   notifications SchoolNotification[]
+  districtForwards DistrictForward[]
 
   @@schema("public")
 }
@@ -1491,5 +1492,19 @@ model CoinGameRule {
   bands          Json
   updatedAt      DateTime @updatedAt
 
+// A student SuperAdmin has forwarded to the district level: they were among
+// those on the top 10 distinct holistic percentages across all schools. One row
+// per student (olympiadCode is unique); deleting the row withdraws them.
+// holisticPercent is what it was when they were forwarded.
+model DistrictForward {
+  id              String   @id @default(uuid())
+  olympiadCode    String   @unique
+  schoolId        String
+  school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  holisticPercent Float
+  forwardedAt     DateTime @default(now())
+  forwardedBy     String?
+
+  @@index([schoolId])
   @@schema("public")
 }

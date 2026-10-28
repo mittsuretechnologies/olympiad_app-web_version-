@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import { fetcher, authFetch } from '@/lib/swr';
 import {
-  Award, Loader2, Search, Download, ChevronDown, ChevronUp,
+  Loader2, Search, Download, ChevronDown, ChevronUp,
   Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock, BookOpen, Star,
   ChevronRight, ChevronLeft, School, GraduationCap, Send, Undo2,
 } from 'lucide-react';
@@ -747,15 +747,9 @@ ${sc.complete} completed passport${sc.complete === 1 ? '' : 's'} will become vis
   return (
     <div className="space-y-6 pb-8">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-200">
-            <Award className="text-white" size={22} />
+        <div>
+            <h1 className="text-2xl font-medium text-[#004f9f]">Holistic Progress Passport</h1>
           </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Holistic Progress Passport</h1>
-            <p className="text-sm text-gray-400">Each kosh's % = average of exam performance and video evaluation, where both exist</p>
-          </div>
-        </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm p-1">
             <span className="pl-2 pr-1 text-xs font-bold text-gray-400 uppercase tracking-wide">Exam Score:</span>
