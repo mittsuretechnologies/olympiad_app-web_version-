@@ -638,9 +638,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <Link href="/dashboard/settings/app-version" className={subItemClass(pathname === '/dashboard/settings/app-version')}>
                       <span>App Version</span>
                     </Link>
-                    <Link href="/dashboard/settings/daily-report" className={subItemClass(pathname === '/dashboard/settings/daily-report')}>
-                      <span>Daily Report</span>
-                    </Link>
                   </div>
                   </div>
                 </div>

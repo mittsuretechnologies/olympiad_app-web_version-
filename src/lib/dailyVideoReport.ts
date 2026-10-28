@@ -2,16 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { sendDailyVideoReportEmail, renderDailyVideoReportText, DailyVideoReportMail } from '@/lib/mailer';
 
 // Daily internal report of Mittmee videos, emailed at a fixed IST time.
-// Configured by the SuperAdmin in Dashboard → Settings → Daily Report and
-// stored in AppSetting. Sent by the in-app scheduler (src/instrumentation.ts),
+// Configured through DAILY_REPORT_EMAILS / DAILY_REPORT_TIME in the environment.
+// Sent by the in-app scheduler (src/instrumentation.ts),
 // which calls runDailyReportIfDue() every minute. Soft-deleted videos are not
 // counted.
 
 const KEYS = {
-  enabled:   'DAILY_REPORT_ENABLED',
-  emails:    'DAILY_REPORT_EMAILS',
-  time:      'DAILY_REPORT_TIME',        // "HH:MM", 24-hour, IST
-  lastSent:  'DAILY_REPORT_LAST_SENT',   // IST date "YYYY-MM-DD" of the last scheduled send
+  lastSent: 'DAILY_REPORT_LAST_SENT',   // IST date "YYYY-MM-DD" of the last scheduled send
   lastError: 'DAILY_REPORT_LAST_ERROR',
 } as const;
 
@@ -51,31 +48,21 @@ export function invalidEmails(emails: string[]): string[] {
   return emails.filter(e => !EMAIL_RE.test(e));
 }
 
+// Recipients and time come from the environment (DAILY_REPORT_EMAILS,
+// DAILY_REPORT_TIME); the report is on whenever at least one email is set.
+// Only the send bookkeeping (lastSent / lastError) lives in AppSetting.
 export async function getDailyReportSettings(): Promise<DailyReportSettings> {
-  const rows = await prisma.appSetting.findMany({ where: { key: { in: Object.values(KEYS) } } });
+  const rows = await prisma.appSetting.findMany({ where: { key: { in: [KEYS.lastSent, KEYS.lastError] } } });
   const get = (k: string) => rows.find(r => r.key === k)?.value ?? '';
-  const time = get(KEYS.time);
+  const emails = parseEmails(process.env.DAILY_REPORT_EMAILS ?? '');
+  const time = (process.env.DAILY_REPORT_TIME ?? '').trim();
   return {
-    enabled:   get(KEYS.enabled) === 'true',
-    emails:    parseEmails(get(KEYS.emails)),
-    time:      /^\d{2}:\d{2}$/.test(time) ? time : DEFAULT_REPORT_TIME,
+    enabled:   emails.length > 0,
+    emails,
+    time:      /^([01]\d|2[0-3]):[0-5]\d$/.test(time) ? time : DEFAULT_REPORT_TIME,
     lastSent:  get(KEYS.lastSent) || null,
     lastError: get(KEYS.lastError) || null,
   };
-}
-
-export async function setDailyReportSettings(input: { enabled: boolean; emails: string[]; time: string }) {
-  const values: Record<string, string> = {
-    [KEYS.enabled]: input.enabled ? 'true' : 'false',
-    [KEYS.emails]:  input.emails.join(','),
-    [KEYS.time]:    input.time,
-  };
-  await prisma.$transaction(
-    Object.entries(values).map(([key, value]) =>
-      prisma.appSetting.upsert({ where: { key }, update: { value }, create: { key, value } }),
-    ),
-  );
-  return getDailyReportSettings();
 }
 
 export async function buildDailyVideoReport(now = new Date()): Promise<DailyVideoReport> {

@@ -5,8 +5,8 @@ export const dynamic = 'force-dynamic';
 
 // Backup trigger for the daily video report. The app already sends it on its
 // own (src/instrumentation.ts); this exists for setups where the in-app
-// scheduler does not run. It obeys the same settings (Dashboard → Settings →
-// Daily Report) and never sends twice in a day, so calling it more often is safe.
+// scheduler does not run. It obeys the same settings (DAILY_REPORT_EMAILS /
+// DAILY_REPORT_TIME) and never sends twice in a day, so calling it more often is safe.
 //
 // Call it from the server's crontab with CRON_SECRET as a Bearer token,
 // like /api/cron/infringement-reviews.

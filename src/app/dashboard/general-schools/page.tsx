@@ -147,13 +147,9 @@ export default function GeneralSchoolsPage() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#009846]/10 text-[#009846]"><School size={22} /></div>
-          <div>
-            <h1 className="text-xl font-bold text-[#052E5C]">General Schools</h1>
-            <p className="text-xs text-gray-500">Schools that registered themselves in the Mittmee app (not part of the Olympiad programme)</p>
+        <div>
+            <h1 className="text-2xl font-medium text-[#004f9f]">General Schools</h1>
           </div>
-        </div>
         <div className="flex gap-2">
           <button onClick={load} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50">
             <RefreshCw size={14} /> Refresh

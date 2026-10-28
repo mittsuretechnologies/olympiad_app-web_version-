@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { Award, Download, Loader2, Send, Undo2, AlertTriangle, CheckCircle2, Users, MapPin, School } from 'lucide-react';
+import { Download, Loader2, Send, Undo2, AlertTriangle, CheckCircle2, Users, MapPin, School } from 'lucide-react';
 import { fetcher, authFetch } from '@/lib/swr';
 
 interface Row {
@@ -115,17 +115,9 @@ export default function DistrictForwardPage() {
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-200">
-            <Award className="text-white" size={22} />
+        <div>
+            <h1 className="text-2xl font-medium text-[#004f9f]">District Level</h1>
           </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">District Level</h1>
-            <p className="text-sm text-gray-400 max-w-2xl">
-              Across all schools, the top {data.topN} distinct holistic percentages — and every student on them — go to the district level. Only students with a complete result are ranked.
-            </p>
-          </div>
-        </div>
         <div className="flex items-center gap-2">
           <button onClick={exportCsv} disabled={students.length === 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer">
