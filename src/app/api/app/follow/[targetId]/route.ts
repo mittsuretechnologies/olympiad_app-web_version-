@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { notifyNewFollower, notifyFollowRequest } from '@/lib/notifications';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordCoinEvent } from '@/lib/coins/tasks';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -104,7 +105,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ tar
   }
 
   if (didFollow) {
-    const follower = await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { userId: true } });
+    void recordCoinEvent(appUser.id, 'FOLLOW').catch(() => {});
+    const follower =await prisma.appUser.findUnique({ where: { id: appUser.id }, select: { userId: true } });
     await notifyNewFollower({
       followedId: targetId,
       followerId: appUser.id,

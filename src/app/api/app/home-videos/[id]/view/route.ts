@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordCoinEvent } from '@/lib/coins/tasks';
 
 function getAppUserFromToken(request: Request) {
   const authHeader = request.headers.get('Authorization');
@@ -19,9 +20,12 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  if (!getAppUserFromToken(request)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const viewer = getAppUserFromToken(request);
+  if (!viewer) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   try {
     const { id } = await params;
+    // Counts towards a "watch videos" coin task.
+    void recordCoinEvent(viewer.id, 'WATCH_VIDEO').catch(() => {});
     const result = await prisma.homeSectionVideo.updateMany({
       where: { id, isActive: true },
       data: { viewsCount: { increment: 1 } },

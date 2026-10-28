@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { requireAppUser } from '@/lib/coins/appAuth';
+import { recordCoinEvent } from '@/lib/coins/tasks';
 
 // POST /api/reels/[id]/view
 // Body: { sessionId: string }  — every play is counted, repeats included
@@ -35,6 +37,11 @@ export async function POST(
         data:  { viewsCount: { increment: 1 } },
       }),
     ]);
+
+    // Views are anonymous, but a signed-in viewer's watch counts towards a
+    // "watch videos" coin task (signature check only, no extra query).
+    const viewer = requireAppUser(request);
+    if (viewer.userId) void recordCoinEvent(viewer.userId, 'WATCH_VIDEO').catch(() => {});
 
     const updated = await prisma.video.findUnique({
       where:  { id: videoId },

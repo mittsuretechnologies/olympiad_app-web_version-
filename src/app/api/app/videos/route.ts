@@ -12,6 +12,7 @@ import { hasMittfestTag } from '@/lib/mittfest';
 import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { recordCoinEvent } from '@/lib/coins/tasks';
 import {
   ACCOUNT_TYPE_SCHOOL,
   UPLOADER_SCHOOL_OWN,
@@ -220,6 +221,7 @@ export async function POST(request: Request) {
       },
     });
 
+    void recordCoinEvent(appUser.id, 'UPLOAD_VIDEO').catch(() => {});
     return NextResponse.json(newVideo, { status: 201 });
   } catch (error: any) {
     console.error('App video save error:', error);
