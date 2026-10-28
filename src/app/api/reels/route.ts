@@ -30,8 +30,10 @@ const MIX_TTL_MS    = 5 * 60 * 1000;
 const MIX_CACHE_MAX = 100;
 const MIX_CACHE = new Map<string, { at: number; ids: string[] }>();
 
-// A school's own reels, then its city, then its state, then everything else.
+// Reels from people the viewer follows come first, then the viewer's own
+// school's reels, then its city, then its state, then everything else.
 // 3 has no upper neighbour so ties (score never seen) can't collide with it.
+const TIER_FOLLOWING = -1;
 const TIER_SCHOOL = 0;
 const TIER_CITY   = 1;
 const TIER_STATE  = 2;
@@ -67,6 +69,10 @@ export async function GET(request: NextRequest) {
     const subCategory = searchParams.get('subCategory') ?? undefined;
     const userId   = searchParams.get('userId')   ?? undefined;
     const seed     = searchParams.get('seed')     ?? undefined;
+    // One specific video (e.g. opened from a "new video" notification). It still
+    // has to pass the visibility rules below, so a private / removed video
+    // simply comes back empty.
+    const videoId  = searchParams.get('videoId')  ?? undefined;
     const offset   = cursor ? Math.max(parseInt(cursor) || 0, 0) : 0;
 
     const viewerId = getViewerIdFromToken(request);
@@ -77,6 +83,8 @@ export async function GET(request: NextRequest) {
       isPublic: true,
       ...visWhere,
     };
+
+    if (videoId) where.id = videoId;
 
     // category may be a comma-separated list (e.g. the Olympiad and normal
     // names of the same group); subCategory narrows it to one item.
@@ -195,6 +203,14 @@ export async function GET(request: NextRequest) {
         select:  baseSelect,
       });
 
+      // Accounts the viewer follows — their videos lead the feed.
+      const followedIds = viewerId
+        ? new Set((await prisma.follow.findMany({
+            where:  { followerId: viewerId },
+            select: { followingId: true },
+          })).map(f => f.followingId))
+        : new Set<string>();
+
       const poolAppUserIds = [...new Set(pool.map(v => v.appUserId).filter(Boolean))] as string[];
       const poolAppUsersRaw = poolAppUserIds.length > 0
         ? await prisma.appUser.findMany({
@@ -224,7 +240,8 @@ export async function GET(request: NextRequest) {
         // below is a no-op and the sort falls through to pure seeded-random
         // via `rank` alone.
         let tier = TIER_OTHER;
-        if (viewerSchool) {
+        if (v.appUserId && followedIds.has(v.appUserId)) tier = TIER_FOLLOWING;
+        else if (viewerSchool) {
           if (school?.id === viewerSchool.id) tier = TIER_SCHOOL;
           else if (viewerSchool.city  && school?.city  === viewerSchool.city)  tier = TIER_CITY;
           else if (viewerSchool.state && school?.state === viewerSchool.state) tier = TIER_STATE;
@@ -233,15 +250,15 @@ export async function GET(request: NextRequest) {
         return { video: v, tier, rank: seededRank(seed!, v.id) };
       });
 
-      // Already-watched local videos drop out of the front: any school / city /
-      // state video this phone viewed BEFORE this feed-open started (the app
+      // Already-watched followed / local videos drop out of the front: any
+      // followed, school / city / state video this phone viewed BEFORE this feed-open started (the app
       // sends its view session id and that moment) moves into the shuffled
       // "everyone else" group, so the unseen local ones lead. Only views from
       // before the open count — views made while scrolling must not reorder
       // later pages of the same open (that would repeat or skip videos).
       const sessionId  = searchParams.get('sessionId');
       const seenBefore = Number(searchParams.get('seenBefore'));
-      if (viewerSchool && sessionId && seenBefore > 0) {
+      if ((viewerSchool || followedIds.size > 0) && sessionId && seenBefore > 0) {
         const localIds = tiered.filter(t => t.tier !== TIER_OTHER).map(t => t.video.id);
         if (localIds.length > 0) {
           const seenRows = await prisma.videoView.findMany({
