@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import {
-  AlertCircle, CheckCircle2, Clock, Download, FileSignature, Loader2,
+  AlertCircle, CheckCircle2, Clock, Download, Loader2,
   RefreshCw, Search, Shield, Users, X, ChevronLeft, ChevronRight,
   Building2, Calendar, User, Fingerprint, ShieldCheck, RotateCcw,
 } from 'lucide-react';
@@ -227,17 +227,9 @@ export default function AgreementsPage() {
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-        <div className="flex items-center gap-3 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-[#1559C7]/10 flex items-center justify-center flex-shrink-0">
-            <FileSignature size={18} className="text-[#1559C7]" />
+        <div className="min-w-0">
+            <h1 className="text-2xl font-medium text-[#004f9f]">Agreement Register</h1>
           </div>
-          <div className="min-w-0">
-            <h1 className="text-[18px] font-semibold text-[#0E2A5C] leading-tight">Agreement Register</h1>
-            <p className="text-[12px] text-[#6B7280] mt-0.5">
-              {roleMeta.document} — acceptance records{role === 'SCHOOL' && data ? ` · v${data.currentVersion}` : ''}{role === 'EVALUATOR' && evalData ? ` · v${evalData.currentVersion}` : ''}
-            </p>
-          </div>
-        </div>
         <div className="sm:ml-auto flex items-center gap-2 flex-shrink-0">
           <button onClick={load} disabled={status === 'loading'} title="Refresh" className="inline-flex items-center justify-center h-9 w-9 rounded-lg border border-[#E4E8EE] bg-white hover:bg-[#F3F5F8] disabled:opacity-50 transition-colors">
             <RefreshCw size={15} className={status === 'loading' ? 'animate-spin text-[#1559C7]' : 'text-[#6B7280]'} />

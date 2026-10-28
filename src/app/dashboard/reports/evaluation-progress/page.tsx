@@ -5,7 +5,7 @@ import Link from 'next/link';
 import useSWR from 'swr';
 import { fetcher } from '@/lib/swr';
 import {
-  ClipboardCheck, Loader2, Search, Download, ChevronDown, ChevronUp,
+  Loader2, Search, Download, ChevronDown, ChevronUp,
   Users, Building2, Filter, X, CheckCircle2, Clock, Video, Play,
   AlertCircle, BarChart2, Pencil
 } from 'lucide-react';
@@ -232,15 +232,9 @@ export default function EvaluationProgressPage() {
 
       {/* ── Header ── */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-500 to-fuchsia-600 flex items-center justify-center shadow-lg shadow-violet-200">
-            <ClipboardCheck className="text-white" size={22} />
+        <div>
+            <h1 className="text-2xl font-medium text-[#004f9f]">Evaluation Progress</h1>
           </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">Evaluation Progress</h1>
-            <p className="text-sm text-gray-400">Student-wise evaluation status for Olympiad videos</p>
-          </div>
-        </div>
         <button onClick={downloadCSV}
           className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-all hover:shadow-md active:scale-95">
           <Download size={16} /> Export CSV

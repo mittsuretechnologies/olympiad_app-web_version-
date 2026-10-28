@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { Award, Download, Loader2, Search, School, Users, Medal } from 'lucide-react';
+import { Award, Download, Loader2, Search, School, Users } from 'lucide-react';
 import { fetcher } from '@/lib/swr';
 
 interface Student { name: string; olympiadCode: string; className: string | null }
@@ -68,17 +68,9 @@ export default function SchoolToppersPage() {
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg shadow-amber-200">
-            <Medal className="text-white" size={22} />
+        <div>
+            <h1 className="text-2xl font-medium text-[#004f9f]">School Toppers</h1>
           </div>
-          <div>
-            <h1 className="text-2xl font-extrabold text-gray-900">School Toppers</h1>
-            <p className="text-sm text-gray-400 max-w-2xl">
-              Each school&apos;s top {data.topN} distinct holistic percentages, and every student on them. Only students with a complete result are ranked.
-            </p>
-          </div>
-        </div>
         <button onClick={exportCsv} disabled={filtered.length === 0}
           className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer">
           <Download size={16} /> Export CSV
