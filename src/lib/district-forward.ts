@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma';
 import { getResultOverview } from '@/lib/result-overview';
 
 // How many distinct holistic percentages count as "top" when picking students
-// to forward to the district level.
+// to forward to the next level.
 export const DISTRICT_TOP_N = 10;
 
 export interface RankedStudent {
@@ -18,7 +18,7 @@ export interface RankedStudent {
   rank: number; // 1 = highest distinct percentage
 }
 
-// The district-level pool: across ALL schools together, every student with a
+// The qualifying pool: across ALL schools together, every student with a
 // complete result (exam + both videos), take the top DISTRICT_TOP_N distinct
 // holistic percentages; everyone sitting on one of those percentages qualifies,
 // so ties can make it more than ten students. Uses the same numbers as the

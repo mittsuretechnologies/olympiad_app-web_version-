@@ -5,7 +5,7 @@ import { rankForDistrict, schoolIdsByCode, DISTRICT_TOP_N } from '@/lib/district
 
 export const dynamic = 'force-dynamic';
 
-// GET    /api/result/district-forward   the district-level pool: top distinct holistic %s across all
+// GET    /api/result/district-forward   the qualifying pool: top 10 distinct holistic %s across all
 //                                       schools, everyone on them, and who is already forwarded
 // POST   /api/result/district-forward   forward everyone currently in the pool
 // DELETE /api/result/district-forward   { olympiadCode } withdraw one student, or { all: true } everyone
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ topN: DISTRICT_TOP_N, topPercents, tableReady, students });
   } catch (err: any) {
     console.error('GET result/district-forward failed:', err);
-    return NextResponse.json({ message: 'Failed to load the district pool' }, { status: 500 });
+    return NextResponse.json({ message: 'Failed to load the state-level pool' }, { status: 500 });
   }
 }
 
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       const schoolId = s.schoolCode ? schoolIds.get(s.schoolCode) : undefined;
       return schoolId ? [{ olympiadCode: s.olympiadCode, schoolId, holisticPercent: s.holisticPercent, forwardedBy: payload?.id ?? null }] : [];
     });
-    if (data.length === 0) return NextResponse.json({ message: 'Nobody is in the district pool yet' }, { status: 400 });
+    if (data.length === 0) return NextResponse.json({ message: 'Nobody is in the state-level pool yet' }, { status: 400 });
     // Already-forwarded students are left exactly as they were.
     const res = await prisma.districtForward.createMany({ data, skipDuplicates: true });
     return NextResponse.json({ forwarded: res.count, inPool: qualifying.length });
