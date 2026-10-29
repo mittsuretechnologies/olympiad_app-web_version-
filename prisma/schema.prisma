@@ -1492,6 +1492,9 @@ model CoinGameRule {
   bands          Json
   updatedAt      DateTime @updatedAt
 
+  @@schema("public")
+}
+
 // A student SuperAdmin has forwarded to the district level: they were among
 // those on the top 10 distinct holistic percentages across all schools. One row
 // per student (olympiadCode is unique); deleting the row withdraws them.
