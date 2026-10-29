@@ -25,7 +25,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { STATES, STATE_CODE_BY_NAME, getDistrictsForState } from '@/lib/locations';
+import { STATES, STATE_CODE_BY_NAME, getDistrictsForState, findDistrictByName } from '@/lib/locations';
 import { CLASSES } from '@/lib/classes';
 import { olympiadPrefixForCrm } from '@/lib/olympiadIdFormat';
 
@@ -214,7 +214,7 @@ export default function SchoolsPage() {
     const stateCode = school.stateCode || STATE_CODE_BY_NAME[school.state] || '';
     const districtCode =
       school.districtCode ||
-      getDistrictsForState(stateCode).find((d) => d.name === school.district)?.code ||
+      findDistrictByName(stateCode, school.district)?.code ||
       '';
 
     setEditFormData({

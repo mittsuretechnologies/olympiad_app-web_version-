@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { requireRole } from '@/lib/auth-guard';
-import { STATES } from '@/lib/locations';
+import { STATES, findDistrictByName } from '@/lib/locations';
 import { currentGeneralSchoolAcceptance, getGeneralSchoolForUser } from '@/lib/generalSchool';
 
 export const dynamic = 'force-dynamic';
@@ -65,9 +65,7 @@ export async function PATCH(request: Request) {
     if (body.state !== undefined || body.district !== undefined) {
       const stateDef = STATES.find(s => s.name.toLowerCase() === String(body.state ?? school.state).trim().toLowerCase());
       if (!stateDef) return NextResponse.json({ message: 'Select your state' }, { status: 400 });
-      const districtDef = stateDef.districts.find(
-        d => d.name.toLowerCase() === String(body.district ?? school.district).trim().toLowerCase(),
-      );
+      const districtDef = findDistrictByName(stateDef.code, String(body.district ?? school.district));
       if (!districtDef) return NextResponse.json({ message: 'Select your district' }, { status: 400 });
       data.state = stateDef.name;
       data.district = districtDef.name;

@@ -4,7 +4,7 @@ import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
 import { signAppUserToken } from '@/lib/appUserToken';
-import { STATES } from '@/lib/locations';
+import { STATES, findDistrictByName } from '@/lib/locations';
 import {
   SCHOOL_AGREEMENT_KEY,
   SCHOOL_AGREEMENT_VERSION,
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
     // auto hashtags and the admin filters, so free text would fragment them.
     const stateDef = STATES.find(s => s.name.toLowerCase() === stateIn.toLowerCase());
     if (!stateDef) return NextResponse.json({ message: 'Select your state' }, { status: 400 });
-    const districtDef = stateDef.districts.find(d => d.name.toLowerCase() === districtIn.toLowerCase());
+    const districtDef = findDistrictByName(stateDef.code, districtIn);
     if (!districtDef) return NextResponse.json({ message: 'Select your district' }, { status: 400 });
 
     // Agreement: the same document and the same four declarations an Olympiad

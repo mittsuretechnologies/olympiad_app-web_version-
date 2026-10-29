@@ -68,19 +68,19 @@ export default function DistrictForwardPage() {
   };
 
   const forwardAll = async () => {
-    if (!window.confirm(`Forward ${pending} student${pending === 1 ? '' : 's'} to the district level?\n\nThese are everyone on the top ${data?.topN} holistic percentages across all schools.`)) return;
+    if (!window.confirm(`Forward ${pending} student${pending === 1 ? '' : 's'} to the state level?\n\nThese are everyone on the top ${data?.topN} holistic percentages across all schools.`)) return;
     const j = await call('all', 'POST');
-    if (j) setNotice({ ok: true, text: `${j.forwarded} student${j.forwarded === 1 ? '' : 's'} forwarded to the district level.` });
+    if (j) setNotice({ ok: true, text: `${j.forwarded} student${j.forwarded === 1 ? '' : 's'} forwarded to the state level.` });
   };
 
   const withdraw = async (s: Row) => {
-    if (!window.confirm(`Withdraw ${s.name} (${s.olympiadCode}) from the district level?`)) return;
+    if (!window.confirm(`Withdraw ${s.name} (${s.olympiadCode}) from the state level?`)) return;
     const j = await call(s.olympiadCode, 'DELETE', { olympiadCode: s.olympiadCode });
     if (j) setNotice({ ok: true, text: `${s.name} withdrawn.` });
   };
 
   const withdrawAll = async () => {
-    if (!window.confirm(`Withdraw ALL ${forwardedCount} forwarded students from the district level?`)) return;
+    if (!window.confirm(`Withdraw ALL ${forwardedCount} forwarded students from the state level?`)) return;
     const j = await call('all', 'DELETE', { all: true });
     if (j) setNotice({ ok: true, text: `${j.withdrawn} withdrawn.` });
   };
@@ -94,7 +94,7 @@ export default function DistrictForwardPage() {
     const csv = [header, ...lines].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
-    a.href = url; a.download = `district-level-students-${new Date().toISOString().split('T')[0]}.csv`; a.click();
+    a.href = url; a.download = `state-level-students-${new Date().toISOString().split('T')[0]}.csv`; a.click();
     URL.revokeObjectURL(url);
   };
 
@@ -109,14 +109,14 @@ export default function DistrictForwardPage() {
     );
   }
   if (error || !data) {
-    return <div className="bg-white rounded-2xl border border-red-100 shadow-sm py-10 text-center text-red-500 font-medium">Could not load the district pool. Please refresh.</div>;
+    return <div className="bg-white rounded-2xl border border-red-100 shadow-sm py-10 text-center text-red-500 font-medium">Could not load the state-level pool. Please refresh.</div>;
   }
 
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-            <h1 className="text-2xl font-medium text-[#004f9f]">District Level</h1>
+            <h1 className="text-2xl font-medium text-[#004f9f]">State Level</h1>
           </div>
         <div className="flex items-center gap-2">
           <button onClick={exportCsv} disabled={students.length === 0}
@@ -132,7 +132,7 @@ export default function DistrictForwardPage() {
           <button onClick={forwardAll} disabled={pending === 0 || busy !== null || !data.tableReady}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#06013E] text-[#F5E9C8] text-sm font-bold shadow-md hover:bg-[#0a0258] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
             {busy === 'all' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
-            Forward {pending > 0 ? `${pending} ` : ''}to district
+            Forward {pending > 0 ? `${pending} ` : ''}to state
           </button>
         </div>
       </div>
