@@ -55,12 +55,11 @@ export default function SchoolOlympiadIdsPage() {
   /**
    * Delivery step. Pressing Allot on the details form doesn't register anyone —
    * it moves the modal to this step, where the school picks which channels the
-   * credentials go out on. SMS is the default because every student has a phone
-   * number on this form while email is optional.
+   * credentials go out on. Only email is offered — there is no approved SMS
+   * template for credentials yet.
    */
   const [allotStep, setAllotStep] = useState<'details' | 'deliver'>('details');
   const [sendEmail, setSendEmail] = useState(false);
-  const [sendSms, setSendSms] = useState(true);
   const [allotSuccess, setAllotSuccess] = useState<{
     code: string; userId: string; password: string;
     email: string; phone: string;
@@ -103,12 +102,11 @@ export default function SchoolOlympiadIdsPage() {
     setAllotSuccess(null);
     setAllotStep('details');
     setSendEmail(false);
-    setSendSms(true);
   };
   const closeAllotModal = () => {
     setAllotRow(null); setAllotName(''); setAllotGuardianName(''); setAllotPhone(''); setAllotEmail('');
     setAllotError(''); setAllotSuccess(null); setAllotStep('details');
-    setSendEmail(false); setSendSms(true);
+    setSendEmail(false);
   };
 
   /** Validates the details form, then hands over to the delivery step. All four
@@ -128,7 +126,6 @@ export default function SchoolOlympiadIdsPage() {
 
   const handleAllot = async () => {
     if (!allotRow) return;
-    if (!sendEmail && !sendSms) { setAllotError('Pick at least one way to send the credentials'); return; }
     setAllotting(true); setAllotError('');
     try {
       // Registers against this exact code. The password is generated server-side
@@ -142,7 +139,6 @@ export default function SchoolOlympiadIdsPage() {
           phone: allotPhone.trim(),
           email: allotEmail.trim(),
           sendEmail,
-          sendSms,
         }),
       });
       const data = await res.json();
@@ -550,19 +546,6 @@ export default function SchoolOlympiadIdsPage() {
                 They are also shown here once the ID is allotted.
               </p>
               <div className="space-y-2">
-                <label className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${sendSms ? 'border-[#1559C7] bg-[#1559C7]/[0.05]' : 'border-[#E6E8EC] bg-white'}`}>
-                  <input
-                    type="checkbox" checked={sendSms}
-                    onChange={e => { setSendSms(e.target.checked); setAllotError(''); }}
-                    className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[#1559C7]"
-                  />
-                  <span className="min-w-0">
-                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0F1B2D]">
-                      <Phone size={13} className="text-[#677285]" /> Send by SMS
-                    </span>
-                    <span className="mt-0.5 block truncate text-[11.5px] tabular-nums text-[#677285]">{allotPhone.trim()}</span>
-                  </span>
-                </label>
                 {/* Email is only offerable when an address was filled in on the
                     previous step, so the disabled state explains itself rather
                     than looking like a permission problem. */}
