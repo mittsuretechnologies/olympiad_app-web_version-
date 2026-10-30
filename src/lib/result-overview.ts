@@ -11,9 +11,10 @@ export type ExamSource = 'ai' | 'manual';
 // Everyone's result rows (students, videos, exam marks, kosha breakdown, holistic %).
 // Shared by the SuperAdmin Result page and the school's own "Student Passports" page.
 // `schoolCode` scopes it to one school (and loads only that school's rows); with
-// none it is every student — heavy, only the CSV export uses that. Returns null
+// none it is every student — heavy, only the CSV export uses that. `onlyCode`
+// narrows a school scope further to a single Olympiad ID. Returns null
 // when schoolCode names no school.
-export async function getResultOverview(schoolCode: string, examSource: ExamSource) {
+export async function getResultOverview(schoolCode: string, examSource: ExamSource, onlyCode?: string) {
   let scopeCodes: string[] | null = null;
   let scopeSchool: { name: string; schoolId: string; city: string | null } | null = null;
   if (schoolCode) {
@@ -25,6 +26,8 @@ export async function getResultOverview(schoolCode: string, examSource: ExamSour
       select: { code: true },
     });
     scopeCodes = scopeAllocs.map(a => a.code);
+    // One student's passport (the mobile app): load just that Olympiad ID, not the whole school.
+    if (onlyCode) scopeCodes = scopeCodes.filter(c => c === onlyCode);
   }
 
   // Every AppUser assigned an olympiad code — not just the ones with a
