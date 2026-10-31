@@ -12,6 +12,7 @@ import {
   OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_OPTIONS, OLYMPIAD_CAT_B_OPTIONS,
   OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
+import { SCHOOL_ACTIVITY_LABEL, categoryGroupsFor, currentGroupLabel } from '@/lib/moderationCategories';
 import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
 import { CLAIM_RENEW_MS, claimIsLive } from '@/lib/videoClaim';
 import { mergeTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
@@ -146,8 +147,9 @@ function allTags(video: Video): string[] {
   return mergeTags(defaultTagsOf(video), editableTags(video)).split(',').filter(Boolean);
 }
 
-// App upload categories for general users with a single sub-option each. The
-// recategorise dropdowns only know the Olympiad A/B lists, so these stay read-only.
+// App upload categories for general users with a single sub-option each; the
+// filter lists them. What a video can be moved to is decided per uploader by
+// categoryGroupsFor (lib/moderationCategories.ts).
 const GENERAL_ONLY_CATEGORIES = ['Learning', 'Parenting', 'Others'];
 
 function getCategoryLabel(cat: string) {
@@ -168,15 +170,8 @@ function homeSectionBadge(category: string | null) {
 // Seeds the main-category dropdown. Older rows store the raw 'Cat A' / 'Cat B'
 // values instead of the display labels, and some have no usable category at all
 // — fall back to deriving it from the subcategory so the select is never blank.
-function normalizeCat(video: { category: string | null; subCategory: string | null }): string {
-  const c = video.category;
-  if (c === OLYMPIAD_CAT_A_LABEL || c === 'Cat A') return OLYMPIAD_CAT_A_LABEL;
-  if (c === OLYMPIAD_CAT_B_LABEL || c === 'Cat B') return OLYMPIAD_CAT_B_LABEL;
-  // A school's own category: keep it, so the dropdown doesn't default to
-  // Talent Performance and re-file the video if a moderator touches it.
-  if (c === 'School Activity') return c;
-  if (OLYMPIAD_CAT_B_SUBS.includes(video.subCategory ?? '')) return OLYMPIAD_CAT_B_LABEL;
-  return OLYMPIAD_CAT_A_LABEL;
+function normalizeCat(video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'category' | 'subCategory'>): string {
+  return currentGroupLabel(video);
 }
 
 // Must check every role's token key (token / reviewerToken / evaluatorToken /
@@ -723,8 +718,9 @@ export default function VideoModerationPage() {
   // additionally get a slot-conflict check server-side; non-evaluation videos
   // don't occupy an A/B slot so there's nothing to conflict with.
   const canEditCategory = !!previewVideo && !previewVideo.deletedAt &&
-    (filter === 'PENDING' || filter === 'APPROVED') &&
-    !GENERAL_ONLY_CATEGORIES.includes(previewVideo.category ?? '');
+    (filter === 'PENDING' || filter === 'APPROVED');
+  // The groups this uploader gets in the app (see lib/moderationCategories.ts).
+  const categoryGroups = previewVideo ? categoryGroupsFor(previewVideo) : [];
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -857,6 +853,9 @@ export default function VideoModerationPage() {
                   </optgroup>
                   <optgroup label="General uploads">
                     {GENERAL_ONLY_CATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
+                  </optgroup>
+                  <optgroup label="School uploads">
+                    <option value={`cat:${SCHOOL_ACTIVITY_LABEL}`}>{SCHOOL_ACTIVITY_LABEL} (all)</option>
                   </optgroup>
                 </select>
               </div>
@@ -1251,13 +1250,14 @@ export default function VideoModerationPage() {
                         onChange={e => {
                           const cat = e.target.value;
                           setEditedCat(cat);
-                          const subs = cat === OLYMPIAD_CAT_A_LABEL ? OLYMPIAD_CAT_A_OPTIONS : OLYMPIAD_CAT_B_OPTIONS;
+                          const subs = categoryGroups.find(g => g.label === cat)?.subs ?? [];
                           if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0]);
                         }}
                         className="text-[11px] font-black text-amber-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-300"
                       >
-                        <option value={OLYMPIAD_CAT_A_LABEL} className="text-black">{OLYMPIAD_CAT_A_LABEL}</option>
-                        <option value={OLYMPIAD_CAT_B_LABEL} className="text-black">{OLYMPIAD_CAT_B_LABEL}</option>
+                        {categoryGroups.map(g => (
+                          <option key={g.label} value={g.label} className="text-black">{g.label}</option>
+                        ))}
                       </select>
                       <select
                         value={editedSubCat}
@@ -1266,7 +1266,7 @@ export default function VideoModerationPage() {
                       >
                         {/* The app's options, plus the video's own value if it is an
                             older spelling, so the dropdown shows what is saved. */}
-                        {withCurrent(editedCat === OLYMPIAD_CAT_B_LABEL ? OLYMPIAD_CAT_B_OPTIONS : OLYMPIAD_CAT_A_OPTIONS, previewVideo.subCategory)
+                        {withCurrent([...(categoryGroups.find(g => g.label === editedCat)?.subs ?? [])], previewVideo.subCategory)
                           .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
                       </select>
                     </>
