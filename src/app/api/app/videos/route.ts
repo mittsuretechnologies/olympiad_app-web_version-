@@ -7,7 +7,10 @@ import {
   OLYMPIAD_CAT_B_SUBS,
   OLYMPIAD_CAT_A_LABEL,
   OLYMPIAD_CAT_B_LABEL,
+  STATE_CATEGORY,
+  STATE_SUBS,
 } from '@/lib/olympiad-categories';
+import { isStateQualified, stateSlotOf } from '@/lib/state-round';
 import { hasMittfestTag } from '@/lib/mittfest';
 import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
@@ -149,8 +152,24 @@ export async function POST(request: Request) {
 
     const uploaderType = isSchoolAccount ? UPLOADER_SCHOOL_OWN : olympiadCode ? 'STUDENT' : 'VIEWER';
 
+    // State round: only a student forwarded to the state level, one video, on
+    // their own saved Olympiad ID (never one typed into the request).
+    const isStateVideo = category === STATE_CATEGORY;
+    if (isStateVideo) {
+      if (!STATE_SUBS.includes(subCategory)) {
+        return NextResponse.json({ error: 'Pick a valid category for the state round.' }, { status: 400 });
+      }
+      if (!user?.olympiadId || olympiadCode !== user.olympiadId || !(await isStateQualified(user.olympiadId))) {
+        return NextResponse.json({ error: 'The state round is only open to students who qualified for it.' }, { status: 403 });
+      }
+      const stateSlot = await stateSlotOf({ appUserId: appUser.id, studentId });
+      if (stateSlot.used) {
+        return NextResponse.json({ error: 'You have already submitted your state round video.' }, { status: 409 });
+      }
+    }
+
     // Olympiad upload: auto-set isEvaluation and enforce 1-per-category slot limit
-    let finalIsEvaluation = !isSchoolAccount && isEvaluation !== undefined ? Boolean(isEvaluation) : false;
+    let finalIsEvaluation = isStateVideo || (!isSchoolAccount && isEvaluation !== undefined ? Boolean(isEvaluation) : false);
     if (isOlympiadUpload && !isSchoolAccount) {
       finalIsEvaluation = true;
       // Use category label to detect slot — subCategory may be a custom "special talent" label

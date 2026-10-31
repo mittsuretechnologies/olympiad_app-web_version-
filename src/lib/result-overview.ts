@@ -5,6 +5,7 @@ import {
   type CriterionScores,
 } from '@/lib/kosh';
 import { getLatestExamResults } from '@/lib/scanner-exam';
+import { SCHOOL_ROUND_VIDEOS } from '@/lib/olympiad-categories';
 
 export type ExamSource = 'ai' | 'manual';
 
@@ -62,7 +63,7 @@ export async function getResultOverview(schoolCode: string, examSource: ExamSour
 
   const allVideos = await prisma.video.findMany({
     where: {
-      isEvaluation: true, status: 'APPROVED', deletedAt: null,
+      isEvaluation: true, status: 'APPROVED', deletedAt: null, ...SCHOOL_ROUND_VIDEOS,
       ...(scopeCodes ? { OR: [{ studentId: { in: allWebStudents.map(st => st.id) } }, { appUserId: { in: allAppUsers.map(u => u.id) } }] } : {}),
     },
     include: {

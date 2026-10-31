@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
 import { videoPercent } from '@/lib/kosh';
+import { SCHOOL_ROUND_VIDEOS } from '@/lib/olympiad-categories';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +18,7 @@ export async function GET(request: Request) {
         isEvaluation: true,
         status: 'APPROVED',
         deletedAt: null,
+        ...SCHOOL_ROUND_VIDEOS,
       },
       include: {
         student: {

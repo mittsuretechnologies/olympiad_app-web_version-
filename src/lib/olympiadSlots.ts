@@ -4,6 +4,7 @@ import {
   OLYMPIAD_CAT_B_SUBS,
   OLYMPIAD_CAT_A_LABEL,
   OLYMPIAD_CAT_B_LABEL,
+  SCHOOL_ROUND_VIDEOS,
 } from '@/lib/olympiad-categories';
 
 /**
@@ -125,7 +126,7 @@ export async function slotsForStudent(student: SchoolStudent) {
   // is removed, so soft-deleted rows must be seen too (computeOlympiadSlots
   // ignores them for everything else).
   const videos = await prisma.video.findMany({
-    where: { OR: owners, isEvaluation: true },
+    where: { OR: owners, isEvaluation: true, ...SCHOOL_ROUND_VIDEOS },
     select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
   });
   return computeOlympiadSlots(videos);

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { SCHOOL_ROUND_VIDEOS, STATE_CATEGORY } from '@/lib/olympiad-categories';
 import { videoPercent, koshScoresFromVideos, koshGrade, koshPercent, KOSH_KEYS, KOSH_MAX_SCORE, REQUIRED_VIDEOS, type CriterionScores } from '@/lib/kosh';
 import { requireModule } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
@@ -85,6 +86,7 @@ export async function GET(request: Request) {
     const siblingsByOwnerKey = await prisma.video.findMany({
       where: {
         isEvaluation: true,
+        ...SCHOOL_ROUND_VIDEOS,
         OR: [
           { studentId: { in: allOwnerVideos.filter(v => v.studentId).map(v => v.studentId!) } },
           { appUserId: { in: allOwnerVideos.filter(v => v.appUserId).map(v => v.appUserId!) } },
@@ -176,6 +178,10 @@ export async function GET(request: Request) {
 
       // Evaluators only see students from schools assigned to them.
       if (schoolFilter && (!schoolId || !schoolFilter.has(schoolId))) continue;
+
+      // A state-round video is its own card, so it never mixes into the
+      // student's school-round kosha grades or combined percent.
+      if (v.category === STATE_CATEGORY) key = `${key}:state`;
 
       if (!groupMap.has(key)) {
         groupMap.set(key, { studentKey: key, studentName, username, olympiadCode, className, schoolName, videosByVideoId: new Map() });

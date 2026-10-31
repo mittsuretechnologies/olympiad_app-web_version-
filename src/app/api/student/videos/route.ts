@@ -5,6 +5,7 @@ import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
 import { schoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { STATE_CATEGORY } from '@/lib/olympiad-categories';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -34,6 +35,11 @@ export async function POST(request: Request) {
 
     if (!videoUrl || !category || !subCategory) {
       return NextResponse.json({ error: 'Missing required fields: videoUrl, category, subCategory' }, { status: 400 });
+    }
+
+    // The state round is uploaded from the app only (see POST /api/app/videos).
+    if (category === STATE_CATEGORY) {
+      return NextResponse.json({ error: 'The state round video can only be uploaded from the app.' }, { status: 403 });
     }
 
     const abuse = captionTagsAbuseMessage(caption, tags);

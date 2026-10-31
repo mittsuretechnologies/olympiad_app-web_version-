@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 // The option lists below match the mobile app's upload screen exactly
 // (Olympiad_App/Components/screens/app/UploadScreen.js: OLY_CAT_A_SUBS,
 // OLY_CAT_B_NURSERY_SUBS, OLY_CAT_B_UKG_SUBS). The selected option's label is
@@ -78,6 +80,19 @@ export const OLYMPIAD_CAT_B_SUBS = [
 
 export const OLYMPIAD_CAT_A_LABEL = 'Talent Performance';
 export const OLYMPIAD_CAT_B_LABEL = 'Rhymes / Speech';
+
+// State round — one video, only for students forwarded to the state level. The
+// sub-categories are placeholders for now. They must never share a name with a
+// Cat A / Cat B option, because a sub-category alone decides an A/B slot.
+export const STATE_CATEGORY = 'statelvl';
+export const STATE_SUBS = ['State Talent', 'State Speech', 'State Creativity'];
+
+// Add to a Video query that is about the school round, so a state-round video is
+// never counted as a student's extra school-round video. Spelled out with
+// `category: null` because a plain `not` would also drop rows with no category.
+export const SCHOOL_ROUND_VIDEOS: Prisma.VideoWhereInput = {
+  AND: [{ OR: [{ category: null }, { category: { not: STATE_CATEGORY } }] }],
+};
 
 // Maps the internal stored category value ('Cat A' / 'Cat B') — or an
 // already-friendly label from older records — to the current display name.

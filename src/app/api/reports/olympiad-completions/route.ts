@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireRole, requireModule } from '@/lib/auth-guard';
+import { SCHOOL_ROUND_VIDEOS } from '@/lib/olympiad-categories';
 
 export async function GET(request: Request) {
   const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'REVIEWER', 'EVALUATOR', 'MODERATOR']);
@@ -11,7 +12,7 @@ export async function GET(request: Request) {
     // Web students with 2 approved evaluation videos
     const webVideos = await prisma.video.groupBy({
       by: ['studentId'],
-      where: { isEvaluation: true, status: 'APPROVED', studentId: { not: null } },
+      where: { isEvaluation: true, status: 'APPROVED', studentId: { not: null }, ...SCHOOL_ROUND_VIDEOS },
       _count: { id: true },
       having: { id: { _count: { gte: 2 } } },
     });
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     // App users with 2 approved evaluation videos
     const appVideos = await prisma.video.groupBy({
       by: ['appUserId'],
-      where: { isEvaluation: true, status: 'APPROVED', appUserId: { not: null } },
+      where: { isEvaluation: true, status: 'APPROVED', appUserId: { not: null }, ...SCHOOL_ROUND_VIDEOS },
       _count: { id: true },
       having: { id: { _count: { gte: 2 } } },
     });

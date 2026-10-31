@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
 import { REQUIRED_VIDEOS } from '@/lib/kosh';
+import { SCHOOL_ROUND_VIDEOS } from '@/lib/olympiad-categories';
 import { normaliseQuery, schoolMatchesQuery, studentMatchesQuery } from '@/lib/resultSearch';
 
 export const dynamic = 'force-dynamic';
@@ -37,7 +38,7 @@ export async function GET(request: Request) {
       prisma.student.findMany({ select: { id: true, name: true, olympiadCode: true } }),
       prisma.appUser.findMany({ where: { olympiadId: { not: null } }, select: { id: true, userId: true, olympiadId: true } }),
       prisma.video.findMany({
-        where: { isEvaluation: true, status: 'APPROVED', deletedAt: null },
+        where: { isEvaluation: true, status: 'APPROVED', deletedAt: null, ...SCHOOL_ROUND_VIDEOS },
         select: { studentId: true, appUserId: true, evaluations: { select: { isPublished: true } } },
       }),
     ]);

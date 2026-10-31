@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { requireModule } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { assignedSchoolIds } from '@/lib/evaluatorRegion';
+import { STATE_CATEGORY } from '@/lib/olympiad-categories';
 
 export async function GET(request: Request) {
   try {
@@ -79,14 +80,15 @@ export async function GET(request: Request) {
     const allocByCode = new Map(allocations.map(a => [a.code, a]));
 
     // Group each owner's videos so we can assign slot 0 / slot 1 by createdAt order.
+    // A state-round video is its own card, never the student's "Video 3".
     const bySlotKey = new Map<string, typeof studentVideos | typeof appVideos>();
     for (const v of studentVideos) {
-      const key = `s:${v.studentId}`;
+      const key = `s:${v.studentId}${v.category === STATE_CATEGORY ? ':state' : ''}`;
       if (!bySlotKey.has(key)) bySlotKey.set(key, []);
       (bySlotKey.get(key) as any[]).push(v);
     }
     for (const v of appVideos) {
-      const key = `a:${v.appUserId}`;
+      const key = `a:${v.appUserId}${v.category === STATE_CATEGORY ? ':state' : ''}`;
       if (!bySlotKey.has(key)) bySlotKey.set(key, []);
       (bySlotKey.get(key) as any[]).push(v);
     }

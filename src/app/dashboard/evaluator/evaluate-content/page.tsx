@@ -250,6 +250,9 @@ export default function EvaluateContentPage() {
                     <User className="w-3.5 h-3.5 flex-shrink-0 text-[#004f9f]" />
                     <span className="truncate">{s.studentName}</span>
                     <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
+                    {s.ownerKey.endsWith(':state') && (
+                      <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full flex-shrink-0">State round</span>
+                    )}
                   </div>
                   {s.schoolName && (
                     <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-400 truncate">
@@ -258,7 +261,8 @@ export default function EvaluateContentPage() {
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3 p-3 pt-1">
-                  {[0, 1].map(slot => {
+                  {/* A state-round card has its one video, so no empty "Video 2" box. */}
+                  {(s.ownerKey.endsWith(':state') ? [0] : [0, 1]).map(slot => {
                     const v = s.slots[slot];
                     if (!v) {
                       return (

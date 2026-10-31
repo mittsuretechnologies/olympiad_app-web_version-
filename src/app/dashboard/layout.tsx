@@ -287,6 +287,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'School Toppers', href: '/dashboard/result/school-toppers', icon: Trophy },
     { name: 'District Toppers', href: '/dashboard/result/district-toppers', icon: Trophy },
     { name: 'State Level', href: '/dashboard/result/district-forward', icon: Trophy },
+    { name: 'State Round', href: '/dashboard/result/state-round', icon: Trophy },
   ];
 
   const subItemClass = (isActive: boolean) =>
