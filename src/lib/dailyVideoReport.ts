@@ -70,9 +70,11 @@ export async function buildDailyVideoReport(now = new Date()): Promise<DailyVide
   const dayStart = new Date(Date.UTC(i.getUTCFullYear(), i.getUTCMonth(), i.getUTCDate()) - IST_OFFSET_MS);
 
   const live = { deletedAt: null };
-  const [total, today, byStatus, pendingVideos] = await Promise.all([
+  const [total, today, todayRejected, byStatus, pendingVideos] = await Promise.all([
     prisma.video.count({ where: live }),
     prisma.video.count({ where: { ...live, createdAt: { gte: dayStart } } }),
+    // No separate "rejected at" column: a rejected video's updatedAt is when it was last changed, i.e. the rejection.
+    prisma.video.count({ where: { ...live, status: 'REJECTED', updatedAt: { gte: dayStart } } }),
     prisma.video.groupBy({ by: ['status'], where: live, _count: { _all: true } }),
     prisma.video.findMany({
       where: { ...live, status: 'PENDING' },
@@ -88,7 +90,7 @@ export async function buildDailyVideoReport(now = new Date()): Promise<DailyVide
     total,
     today,
     approved: countOf('APPROVED'),
-    rejected: countOf('REJECTED'),
+    todayRejected,
     pending:  countOf('PENDING'),
     pendingUploadedAt: pendingVideos.map(v => `${istDate(v.createdAt)}, ${istTime(v.createdAt)}`),
   };
