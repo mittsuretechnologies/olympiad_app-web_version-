@@ -400,7 +400,7 @@ const EXAM_DATE_TONES = [
 
 // Schools sitting their exam today, followed by upcoming exam dates in order.
 function ExamScheduleCard() {
-  const [schools, setSchools] = useState<{ id: string; name: string; schoolId: string; city: string | null; state: string | null; examDate: string }[]>([]);
+  const [schools, setSchools] = useState<{ id: string; name: string; schoolId: string; olympiadId: string; city: string | null; state: string | null; examDate: string }[]>([]);
   const [today, setToday] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -452,7 +452,7 @@ function ExamScheduleCard() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold truncate">{sc.name}</p>
-                        <p className="text-xs text-slate-500 truncate">{sc.schoolId}{sc.city ? ` · ${sc.city}` : ''}{sc.state ? `, ${sc.state}` : ''}</p>
+                        <p className="text-xs text-slate-500 truncate">{sc.olympiadId}{sc.city ? ` · ${sc.city}` : ''}{sc.state ? `, ${sc.state}` : ''}</p>
                       </div>
                       <ChevronRight size={14} className="text-slate-300 flex-shrink-0" />
                     </Link>
@@ -469,7 +469,7 @@ function ExamScheduleCard() {
 
 // Today's exam schools and whether each has sent its attendance report.
 function TodayAttendanceCard() {
-  const [schools, setSchools] = useState<{ id: string; name: string; schoolId: string; city: string | null; state: string | null; submittedAt: string | null; present: number; absent: number }[]>([]);
+  const [schools, setSchools] = useState<{ id: string; name: string; schoolId: string; olympiadId: string; city: string | null; state: string | null; submittedAt: string | null; present: number; absent: number }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -501,7 +501,7 @@ function TodayAttendanceCard() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold truncate">{sc.name}</p>
-                <p className="text-xs text-slate-500 truncate">{sc.schoolId}{sc.city ? ` · ${sc.city}` : ''}{sc.state ? `, ${sc.state}` : ''}</p>
+                <p className="text-xs text-slate-500 truncate">{sc.olympiadId}{sc.city ? ` · ${sc.city}` : ''}{sc.state ? `, ${sc.state}` : ''}</p>
               </div>
               <div className="text-right flex-shrink-0">
                 <Chip tone={sc.submittedAt ? 'good' : 'warning'}>{sc.submittedAt ? 'Report sent' : 'Not sent yet'}</Chip>

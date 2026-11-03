@@ -32,6 +32,7 @@
 /tunnel-to-prod-db.ps1
 /use-server-db.ps1
 /use-local-db.ps1
+/scripts/reset-local-postgres-password.ps1
 
 # debug
 npm-debug.log*

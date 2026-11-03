@@ -19,7 +19,7 @@ export async function GET(request: Request) {
       where: { examDate: { gte: dayStart, lte: dayEnd } },
       orderBy: { name: 'asc' },
       select: {
-        id: true, name: true, schoolId: true, city: true, state: true,
+        id: true, name: true, schoolId: true, olympiadId: true, city: true, state: true,
         attendanceSubmittedAt: true,
         attendance: { select: { status: true } },
       },
@@ -29,6 +29,7 @@ export async function GET(request: Request) {
       id: s.id,
       name: s.name,
       schoolId: s.schoolId,
+      olympiadId: s.olympiadId,
       city: s.city,
       state: s.state,
       submittedAt: s.attendanceSubmittedAt ? s.attendanceSubmittedAt.toISOString() : null,

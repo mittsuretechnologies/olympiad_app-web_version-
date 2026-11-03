@@ -375,6 +375,7 @@ export async function enrichLogs(logs: LogRow[], { signMedia = true } = {}) {
         select: {
           id: true, thumbnailUrl: true, videoUrl: true, caption: true, category: true,
           subCategory: true, status: true, deletedAt: true, appUserId: true,
+          isEvaluation: true, createdAt: true,
           student: { select: { name: true } },
         },
       })
@@ -462,6 +463,8 @@ export async function enrichLogs(logs: LogRow[], { signMedia = true } = {}) {
       subCategory: v.subCategory,
       status: v.status,
       deleted: Boolean(v.deletedAt),
+      isEvaluation: v.isEvaluation,
+      uploadedAt: v.createdAt.toISOString(),
       uploaderName: appUser?.name || v.student?.name || null,
       olympiadId: appUser?.olympiadId ?? null,
       schoolName: appUser?.schoolName ?? null,
@@ -480,6 +483,7 @@ export async function enrichLogs(logs: LogRow[], { signMedia = true } = {}) {
       id: log.entityId, thumbnailUrl: null, videoUrl: null,
       caption: snap.caption ?? null, category: snap.category ?? null, subCategory: snap.subCategory ?? null,
       status: snap.status ?? 'UNKNOWN', deleted: true,
+      isEvaluation: typeof snap.isEvaluation === 'boolean' ? snap.isEvaluation : undefined, uploadedAt: null,
       uploaderName: appUser?.name ?? null, olympiadId: appUser?.olympiadId ?? null, schoolName: appUser?.schoolName ?? null,
       fromSnapshot: true,
     };

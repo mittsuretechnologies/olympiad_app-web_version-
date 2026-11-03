@@ -9,3 +9,15 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+// Local development should run on the local copy (.env.local-db). Say loudly
+// when it is wired to production instead — the prod tunnel is port 5433.
+if (process.env.NODE_ENV === 'development' && !(globalForPrisma as { warned?: boolean }).warned) {
+  (globalForPrisma as { warned?: boolean }).warned = true;
+  const target = (process.env.DATABASE_URL || '').replace(/^[^@]*@/, '').replace(/\?.*$/, '');
+  if (/:5433\//.test(target)) {
+    console.warn(`\n  !!! DEV SERVER IS USING THE PRODUCTION DATABASE (${target}) — every change is real !!!\n`);
+  } else {
+    console.log(`  Database: ${target}`);
+  }
+}

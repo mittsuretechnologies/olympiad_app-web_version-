@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     const schools = await prisma.school.findMany({
       where: { examDate: { gte: todayStart } },
       orderBy: [{ examDate: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true, schoolId: true, city: true, state: true, examDate: true, isActive: true },
+      select: { id: true, name: true, schoolId: true, olympiadId: true, city: true, state: true, examDate: true, isActive: true },
     });
 
     return NextResponse.json({
@@ -27,6 +27,7 @@ export async function GET(request: Request) {
         id: s.id,
         name: s.name,
         schoolId: s.schoolId,
+        olympiadId: s.olympiadId,
         city: s.city,
         state: s.state,
         isActive: s.isActive,
