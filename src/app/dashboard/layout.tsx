@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { isTokenExpired, tokenRole } from '@/lib/session-token';
 import { DASHBOARD_TOKEN_KEYS, clearDashboardSession } from '@/lib/swr';
+import { resolveAllowedModules } from '@/lib/permission-modules';
 import TermsAcceptanceModal from '@/components/TermsAcceptanceModal';
 import EvaluatorTermsGate from '@/components/EvaluatorTermsGate';
 import {
@@ -136,14 +137,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .then(r => r.json())
         .then((data: { global: { role: string; allowedModules: string[] }[]; individual: { memberId: string; allowedModules: string[] }[] } | { message: string }) => {
           if ('global' in data) {
-            // check individual override first
-            if (memberId) {
-              const individual = data.individual?.find(p => p.memberId === memberId);
-              if (individual) { setAllowedModules(individual.allowedModules); return; }
-            }
-            // fall back to global role permissions
-            const global = data.global?.find(p => p.role === detectedRole);
-            setAllowedModules(global ? global.allowedModules : []);
+            // The member's own override wins over the role's global list —
+            // same rule as requireModule() on the server.
+            const global = data.global?.find(p => p.role === detectedRole)?.allowedModules ?? [];
+            const individual = memberId ? data.individual?.find(p => p.memberId === memberId)?.allowedModules : null;
+            setAllowedModules(resolveAllowedModules(global, individual));
           } else {
             setAllowedModules([]);
           }

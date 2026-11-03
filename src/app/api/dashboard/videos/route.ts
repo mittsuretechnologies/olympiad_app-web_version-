@@ -171,6 +171,13 @@ function buildVideoStatusNotification(
 }
 
 export async function GET(request: Request) {
+  // Same gate as the moderation actions below: the list carries uploaders'
+  // email and mobile, so it is never served without a moderation login.
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
+  if (error) return error;
+  const moduleCheck = await requireModule(payload, 'moderation.pending', request);
+  if (moduleCheck.error) return moduleCheck.error;
+
   try {
     const { searchParams } = new URL(request.url);
     const status    = searchParams.get('status');
@@ -641,20 +648,16 @@ export async function POST(request: Request) {
       }
     }
 
-    await recordAuditLog({
-      ...actor,
-      action,
-      entityType: 'Video',
-      entityId: videoId,
-      previousValue: (({ _count, ...rest }) => rest)(before),
-      newValue: { status: video.status, rejectionReason: video.rejectionReason, quality: video.quality, category: video.category, subCategory: video.subCategory },
-      reason: status === 'REJECTED' ? (rejectionReason || null) : null,
-    });
-
     // A recategorization rides along with an approve, so it would otherwise be
-    // buried under a VIDEO_APPROVED row. Log it separately as well, so the
-    // activity log can answer "who moved this video's category" on its own.
-    if (recategorizing && (video.category !== before?.category || video.subCategory !== before?.subCategory)) {
+    // buried under a VIDEO_APPROVED row. Log it separately, so the activity log
+    // can answer "who moved this video's category" on its own. It is written
+    // first because the category is corrected before the video is approved, and
+    // the log lists newest first: this way "Approved" reads above "Category
+    // Changed", the real order. The approve row then leaves the category out
+    // instead of repeating the same change.
+    const categoryMoved = recategorizing &&
+      (video.category !== before?.category || video.subCategory !== before?.subCategory);
+    if (categoryMoved) {
       await recordAuditLog({
         ...actor,
         action: 'VIDEO_RECATEGORIZED',
@@ -665,6 +668,19 @@ export async function POST(request: Request) {
         reason: null,
       });
     }
+
+    await recordAuditLog({
+      ...actor,
+      action,
+      entityType: 'Video',
+      entityId: videoId,
+      previousValue: (({ _count, ...rest }) => rest)(before),
+      newValue: {
+        status: video.status, rejectionReason: video.rejectionReason, quality: video.quality,
+        ...(categoryMoved ? {} : { category: video.category, subCategory: video.subCategory }),
+      },
+      reason: status === 'REJECTED' ? (rejectionReason || null) : null,
+    });
 
     await notifyVideoStatus({ id: videoId, ...before }, status, rejectionReason);
 

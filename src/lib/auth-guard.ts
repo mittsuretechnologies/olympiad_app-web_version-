@@ -2,7 +2,7 @@ import jwt from 'jsonwebtoken';
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
-import { isReadOnlyKey } from '@/lib/permission-modules';
+import { isDeltaOverride, isReadOnlyKey, resolveAllowedModules } from '@/lib/permission-modules';
 
 export function requireRole(request: Request, allowedRoles: string[]) {
   const auth = request.headers.get('authorization') || '';
@@ -54,10 +54,13 @@ export async function requireModule(payload: any, moduleKey: string | string[], 
     select: { allowedModules: true },
   });
 
-  const allowedModules = individual
-    ? individual.allowedModules
-    : (await prisma.rolePermissions.findUnique({ where: { role: payload?.role }, select: { allowedModules: true } }))
-        ?.allowedModules ?? [];
+  // The member's own setting wins; an override that only lists differences
+  // needs the global list underneath it (see resolveAllowedModules).
+  const global = !individual || isDeltaOverride(individual.allowedModules)
+    ? (await prisma.rolePermissions.findUnique({ where: { role: payload?.role }, select: { allowedModules: true } }))
+        ?.allowedModules ?? []
+    : [];
+  const allowedModules = resolveAllowedModules(global, individual?.allowedModules);
 
   const keys = Array.isArray(moduleKey) ? moduleKey : [moduleKey];
   const granted = keys.filter((k) => allowedModules.includes(k));

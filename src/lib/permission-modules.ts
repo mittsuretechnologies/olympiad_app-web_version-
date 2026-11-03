@@ -57,3 +57,43 @@ export function isReadOnlyKey(allowedModules: string[], key: string): boolean {
   const parent = key.split('.')[0];
   return allowedModules.includes(readOnlyMarker(key)) || allowedModules.includes(readOnlyMarker(parent));
 }
+
+// ─── Individual overrides ────────────────────────────────────────────────────
+// An individual row stores only how one member differs from their role's
+// global list, so every module left alone keeps following the global setting:
+//   ["@delta", "-moderation", "-moderation.pending", "+coins", "+ro:schools"]
+// "-key" switches a key off for this member even when global has it on, and
+// "+key" switches it on even when global has it off — the member's own setting
+// always wins. Rows saved before this format (no "@delta") are full lists and
+// still replace the global list as a whole.
+export const DELTA_MARKER = '@delta';
+
+export function isDeltaOverride(list: string[] | null | undefined): boolean {
+  return !!list && list.includes(DELTA_MARKER);
+}
+
+/** The keys a member actually has: their override applied on top of the global list. */
+export function resolveAllowedModules(global: string[], individual: string[] | null | undefined): string[] {
+  if (!individual) return global;
+  if (!isDeltaOverride(individual)) return individual;
+  const off = new Set(individual.filter((k) => k.startsWith('-')).map((k) => k.slice(1)));
+  const on = individual.filter((k) => k.startsWith('+')).map((k) => k.slice(1));
+  const keys = new Set([...global.filter((k) => !off.has(k)), ...on]);
+  // A sub-item global turned on later must not open a module this member has
+  // switched off: the API checks sub-item keys on their own.
+  const moduleKeys = new Set(PERMISSION_MODULES.map((m) => m.key));
+  return [...keys].filter((k) => {
+    const parent = k.replace(READ_ONLY_PREFIX, '').split('.')[0];
+    return !moduleKeys.has(parent) || keys.has(parent);
+  });
+}
+
+/** Stores `effective` as the difference from `global`, so untouched modules follow global. */
+export function toDeltaOverride(global: string[], effective: string[]): string[] {
+  const g = new Set(global), e = new Set(effective);
+  return [
+    DELTA_MARKER,
+    ...effective.filter((k) => !g.has(k)).map((k) => `+${k}`),
+    ...global.filter((k) => !e.has(k)).map((k) => `-${k}`),
+  ];
+}

@@ -24,6 +24,10 @@ interface LogVideo {
   subCategory: string | null;
   status: string;
   deleted: boolean;
+  /** Jury (Olympiad) entry vs a regular upload; unknown for old snapshots. */
+  isEvaluation?: boolean;
+  /** When the clip was uploaded; null once the clip is hard-deleted. */
+  uploadedAt?: string | null;
   uploaderName: string | null;
   olympiadId: string | null;
   schoolName: string | null;
@@ -158,6 +162,9 @@ const fmtShortDay = (iso: string) =>
   new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
 const fmtTime = (iso: string) =>
   new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+// Seconds tell apart the steps of one moderator action (same minute).
+const fmtTimeSec = (iso: string) =>
+  new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
 function tryParse(json: string | null): any {
   if (!json) return null;
@@ -170,6 +177,7 @@ const IGNORED_DIFF_KEYS = new Set(['id', 'appUserId', 'studentId', 'videoId', 'c
 
 const FIELD_LABELS: Record<string, string> = {
   status: 'Status',
+  quality: 'Quality',
   rejectionReason: 'Reason',
   category: 'Category',
   subCategory: 'Sub-category',
@@ -196,9 +204,12 @@ const FIELD_LABELS: Record<string, string> = {
 
 const SCORE_KEYS = ['coordinationScore', 'memoryEnergyScore', 'imaginationEmotionScore', 'focusLanguageScore', 'creativityJoyScore'];
 
+const sentenceCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+
 function formatFieldValue(key: string, value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
   if (typeof value === 'boolean') return value ? 'Yes' : 'No';
+  if ((key === 'status' || key === 'quality') && typeof value === 'string') return sentenceCase(value);
   if (key === 'deletedAt') return 'Yes';
   if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
@@ -225,10 +236,113 @@ function diffSnapshots(previousValue: string | null, newValue: string | null): F
 
 function stateTone(key: string, value: string): string {
   if (key !== 'status') return 'text-slate-600 bg-slate-100';
-  if (value === 'APPROVED') return 'text-emerald-700 bg-emerald-50';
-  if (value === 'REJECTED') return 'text-rose-700 bg-rose-50';
-  if (value === 'PENDING') return 'text-amber-700 bg-amber-50';
+  const v = value.toUpperCase();
+  if (v === 'APPROVED') return 'text-emerald-700 bg-emerald-50';
+  if (v === 'REJECTED') return 'text-rose-700 bg-rose-50';
+  if (v === 'PENDING') return 'text-amber-700 bg-amber-50';
   return 'text-slate-600 bg-slate-100';
+}
+
+// ─── Plain-language entries ──────────────────────────────────────────────────
+// A moderator's one click (approve + move category) is stored as two rows. The
+// page folds them into one entry and words each entry as a sentence, using the
+// values recorded at that moment (not the video's state today).
+
+const catPath = (category?: string | null, sub?: string | null) => [category, sub].filter(Boolean).join(' › ');
+
+function snapOf(json: string | null): Record<string, any> | null {
+  const v = tryParse(json);
+  return v && typeof v === 'object' ? v : null;
+}
+
+interface Moved { from: string; to: string }
+interface Entry { log: LogEntry; moved: Moved | null }
+
+const FOLD_WINDOW_MS = 10_000;
+
+/** Folds each VIDEO_RECATEGORIZED row into the VIDEO_APPROVED row it was saved with. */
+function foldEntries(logs: LogEntry[]): Entry[] {
+  const folded = new Set<string>();
+  const movedBy = new Map<string, Moved>();
+  for (const r of logs) {
+    if (r.action !== 'VIDEO_RECATEGORIZED') continue;
+    const t = new Date(r.createdAt).getTime();
+    const approve = logs.find((a) =>
+      a.action === 'VIDEO_APPROVED' && !movedBy.has(a.id) && a.entityId === r.entityId &&
+      a.actorId === r.actorId && Math.abs(new Date(a.createdAt).getTime() - t) <= FOLD_WINDOW_MS);
+    if (!approve) continue;
+    const from = snapOf(r.previousValue), to = snapOf(r.newValue);
+    movedBy.set(approve.id, { from: catPath(from?.category, from?.subCategory), to: catPath(to?.category, to?.subCategory) });
+    folded.add(r.id);
+  }
+  return logs.filter((l) => !folded.has(l.id)).map((log) => ({ log, moved: movedBy.get(log.id) ?? null }));
+}
+
+/** The first line of a video's story: the upload itself, which is not an audit row. */
+function uploadEntry(logs: LogEntry[]): Entry | null {
+  const video = logs.find((l) => l.video?.uploadedAt)?.video;
+  if (!video?.uploadedAt) return null;
+  // Oldest recorded "before" category is what it was uploaded under.
+  const original = [...logs].reverse().map((l) => snapOf(l.previousValue)).find((s) => s && (s.category || s.subCategory))
+    ?? { category: video.category, subCategory: video.subCategory };
+  return {
+    moved: null,
+    log: {
+      id: 'upload', actorId: '', actorRole: 'UPLOADER', actorName: video.uploaderName, action: 'UPLOADED',
+      entityType: 'Video', entityId: video.id, previousValue: null,
+      newValue: JSON.stringify({ category: original.category, subCategory: original.subCategory }),
+      reason: null, createdAt: video.uploadedAt, video, target: null,
+    },
+  };
+}
+
+/** The changed fields of an entry; a folded category move shows as one row. */
+function changesFor(entry: Entry): FieldChange[] {
+  let changes = diffSnapshots(entry.log.previousValue, entry.log.newValue);
+  if (entry.moved) {
+    changes = changes.filter((c) => c.key !== 'category' && c.key !== 'subCategory');
+    changes.push({ key: 'category', label: 'Category', before: entry.moved.from || '—', after: entry.moved.to || '—' });
+  }
+  return changes;
+}
+
+/** "approved Aradhaya's video" etc.; null for actions that keep their plain label. */
+function describe({ log, moved }: Entry): { text: string; detail: string | null } | null {
+  const owner = log.video?.uploaderName ? `${log.video.uploaderName}’s video` : 'a video';
+  const prev = snapOf(log.previousValue), next = snapOf(log.newValue);
+  const move = (from: string, to: string) => (from && to ? `${from}  →  ${to}` : null);
+  switch (log.action) {
+    case 'UPLOADED':
+      return { text: 'uploaded this video', detail: null };
+    case 'VIDEO_APPROVED':
+      if (prev?.status === 'APPROVED') {
+        return { text: `changed the category of ${owner}`, detail: moved ? move(moved.from, moved.to) : null };
+      }
+      return {
+        text: `approved ${owner}${next?.quality ? ` · ${sentenceCase(String(next.quality))} quality` : ''}`,
+        detail: moved ? `Category moved: ${move(moved.from, moved.to)}` : null,
+      };
+    case 'VIDEO_REJECTED':
+      return { text: `rejected ${owner}`, detail: log.reason ? `Reason: “${log.reason}”` : null };
+    case 'VIDEO_MOVED_TO_PENDING':
+      return { text: `sent ${owner} back to Pending`, detail: null };
+    case 'VIDEO_RECATEGORIZED':
+      return { text: `changed the category of ${owner}`, detail: move(catPath(prev?.category, prev?.subCategory), catPath(next?.category, next?.subCategory)) };
+    case 'VIDEO_DELETED':
+      return { text: `deleted ${owner}`, detail: null };
+    default:
+      return null;
+  }
+}
+
+/** What the clip was filed under when this happened. */
+function clipLabel({ log, moved }: Entry): string {
+  const v = log.video;
+  if (!v) return '';
+  if (v.caption?.trim()) return v.caption.trim();
+  if (moved?.to) return moved.to;
+  const s = snapOf(log.newValue) ?? snapOf(log.previousValue);
+  return s && (s.category || s.subCategory) ? catPath(s.category, s.subCategory) : catPath(v.category, v.subCategory) || clipTitle(v);
 }
 
 function clipTitle(v: LogVideo) {
@@ -385,24 +499,26 @@ function SubjectPicker({
 
 // ─── Entry row ──────────────────────────────────────────────────────────────
 
-function ChangeList({ log }: { log: LogEntry }) {
-  const changes = diffSnapshots(log.previousValue, log.newValue);
+function ChangeList({ entry }: { entry: Entry }) {
+  const changes = changesFor(entry);
   if (changes.length > 0) {
     return (
-      <div className="space-y-1.5">
+      <dl className="space-y-1.5">
         {changes.map((c) => (
-          <div key={c.key} className="flex items-center gap-2 text-[11px] flex-wrap">
-            <span className="text-gray-400 w-24 flex-shrink-0">{c.label}</span>
-            <span className={`px-1.5 py-0.5 rounded font-semibold ${stateTone(c.key, c.before)}`}>{c.before}</span>
-            <ArrowRight size={11} className="text-gray-300" />
-            <span className={`px-1.5 py-0.5 rounded font-semibold ${stateTone(c.key, c.after)}`}>{c.after}</span>
+          <div key={c.key} className="flex items-baseline gap-3 text-[12px]">
+            <dt className="w-24 flex-shrink-0 text-gray-400">{c.label}</dt>
+            <dd className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className={`px-1.5 py-0.5 rounded font-medium ${stateTone(c.key, c.before)}`}>{c.before}</span>
+              <ArrowRight size={11} className="text-gray-300 flex-shrink-0" />
+              <span className={`px-1.5 py-0.5 rounded font-medium ${stateTone(c.key, c.after)}`}>{c.after}</span>
+            </dd>
           </div>
         ))}
-      </div>
+      </dl>
     );
   }
   // A first evaluation has nothing to diff against — the scores are the story.
-  const after = tryParse(log.newValue);
+  const after = tryParse(entry.log.newValue);
   if (after && typeof after === 'object') {
     const scores = SCORE_KEYS.filter((k) => after[k] != null);
     if (scores.length > 0) {
@@ -410,11 +526,11 @@ function ChangeList({ log }: { log: LogEntry }) {
       return (
         <div className="flex items-center gap-1.5 flex-wrap">
           {scores.map((k) => (
-            <span key={k} className="px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 text-[11px] font-semibold">
+            <span key={k} className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 text-[11px] font-medium">
               {FIELD_LABELS[k] ?? k}: {String(after[k])}
             </span>
           ))}
-          <span className="text-[11px] font-bold text-gray-600">Total {total}</span>
+          <span className="text-[11px] font-semibold text-gray-700">Total {total}</span>
         </div>
       );
     }
@@ -437,37 +553,75 @@ function CopyId({ value }: { value: string }) {
   );
 }
 
-function EntryRow({ log, hideActor, onPlay }: { log: LogEntry; hideActor: boolean; onPlay: (v: LogVideo) => void }) {
+/** Tells a jury (Olympiad) entry from a regular upload at a glance. */
+function KindBadge({ evaluation }: { evaluation: boolean }) {
+  return (
+    <span className={`flex-shrink-0 px-1.5 py-0.5 rounded text-[10px] font-medium ring-1 ${
+      evaluation ? 'text-[#004f9f] bg-[#004f9f]/5 ring-[#004f9f]/15' : 'text-slate-500 bg-white ring-slate-200'
+    }`}>
+      {evaluation ? 'Olympiad entry' : 'Regular upload'}
+    </span>
+  );
+}
+
+function EntryRow({ entry, hideActor, onPlay }: { entry: Entry; hideActor: boolean; onPlay: (v: LogVideo) => void }) {
+  const { log } = entry;
   const [open, setOpen] = useState(false);
-  const def = auditActionDef(log.action);
+  const isUpload = log.action === 'UPLOADED';
+  const def = isUpload
+    ? { label: 'Video Uploaded', category: 'moderation' as AuditCategory, tone: 'info' as AuditTone }
+    : auditActionDef(log.action);
   const tone = TONE[def.tone];
-  const Icon = CATEGORY_ICONS[def.category] ?? History;
+  const Icon = isUpload ? Film : CATEGORY_ICONS[def.category] ?? History;
+  const said = describe(entry);
   const target = targetText(log);
   const after = tryParse(log.newValue);
   const endpoint = after && typeof after === 'object' && typeof after.endpoint === 'string' ? after.endpoint : null;
-  const changeCount = diffSnapshots(log.previousValue, log.newValue).length;
-  const hasChanges = changeCount > 0;
+  const changeCount = changesFor(entry).length;
+  const hasScores = SCORE_KEYS.some((k) => after?.[k] != null);
+  const evaluation: unknown = log.video?.isEvaluation ?? snapOf(log.previousValue)?.isEvaluation;
+  const actor = log.actorName || `${log.actorId.slice(0, 8)}…`;
+  const role = ACTOR_ROLE_LABELS[log.actorRole] ?? log.actorRole;
 
   return (
-    <li className="relative">
+    <li>
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-start gap-3 sm:gap-4 px-4 sm:px-5 py-3.5 text-left hover:bg-gray-50/70 transition-colors"
+        className="w-full flex items-start gap-3 sm:gap-4 px-4 sm:px-5 py-4 text-left hover:bg-gray-50/70 transition-colors"
       >
-        <span className="w-12 flex-shrink-0 pt-1 text-[11px] font-semibold text-gray-400 tabular-nums">{fmtTime(log.createdAt)}</span>
+        <span className="w-[4.5rem] flex-shrink-0 pt-1 text-[11px] text-gray-400 tabular-nums">{fmtTimeSec(log.createdAt)}</span>
 
         <span className={`mt-0.5 w-8 h-8 rounded-lg ring-1 flex items-center justify-center flex-shrink-0 ${tone.chip}`}>
           <Icon size={15} />
         </span>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className="text-[13px] font-semibold text-gray-800">{def.label}</p>
-            {hasChanges && <span className="text-[10px] font-semibold text-gray-400">· {changeCount} change{changeCount === 1 ? '' : 's'}</span>}
-          </div>
+          {said ? (
+            <p className="text-[13px] leading-snug text-gray-700">
+              {hideActor && !isUpload ? (
+                // Staff lookup: every row is by the same person, so lead with the action.
+                <span className="font-medium text-gray-900">{said.text.charAt(0).toUpperCase() + said.text.slice(1)}</span>
+              ) : (
+                <>
+                  <span className="font-semibold text-gray-900">{actor}</span>
+                  {isUpload
+                    ? ` ${said.text}`
+                    : <><span className="mx-1.5 px-1.5 py-0.5 rounded bg-gray-100 text-[10px] font-medium text-gray-500 align-middle">{role}</span>{said.text}</>}
+                </>
+              )}
+            </p>
+          ) : (
+            <p className="text-[13px] leading-snug">
+              <span className="font-semibold text-gray-900">{def.label}</span>
+              {changeCount > 0 && <span className="text-[11px] text-gray-400"> · {changeCount} change{changeCount === 1 ? '' : 's'}</span>}
+              {!hideActor && <span className="text-[12px] text-gray-500"> by {actor} <span className="text-gray-400">({role})</span></span>}
+            </p>
+          )}
 
-          <div className="mt-1 flex items-center gap-2 min-w-0">
+          {said?.detail && <p className="mt-1 text-[12px] text-gray-500">{said.detail}</p>}
+
+          <div className="mt-2 flex items-center gap-2 min-w-0">
             {log.video && (
               <span className="relative w-10 h-7 rounded overflow-hidden bg-gray-100 border border-gray-200 flex-shrink-0">
                 {log.video.thumbnailUrl
@@ -476,36 +630,37 @@ function EntryRow({ log, hideActor, onPlay }: { log: LogEntry; hideActor: boolea
                 {log.video.deleted && <span className="absolute inset-0 bg-black/50 flex items-center justify-center"><Trash2 size={9} className="text-white" /></span>}
               </span>
             )}
-            <p className="text-[12px] text-gray-600 truncate">
-              <span className="text-gray-400">{target.kind}:</span> {target.name}
-              {target.sub && <span className="text-gray-400"> · {target.sub}</span>}
-            </p>
+            {log.video ? (
+              <p className="text-[12px] text-gray-600 truncate min-w-0">
+                {clipLabel(entry)}
+                {log.video.olympiadId && <span className="text-gray-400"> · {log.video.olympiadId}</span>}
+                {log.video.deleted && <span className="text-gray-400"> · deleted</span>}
+              </p>
+            ) : (
+              <p className="text-[12px] text-gray-600 truncate">
+                <span className="text-gray-400">{target.kind}:</span> {target.name}
+                {target.sub && <span className="text-gray-400"> · {target.sub}</span>}
+              </p>
+            )}
+            {log.video && typeof evaluation === 'boolean' && <KindBadge evaluation={evaluation} />}
           </div>
-
-          {!hideActor && (
-            <p className="mt-1 text-[11px] text-gray-400 truncate">
-              by <span className="font-semibold text-gray-600">{log.actorName || `${log.actorId.slice(0, 8)}…`}</span>
-              {' · '}{ACTOR_ROLE_LABELS[log.actorRole] ?? log.actorRole}
-              {log.actorStaffId && <span className="font-mono"> · {log.actorStaffId}</span>}
-            </p>
-          )}
         </div>
 
         <ChevronDown size={16} className={`mt-1.5 text-gray-300 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
-        <div className="mx-4 sm:ml-[7.25rem] sm:mr-5 mb-4 rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-4">
-          {(hasChanges || SCORE_KEYS.some((k) => after?.[k] != null)) && (
+        <div className="mx-4 sm:ml-[7.5rem] sm:mr-5 mb-4 rounded-xl border border-gray-100 bg-gray-50/60 p-4 space-y-4">
+          {(changeCount > 0 || hasScores) && (
             <section>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">What changed</p>
-              <ChangeList log={log} />
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">What changed</p>
+              <ChangeList entry={entry} />
             </section>
           )}
 
           {log.reason && (
             <section>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">Reason</p>
+              <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1">Reason</p>
               <p className="text-[12px] text-gray-700 leading-relaxed">{log.reason}</p>
             </section>
           )}
@@ -514,27 +669,37 @@ function EntryRow({ log, hideActor, onPlay }: { log: LogEntry; hideActor: boolea
             <button
               type="button"
               onClick={() => onPlay(log.video!)}
-              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-gray-200 text-[11px] font-bold text-[#004f9f] hover:border-[#004f9f]/40"
+              className="inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-gray-200 text-[11px] font-semibold text-[#004f9f] hover:border-[#004f9f]/40"
             >
               <Play size={12} className="fill-current" /> Play clip
             </button>
           )}
 
-          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[11px]">
-            <div><dt className="text-gray-400">When</dt><dd className="text-gray-700">{fmtDay(log.createdAt)}, {fmtTime(log.createdAt)}</dd></div>
+          <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[12px]">
+            <div><dt className="text-[11px] text-gray-400">When</dt><dd className="text-gray-700">{fmtDay(log.createdAt)}, {fmtTimeSec(log.createdAt)}</dd></div>
             <div>
-              <dt className="text-gray-400">Done by</dt>
+              <dt className="text-[11px] text-gray-400">{isUpload ? 'Uploaded by' : 'Done by'}</dt>
               <dd className="text-gray-700">
-                {log.actorName || 'Unknown'} ({ACTOR_ROLE_LABELS[log.actorRole] ?? log.actorRole})
+                {actor} <span className="text-gray-400">({role})</span>
                 {log.actorEmail && <span className="text-gray-400"> · {log.actorEmail}</span>}
               </dd>
             </div>
-            {endpoint && (
-              <div className="sm:col-span-2"><dt className="text-gray-400">Screen / API</dt><dd className="font-mono text-[10px] text-gray-600 break-all">{endpoint}</dd></div>
-            )}
-            <div><dt className="text-gray-400">Record</dt><dd className="text-gray-700">{log.entityType} · {log.entityId === 'LIST' ? 'list' : <CopyId value={log.entityId} />}</dd></div>
-            <div><dt className="text-gray-400">Log entry</dt><dd><CopyId value={log.id} /></dd></div>
           </dl>
+
+          {!isUpload && (
+            <details className="group">
+              <summary className="cursor-pointer select-none text-[11px] font-medium text-gray-400 hover:text-gray-600 list-none flex items-center gap-1">
+                <ChevronDown size={12} className="-rotate-90 group-open:rotate-0 transition-transform" /> Technical details
+              </summary>
+              <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2 text-[11px]">
+                <div><dt className="text-gray-400">Record</dt><dd className="text-gray-700">{log.entityType} · {log.entityId === 'LIST' ? 'list' : <CopyId value={log.entityId} />}</dd></div>
+                <div><dt className="text-gray-400">Log entry</dt><dd><CopyId value={log.id} /></dd></div>
+                {endpoint && (
+                  <div className="sm:col-span-2"><dt className="text-gray-400">Screen / API</dt><dd className="font-mono text-[10px] text-gray-600 break-all">{endpoint}</dd></div>
+                )}
+              </dl>
+            </details>
+          )}
         </div>
       )}
     </li>
@@ -592,6 +757,16 @@ export default function ActivityLogPage() {
     setLoading(true); setError('');
     try {
       const data = await authedJson<Omit<Report, 'query'>>(`/api/dashboard/audit-log?${buildQueryString(q)}`);
+      // One clip's story reads oldest-first and needs every step, so fetch the rest now.
+      if (q.mode === 'video') {
+        for (let i = 0; data.nextCursor && i < 10; i++) {
+          const more = await authedJson<{ logs: LogEntry[]; nextCursor: string | null }>(
+            `/api/dashboard/audit-log?${buildQueryString(q, { cursor: data.nextCursor })}`,
+          );
+          data.logs = [...data.logs, ...more.logs];
+          data.nextCursor = more.nextCursor;
+        }
+      }
       setReport({ ...data, query: q });
       requestAnimationFrame(() => reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
     } catch (e: any) {
@@ -664,16 +839,33 @@ export default function ActivityLogPage() {
     }
   };
 
+  // A clip's lookup is a journey: oldest first, starting from the upload (when
+  // the whole history is loaded and no activity filter hides steps).
+  const journey = report?.query.mode === 'video';
+  const entries = useMemo(() => {
+    const folded = foldEntries(report?.logs ?? []);
+    if (!journey) return folded;
+    const ordered = [...folded].reverse();
+    const upload = !report?.nextCursor && !report?.query.category ? uploadEntry(report?.logs ?? []) : null;
+    // An upload before the period would leave earlier steps unloaded, so its
+    // "original category" couldn't be trusted.
+    const inPeriod = upload && isoDay(new Date(upload.log.createdAt)) >= (report?.query.from ?? '');
+    return upload && inPeriod ? [upload, ...ordered] : ordered;
+  }, [report?.logs, report?.nextCursor, report?.query.category, report?.query.from, journey]);
+
   // Rows grouped under one heading per day.
   const groups = useMemo(() => {
-    const out: { day: string; logs: LogEntry[] }[] = [];
-    for (const l of report?.logs ?? []) {
-      const day = isoDay(new Date(l.createdAt));
-      if (out[out.length - 1]?.day !== day) out.push({ day, logs: [] });
-      out[out.length - 1].logs.push(l);
+    const out: { day: string; entries: Entry[] }[] = [];
+    for (const e of entries) {
+      const day = isoDay(new Date(e.log.createdAt));
+      if (out[out.length - 1]?.day !== day) out.push({ day, entries: [] });
+      out[out.length - 1].entries.push(e);
     }
     return out;
-  }, [report?.logs]);
+  }, [entries]);
+
+  // Where a looked-up clip stands today, from the newest entry's joined clip.
+  const clipNow = journey ? report?.logs[0]?.video ?? null : null;
 
   const categoryCounts = useMemo(() => {
     const counts: Partial<Record<AuditCategory, number>> = {};
@@ -888,6 +1080,14 @@ export default function ActivityLogPage() {
                     <span className="text-[10px] font-bold text-[#004f9f] bg-[#004f9f]/5 px-2 py-0.5 rounded-full">{report.subject.badge}</span>
                   </div>
                   {report.subject.sub && <p className="text-[11px] text-gray-500 truncate">{report.subject.sub}</p>}
+                  {clipNow && (
+                    <p className="text-[12px] text-gray-600 mt-1">
+                      <span className="text-gray-400">Now:</span>{' '}
+                      <span className="font-medium">{sentenceCase(clipNow.deleted ? 'deleted' : clipNow.status)}</span>
+                      {catPath(clipNow.category, clipNow.subCategory) && <span className="text-gray-400"> · {catPath(clipNow.category, clipNow.subCategory)}</span>}
+                      {typeof clipNow.isEvaluation === 'boolean' && <span className="ml-2 align-middle"><KindBadge evaluation={clipNow.isEvaluation} /></span>}
+                    </p>
+                  )}
                   <p className="text-[11px] text-gray-400 mt-0.5 flex items-center gap-1">
                     <CalendarDays size={11} /> {fmtShortDay(report.query.from)} – {fmtShortDay(report.query.to)}
                   </p>
@@ -961,12 +1161,12 @@ export default function ActivityLogPage() {
               {groups.map((g) => (
                 <section key={g.day}>
                   <div className="px-4 sm:px-5 py-2 bg-gray-50 border-y border-gray-100 first:border-t-0 flex items-center justify-between">
-                    <p className="text-[11px] font-bold text-gray-600">{fmtDay(g.logs[0].createdAt)}</p>
-                    <p className="text-[10px] text-gray-400">{g.logs.length} shown</p>
+                    <p className="text-[11px] font-bold text-gray-600">{fmtDay(g.entries[0].log.createdAt)}</p>
+                    <p className="text-[10px] text-gray-400">{g.entries.length} {g.entries.length === 1 ? 'entry' : 'entries'}</p>
                   </div>
-                  <ul className="divide-y divide-gray-50">
-                    {g.logs.map((l) => (
-                      <EntryRow key={l.id} log={l} hideActor={report.query.mode === 'staff'} onPlay={setPlaying} />
+                  <ul className="divide-y divide-gray-100">
+                    {g.entries.map((e) => (
+                      <EntryRow key={e.log.id} entry={e} hideActor={report.query.mode === 'staff'} onPlay={setPlaying} />
                     ))}
                   </ul>
                 </section>
