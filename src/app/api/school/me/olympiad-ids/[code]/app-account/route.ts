@@ -39,14 +39,7 @@ export async function PATCH(
     const appUser = await prisma.appUser.findFirst({ where: { olympiadId: code } });
     if (!appUser) return NextResponse.json({ message: 'No app account linked to this ID' }, { status: 404 });
 
-    // Same uniqueness rule as allotment, but the student's own current address
-    // doesn't count as a clash.
-    const emailOwner = await prisma.appUser.findFirst({
-      where: { email: emailNormalized, NOT: { id: appUser.id } },
-      select: { id: true },
-    });
-    if (emailOwner) return NextResponse.json({ message: 'This email is already registered on the app' }, { status: 409 });
-
+    // No uniqueness check, same as allotment: siblings may share a parent's email.
     const mobileNormalized = phone.trim().replace(/\D/g, '');
 
     await prisma.appUser.update({

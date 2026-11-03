@@ -79,16 +79,11 @@ export async function PATCH(request: Request) {
     }
   }
 
-  // Validate email
+  // Validate email. Emails may be shared across sibling accounts, so no
+  // uniqueness check here (same as mobile below).
   if (email !== undefined && email !== null && email !== '') {
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       return NextResponse.json({ message: 'Invalid email address' }, { status: 422 });
-    }
-    const existing = await prisma.appUser.findFirst({
-      where: { email: email.trim(), NOT: { id: appUser.id } },
-    });
-    if (existing) {
-      return NextResponse.json({ message: 'Email is already in use' }, { status: 409 });
     }
   }
 

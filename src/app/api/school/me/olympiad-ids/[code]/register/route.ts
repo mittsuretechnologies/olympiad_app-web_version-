@@ -73,10 +73,8 @@ export async function POST(
     const existingOlympiadLink = await prisma.appUser.findFirst({ where: { olympiadId: code } });
     if (existingOlympiadLink) return NextResponse.json({ message: 'This Olympiad ID is already linked to an app account' }, { status: 409 });
 
-    if (emailNormalized) {
-      const existingEmail = await prisma.appUser.findFirst({ where: { email: emailNormalized } });
-      if (existingEmail) return NextResponse.json({ message: 'This email is already registered on the app' }, { status: 409 });
-    }
+    // No uniqueness check on email or mobile: siblings usually share a parent's
+    // contact, and login picks the right account by password.
 
     // Generate userId from student's name → e.g. "Suraj Joshi" → surajjoshi_4f2a
     const userId = await generateUserId(name.trim());
