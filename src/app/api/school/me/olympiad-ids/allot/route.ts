@@ -35,12 +35,9 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Invalid email address' }, { status: 400 });
     }
 
+    // No uniqueness check on email or mobile: siblings usually share a parent's
+    // contact, and login picks the right account by password.
     const mobileNormalized = phone.trim().replace(/\D/g, '');
-
-    if (emailNormalized) {
-      const existingEmail = await prisma.appUser.findFirst({ where: { email: emailNormalized } });
-      if (existingEmail) return NextResponse.json({ message: 'This email is already registered on the app' }, { status: 409 });
-    }
 
     // Find the next unassigned Olympiad ID for this class
     const available = await prisma.olympiadIdAllocation.findFirst({
