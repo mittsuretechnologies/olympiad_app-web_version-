@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 export async function PATCH(
@@ -17,6 +18,8 @@ export async function PATCH(
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    const blocked = await inactiveSchoolResponse(payload.id);
+    if (blocked) return blocked;
 
     const { code } = await params;
     const { name, phone, email } = await request.json();
@@ -24,11 +27,9 @@ export async function PATCH(
     if (!name?.trim()) return NextResponse.json({ message: 'Student name is required' }, { status: 400 });
     if (!phone?.trim() || phone.trim().length < 10) return NextResponse.json({ message: 'Valid phone number is required' }, { status: 400 });
 
-    // Required, matching the Allot Student form — students allotted before email
-    // became mandatory get one added the first time their details are edited.
-    const emailNormalized = email?.trim().toLowerCase() || '';
-    if (!emailNormalized) return NextResponse.json({ message: 'Email address is required' }, { status: 400 });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
+    // Optional, matching the Allot Student form; left empty, the email is cleared.
+    const emailNormalized = email?.trim().toLowerCase() || null;
+    if (emailNormalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
       return NextResponse.json({ message: 'Invalid email address' }, { status: 400 });
     }
 

@@ -28,11 +28,23 @@ export default function SchoolLayout({ children }: { children: React.ReactNode }
       setSchoolToken(token);
       // Check whether the school has accepted the onboarding agreement.
       // We kick off a lightweight fetch here; the gate shows a spinner while it resolves.
+      // A 401/403 here means the session is no longer valid — most often the
+      // school was deactivated (every School Panel API refuses it) — so log out
+      // instead of opening a panel where nothing works.
+      let loggedOut = false;
       fetch('/api/school/me/agreement', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => (r.ok ? r.json() : Promise.reject()))
-        .then(json => { if (!json.accepted) setAgreementPending(true); })
+        .then(r => {
+          if (r.status === 401 || r.status === 403) {
+            loggedOut = true;
+            clearSchoolSession();
+            router.replace('/login');
+            return null;
+          }
+          return r.ok ? r.json() : Promise.reject();
+        })
+        .then(json => { if (json && !json.accepted) setAgreementPending(true); })
         .catch(() => { /* network error — show the gate, it will retry */ setAgreementPending(true); })
-        .finally(() => setReady(true));
+        .finally(() => { if (!loggedOut) setReady(true); });
     } catch {
       clearSchoolSession();
       router.replace('/login');

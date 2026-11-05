@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireActiveSchool } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -55,7 +55,7 @@ async function schoolOwnVideos(schoolId: string) {
 // ?includeOwn=1 (the web portal's Upload Status page) also returns the
 // school's own videos, each row tagged kind "SCHOOL" or "STUDENT".
 export async function GET(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {

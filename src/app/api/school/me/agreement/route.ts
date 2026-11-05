@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireActiveSchool } from '@/lib/auth-guard';
 import {
   SCHOOL_AGREEMENT_KEY,
   SCHOOL_AGREEMENT_VERSION,
@@ -52,7 +52,7 @@ function currentAcceptance(schoolId: string) {
 }
 
 export async function GET(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {
@@ -91,7 +91,7 @@ function plausibleDate(v: unknown): Date | null {
 }
 
 export async function POST(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {

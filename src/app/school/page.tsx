@@ -2,13 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import Lottie from 'lottie-react';
 import {
   Contact, Users, Clock, ArrowRight, CheckCircle2,
-  BookOpen, Activity, ChevronRight, School, Clapperboard, Info,
+  BookOpen, Activity, ChevronRight, School, Clapperboard, Info, Eye,
 } from 'lucide-react';
-import { CARD, CARD_HEADER, CARD_TITLE, STACK, avatarTint } from './ui';
+import { CARD, CARD_HEADER, CARD_TITLE, STACK, BTN_SECONDARY, avatarTint } from './ui';
 import { PageHeader, StatTile, ProgressBar, Avatar } from './components';
+
+// The guide book (and its text in both languages) loads only when opened.
+const PanelGuideBook = dynamic(() => import('./PanelGuideBook'), { ssr: false });
 
 // Mascot animation shown in the greeting card — fetched at runtime since the
 // source file lives in /public with spaces/capitals in its name.
@@ -72,6 +76,7 @@ export default function SchoolDashboardPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [loading, setLoading] = useState(true);
   const [schoolName, setSchoolName] = useState('');
+  const [guideOpen, setGuideOpen] = useState(false);
 
   useEffect(() => {
     const token = sessionStorage.getItem('schoolToken');
@@ -109,7 +114,21 @@ export default function SchoolDashboardPage() {
 
   return (
     <div className={STACK}>
-      <PageHeader title="Dashboard" />
+      <PageHeader
+        title="Dashboard"
+        actions={
+          <button
+            type="button"
+            onClick={() => setGuideOpen(true)}
+            className={BTN_SECONDARY}
+            title="How to use the School Panel — English / हिंदी"
+            aria-label="Open the School Panel guide"
+          >
+            <Eye size={15} /> <span className="hidden sm:inline">Panel Guide</span>
+          </button>
+        }
+      />
+      {guideOpen && <PanelGuideBook onClose={() => setGuideOpen(false)} />}
 
       {/* Greeting card — the one dark surface on the page, set apart from the
           metric cards below it so the eye has a clear entry point. */}

@@ -78,8 +78,13 @@ export const AUDIT_ACTIONS: Record<string, AuditActionDef> = {
   GENERAL_SCHOOL_ACTIVATED:         { label: 'General School Activated',     category: 'accounts', tone: 'success' },
   GENERAL_SCHOOL_DEACTIVATED:       { label: 'General School Deactivated',   category: 'accounts', tone: 'danger' },
 
+  SCHOOL_ACTIVATED:        { label: 'School Activated',          category: 'schools', tone: 'success' },
+  SCHOOL_DEACTIVATED:      { label: 'School Deactivated',        category: 'schools', tone: 'danger' },
   ATTENDANCE_REOPENED:     { label: 'Attendance Reopened',       category: 'schools', tone: 'warning' },
   SCHOOL_EXAM_DATE_SET:    { label: 'Exam Date Set',             category: 'schools', tone: 'info' },
+  EXAM_DATE_CHANGE_REQUESTED: { label: 'Exam Date Change Requested', category: 'schools', tone: 'info' },
+  EXAM_DATE_CHANGE_APPROVED:  { label: 'Exam Date Change Approved',  category: 'schools', tone: 'success' },
+  EXAM_DATE_CHANGE_REJECTED:  { label: 'Exam Date Change Rejected',  category: 'schools', tone: 'neutral' },
   OLYMPIAD_IDS_DELETED:    { label: 'Unused Olympiad IDs Deleted', category: 'schools', tone: 'danger' },
   SCHOOL_SUPPORT_REPLIED:  { label: 'School Support Reply',      category: 'schools', tone: 'info' },
   SCHOOL_SUPPORT_UPDATED:  { label: 'School Ticket Updated',     category: 'schools', tone: 'neutral' },

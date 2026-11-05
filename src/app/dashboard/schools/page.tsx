@@ -87,16 +87,20 @@ export default function SchoolsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [page, setPage] = useState(1);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   useEffect(() => {
     const t = setTimeout(() => { setDebouncedSearch(searchTerm.trim()); setPage(1); }, 350);
     return () => clearTimeout(t);
   }, [searchTerm]);
-  const schoolsQuery = new URLSearchParams({ page: String(page), pageSize: String(SCHOOLS_PAGE_SIZE), q: debouncedSearch });
+  const schoolsQuery = new URLSearchParams({
+    page: String(page), pageSize: String(SCHOOLS_PAGE_SIZE), q: debouncedSearch,
+    ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+  });
   const {
     data: schoolsData,
     isLoading: schoolsLoading,
     mutate: mutateSchools,
-  } = useSWR<{ schools: School[]; total: number; totalAll: number; page: number; pageSize: number }>(
+  } = useSWR<{ schools: School[]; total: number; totalAll: number; activeCount: number; inactiveCount: number; page: number; pageSize: number }>(
     `/api/schools?${schoolsQuery}`,
     fetcher,
     { keepPreviousData: true },
@@ -116,6 +120,8 @@ export default function SchoolsPage() {
   const [editingSchool, setEditingSchool] = useState<School | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<School | null>(null);
   const [toggleTarget, setToggleTarget] = useState<School | null>(null);
+  const [toggleReason, setToggleReason] = useState('');
+  const [linkedStudents, setLinkedStudents] = useState<number | null>(null);
   const [actionBusy, setActionBusy] = useState(false);
 
   // View / Allocation state
@@ -483,14 +489,34 @@ export default function SchoolsPage() {
     }
   };
 
+  // Opening the confirm dialog: clear the reason and count the students whose
+  // Olympiad IDs are in use, so the admin sees who keeps access.
+  useEffect(() => {
+    setToggleReason('');
+    setLinkedStudents(null);
+    if (!toggleTarget) return;
+    let alive = true;
+    fetch(`/api/schools/${toggleTarget.id}/olympiad-ids`, { headers: authHeaders() })
+      .then(r => (r.ok ? r.json() : null))
+      .then(rows => { if (alive && Array.isArray(rows)) setLinkedStudents(rows.filter((a: { inUse?: boolean }) => a.inUse).length); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [toggleTarget]);
+
+  const deactivating = toggleTarget?.isActive !== false;
+
   const handleToggleActive = async () => {
     if (!toggleTarget) return;
+    if (deactivating && !toggleReason.trim()) {
+      alert('Please write the reason for deactivating this school.');
+      return;
+    }
     setActionBusy(true);
     try {
       const res = await fetch(`/api/schools/${toggleTarget.id}`, {
         method: 'PATCH',
         headers: authHeaders(),
-        body: JSON.stringify({ isActive: !toggleTarget.isActive }),
+        body: JSON.stringify({ isActive: !toggleTarget.isActive, reason: toggleReason.trim() || undefined }),
       });
       if (res.ok) {
         setToggleTarget(null);
@@ -588,9 +614,9 @@ export default function SchoolsPage() {
         </div>
       </div>
 
-      {/* Search Bar */}
-      <div className="px-6 py-3 border-b border-gray-300 bg-white">
-        <div className="relative max-w-md">
+      {/* Search Bar + Active/Inactive filter */}
+      <div className="px-6 py-3 border-b border-gray-300 bg-white flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-[240px] max-w-md">
           <Search
             className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
             size={16}
@@ -602,6 +628,27 @@ export default function SchoolsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-gray-300 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
           />
+        </div>
+        <div className="inline-flex border border-gray-300" role="group" aria-label="Filter by status">
+          {([
+            ['all', 'All', (schoolsData?.activeCount ?? 0) + (schoolsData?.inactiveCount ?? 0)],
+            ['active', 'Active', schoolsData?.activeCount ?? 0],
+            ['inactive', 'Inactive', schoolsData?.inactiveCount ?? 0],
+          ] as const).map(([key, label, count]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => { setStatusFilter(key); setPage(1); }}
+              aria-pressed={statusFilter === key}
+              className={`px-3 py-2 text-sm font-semibold border-r last:border-r-0 border-gray-300 transition-colors ${
+                statusFilter === key
+                  ? key === 'inactive' ? 'bg-red-600 text-white' : 'bg-[#004f9f] text-white'
+                  : 'bg-white text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {label} <span className="opacity-75">({count})</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -1171,11 +1218,23 @@ export default function SchoolsPage() {
           </div>
 
           <div className="bg-white px-6 py-5 space-y-4">
-            <p className="text-sm text-gray-600 leading-relaxed">
-              {toggleTarget?.isActive === false
-                ? 'The school will be reactivated. Students and other users associated with it will regain full access to the app.'
-                : 'The school will be marked inactive. No student or any other user linked to this school will be able to use the app until it is reactivated.'}
-            </p>
+            {toggleTarget?.isActive === false ? (
+              <p className="text-sm text-gray-600 leading-relaxed">
+                The school will be able to log in to the School Panel and its app account again, and it will show up in the app&apos;s school lists.
+              </p>
+            ) : (
+              <div className="text-sm text-gray-600 leading-relaxed space-y-2">
+                <p>
+                  <span className="font-semibold text-gray-800">The school is locked out immediately:</span> School Panel and its app
+                  account stop working (even if already logged in), and it is hidden from the app&apos;s school lists.
+                </p>
+                <p>
+                  <span className="font-semibold text-gray-800">Students are not affected:</span>{' '}
+                  {linkedStudents === null ? 'students' : `${linkedStudents} student${linkedStudents === 1 ? '' : 's'}`} with this
+                  school&apos;s Olympiad IDs keep their app account, videos and results. No data is deleted.
+                </p>
+              </div>
+            )}
 
             {toggleTarget && (
               <div className="bg-gray-50 border border-gray-200 p-3 space-y-2">
@@ -1195,6 +1254,21 @@ export default function SchoolsPage() {
                 </div>
               </div>
             )}
+
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">
+                Reason {deactivating ? <span className="text-red-600">*</span> : <span className="font-normal text-gray-400">(optional)</span>}
+              </label>
+              <textarea
+                value={toggleReason}
+                onChange={(e) => setToggleReason(e.target.value)}
+                rows={2}
+                maxLength={500}
+                placeholder={deactivating ? 'e.g. Agreement ended / duplicate registration' : 'e.g. Payment received'}
+                className="w-full border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:border-[#06013E] focus:ring-1 focus:ring-[#06013E]"
+              />
+              <p className="mt-1 text-[11px] text-gray-400">Saved in the Activity Log with your name and the time.</p>
+            </div>
           </div>
 
           <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex gap-3">
@@ -1209,7 +1283,7 @@ export default function SchoolsPage() {
             <button
               type="button"
               onClick={handleToggleActive}
-              disabled={actionBusy}
+              disabled={actionBusy || (deactivating && !toggleReason.trim())}
               className={`flex-1 h-10 text-white font-semibold text-sm transition-colors disabled:opacity-50 ${
                 toggleTarget?.isActive === false
                   ? 'bg-[#009846] hover:bg-[#007a38]'

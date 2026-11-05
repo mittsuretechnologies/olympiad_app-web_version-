@@ -90,3 +90,22 @@ export async function requireAdmin(request: Request, moduleKey: string | string[
   if ('error' in check && check.error) return { error: check.error };
   return { payload };
 }
+
+// School tokens live for a day, so — like MasterAdmin above — deactivation is
+// re-checked on every School Panel request rather than only at login: a school
+// switched off in View / Edit Schools is locked out immediately. Its students
+// are not affected; this only guards the school's own endpoints.
+export async function inactiveSchoolResponse(schoolId: string): Promise<NextResponse | null> {
+  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { isActive: true } });
+  if (school?.isActive) return null;
+  return NextResponse.json({ message: 'Your account has been deactivated. Contact admin.' }, { status: 403 });
+}
+
+/** requireRole(request, ['SCHOOL']) plus the deactivation check above. */
+export async function requireActiveSchool(request: Request): Promise<AdminCheck> {
+  const { payload, error } = requireRole(request, ['SCHOOL']);
+  if (error) return { error };
+  const blocked = await inactiveSchoolResponse(payload.id);
+  if (blocked) return { error: blocked };
+  return { payload };
+}

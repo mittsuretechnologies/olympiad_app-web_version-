@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireActiveSchool } from '@/lib/auth-guard';
 import {
   SUPPORT_LIMITS,
   cleanAttachments,
@@ -17,7 +17,7 @@ export const dynamic = 'force-dynamic';
 // Identity always comes from the JWT, never the body.
 
 export async function GET(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {
@@ -57,7 +57,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {

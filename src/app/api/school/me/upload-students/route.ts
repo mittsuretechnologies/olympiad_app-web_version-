@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 // Returns all students assigned to this school's olympiad IDs (for upload page).
@@ -16,6 +17,8 @@ export async function GET(request: Request) {
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    const blocked = await inactiveSchoolResponse(payload.id);
+    if (blocked) return blocked;
 
     // All sent allocations for this school
     const allocations = await prisma.olympiadIdAllocation.findMany({

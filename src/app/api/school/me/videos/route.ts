@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
 import { schoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
@@ -38,6 +39,8 @@ export async function POST(request: Request) {
     if (!school) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const blocked = await inactiveSchoolResponse(school.id);
+    if (blocked) return blocked;
 
     const { studentId, videoUrl, thumbnailUrl, caption, category, subCategory, tags, isPublic, isMittfest } =
       await request.json();
@@ -135,6 +138,8 @@ export async function GET(request: Request) {
     if (!school) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
+    const blocked = await inactiveSchoolResponse(school.id);
+    if (blocked) return blocked;
 
     const videos = await prisma.video.findMany({
       where: { uploaderType: 'SCHOOL', student: { allocation: { schoolId: school.id } }, deletedAt: null },
