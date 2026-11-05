@@ -13,7 +13,7 @@ export interface PermissionModule { key: string; label: string; subItems: Permis
 
 export const PERMISSION_MODULES: PermissionModule[] = [
   { key: 'overview', label: 'Dashboard Overview', subItems: [], adminOnly: true },
-  { key: 'schools', label: 'Schools', subItems: [{ key: 'schools.register', label: 'Register School' }, { key: 'schools.bulk', label: 'Bulk Upload' }, { key: 'schools.view', label: 'View / Edit Schools' }, { key: 'schools.attendance', label: 'Attendance Reports', adminOnly: true }] },
+  { key: 'schools', label: 'Schools', subItems: [{ key: 'schools.register', label: 'Register School' }, { key: 'schools.bulk', label: 'Bulk Upload' }, { key: 'schools.view', label: 'View / Edit Schools' }, { key: 'schools.attendance', label: 'Attendance Reports', adminOnly: true }, { key: 'schools.examDateRequests', label: 'Exam Date Requests', adminOnly: true }] },
   { key: 'moderation', label: 'Moderation', subItems: [{ key: 'moderation.pending', label: 'Pending Approvals' }, { key: 'moderation.reported', label: 'Reported Videos' }, { key: 'moderation.moderators', label: 'Create Moderator' }] },
   { key: 'support', label: 'Support', subItems: [] },
   { key: 'uploaders', label: 'Uploaders', subItems: [{ key: 'uploaders.register', label: 'Register Uploader' }, { key: 'uploaders.view', label: 'View / Manage Uploaders' }] },

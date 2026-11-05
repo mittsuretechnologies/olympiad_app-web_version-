@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 export async function PATCH(
@@ -22,6 +23,8 @@ export async function PATCH(
     if (payload?.role !== 'SCHOOL' || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+    const blocked = await inactiveSchoolResponse(payload.id);
+    if (blocked) return blocked;
 
     const { code } = await params;
     const { assignedName } = await request.json();
@@ -81,6 +84,8 @@ export async function DELETE(
     if (payload?.role !== 'SCHOOL' || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+    const blocked = await inactiveSchoolResponse(payload.id);
+    if (blocked) return blocked;
 
     const { code } = await params;
 

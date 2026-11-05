@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import Image from 'next/image';
 import { animate, motion, useMotionValue, useReducedMotion, useTransform, type MotionValue } from 'framer-motion';
-import { ChevronLeft, ChevronRight, ListOrdered, ShieldCheck, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, ListOrdered, ShieldCheck, X, type LucideIcon } from 'lucide-react';
 import type { Handbook, HandbookBlock } from '@/lib/handbook/moderator-handbook';
 import { literata } from './fonts';
 import s from './HandbookBook.module.css';
 
 /**
- * The Moderator Handbook as a hardcover book.
+ * A handbook as a hardcover book: the Moderator Handbook, and the School Panel
+ * Guide (which passes its own `labels`, in English or Hindi, and cover icon).
  *
  * Content is paginated by measurement: every block is rendered once off-screen
  * at the current page size, its height read back, and blocks are packed into
@@ -24,11 +25,11 @@ import s from './HandbookBook.module.css';
 
 /* ── Content model ─────────────────────────────────────────────────────────── */
 
-type Chapter = Extract<HandbookBlock, { k: 'chapter' }>;
-type Template = Extract<HandbookBlock, { k: 'template' }>;
-type TableDef = Extract<HandbookBlock, { k: 'table' }>;
-type RowItem = { t: 'row'; key: number; table: number; row: number };
-type Item =
+export type Chapter = Extract<HandbookBlock, { k: 'chapter' }>;
+export type Template = Extract<HandbookBlock, { k: 'template' }>;
+export type TableDef = Extract<HandbookBlock, { k: 'table' }>;
+export type RowItem = { t: 'row'; key: number; table: number; row: number };
+export type Item =
   | { t: 'chapter'; key: number; b: Chapter }
   | { t: 'heading'; key: number; text: string }
   | { t: 'p'; key: number; text: string; indent: 0 | 1 | 2; drop: boolean }
@@ -54,7 +55,45 @@ interface Geo {
 
 const FRONT_MATTER = 4; // cover, endpaper, title, contents
 
-function flatten(blocks: HandbookBlock[]) {
+/** Every piece of text the book draws itself, so another book (or language) can reuse it. */
+export interface BookLabels {
+  coverTitle: [string, string];
+  coverTag: string;
+  runningTitle: string;
+  section: string;
+  contents: string;
+  version: string;
+  effectiveDate: string;
+  previous: string;
+  next: string;
+  closeBook: string;
+  hint: string;
+  cover: string;
+  backCover: string;
+  titlePage: string;
+  /** "Page 3 of 40" / "Pages 3–4 of 40" */
+  pages: (nums: number[], total: number) => string;
+}
+
+export const MODERATOR_LABELS: BookLabels = {
+  coverTitle: ['Moderator', 'Handbook'],
+  coverTag: 'INTERNAL',
+  runningTitle: 'Moderator Handbook',
+  section: 'Section',
+  contents: 'Contents',
+  version: 'Version',
+  effectiveDate: 'Effective date',
+  previous: 'Previous',
+  next: 'Next',
+  closeBook: 'Close book',
+  hint: 'Click or drag a page edge to turn · ← → keys',
+  cover: 'Cover',
+  backCover: 'Back cover',
+  titlePage: 'Title page',
+  pages: (nums, total) => `${nums.length > 1 ? 'Pages' : 'Page'} ${nums.join('–')} of ${total}`,
+};
+
+export function flatten(blocks: HandbookBlock[]) {
   const items: Item[] = [];
   const tables: TableDef[] = [];
   let key = 0;
@@ -81,7 +120,7 @@ function flatten(blocks: HandbookBlock[]) {
 const keepWithNext = (it: Item) =>
   it.t === 'chapter' || it.t === 'heading' || (it.t === 'p' && /:\s*(<\/b>)?$/.test(it.text));
 
-function paginate(items: Item[], height: (it: Item) => number, tableExtra: (id: number) => number, max: number) {
+export function paginate(items: Item[], height: (it: Item) => number, tableExtra: (id: number) => number, max: number) {
   const pages: Item[][] = [];
   let cur: Item[] = [];
   let used = 0;
@@ -136,7 +175,7 @@ function computeGeo(width: number, availH: number): Geo {
 
 /* ── Inline markup: <b> <i> <mark> <a href> ────────────────────────────────── */
 
-function rich(text: string): ReactNode {
+export function rich(text: string): ReactNode {
   type Frame = { tag: string; href?: string; kids: ReactNode[] };
   const root: Frame = { tag: 'root', kids: [] };
   const stack: Frame[] = [root];
@@ -164,11 +203,11 @@ function rich(text: string): ReactNode {
 
 /* ── Blocks ────────────────────────────────────────────────────────────────── */
 
-function ItemView({ it }: { it: Exclude<Item, RowItem> }) {
+function ItemView({ it, section }: { it: Exclude<Item, RowItem>; section: string }) {
   if (it.t === 'chapter') {
     return (
       <div className={s.chapter}>
-        {it.b.n !== undefined && <div className={s.chapterNum}>Section {it.b.n}</div>}
+        {it.b.n !== undefined && <div className={s.chapterNum}>{section} {it.b.n}</div>}
         <div className={s.chapterTitle}>{it.b.title}</div>
         {it.b.subtitle && <div className={s.chapterSub}>{it.b.subtitle}</div>}
         <div className={s.ornament} aria-hidden="true">◆</div>
@@ -215,7 +254,7 @@ function TableView({ def, rows }: { def: TableDef; rows: number[] }) {
   );
 }
 
-function PageItems({ items, tables }: { items: Item[]; tables: TableDef[] }) {
+function PageItems({ items, tables, section }: { items: Item[]; tables: TableDef[]; section: string }) {
   const out: ReactNode[] = [];
   for (let i = 0; i < items.length;) {
     const it = items[i];
@@ -228,7 +267,7 @@ function PageItems({ items, tables }: { items: Item[]; tables: TableDef[] }) {
       out.push(<TableView key={`t${it.key}`} def={tables[it.table]} rows={rows} />);
       continue;
     }
-    out.push(<ItemView key={it.key} it={it} />);
+    out.push(<ItemView key={it.key} it={it} section={section} />);
     i++;
   }
   return <>{out}</>;
@@ -236,7 +275,15 @@ function PageItems({ items, tables }: { items: Item[]; tables: TableDef[] }) {
 
 /* ── The book ──────────────────────────────────────────────────────────────── */
 
-export default function HandbookBook({ handbook }: { handbook: Handbook }) {
+export default function HandbookBook({
+  handbook,
+  labels: T = MODERATOR_LABELS,
+  coverIcon: CoverIcon = ShieldCheck,
+}: {
+  handbook: Handbook;
+  labels?: BookLabels;
+  coverIcon?: LucideIcon;
+}) {
   const reduce = useReducedMotion();
   const stageRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
@@ -444,7 +491,7 @@ export default function HandbookBook({ handbook }: { handbook: Handbook }) {
       className={`${s.body} ${literata.className}`}
       style={{ position: 'absolute', left: -10000, top: 0, width: geo.contentW, fontSize: geo.fs, visibility: 'hidden', pointerEvents: 'none' }}
     >
-      {items.map(it => (it.t === 'row' ? null : <div key={it.key} data-k={it.key}><ItemView it={it} /></div>))}
+      {items.map(it => (it.t === 'row' ? null : <div key={it.key} data-k={it.key}><ItemView it={it} section={T.section} /></div>))}
       {tables.map((tb, id) => <div key={`m${id}`} data-t={id}><TableView def={tb} rows={tb.rows.map((_, i) => i)} /></div>)}
     </div>
   );
@@ -521,16 +568,16 @@ export default function HandbookBook({ handbook }: { handbook: Handbook }) {
               <div className="absolute inset-0 flex flex-col items-center justify-center text-center" style={{ padding: '0 16% 0 19%' }}>
                 <span className={`${s.gold} text-[0.78em] tracking-[0.42em] font-semibold`}>MITTMEE</span>
                 <span className="mt-[1.6em] flex items-center justify-center w-[4.2em] h-[4.2em] rounded-full border border-[#d4b26a]/70 shadow-[inset_0_0_0_3px_rgba(0,0,0,.15),0_1px_0_rgba(0,0,0,.4)]">
-                  <ShieldCheck className="text-[#d6b66f] drop-shadow-[0_1px_0_rgba(0,0,0,.6)]" style={{ width: '2em', height: '2em' }} strokeWidth={1.4} />
+                  <CoverIcon className="text-[#d6b66f] drop-shadow-[0_1px_0_rgba(0,0,0,.6)]" style={{ width: '2em', height: '2em' }} strokeWidth={1.4} />
                 </span>
-                <h2 className={`${s.gold} mt-[1.2em] text-[2.35em] leading-[1.08] font-semibold`}>Moderator<br />Handbook</h2>
+                <h2 className={`${s.gold} mt-[1.2em] text-[2.35em] leading-[1.08] font-semibold`}>{T.coverTitle[0]}<br />{T.coverTitle[1]}</h2>
                 <span className="mt-[1.1em] h-px w-[5em] bg-[#d4b26a]/70" />
-                <span className={`${s.gold} mt-[1em] text-[0.72em] tracking-[0.34em] font-semibold`}>INTERNAL</span>
-                <span className={`${s.gold} absolute bottom-[12%] text-[0.7em] tracking-[0.2em]`}>VERSION {handbook.version}</span>
+                <span className={`${s.gold} mt-[1em] text-[0.72em] tracking-[0.34em] font-semibold`}>{T.coverTag}</span>
+                <span className={`${s.gold} absolute bottom-[12%] text-[0.7em] tracking-[0.2em]`}>{T.version.toUpperCase()} {handbook.version}</span>
               </div>
             ) : (
               <div className="absolute inset-x-0 bottom-[12%] flex flex-col items-center">
-                <ShieldCheck className="text-[#d6b66f]/80" style={{ width: '1.6em', height: '1.6em' }} strokeWidth={1.4} />
+                <CoverIcon className="text-[#d6b66f]/80" style={{ width: '1.6em', height: '1.6em' }} strokeWidth={1.4} />
                 <span className={`${s.gold} mt-[0.5em] text-[0.72em] tracking-[0.42em] font-semibold`}>MITTMEE</span>
               </div>
             )}
@@ -563,8 +610,8 @@ export default function HandbookBook({ handbook }: { handbook: Handbook }) {
           <div className="flex-1 flex flex-col items-center justify-center">
             <div className={s.ornament} aria-hidden="true">◆</div>
             <h1 className="mt-[1.2em] text-[1.55em] leading-[1.25] font-semibold text-[#1c2a44]">{handbook.title}</h1>
-            <p className="mt-[1.1em] font-semibold">Version: {handbook.version}</p>
-            <p className="mt-[0.4em]"><b>Effective date</b>: {handbook.effectiveDate}</p>
+            <p className="mt-[1.1em] font-semibold">{T.version}: {handbook.version}</p>
+            <p className="mt-[0.4em]"><b>{T.effectiveDate}</b>: {handbook.effectiveDate}</p>
             <div className={`${s.ornament} mt-[1.4em]`} aria-hidden="true">◆</div>
           </div>
           <div className="flex items-center gap-[0.5em] opacity-80">
@@ -576,7 +623,7 @@ export default function HandbookBook({ handbook }: { handbook: Handbook }) {
     } else if (page.kind === 'contents') {
       inner = body(
         <>
-          <div className={s.tocTitle}>Contents</div>
+          <div className={s.tocTitle}>{T.contents}</div>
           <div className={s.ornament} style={{ justifyContent: 'center' }} aria-hidden="true">◆</div>
           <div className={s.tocList}>
             {book.toc.map(e => (
@@ -595,10 +642,10 @@ export default function HandbookBook({ handbook }: { handbook: Handbook }) {
         <>
           {!page.opensChapter && (
             <div className={s.runhead} style={{ top: geo.padTop * 0.42, ...pad, textAlign: side === 'left' ? 'left' : 'right' }}>
-              {side === 'left' ? 'Moderator Handbook' : page.running}
+              {side === 'left' ? T.runningTitle : page.running}
             </div>
           )}
-          {body(<PageItems items={page.items} tables={tables} />)}
+          {body(<PageItems items={page.items} tables={tables} section={T.section} />)}
           <div className={s.folio} style={{ bottom: geo.padBottom * 0.38, [side === 'left' ? 'left' : 'right']: geo.padOuter }}>{page.folio}</div>
         </>
       );
@@ -646,13 +693,11 @@ export default function HandbookBook({ handbook }: { handbook: Handbook }) {
     if (p === null) return null;
     const pg = book.pages[p];
     if (pg.kind === 'content') return pg.folio;
-    return ({ cover: 'Cover', backcover: 'Back cover', title: 'Title page', contents: 'Contents' } as Record<string, string>)[pg.kind] ?? null;
+    return ({ cover: T.cover, backcover: T.backCover, title: T.titlePage, contents: T.contents } as Record<string, string>)[pg.kind] ?? null;
   };
   const shown = (spread ? visible : [visible[1]]).map(nameOf).filter(v => v !== null) as (string | number)[];
   const nums = shown.filter((v): v is number => typeof v === 'number');
-  const label = nums.length
-    ? `${nums.length > 1 ? 'Pages' : 'Page'} ${nums.join('–')} of ${book.folios}`
-    : shown.join(' · ');
+  const label = nums.length ? T.pages(nums, book.folios) : shown.join(' · ');
 
   const btn = 'inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-[13px] font-medium text-[#3b3225] bg-white/70 border border-[#d7ccb6] hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors';
 
@@ -714,25 +759,25 @@ export default function HandbookBook({ handbook }: { handbook: Handbook }) {
       <div className="relative z-10 mt-3 flex flex-wrap items-center justify-center gap-2 font-sans sm:grid sm:grid-cols-[1fr_auto_1fr]">
         <div className="flex justify-end">
           <button type="button" className={btn} onClick={() => flipTo(viewForPage(3))} disabled={!!flip}>
-            <ListOrdered size={15} /> Contents
+            <ListOrdered size={15} /> {T.contents}
           </button>
         </div>
         <div className="flex items-center gap-2">
-          <button type="button" className={`${btn} justify-center sm:w-[108px]`} onClick={() => go(-1)} disabled={view === 0 || !!flip} aria-label="Previous page">
-            <ChevronLeft size={16} /> <span className="hidden sm:inline">Previous</span>
+          <button type="button" className={`${btn} justify-center sm:w-[108px]`} onClick={() => go(-1)} disabled={view === 0 || !!flip} aria-label={T.previous}>
+            <ChevronLeft size={16} /> <span className="hidden sm:inline">{T.previous}</span>
           </button>
           <span className="min-w-[150px] text-center text-[12.5px] font-medium text-[#5b4f3c] tabular-nums" aria-live="polite">{label}</span>
-          <button type="button" className={`${btn} justify-center sm:w-[108px]`} onClick={() => go(1)} disabled={view === last || !!flip} aria-label="Next page">
-            <span className="hidden sm:inline">Next</span> <ChevronRight size={16} />
+          <button type="button" className={`${btn} justify-center sm:w-[108px]`} onClick={() => go(1)} disabled={view === last || !!flip} aria-label={T.next}>
+            <span className="hidden sm:inline">{T.next}</span> <ChevronRight size={16} />
           </button>
         </div>
         <div className="flex items-center gap-3 min-w-0">
           {view !== 0 && (
             <button type="button" className={btn} onClick={() => flipTo(0)} disabled={!!flip}>
-              <X size={15} /> Close book
+              <X size={15} /> {T.closeBook}
             </button>
           )}
-          <span className="hidden xl:inline truncate text-[11.5px] text-[#8a7c62]">Click or drag a page edge to turn · ← → keys</span>
+          <span className="hidden xl:inline truncate text-[11.5px] text-[#8a7c62]">{T.hint}</span>
         </div>
       </div>
 

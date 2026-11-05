@@ -64,7 +64,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // 2) Try School (by username = schoolId)
+    // 2) Try School (by username — name prefix + schoolId, not the schoolId alone)
     const school = await prisma.school.findUnique({
       where: { username: identifier },
     });

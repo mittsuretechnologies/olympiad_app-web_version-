@@ -3,9 +3,9 @@
 import { useEffect, useState } from 'react';
 import {
   School as SchoolIcon, MapPin, AlertCircle, ShieldCheck, CheckCircle2, XCircle,
-  CalendarDays, Pencil, Loader2, Lock,
+  CalendarDays, Pencil, Loader2, Lock, Clock,
 } from 'lucide-react';
-import { CARD, CARD_HEADER, CARD_TITLE, STACK, LABEL, INPUT, BTN_PRIMARY, BTN_SECONDARY, FOCUS } from '../ui';
+import { CARD, CARD_HEADER, CARD_TITLE, STACK, LABEL, INPUT, BTN_PRIMARY, BTN_SECONDARY, FOCUS, STATUS } from '../ui';
 import { PageHeader, StatusBadge, LoadingState, ErrorState } from '../components';
 
 interface SchoolProfile {
@@ -25,7 +25,22 @@ interface SchoolProfile {
   createdAt: string;
   examDate: string | null;
   attendanceSubmittedAt: string | null;
+  examDateRequest: ExamDateRequest | null;
 }
+
+interface ExamDateRequest {
+  id: string;
+  previousDate: string | null;
+  requestedDate: string;
+  reason: string | null;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  remark: string | null;
+  decidedAt: string | null;
+  createdAt: string;
+}
+
+const longDate = (d: string) =>
+  new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
 
 function InfoRow({ label, value }: { label: string; value: string | null | undefined }) {
   return (
@@ -39,39 +54,43 @@ function InfoRow({ label, value }: { label: string; value: string | null | undef
 }
 
 /**
- * Exam date — the one field a school can self-edit. SuperAdmin doesn't require
- * it at registration (schools register before a date is fixed), so a school
- * sets it here once known, and can correct it right up until attendance has
- * been submitted against it. After that it's frozen: it's what attendance was
- * actually marked against, not just a plan.
+ * Exam date — a school can't change it directly. It sends a request with the
+ * new date here; a Mittsure admin approves it (the date updates) or declines
+ * it with a remark, shown below. Once attendance has been submitted the date
+ * is frozen: it's what attendance was actually marked against.
  */
-function ExamDateCard({ profile, onSaved }: { profile: SchoolProfile; onSaved: (examDate: string | null) => void }) {
+function ExamDateCard({ profile, onRequested }: { profile: SchoolProfile; onRequested: (req: ExamDateRequest) => void }) {
   const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState(profile.examDate ? profile.examDate.slice(0, 10) : '');
+  const [value, setValue] = useState('');
+  const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
   const locked = Boolean(profile.attendanceSubmittedAt);
+  const req = profile.examDateRequest;
+  const pending = req?.status === 'PENDING';
 
   const startEdit = () => {
     setValue(profile.examDate ? profile.examDate.slice(0, 10) : '');
+    setReason('');
     setError('');
     setEditing(true);
   };
 
   const save = async () => {
+    if (!value) { setError('Pick the new exam date.'); return; }
     setSaving(true);
     setError('');
     try {
       const token = sessionStorage.getItem('schoolToken');
-      const res = await fetch('/api/school/me/profile', {
-        method: 'PATCH',
+      const res = await fetch('/api/school/me/exam-date-request', {
+        method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ examDate: value || null }),
+        body: JSON.stringify({ requestedDate: value, reason: reason.trim() || undefined }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Could not save the exam date.');
-      onSaved(data.examDate);
+      if (!res.ok) throw new Error(data.message || 'Could not send the request.');
+      onRequested(data);
       setEditing(false);
     } catch (err: any) {
       setError(err.message);
@@ -87,12 +106,12 @@ function ExamDateCard({ profile, onSaved }: { profile: SchoolProfile; onSaved: (
           <CalendarDays size={14} strokeWidth={1.75} className="text-[#677285]" />
           <h2 className={CARD_TITLE}>Exam date</h2>
         </div>
-        {!editing && !locked && (
+        {!editing && !locked && !pending && (
           <button
             onClick={startEdit}
             className={`inline-flex cursor-pointer items-center gap-1.5 text-[12px] font-medium text-[#1559C7] hover:text-[#0F4AAE] ${FOCUS} rounded`}
           >
-            <Pencil size={12} /> {profile.examDate ? 'Edit' : 'Set date'}
+            <Pencil size={12} /> {profile.examDate ? 'Request change' : 'Request date'}
           </button>
         )}
       </div>
@@ -100,7 +119,7 @@ function ExamDateCard({ profile, onSaved }: { profile: SchoolProfile; onSaved: (
       <div className="px-4 py-3.5">
         {editing ? (
           <div>
-            <label htmlFor="examDate" className={LABEL}>Exam date</label>
+            <label htmlFor="examDate" className={LABEL}>New exam date</label>
             <input
               id="examDate"
               type="date"
@@ -108,6 +127,19 @@ function ExamDateCard({ profile, onSaved }: { profile: SchoolProfile; onSaved: (
               onChange={e => setValue(e.target.value)}
               className={`${INPUT} max-w-[220px]`}
             />
+            <label htmlFor="examDateReason" className={`${LABEL} mt-3`}>Reason (optional)</label>
+            <textarea
+              id="examDateReason"
+              rows={2}
+              maxLength={500}
+              value={reason}
+              onChange={e => setReason(e.target.value)}
+              placeholder="Why do you need to change the date?"
+              className={`${INPUT} max-w-[480px]`}
+            />
+            <p className="mt-2 text-[11.5px] text-[#677285]">
+              Your exam date changes only after Mittsure approves this request.
+            </p>
             {error && (
               <p className="mt-2 flex items-center gap-1.5 text-[12px] text-[#B42323]">
                 <AlertCircle size={13} className="flex-shrink-0" /> {error}
@@ -115,7 +147,7 @@ function ExamDateCard({ profile, onSaved }: { profile: SchoolProfile; onSaved: (
             )}
             <div className="mt-3 flex items-center gap-2">
               <button onClick={save} disabled={saving} className={`${BTN_PRIMARY} h-8 px-3 text-[12.5px]`}>
-                {saving && <Loader2 size={13} className="animate-spin" />} Save
+                {saving && <Loader2 size={13} className="animate-spin" />} Send request
               </button>
               <button onClick={() => setEditing(false)} disabled={saving} className={`${BTN_SECONDARY} h-8 px-3 text-[12.5px]`}>
                 Cancel
@@ -141,6 +173,43 @@ function ExamDateCard({ profile, onSaved }: { profile: SchoolProfile; onSaved: (
             Attendance has been submitted for this date, so it&apos;s locked. Contact your Mittsure coordinator to change it.
           </p>
         )}
+        {req && !editing && <ExamDateRequestStatus req={req} />}
+      </div>
+    </div>
+  );
+}
+
+/** The school's latest request: waiting, approved, or declined with the admin's remark. */
+function ExamDateRequestStatus({ req }: { req: ExamDateRequest }) {
+  const tone = req.status === 'PENDING' ? STATUS.warning : req.status === 'APPROVED' ? STATUS.success : STATUS.danger;
+  const Icon = req.status === 'PENDING' ? Clock : req.status === 'APPROVED' ? CheckCircle2 : XCircle;
+  return (
+    <div className="mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5" style={{ background: tone.bg }}>
+      <Icon size={14} className="mt-0.5 flex-shrink-0" style={{ color: tone.fg }} />
+      <div className="text-[12px] leading-relaxed text-[#2A3446]">
+        {req.status === 'PENDING' && (
+          <p>
+            <span className="font-semibold" style={{ color: tone.fg }}>Change requested</span> to{' '}
+            <span className="font-semibold">{longDate(req.requestedDate)}</span> on {longDate(req.createdAt)}. Waiting for approval from Mittsure.
+          </p>
+        )}
+        {req.status === 'APPROVED' && (
+          <p>
+            <span className="font-semibold" style={{ color: tone.fg }}>Approved</span>: your exam date was changed to{' '}
+            <span className="font-semibold">{longDate(req.requestedDate)}</span>
+            {req.decidedAt && <> on {longDate(req.decidedAt)}</>}.
+          </p>
+        )}
+        {req.status === 'REJECTED' && (
+          <>
+            <p>
+              <span className="font-semibold" style={{ color: tone.fg }}>Declined</span>: your request to change the date to{' '}
+              <span className="font-semibold">{longDate(req.requestedDate)}</span> was not approved. Your exam date is unchanged.
+            </p>
+            {req.remark && <p className="mt-1"><span className="font-semibold">Remark:</span> {req.remark}</p>}
+          </>
+        )}
+        {req.reason && <p className="mt-1 text-[#677285]">Your reason: {req.reason}</p>}
       </div>
     </div>
   );
@@ -235,15 +304,15 @@ export default function SchoolProfilePage() {
         </div>
       </div>
 
-      {/* Exam date — the one self-editable field */}
-      <ExamDateCard profile={profile} onSaved={examDate => setProfile(p => (p ? { ...p, examDate } : p))} />
+      {/* Exam date — changed only through an approved request */}
+      <ExamDateCard profile={profile} onRequested={examDateRequest => setProfile(p => (p ? { ...p, examDateRequest } : p))} />
 
       {/* Notice */}
       <div className={`${CARD} flex items-start gap-2.5 px-4 py-3`}>
         <AlertCircle size={15} className="mt-0.5 flex-shrink-0 text-[#A1530A]" />
         <p className="text-[12.5px] leading-relaxed text-[#475265]">
-          To update your exam date, use the card above. For any other school details, please contact your Mittsure coordinator —
-          schools cannot self-edit other profile information.
+          To change your exam date, send a request from the card above — it updates once Mittsure approves it. For any other
+          school details, please contact your Mittsure coordinator — schools cannot self-edit other profile information.
         </p>
       </div>
     </div>

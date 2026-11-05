@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { getResultOverview } from '@/lib/result-overview';
 
@@ -24,6 +25,8 @@ export async function GET(request: Request) {
   if (payload?.role !== 'SCHOOL' || !payload?.id) {
     return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
   }
+  const blocked = await inactiveSchoolResponse(payload.id);
+  if (blocked) return blocked;
 
   try {
     const school = await prisma.school.findUnique({ where: { id: payload.id }, select: { schoolId: true, name: true } });

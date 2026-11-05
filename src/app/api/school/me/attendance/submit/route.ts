@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 
 function getSchoolPayload(request: Request) {
   const auth = request.headers.get('authorization') || '';
@@ -23,6 +24,8 @@ function getSchoolPayload(request: Request) {
 export async function POST(request: Request) {
   const payload = getSchoolPayload(request);
   if (!payload) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
+  const blocked = await inactiveSchoolResponse(payload.id);
+  if (blocked) return blocked;
 
   try {
     const school = await prisma.school.findUnique({
