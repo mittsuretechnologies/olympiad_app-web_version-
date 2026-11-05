@@ -87,38 +87,12 @@ export async function DELETE(
     const blocked = await inactiveSchoolResponse(payload.id);
     if (blocked) return blocked;
 
-    const { code } = await params;
-
-    const allocation = await prisma.olympiadIdAllocation.findUnique({ where: { code }, include: { student: true } });
-    if (!allocation) return NextResponse.json({ message: 'Not found' }, { status: 404 });
-    if (allocation.schoolId !== payload.id) return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-    if (allocation.student) return NextResponse.json({ message: 'Cannot unassign — student already registered' }, { status: 409 });
-
-    // If an app account was created via Allot Student, downgrade it to a plain
-    // Viewer account (clear olympiadId) instead of deleting it — this frees the
-    // ID for reassignment while keeping the account, its login, and its videos
-    // intact. Their videos also stop being Olympiad/evaluation content: without
-    // this, they'd keep showing the Olympiad badge and score forever, while
-    // silently dropping out of this school's completion reports and any
-    // region-scoped evaluator's queue (both are resolved via olympiadId).
-    const freedAppUsers = await prisma.appUser.findMany({ where: { olympiadId: code }, select: { id: true } });
-    const freedAppUserIds = freedAppUsers.map(u => u.id);
-
-    if (freedAppUserIds.length > 0) {
-      await prisma.video.updateMany({
-        where: { appUserId: { in: freedAppUserIds }, isEvaluation: true },
-        data: { isEvaluation: false, olympiadVisibility: null },
-      });
-    }
-
-    await prisma.appUser.updateMany({ where: { olympiadId: code }, data: { olympiadId: null } });
-
-    await prisma.olympiadIdAllocation.update({
-      where: { code },
-      data: { assignedName: null, guardianName: null, assignedAt: null },
-    });
-
-    return NextResponse.json({ success: true });
+    // Schools are not allowed to remove an allocation once it's made — they can
+    // only edit the details (name/phone/email) via the app-account endpoint.
+    return NextResponse.json(
+      { message: 'Removing an allotted Olympiad ID is not allowed. You can edit the student details instead.' },
+      { status: 403 },
+    );
   } catch (error) {
     console.error('DELETE unassign failed:', error);
     return NextResponse.json({ message: 'Failed to unassign' }, { status: 500 });

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Contact, Loader2, Search, Download, Clock, BookOpen, ChevronDown, ChevronUp,
-  UserPlus, Pencil, Trash2, CheckCircle, CheckCircle2, Phone, Mail, AlertCircle,
+  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, AlertCircle,
 } from 'lucide-react';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL, FOCUS,
@@ -163,23 +163,6 @@ export default function SchoolOlympiadIdsPage() {
       setAllotError(e.message);
     } finally {
       setAllotting(false);
-    }
-  };
-
-  const handleUnassign = async (code: string) => {
-    if (!confirm('Remove assignment for this ID? Any app account linked to it will also be removed.')) return;
-    try {
-      const res = await fetch(`/api/school/me/olympiad-ids/${code}/assign`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      setAllocations(prev => prev.map(a =>
-        a.code === code ? { ...a, assignedName: null, assignedAt: null, hasAppUser: false, appUserPhone: null } : a
-      ));
-    } catch (e: any) {
-      alert(e.message);
     }
   };
 
@@ -431,9 +414,6 @@ export default function SchoolOlympiadIdsPage() {
                                 <div className="flex items-center justify-center gap-1.5">
                                   <button onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`} title="Edit name, phone & email">
                                     <Pencil size={12} />
-                                  </button>
-                                  <button onClick={() => handleUnassign(a.code)} className={`${BTN_ICON} hover:!text-[#B42323]`} aria-label={`Remove assignment for ${a.code}`} title="Remove">
-                                    <Trash2 size={12} />
                                   </button>
                                 </div>
                               ) : (
