@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic';
 // `field` in the form data just labels which slot the file is for so the
 // admin UI can call this once per image without two near-duplicate routes.
 export async function POST(request: Request) {
-  const { error } = await requireAdmin(request, ['banners', 'appCarousel', 'homeVideos', 'appTheme']);
+  const { error } = await requireAdmin(request, ['banners', 'appCarousel', 'homeVideos', 'appTheme', 'uploadCategories']);
   if (error) return error;
 
   try {

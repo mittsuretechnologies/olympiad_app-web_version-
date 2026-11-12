@@ -6,6 +6,7 @@ import { hasMittfestTag } from '@/lib/mittfest';
 import { schoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { olympiadSlotOf, resolveSchoolStudent, slotsForStudent } from '@/lib/olympiadSlots';
+import { checkOlympiadCategory } from '@/lib/uploadCategories';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -77,6 +78,12 @@ export async function POST(request: Request) {
         { status: 400 },
       );
     }
+    // An option of that category offered to the student's class — the same
+    // check the student's own app upload gets.
+    const categoryProblem = await checkOlympiadCategory(category, subCategory, {
+      classCode: student.classCode, olympiadCode: student.olympiadCode,
+    });
+    if (categoryProblem) return NextResponse.json({ error: categoryProblem }, { status: 400 });
 
     const slots = await slotsForStudent(student);
     const used = slot === 'A' ? slots.slotA : slots.slotB;

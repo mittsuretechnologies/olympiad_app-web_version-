@@ -15,6 +15,7 @@ import {
 import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
 import { CLAIM_RENEW_MS, claimIsLive } from '@/lib/videoClaim';
 import { mergeTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
+import { isSlot, uniqueNames, type CategoryDTO } from '@/lib/uploadCategoryShared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -243,6 +244,32 @@ export default function VideoModerationPage() {
   // Public/Private override: Super Admin only (the API enforces it too).
   const [canChangeVisibility] = useState(() => myRole() === 'SUPERADMIN');
   const [myId] = useState(myUserId);
+
+  // Options for the category filter and the recategorise dropdowns: the current
+  // lists from dashboard → Upload Categories (the built-in ones until they load,
+  // or if they can't).
+  const [catOptions, setCatOptions] = useState({
+    a: OLYMPIAD_CAT_A_OPTIONS, b: OLYMPIAD_CAT_B_OPTIONS, general: GENERAL_ONLY_CATEGORIES,
+  });
+  useEffect(() => {
+    fetch('/api/app/categories')
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { categories?: CategoryDTO[] } | null) => {
+        if (!Array.isArray(d?.categories)) return;
+        const labels = (slot: string) => uniqueNames(
+          d.categories!.filter(c => c.slotKind === slot).flatMap(c => c.subs.map(s => s.label)),
+        );
+        const a = labels('OLY_A');
+        const b = labels('OLY_B');
+        if (!a.length || !b.length) return;
+        const inSlots = new Set([...a, ...b].map(s => s.toLowerCase()));
+        const general = uniqueNames(
+          d.categories!.filter(c => !isSlot(c)).flatMap(c => c.subs.map(s => s.label)),
+        ).filter(s => !inSlots.has(s.toLowerCase()));
+        setCatOptions({ a, b, general });
+      })
+      .catch(() => {});
+  }, []);
 
   // ── Tab & Filters ─────────────────────────────────────────────────────────
   const [filter,       setFilter]       = useState<StatusFilter>('PENDING');
@@ -850,13 +877,13 @@ export default function VideoModerationPage() {
                 >
                   <option value="">All categories</option>
                   <optgroup label={OLYMPIAD_CAT_A_LABEL}>
-                    {OLYMPIAD_CAT_A_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {catOptions.a.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                   <optgroup label={OLYMPIAD_CAT_B_LABEL}>
-                    {OLYMPIAD_CAT_B_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {catOptions.b.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                   <optgroup label="General uploads">
-                    {GENERAL_ONLY_CATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
+                    {catOptions.general.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                 </select>
               </div>
@@ -1251,7 +1278,7 @@ export default function VideoModerationPage() {
                         onChange={e => {
                           const cat = e.target.value;
                           setEditedCat(cat);
-                          const subs = cat === OLYMPIAD_CAT_A_LABEL ? OLYMPIAD_CAT_A_OPTIONS : OLYMPIAD_CAT_B_OPTIONS;
+                          const subs = cat === OLYMPIAD_CAT_A_LABEL ? catOptions.a : catOptions.b;
                           if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0]);
                         }}
                         className="text-[11px] font-black text-amber-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-300"
@@ -1266,7 +1293,7 @@ export default function VideoModerationPage() {
                       >
                         {/* The app's options, plus the video's own value if it is an
                             older spelling, so the dropdown shows what is saved. */}
-                        {withCurrent(editedCat === OLYMPIAD_CAT_B_LABEL ? OLYMPIAD_CAT_B_OPTIONS : OLYMPIAD_CAT_A_OPTIONS, previewVideo.subCategory)
+                        {withCurrent(editedCat === OLYMPIAD_CAT_B_LABEL ? catOptions.b : catOptions.a, previewVideo.subCategory)
                           .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
                       </select>
                     </>

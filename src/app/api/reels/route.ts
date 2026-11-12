@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { browseWhere, findBrowseGroup } from '@/lib/uploadCategories';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -86,13 +87,28 @@ export async function GET(request: NextRequest) {
 
     if (videoId) where.id = videoId;
 
-    // category may be a comma-separated list (e.g. the Olympiad and normal
-    // names of the same group); subCategory narrows it to one item.
-    if (category) {
+    // card = a Search card / Reels filter category (its key): exactly the
+    // videos its Search card and Home row show, Olympiad ones included (see
+    // browseGroups in lib/uploadCategoryShared). Otherwise `category` may be a
+    // comma-separated list (e.g. the Olympiad and normal names of the same
+    // group). subCategory narrows either to one item, and may also list that
+    // item's earlier names (a renamed option).
+    const card = searchParams.get('card') ?? undefined;
+    const cardGroup = card ? await findBrowseGroup(card) : null;
+    if (cardGroup) {
+      where.AND = ([] as any[]).concat(where.AND ?? [], browseWhere(cardGroup));
+    } else if (category) {
       const cats = category.split(',').map(c => c.trim()).filter(Boolean);
       where.AND = ([] as any[]).concat(where.AND ?? [], { OR: cats.map(c => ({ category: { equals: c, mode: 'insensitive' } })) } as any);
     }
-    if (subCategory) where.subCategory = { equals: subCategory, mode: 'insensitive' };
+    if (subCategory) {
+      const subs = subCategory.split(',').map(s => s.trim()).filter(Boolean);
+      if (subs.length > 1) {
+        where.AND = ([] as any[]).concat(where.AND ?? [], { OR: subs.map(s => ({ subCategory: { equals: s, mode: 'insensitive' } })) } as any);
+      } else {
+        where.subCategory = { equals: subCategory, mode: 'insensitive' };
+      }
+    }
 
     // Resolve the viewer's own school/city/state, when there is one (Olympiad
     // accounts only — an olympiadId is what makes "their school" a meaningful
@@ -165,7 +181,7 @@ export async function GET(request: NextRequest) {
       // The ranked id list is the expensive part, and every page of one feed
       // needs the same one — so keep it briefly, keyed by viewer + seed (+ any
       // category filter). Pages after the first are then a slice + one query.
-      const cacheKey = `${viewerId ?? 'anon'}|${seed}|${category ?? ''}|${subCategory ?? ''}`;
+      const cacheKey = `${viewerId ?? 'anon'}|${seed}|${cardGroup ? `card:${card}` : category ?? ''}|${subCategory ?? ''}`;
       const now = Date.now();
       let rankedIds = MIX_CACHE.get(cacheKey)?.ids;
       if (!rankedIds || now - (MIX_CACHE.get(cacheKey)?.at ?? 0) > MIX_TTL_MS) {

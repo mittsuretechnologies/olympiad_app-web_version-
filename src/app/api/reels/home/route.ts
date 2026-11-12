@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { visibilityWhere } from '@/lib/videoVisibility';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { getLiveTheme } from '@/lib/appTheme';
+import { loadHomeLayout } from '@/lib/homeLayout';
+import { browseGroups, browseWhere, loadCategoriesSafe, type CategoryDTO } from '@/lib/uploadCategories';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -19,6 +21,18 @@ function getViewerIdFromToken(request: NextRequest): string | null {
 
 const ROW_LIMIT = 15;
 const OLYMPIAD_ROW_LIMIT = 100;
+
+/** Home category rows: the normal categories switched on for Home, in their
+ *  Home order. The Olympiad categories have no row of their own: their videos
+ *  show in these rows (see browseGroups in lib/uploadCategoryShared). */
+function homeCategoryRows(categories: CategoryDTO[]): { key: string; title: string; where: ReturnType<typeof browseWhere> }[] {
+  return browseGroups(categories)
+    // Learning / Parenting rows come from /api/app/home-videos (the Home
+    // switch is applied there), so the app never draws them from here.
+    .filter(g => g.category.showOnHome && !['learning', 'parenting'].includes(g.category.key))
+    .sort((a, b) => a.category.homeSortOrder - b.category.homeSortOrder)
+    .map(g => ({ key: `cat:${g.category.key}`, title: g.category.label, where: browseWhere(g) }));
+}
 
 type RawVideo = {
   id: string;
@@ -190,11 +204,9 @@ export async function GET(request: NextRequest) {
         orderBy: { createdAt: 'desc' },
         select: VIDEO_SELECT,
       }),
-      prisma.video.findMany({
-        where: { ...baseWhere, category: { not: null } },
-        select: { category: true },
-        distinct: ['category'],
-      }),
+      // The category rows the SuperAdmin put on Home (dashboard → Upload
+      // Categories), in that order.
+      loadCategoriesSafe().then(homeCategoryRows),
       // MittFest — videos whose uploader ticked the MittFest checkbox. Shown
       // to every user (Olympiad or not), directly under the hero carousel.
       prisma.video.findMany({
@@ -215,7 +227,6 @@ export async function GET(request: NextRequest) {
     ]);
 
     const trendingIds = trendingViews.map(t => t.videoId);
-    const categoryNames = categories.map(c => c.category).filter(Boolean) as string[];
 
     // Second round, all at once: the trending videos (with their fallback),
     // every category row, and the carousel slides.
@@ -240,10 +251,12 @@ export async function GET(request: NextRequest) {
         });
       })(),
       Promise.all(
-        categoryNames.map(name =>
+        categories.map(row =>
           prisma.video.findMany({
             take: ROW_LIMIT,
-            where: { ...baseWhere, category: name },
+            // Its own names (and earlier ones), plus the Olympiad videos that
+            // belong to it — the same videos its Search card shows.
+            where: { ...baseWhere, ...row.where },
             orderBy: { viewsCount: 'desc' },
             select: VIDEO_SELECT,
           })
@@ -272,13 +285,20 @@ export async function GET(request: NextRequest) {
       { key: 'mittfest', title: 'MittFest', videos: mittfestVideos },
       { key: 'trending', title: 'Most Watched This Week', videos: trending },
       { key: 'new', title: 'New Releases', videos: releases },
-      ...categoryNames.map((name, i) => ({ key: `cat_${i}`, title: name, videos: categoryRows[i] })),
+      ...categories.map((row, i) => ({ key: row.key, title: row.title, videos: categoryRows[i] })),
     ].filter(row => row.videos.length > 0);
 
     // `banners` is additive: older app builds that only read `rows` are
     // unaffected, and a build that does read it treats an empty array as
     // "no admin slides, use videos only".
-    return NextResponse.json({ rows, banners: appBanners });
+    // The SuperAdmin's order and on/off switches for the whole Home screen
+    // (dashboard → Upload Categories → Home Screen). Additive: an app build that
+    // does not read it keeps drawing Home the way it always did.
+    const layout = await loadCategoriesSafe()
+      .then(loadHomeLayout)
+      .then(list => list.map(e => ({ key: e.key, visible: e.visible })))
+      .catch(() => []);
+    return NextResponse.json({ rows, banners: appBanners, layout });
   } catch (error) {
     console.error('GET /api/reels/home failed:', error);
     return NextResponse.json({ message: 'Failed to fetch home feed' }, { status: 500 });

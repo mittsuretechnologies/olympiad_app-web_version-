@@ -1162,6 +1162,82 @@ model AppBannerSlide {
   @@schema("public")
 }
 
+// Upload categories, managed by the SuperAdmin (dashboard → Upload Categories)
+// and read by the app, the school portal and the upload routes through
+// src/lib/uploadCategories.ts. Videos store the category / sub-category NAME as
+// text, so renaming one keeps the old name in `aliases` for the videos already
+// uploaded under it.
+//
+// Tables made by prisma/manual-migrations/2026-11-12-upload-categories.sql —
+// never `prisma db push` (the databases have tables that are not in this file).
+model UploadCategory {
+  id              String   @id @default(uuid())
+  key             String   @unique
+  label           String
+  // Earlier names of this category (old videos still carry them).
+  aliases         String[] @default([])
+  // Who may upload into it: NORMAL (general users, and Olympiad students once
+  // both Olympiad videos are in), GENERAL_SCHOOL, OLYMPIAD_SCHOOL; and
+  // OLYMPIAD_STUDENT for the two Olympiad slot categories.
+  audiences       String[] @default([])
+  // NONE, or OLY_A / OLY_B: the Olympiad slot this category fills.
+  slotKind        String   @default("NONE")
+  icon            String   @default("apps-outline")
+  color           String   @default("#5C6B8A")
+  // Search card picture; null = the app's built-in one, or a plain colour.
+  imageUrl        String?
+  // Not used any more (first version); kept so old rows load.
+  searchQuery     String?
+  // Comma-separated extra category names the Search card also shows videos of
+  // (e.g. Rhymes also shows Olympiad "Rhymes / Speech" videos).
+  searchCats      String?
+  // Title on the Search card when it differs from the upload name.
+  searchLabel     String?
+  showInSearch    Boolean  @default(true)
+  searchSortOrder Int      @default(0)
+  showOnHome      Boolean  @default(false)
+  homeSortOrder   Int      @default(0)
+  // Upload order.
+  sortOrder       Int      @default(0)
+  // Open for uploads. A closed category can still show on Search / Home.
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  subs            UploadSubCategory[]
+
+  @@schema("public")
+}
+
+model UploadSubCategory {
+  id         String         @id @default(uuid())
+  categoryId String
+  category   UploadCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  label      String
+  // Earlier names of this option (old videos still carry them).
+  aliases    String[]       @default([])
+  icon       String         @default("star-outline")
+  // Classes it is offered to (single-letter class codes, src/lib/classes.ts);
+  // empty = every class. Used by the Olympiad slot categories.
+  classCodes String[]       @default([])
+  sortOrder  Int            @default(0)
+  isActive   Boolean        @default(true)
+
+  @@index([categoryId])
+  @@schema("public")
+}
+
+// Order of every item on the app Home screen, and the on/off switch of the
+// sections that are not categories (mittfest, trending, school). Categories
+// are "cat:<UploadCategory.key>" and keep their own switch (showOnHome).
+// Table made by prisma/manual-migrations/2026-11-12-upload-categories.sql.
+model HomeLayoutItem {
+  key       String  @id
+  sortOrder Int     @default(0)
+  visible   Boolean @default(true)
+
+  @@schema("public")
+}
+
 // SuperAdmin-managed look of the mobile app home screen (festival themes:
 // Diwali, Holi, Christmas, …). At most one is "live" at a time — the enabled
 // theme whose window contains now, highest priority first (see
