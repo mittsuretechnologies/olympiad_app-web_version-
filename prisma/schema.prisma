@@ -979,11 +979,40 @@ model Notification {
   actorId        String? // AppUser.id of whoever triggered this (FOLLOW / FOLLOW_REQUEST)
   count          Int      @default(1) // how many actors this row represents (VIDEO_LIKED)
   recentActorIds String[] @default([]) // most recent likers' userIds, for "X and N others"
+  // ANNOUNCEMENT (SuperAdmin → App Notifications): the link it opens
+  // (app://Upload, https://…) and the AppAnnouncement it belongs to.
+  link           String?
+  broadcastId    String?
   user           AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, isRead])
   @@index([userId, videoId, type, isRead])
+  @@index([broadcastId])
+  @@schema("public")
+}
+
+// A message the SuperAdmin sent from App Notifications: the log behind the
+// sent history and "Delete for everyone". The recipients' copies are
+// Notification rows (and SchoolNotification rows for Olympiad schools' web
+// bell) carrying this id as broadcastId. Table made by
+// prisma/manual-migrations/2026-11-13-app-announcements.sql.
+model AppAnnouncement {
+  id            String    @id @default(uuid())
+  title         String
+  message       String
+  link          String?
+  // { types, states, districts, classes } as chosen when sending.
+  filters       Json      @default("{}")
+  appRecipients Int       @default(0)
+  webRecipients Int       @default(0)
+  createdBy     String?
+  createdByName String?
+  createdAt     DateTime  @default(now())
+  recalledAt    DateTime?
+  recalledBy    String?
+
+  @@index([createdAt])
   @@schema("public")
 }
 
@@ -1342,9 +1371,12 @@ model SchoolNotification {
   // SuperAdmin/MasterAdmin id for ANNOUNCEMENT; null for system notifications.
   createdBy String?
   createdAt DateTime  @default(now())
+  // The AppAnnouncement this came from (SuperAdmin → App Notifications).
+  broadcastId String?
 
   @@index([schoolId, createdAt])
   @@index([schoolId, readAt])
+  @@index([broadcastId])
   @@schema("public")
 }
 

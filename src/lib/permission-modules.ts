@@ -27,6 +27,7 @@ export const PERMISSION_MODULES: PermissionModule[] = [
   { key: 'coins', label: 'Coins & Rewards', subItems: [], adminOnly: true },
   { key: 'homeVideos', label: 'Learning & Parenting', subItems: [], adminOnly: true },
   { key: 'uploadCategories', label: 'Upload Categories', subItems: [], adminOnly: true },
+  { key: 'appNotifications', label: 'App Notifications', subItems: [], adminOnly: true },
   { key: 'videoDownloads', label: 'Download Videos', subItems: [], adminOnly: true },
   { key: 'activityLog', label: 'Activity Log', subItems: [], adminOnly: true },
   { key: 'deletionRequests', label: 'Deletion Requests', subItems: [], adminOnly: true },

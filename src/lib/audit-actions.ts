@@ -73,6 +73,8 @@ export const AUDIT_ACTIONS: Record<string, AuditActionDef> = {
   COIN_ADJUSTED:                    { label: 'Coins Adjusted by Admin',      category: 'accounts', tone: 'warning' },
   COIN_REDEMPTION_HANDLED:          { label: 'Reward Redemption Handled',    category: 'accounts', tone: 'info' },
   COIN_REFERRAL_REVIEWED:           { label: 'Referral Reviewed',            category: 'accounts', tone: 'info' },
+  APP_NOTIFICATION_SENT:            { label: 'App Notification Sent',        category: 'accounts', tone: 'info' },
+  APP_NOTIFICATION_DELETED:         { label: 'App Notification Deleted',     category: 'accounts', tone: 'warning' },
   EVALUATOR_TERMS_ACCEPTED: { label: 'Evaluator Terms Accepted', category: 'accounts', tone: 'success' },
   AGREEMENT_REACCEPTANCE_REQUESTED: { label: 'Agreement Re-acceptance Asked', category: 'accounts', tone: 'info' },
   GENERAL_SCHOOL_ACTIVATED:         { label: 'General School Activated',     category: 'accounts', tone: 'success' },
