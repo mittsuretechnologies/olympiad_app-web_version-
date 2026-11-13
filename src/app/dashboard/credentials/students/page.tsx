@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 interface StudentCred {
   id: string;
   code: string;
-  school: { id: string; schoolId: string; name: string; city: string | null } | null;
+  school: { id: string; schoolId: string; olympiadId: string | null; name: string; city: string | null } | null;
   student: {
     id: string; name: string; phone: string; username?: string | null;
     plainPassword?: string | null; isVerified: boolean; createdAt: string; source?: string;
@@ -21,6 +21,7 @@ interface StudentCred {
 
 interface SchoolGroup {
   schoolId: string;
+  crmId: string | null; // School.olympiadId — shown instead of the internal school code
   name: string;
   city: string | null;
   dbId: string;
@@ -51,6 +52,7 @@ export default function StudentCredentialsPage() {
       r.code?.toLowerCase().includes(q) ||
       r.school?.name?.toLowerCase().includes(q) ||
       r.school?.schoolId?.toLowerCase().includes(q) ||
+      r.school?.olympiadId?.toLowerCase().includes(q) ||
       r.school?.city?.toLowerCase().includes(q) ||
       r.student?.name?.toLowerCase().includes(q) ||
       r.student?.phone?.toLowerCase().includes(q)
@@ -64,6 +66,7 @@ export default function StudentCredentialsPage() {
       if (!map.has(key)) {
         map.set(key, {
           schoolId: r.school?.schoolId || '-',
+          crmId: r.school?.olympiadId || null,
           name: r.school?.name || 'Unknown School',
           city: r.school?.city || null,
           dbId: r.school?.id || '',
@@ -223,7 +226,7 @@ export default function StudentCredentialsPage() {
                         <div className="flex items-center gap-3 flex-wrap">
                           <Building2 size={15} className="text-[#004f9f] shrink-0" />
                           <span className="font-bold text-[#004f9f] text-sm">{school.name}</span>
-                          <span className="font-mono text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5">{school.schoolId}</span>
+                          {school.crmId && <span className="font-mono text-xs text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5" title="CRM ID">{school.crmId}</span>}
                           {school.city && <span className="text-xs text-gray-500 bg-gray-100 border border-gray-200 px-2 py-0.5">{school.city}</span>}
                           <span className="ml-auto flex items-center gap-2 text-xs">
                             <span className="bg-green-100 text-green-800 border border-green-200 px-2 py-0.5 font-semibold">{registered} registered</span>
