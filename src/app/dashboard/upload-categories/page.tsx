@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Loader2, Plus, X, Trash2, AlertCircle, GripVertical, Pencil, Info, Lock, Search, Home,
-  UploadCloud, ChevronUp, ChevronDown, Eye, EyeOff, LayoutGrid,
+  UploadCloud, ChevronUp, ChevronDown, Eye, EyeOff, LayoutGrid, Flame, Shuffle, ListOrdered,
 } from 'lucide-react';
 import {
   AUDIENCE_LABELS, NORMAL_AUDIENCES, browseGroups, categoryNames, isSlot,
@@ -11,6 +11,10 @@ import {
 } from '@/lib/uploadCategoryShared';
 import { IONICON_NAMES, IONICON_VERSION } from '@/lib/ioniconNames';
 import type { HomeLayoutEntry } from '@/lib/homeLayout';
+import {
+  DEFAULT_TRENDING_SETTINGS, MIN_VIDEOS_LIMITS, eligibleOptions, isOptionOn, istDayLabel, listsOption, orderedOptions,
+  pickForDay, type TrendingMode, type TrendingOption, type TrendingSettings, type TrendingView,
+} from '@/lib/trendingTotsShared';
 
 // SuperAdmin → Upload Categories. The categories the app offers on its upload
 // screen, per kind of user, and the category lists on the app's Search and
@@ -227,6 +231,7 @@ export default function UploadCategoriesPage() {
   const [videoCounts, setVideoCounts] = useState<Record<string, number>>({});
   const [browseCounts, setBrowseCounts] = useState<Record<string, number>>({});
   const [homeLayout, setHomeLayout] = useState<HomeLayoutEntry[]>([]);
+  const [trending, setTrending] = useState<TrendingView | null>(null);
   const [classLetters, setClassLetters] = useState<string[]>(['P', 'N', 'L', 'U']);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
@@ -242,6 +247,7 @@ export default function UploadCategoriesPage() {
       setVideoCounts(data.videoCounts ?? {});
       setBrowseCounts(data.browseCounts ?? {});
       setHomeLayout(data.homeLayout ?? []);
+      setTrending(data.trending ?? null);
       if (Array.isArray(data.classLetters)) setClassLetters(data.classLetters);
     } catch (e: any) {
       setLoadError(e.message);
@@ -328,6 +334,7 @@ export default function UploadCategoriesPage() {
           counts={browseCounts} onToggle={(c, v) => setFlag(c, 'showInSearch', v)}
           onEdit={(c) => setDraft(toDraft(c))} onOrder={(ids) => saveOrder('search', ids)} />
       ) : tab === 'HOME' ? (
+        <>
         <HomeList layout={homeLayout} categories={categories} slots={byUpload.filter(isSlot)} groups={groups}
           counts={browseCounts} onToggleCategory={(c, v) => {
             setHomeLayout((prev) => prev.map((e) => (e.key === `cat:${c.key}` ? { ...e, visible: v } : e)));
@@ -342,6 +349,9 @@ export default function UploadCategoriesPage() {
             setHomeLayout((prev) => keys.map((k) => prev.find((e) => e.key === k)!).filter(Boolean));
             run('Saving order…', () => api('/api/dashboard/upload-categories', 'PATCH', { list: 'home', order: keys }));
           }} />
+        <TrendingTotsBox view={trending}
+          onSave={(s) => run('Saving Trending Tots…', () => api('/api/dashboard/upload-categories', 'PATCH', { trending: s }))} />
+        </>
       ) : tab === 'OLYMPIAD_STUDENT' ? (
         <SlotList items={byUpload.filter(isSlot)} countFor={countFor} onEdit={(c) => setDraft(toDraft(c))} />
       ) : (
@@ -577,7 +587,7 @@ function HomeList({ layout, categories, slots, groups, counts, onToggleCategory,
   const catOf = (key: string) => categories.find((c) => `cat:${c.key}` === key);
   const SECTION_NOTES: Record<string, string> = {
     mittfest: 'The MittFest row (videos marked for MittFest).',
-    trending: 'The Most Watched This Week row (also feeds the top carousel, which stays).',
+    trending: 'Trending Tots: a different option every day (set it up in the box below). The top carousel keeps the overall most watched.',
     school: 'The row of the viewer’s own school videos (only shown to users who belong to a school).',
   };
   return (
@@ -617,6 +627,177 @@ function HomeList({ layout, categories, slots, groups, counts, onToggleCategory,
         })}
       </Panel>
     </>
+  );
+}
+
+/**
+ * Trending Tots: which options take turns on the Home row, how (shuffle / the
+ * SuperAdmin's order), and how many videos an option needs. The 7-day preview
+ * uses the same rotation as the server (lib/trendingTotsShared), so it shows
+ * the unsaved changes too.
+ */
+function TrendingTotsBox({ view, onSave }: { view: TrendingView | null; onSave: (s: TrendingSettings) => void }) {
+  const [mode, setMode] = useState<TrendingMode>(DEFAULT_TRENDING_SETTINGS.mode);
+  const [minVideos, setMinVideos] = useState<number>(DEFAULT_TRENDING_SETTINGS.minVideos);
+  const [keys, setKeys] = useState<string[]>([]);         // option keys, in the SuperAdmin's order
+  const [off, setOff] = useState<Set<string>>(new Set()); // option keys left out
+  const [dirty, setDirty] = useState(false);
+
+  const reset = useCallback(() => {
+    if (!view) return;
+    setMode(view.settings.mode);
+    setMinVideos(view.settings.minVideos);
+    setKeys(orderedOptions(view.options, view.settings).map((o) => o.key));
+    setOff(new Set(view.options.filter((o) => !isOptionOn(o, view.settings)).map((o) => o.key)));
+    setDirty(false);
+  }, [view]);
+  useEffect(() => { reset(); }, [reset]);
+
+  const byKey = useMemo(() => new Map((view?.options ?? []).map((o) => [o.key, o])), [view]);
+  const listed = useMemo(
+    () => keys.map((k) => byKey.get(k)).filter((o): o is TrendingOption => !!o).map((o) => ({ ...o, id: o.key })),
+    [keys, byKey],
+  );
+  const { order, rowProps } = useDragOrder(listed, (ids) => { setKeys(ids); setDirty(true); });
+
+  if (!view) return null;
+
+  // Saved names of options that aren't listed right now (e.g. switched off for
+  // uploads) are kept, so they come back the way they were.
+  const known = (n: string) => view.options.some((o) => listsOption([n], o));
+  const draft: TrendingSettings = {
+    mode,
+    minVideos,
+    order: [...listed.map((o) => o.name), ...view.settings.order.filter((n) => !known(n))],
+    off: [...listed.filter((o) => off.has(o.key)).map((o) => o.name), ...view.settings.off.filter((n) => !known(n))],
+  };
+  const schedule = Array.from({ length: 7 }, (_, i) => {
+    const day = view.day + i;
+    // Today is fixed on the server; saving picks it again under the new settings.
+    const option = i === 0 && !dirty
+      ? (view.todayKey ? byKey.get(view.todayKey) ?? null : null)
+      : pickForDay(listed, draft, day);
+    return { day, option };
+  });
+  const readyCount = eligibleOptions(listed, draft).length;
+
+  const toggle = (key: string, on: boolean) => {
+    setOff((prev) => {
+      const next = new Set(prev);
+      if (on) next.delete(key); else next.add(key);
+      return next;
+    });
+    setDirty(true);
+  };
+  const setMin = (raw: string) => {
+    const v = Math.round(Number(raw));
+    if (!Number.isFinite(v)) return;
+    setMinVideos(Math.min(MIN_VIDEOS_LIMITS.max, Math.max(MIN_VIDEOS_LIMITS.min, v)));
+    setDirty(true);
+  };
+  const MODES = [['shuffle', 'Shuffle daily', Shuffle], ['order', 'In my order', ListOrdered]] as const;
+
+  return (
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+      <div className="px-4 py-3 flex items-start gap-3 flex-wrap border-b border-gray-50">
+        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0 bg-amber-50 border border-amber-200">
+          <Flame size={16} className="text-amber-600" />
+        </div>
+        <div className="flex-1 min-w-[220px]">
+          <p className="text-sm font-bold text-gray-800">Trending Tots</p>
+          <p className="text-[11px] text-gray-500 mt-0.5">
+            One option a day, changing at midnight India time. The row shows that option&apos;s most watched videos: views in the last 7 days first, then all-time.
+            Options with the same name count as one, Olympiad videos included. If no option is ready, the row shows the overall most watched.
+          </p>
+        </div>
+        {dirty && (
+          <div className="flex items-center gap-2">
+            <button onClick={reset} className="px-3 py-1.5 rounded-lg text-xs font-semibold border border-gray-200 text-gray-600 hover:bg-gray-50">
+              Discard
+            </button>
+            <button onClick={() => onSave(draft)} className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#004f9f] text-white hover:bg-[#003d7a]">
+              Save
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="px-4 py-3 bg-amber-50/40 border-b border-gray-50">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {schedule.map((d, i) => (
+            <div key={d.day} className={`shrink-0 min-w-[110px] rounded-xl border px-3 py-2 ${i === 0 ? 'bg-amber-100 border-amber-300' : 'bg-white border-gray-200'}`}>
+              <p className="text-[10px] font-bold uppercase tracking-wide text-gray-500">
+                {i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : istDayLabel(d.day)}
+              </p>
+              <p className={`text-xs font-semibold mt-0.5 ${d.option ? 'text-gray-800' : 'text-gray-400 italic'}`}>
+                {d.option?.name ?? 'Overall most watched'}
+              </p>
+            </div>
+          ))}
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1.5">
+          {dirty ? 'Preview of your unsaved changes. Saving picks today’s option again.' : 'Today’s option stays for the whole day.'}{' '}
+          Days ahead can shift when an option gains or loses videos.
+        </p>
+      </div>
+
+      <div className="px-4 py-3 flex items-center gap-4 flex-wrap border-b border-gray-50">
+        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+          {MODES.map(([m, label, Icon]) => (
+            <button
+              key={m} onClick={() => { setMode(m); setDirty(true); }}
+              className={`px-3 py-1.5 text-xs font-semibold inline-flex items-center gap-1.5 ${mode === m ? 'bg-[#004f9f] text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+            >
+              <Icon size={12} /> {label}
+            </button>
+          ))}
+        </div>
+        <label className="text-xs text-gray-600 inline-flex items-center gap-2">
+          Needs at least
+          <input
+            type="number" min={MIN_VIDEOS_LIMITS.min} max={MIN_VIDEOS_LIMITS.max} value={minVideos}
+            onChange={(e) => setMin(e.target.value)}
+            className="w-14 border border-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-[#004f9f]"
+          />
+          approved videos to get a day
+        </label>
+        <span className="text-[11px] text-gray-400 sm:ml-auto">{readyCount} of {listed.length} options ready</span>
+      </div>
+
+      {mode === 'order' && (
+        <p className="px-4 pt-2 text-[11px] text-gray-400">Drag to set the order. The ready options take turns from the top.</p>
+      )}
+      <div className="divide-y divide-gray-50 max-h-[480px] overflow-y-auto">
+        {order.map((o, i) => {
+          const on = !off.has(o.key);
+          const ready = on && o.videos >= minVideos;
+          const others = o.names.filter((n) => n.toLowerCase() !== o.key);
+          return (
+            <div
+              key={o.key} {...(mode === 'order' ? rowProps(i) : {})}
+              className={`flex items-center gap-3 px-4 py-2.5 ${mode === 'order' ? 'cursor-grab active:cursor-grabbing hover:bg-gray-50/60' : ''} ${on ? '' : 'opacity-60'}`}
+            >
+              {mode === 'order' && <GripVertical size={16} className="text-gray-300 shrink-0" />}
+              <Toggle on={on} onChange={(v) => toggle(o.key, v)} title={on ? 'In the rotation' : 'Left out'} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-gray-800 truncate">{o.name}</p>
+                <p className="text-[11px] text-gray-400 truncate">
+                  {o.categories.join(' · ')}{others.length ? ` · also counts: ${others.join(', ')}` : ''}
+                </p>
+              </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {schedule[0].option?.key === o.key && <Badge tone="green">Today</Badge>}
+                {on && !ready && <Badge tone="amber">Needs {minVideos}+ videos</Badge>}
+                <Badge tone="gray">{videos(o.videos)}</Badge>
+              </div>
+            </div>
+          );
+        })}
+        {order.length === 0 && (
+          <div className="py-10 text-center text-gray-400 text-sm">No options yet. Add options to your categories first.</div>
+        )}
+      </div>
+    </div>
   );
 }
 

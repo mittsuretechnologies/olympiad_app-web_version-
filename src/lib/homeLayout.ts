@@ -11,7 +11,7 @@ import { isSlot, type CategoryDTO } from '@/lib/uploadCategoryShared';
 
 export const SYSTEM_SECTIONS = [
   { key: 'mittfest', label: 'MittFest' },
-  { key: 'trending', label: 'Most Watched This Week' },
+  { key: 'trending', label: 'Trending Tots' },
   { key: 'school', label: 'Videos From Your School' },
 ] as const;
 

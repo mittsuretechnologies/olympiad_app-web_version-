@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
 import { loadHomeLayout, saveHomeOrder, setSectionVisible } from '@/lib/homeLayout';
 import { browseGroups, browseWhere, invalidateCategoryCache, loadAllCategories } from '@/lib/uploadCategories';
+import { saveTrendingSettings, trendingAdminView } from '@/lib/trendingTots';
 import {
   CLASS_LETTERS, ORDER_LISTS, checkAgainstOthers, cleanInput, createCategory, saveOrder,
 } from '@/lib/uploadCategoriesAdmin';
@@ -34,7 +35,12 @@ export async function GET(request: Request) {
     })));
     const browseCounts = Object.fromEntries(groups.map((g, i) => [g.category.id, shown[i]]));
     const homeLayout = await loadHomeLayout(categories);
-    return NextResponse.json({ categories, videoCounts, browseCounts, homeLayout, classLetters: CLASS_LETTERS });
+    // Trending Tots (Home Screen tab). A failure only hides that box.
+    const trending = await trendingAdminView().catch((e) => {
+      console.error('upload-categories: Trending Tots view failed:', e);
+      return null;
+    });
+    return NextResponse.json({ categories, videoCounts, browseCounts, homeLayout, trending, classLetters: CLASS_LETTERS });
   } catch (e: any) {
     console.error('GET /api/dashboard/upload-categories failed:', e);
     return NextResponse.json({ message: e.message }, { status: 500 });
@@ -59,12 +65,21 @@ export async function POST(request: Request) {
 }
 
 // PATCH { list: 'upload' | 'search' | 'home', order: [id, …] } — one of the
-// three display orders, the whole list.
+// three display orders, the whole list. Also { section, visible } and
+// { trending } (below).
 export async function PATCH(request: Request) {
   const { error } = await requireAdmin(request, 'uploadCategories');
   if (error) return error;
   try {
     const body = await request.json();
+    // { trending: { mode, order, off, minVideos } } — the Trending Tots settings.
+    if (body.trending !== undefined) {
+      if (!body.trending || typeof body.trending !== 'object') {
+        return NextResponse.json({ message: 'trending must be an object' }, { status: 400 });
+      }
+      await saveTrendingSettings(body.trending);
+      return NextResponse.json({ ok: true, trending: await trendingAdminView() });
+    }
     // { section, visible } — switch a non-category Home section on or off.
     if (typeof body.section === 'string') {
       const problem = await setSectionVisible(body.section, body.visible === true, await loadAllCategories());
