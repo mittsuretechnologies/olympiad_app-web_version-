@@ -12,7 +12,7 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'desc' },
       include: {
         school: {
-          select: { id: true, schoolId: true, name: true, city: true },
+          select: { id: true, schoolId: true, olympiadId: true, name: true, city: true },
         },
         student: {
           select: {

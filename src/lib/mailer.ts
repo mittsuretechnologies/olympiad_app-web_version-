@@ -1051,7 +1051,7 @@ export async function sendSchoolSupportTeamEmail(data: SchoolSupportTeamMail): P
   }
 
   const heading = data.event === 'NEW' ? 'New support request' : 'School replied';
-  const link = PANEL_URL ? `${PANEL_URL}/dashboard/school-support?ticket=${encodeURIComponent(data.ticketId)}` : null;
+  const link = PANEL_URL ? `${PANEL_URL}/dashboard/support?tab=schools&ticket=${encodeURIComponent(data.ticketId)}` : null;
   const rows: [string, string][] = [
     ['Reference', data.ticketRef],
     ['School', `${data.schoolName} (${data.schoolCode})`],
