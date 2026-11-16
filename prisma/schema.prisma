@@ -84,7 +84,36 @@ model School {
   passportRelease PassportRelease?
   notifications SchoolNotification[]
   districtForwards DistrictForward[]
+  examDateRequests ExamDateChangeRequest[]
 
+  @@schema("public")
+}
+
+// A school asking to set or change its exam date. Schools can't edit
+// School.examDate themselves: they file one of these from the School Panel
+// profile, and a SuperAdmin (or a Master Admin granted "schools.examDateRequests")
+// approves it — which writes requestedDate onto the school — or rejects it
+// with a remark the school sees on its profile. One PENDING row per school
+// at a time; decided rows stay as history.
+model ExamDateChangeRequest {
+  id            String    @id @default(uuid())
+  schoolId      String
+  school        School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  // School.examDate when the request was filed (null = no date set yet).
+  previousDate  DateTime?
+  requestedDate DateTime
+  // Optional note from the school explaining the change.
+  reason        String?
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  // Admin's remark — required on reject, shown to the school.
+  remark        String?
+  decidedBy     String?
+  decidedByName String?
+  decidedAt     DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([schoolId, createdAt])
+  @@index([status])
   @@schema("public")
 }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2, Save, CheckCircle2, AlertCircle, ChevronDown, Eye, EyeOff, User, Globe, Trash2, Lock, Pencil } from 'lucide-react';
-import { modulesForRole, readOnlyMarker, type PermissionModule, type PermissionRole, type PermissionSubItem } from '@/lib/permission-modules';
+import { modulesForRole, readOnlyMarker, resolveAllowedModules, type PermissionModule, type PermissionRole, type PermissionSubItem } from '@/lib/permission-modules';
 
 type RoleKey = PermissionRole;
 type ViewMode = 'global' | 'individual';
@@ -22,12 +22,15 @@ interface Member { id: string; name: string; evaluatorId?: string; moderatorId?:
 interface IndividualPerm { memberId: string; allowedModules: string[]; evaluator?: Member; moderator?: Member; masterAdmin?: Member; }
 
 function ModuleList({
-  modules, allowed, setAllowed, search, readOnlyOption = false,
+  modules, allowed, setAllowed, search, readOnlyOption = false, baseline,
 }: {
   modules: Module[];
   allowed: string[];
   setAllowed: (next: string[]) => void;
   search: string;
+  // Individual view: the role's global list, to mark modules this member has
+  // set differently. Everything else keeps following global.
+  baseline?: string[];
   // Master Admin only: per-module "view only" switch (stored as "ro:<key>").
   readOnlyOption?: boolean;
 }) {
@@ -68,6 +71,8 @@ function ModuleList({
         const isExpanded = expanded.has(mod.key);
         const enabledSubCount = mod.subItems.filter(s => allowed.includes(s.key)).length;
         const isReadOnly = allowed.includes(readOnlyMarker(mod.key));
+        const keys = [mod.key, readOnlyMarker(mod.key), ...mod.subItems.map(s => s.key)];
+        const ownSetting = !!baseline && keys.some(k => allowed.includes(k) !== baseline.includes(k));
         return (
           <div key={mod.key}>
             <div className={`flex items-center gap-4 px-5 py-4 transition-colors ${isOn ? 'bg-white' : 'bg-gray-50/50'}`}>
@@ -75,7 +80,14 @@ function ModuleList({
                 {mod.label.slice(0, 2).toUpperCase()}
               </div>
               <div className="flex-1 min-w-0">
-                <p className={`text-sm font-bold ${isOn ? 'text-gray-800' : 'text-gray-400'}`}>{mod.label}</p>
+                <p className={`text-sm font-bold ${isOn ? 'text-gray-800' : 'text-gray-400'}`}>
+                  {mod.label}
+                  {baseline && (
+                    <span className={`ml-2 align-middle text-[10px] font-semibold px-1.5 py-0.5 rounded ${ownSetting ? 'bg-orange-50 text-orange-600 ring-1 ring-orange-200' : 'text-gray-400'}`}>
+                      {ownSetting ? 'Own setting' : 'Follows global'}
+                    </span>
+                  )}
+                </p>
                 {mod.subItems.length > 0 && (
                   <p className="text-[11px] text-gray-400 mt-0.5">{isOn ? `${enabledSubCount}/${mod.subItems.length} sub-items enabled` : 'Disabled'}</p>
                 )}
@@ -132,6 +144,9 @@ export default function PermissionControlPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('global');
   const [activeRole, setActiveRole] = useState<RoleKey>('MASTER_ADMIN');
   const [globalPerms, setGlobalPerms] = useState<Record<RoleKey, string[]>>({ MASTER_ADMIN: [], EVALUATOR: [], MODERATOR: [] });
+  // Global lists as last saved — individual overrides are measured against these,
+  // not against unsaved edits on the Global tab.
+  const [savedGlobal, setSavedGlobal] = useState<Record<RoleKey, string[]>>({ MASTER_ADMIN: [], EVALUATOR: [], MODERATOR: [] });
   const [individualPerms, setIndividualPerms] = useState<IndividualPerm[]>([]);
   const [evaluators, setEvaluators] = useState<Member[]>([]);
   const [moderators, setModerators] = useState<Member[]>([]);
@@ -160,6 +175,7 @@ export default function PermissionControlPage() {
           if (p.role === 'MODERATOR') map.MODERATOR = p.allowedModules;
         });
         setGlobalPerms(map);
+        setSavedGlobal(map);
         setIndividualPerms(Array.isArray(permsData.individual) ? permsData.individual : []);
       }
       if (Array.isArray(evlData)) setEvaluators(evlData.map((e: any) => ({ id: e.id, name: e.name, evaluatorId: e.evaluatorId })));
@@ -175,8 +191,8 @@ export default function PermissionControlPage() {
     setSelectedMember(m);
     setSuccess(false); setError('');
     const existing = individualPerms.find(p => p.memberId === m.id);
-    if (existing) { setIndividualAllowed(existing.allowedModules); setHasIndividual(true); }
-    else { setIndividualAllowed(globalPerms[activeRole]); setHasIndividual(false); }
+    if (existing) { setIndividualAllowed(resolveAllowedModules(savedGlobal[activeRole], existing.allowedModules)); setHasIndividual(true); }
+    else { setIndividualAllowed(savedGlobal[activeRole]); setHasIndividual(false); }
   };
 
   useEffect(() => {
@@ -202,6 +218,7 @@ export default function PermissionControlPage() {
         body: JSON.stringify({ role: activeRole, allowedModules: globalPerms[activeRole] }),
       });
       if (!res.ok) throw new Error((await res.json()).message);
+      setSavedGlobal(p => ({ ...p, [activeRole]: globalPerms[activeRole] }));
       setSuccess(true); setTimeout(() => setSuccess(false), 3000);
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
   };
@@ -214,11 +231,13 @@ export default function PermissionControlPage() {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ role: activeRole, memberId: selectedMember.id, allowedModules: individualAllowed }),
       });
-      if (!res.ok) throw new Error((await res.json()).message);
+      const saved = await res.json();
+      if (!res.ok) throw new Error(saved.message);
       setHasIndividual(true);
+      // The server stores only the differences from global; keep that form.
       setIndividualPerms(prev => {
         const filtered = prev.filter(p => p.memberId !== selectedMember.id);
-        return [...filtered, { memberId: selectedMember.id, allowedModules: individualAllowed }];
+        return [...filtered, { memberId: selectedMember.id, allowedModules: saved.allowedModules }];
       });
       setSuccess(true); setTimeout(() => setSuccess(false), 3000);
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
@@ -228,12 +247,13 @@ export default function PermissionControlPage() {
     if (!selectedMember) return;
     setSaving(true); setError('');
     try {
-      await fetch('/api/settings/individual-permissions', {
+      const res = await fetch('/api/settings/individual-permissions', {
         method: 'DELETE', headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({ memberId: selectedMember.id }),
       });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Could not remove the override');
       setHasIndividual(false);
-      setIndividualAllowed(globalPerms[activeRole]);
+      setIndividualAllowed(savedGlobal[activeRole]);
       setIndividualPerms(prev => prev.filter(p => p.memberId !== selectedMember.id));
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
   };
@@ -320,13 +340,13 @@ export default function PermissionControlPage() {
         <div className={`flex items-center justify-between px-4 py-3 rounded-xl border text-xs font-medium ${hasIndividual ? 'bg-orange-50 border-orange-200 text-orange-700' : 'bg-blue-50 border-blue-100 text-blue-600'}`}>
           <span>
             {hasIndividual
-              ? `${selectedMember.name} has a custom override — changes here will update their individual settings.`
-              : `Showing global defaults for ${roleLabel(activeRole)}. Save to create an individual override for ${selectedMember.name}.`}
+              ? `${selectedMember.name} has their own settings. Modules marked "Own setting" stay as set here; all others follow the global ${roleLabel(activeRole)} settings.`
+              : `${selectedMember.name} follows the global ${roleLabel(activeRole)} settings. Change any module and save to give them their own setting for it.`}
           </span>
           {hasIndividual && (
             <button onClick={handleRemoveIndividual} disabled={saving}
               className="flex items-center gap-1 ml-3 text-red-500 hover:text-red-700 font-bold shrink-0">
-              <Trash2 size={11} /> Remove Override
+              <Trash2 size={11} /> Reset to global
             </button>
           )}
         </div>
@@ -380,7 +400,7 @@ export default function PermissionControlPage() {
               search={search}
             />
           ) : (
-            <ModuleList modules={modules} readOnlyOption={activeRole === 'MASTER_ADMIN'} allowed={individualAllowed} setAllowed={setIndividualAllowed} search={search} />
+            <ModuleList modules={modules} readOnlyOption={activeRole === 'MASTER_ADMIN'} allowed={individualAllowed} setAllowed={setIndividualAllowed} search={search} baseline={savedGlobal[activeRole]} />
           )}
 
           {(error || success) && (

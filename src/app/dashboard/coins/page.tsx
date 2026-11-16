@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { Coins } from 'lucide-react';
 import OverviewTab from './OverviewTab';
 import SettingsTab from './SettingsTab';
 import StreakTab from './StreakTab';
@@ -31,13 +30,10 @@ export default function CoinsPage() {
   const [tab, setTab] = useState<(typeof TABS)[number]['key']>('overview');
   const Active = TABS.find((t) => t.key === tab)!.Comp;
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-600 flex items-center justify-center"><Coins size={22} /></div>
-        <div>
-          <h1 className="text-xl font-extrabold text-gray-900">Coins &amp; Rewards</h1>
-          <p className="text-xs text-gray-500">Daily streaks, tasks, referrals, games and the rewards store — all editable here.</p>
-        </div>
+    <div className="max-w-6xl">
+      <div className="mb-5">
+        <h1 className="text-2xl font-medium text-[#004f9f]">Coins &amp; Rewards</h1>
+        <p className="text-xs text-gray-400 mt-0.5">Daily streaks, tasks, referrals, games and the rewards store — all editable here.</p>
       </div>
       <div className="flex gap-1 overflow-x-auto border-b border-gray-200 mb-5">
         {TABS.map((t) => (

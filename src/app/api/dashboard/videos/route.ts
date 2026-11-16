@@ -5,6 +5,7 @@ import { recordAuditLog } from '@/lib/audit-log';
 import { createNotification, notifyFollowersOfNewVideo } from '@/lib/notifications';
 import { ensureSchoolAccount } from '@/lib/schoolAccount';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
+import { currentGroupLabel, isAllowedCategory } from '@/lib/moderationCategories';
 import { CLEAR_CLAIM, claimFreeFor, claimIsLive } from '@/lib/videoClaim';
 import { mergeTags, schoolAutoTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
 import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
@@ -170,6 +171,13 @@ function buildVideoStatusNotification(
 }
 
 export async function GET(request: Request) {
+  // Same gate as the moderation actions below: the list carries uploaders'
+  // email and mobile, so it is never served without a moderation login.
+  const { error, payload } = requireRole(request, ['SUPERADMIN', 'MASTER_ADMIN', 'MODERATOR']);
+  if (error) return error;
+  const moduleCheck = await requireModule(payload, 'moderation.pending', request);
+  if (moduleCheck.error) return moduleCheck.error;
+
   try {
     const { searchParams } = new URL(request.url);
     const status    = searchParams.get('status');
@@ -191,7 +199,10 @@ export async function GET(request: Request) {
     // ── Build where clause ────────────────────────────────────────────────────
     const where: Record<string, any> = { deletedAt: null };
     if (status && ['PENDING', 'APPROVED', 'REJECTED'].includes(status)) where.status = status;
-    if (category) where.subCategory = { equals: category, mode: 'insensitive' };
+    // "cat:<name>" filters on the main category (e.g. School Activity, whose
+    // "Other" sub would otherwise match Talent's); a bare value is a sub-category.
+    if (category?.startsWith('cat:')) where.category = { equals: category.slice(4), mode: 'insensitive' };
+    else if (category) where.subCategory = { equals: category, mode: 'insensitive' };
     if (uploaderT && ['STUDENT', 'VIEWER'].includes(uploaderT)) where.uploaderType = uploaderT;
 
     const videos = await prisma.video.findMany({
@@ -536,7 +547,7 @@ export async function POST(request: Request) {
     const before = await prisma.video.findUnique({
       where: { id: videoId },
       select: {
-        status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true, uploadedBySchoolId: true,
+        status: true, rejectionReason: true, quality: true, isEvaluation: true, uploaderType: true, appUserId: true, uploadedBySchoolId: true,
         caption: true, category: true, subCategory: true, isPublic: true, olympiadVisibility: true, tags: true,
         _count: { select: { evaluations: true } },
       },
@@ -576,6 +587,20 @@ export async function POST(request: Request) {
     }
 
     const recategorizing = status === 'APPROVED' && (subCategoryChanged || categoryChanged);
+
+    // A non-Olympiad video may only move within the categories its uploader
+    // gets in the app (a school's own video can't become Parenting, a general
+    // user's can't become School Activity). Jury videos keep the A/B rules above.
+    if (recategorizing && !before.isEvaluation) {
+      const targetCategory = categoryChanged ? newCategory : currentGroupLabel(before);
+      const targetSub      = subCategoryChanged ? newSubCategory : before.subCategory;
+      if (!isAllowedCategory(before, targetCategory, targetSub ?? '')) {
+        return NextResponse.json(
+          { message: `"${targetSub}" under "${targetCategory}" is not a category this uploader can use.` },
+          { status: 400 },
+        );
+      }
+    }
 
     // Derive the main category from the new subcategory only as a fallback. A
     // custom subcategory ("Any Other Special Talent", a typed-in rhyme name) is
@@ -623,20 +648,16 @@ export async function POST(request: Request) {
       }
     }
 
-    await recordAuditLog({
-      ...actor,
-      action,
-      entityType: 'Video',
-      entityId: videoId,
-      previousValue: (({ _count, ...rest }) => rest)(before),
-      newValue: { status: video.status, rejectionReason: video.rejectionReason, quality: video.quality, category: video.category, subCategory: video.subCategory },
-      reason: status === 'REJECTED' ? (rejectionReason || null) : null,
-    });
-
     // A recategorization rides along with an approve, so it would otherwise be
-    // buried under a VIDEO_APPROVED row. Log it separately as well, so the
-    // activity log can answer "who moved this video's category" on its own.
-    if (recategorizing && (video.category !== before?.category || video.subCategory !== before?.subCategory)) {
+    // buried under a VIDEO_APPROVED row. Log it separately, so the activity log
+    // can answer "who moved this video's category" on its own. It is written
+    // first because the category is corrected before the video is approved, and
+    // the log lists newest first: this way "Approved" reads above "Category
+    // Changed", the real order. The approve row then leaves the category out
+    // instead of repeating the same change.
+    const categoryMoved = recategorizing &&
+      (video.category !== before?.category || video.subCategory !== before?.subCategory);
+    if (categoryMoved) {
       await recordAuditLog({
         ...actor,
         action: 'VIDEO_RECATEGORIZED',
@@ -647,6 +668,19 @@ export async function POST(request: Request) {
         reason: null,
       });
     }
+
+    await recordAuditLog({
+      ...actor,
+      action,
+      entityType: 'Video',
+      entityId: videoId,
+      previousValue: (({ _count, ...rest }) => rest)(before),
+      newValue: {
+        status: video.status, rejectionReason: video.rejectionReason, quality: video.quality,
+        ...(categoryMoved ? {} : { category: video.category, subCategory: video.subCategory }),
+      },
+      reason: status === 'REJECTED' ? (rejectionReason || null) : null,
+    });
 
     await notifyVideoStatus({ id: videoId, ...before }, status, rejectionReason);
 

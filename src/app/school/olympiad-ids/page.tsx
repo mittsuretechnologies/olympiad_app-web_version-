@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Contact, Loader2, Search, Download, Clock, BookOpen, ChevronDown, ChevronUp,
-  UserPlus, Pencil, Trash2, CheckCircle, CheckCircle2, Phone, Mail, AlertCircle,
+  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, AlertCircle,
 } from 'lucide-react';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL, FOCUS,
@@ -109,14 +109,14 @@ export default function SchoolOlympiadIdsPage() {
     setSendEmail(false);
   };
 
-  /** Validates the details form, then hands over to the delivery step. All four
-   *  fields are required, so email is always available as a delivery channel. */
+  /** Validates the details form, then hands over to the delivery step. Email is
+   *  optional (many families don't have one); without it, "Send by email" is
+   *  disabled and the school shares the details shown after allotment. */
   const goToDeliveryStep = () => {
     if (!allotName.trim()) { setAllotError('Student name is required'); return; }
     if (!allotGuardianName.trim()) { setAllotError('Parent/Guardian name is required'); return; }
     if (!allotPhone.trim() || allotPhone.trim().length < 10) { setAllotError('Valid phone number is required'); return; }
-    if (!allotEmail.trim()) { setAllotError('Email address is required'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) {
+    if (allotEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(allotEmail.trim())) {
       setAllotError('Enter a valid email address'); return;
     }
     setAllotError('');
@@ -145,7 +145,7 @@ export default function SchoolOlympiadIdsPage() {
       if (!res.ok) throw new Error(data.message);
       setAllocations(prev => prev.map(a =>
         a.code === allotRow.code
-          ? { ...a, assignedName: allotName.trim(), assignedAt: new Date().toISOString(), hasAppUser: true, appUserPhone: allotPhone.trim(), appUserEmail: allotEmail.trim().toLowerCase() }
+          ? { ...a, assignedName: allotName.trim(), assignedAt: new Date().toISOString(), hasAppUser: true, appUserPhone: allotPhone.trim(), appUserEmail: allotEmail.trim().toLowerCase() || null }
           : a
       ));
       setAllotSuccess({
@@ -166,23 +166,6 @@ export default function SchoolOlympiadIdsPage() {
     }
   };
 
-  const handleUnassign = async (code: string) => {
-    if (!confirm('Remove assignment for this ID? Any app account linked to it will also be removed.')) return;
-    try {
-      const res = await fetch(`/api/school/me/olympiad-ids/${code}/assign`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      setAllocations(prev => prev.map(a =>
-        a.code === code ? { ...a, assignedName: null, assignedAt: null, hasAppUser: false, appUserPhone: null } : a
-      ));
-    } catch (e: any) {
-      alert(e.message);
-    }
-  };
-
   // Edit app account handlers (ALLOTTED rows)
   const openEditAppModal = (a: Allocation) => {
     setEditAppModal({ code: a.code });
@@ -198,8 +181,7 @@ export default function SchoolOlympiadIdsPage() {
   const handleEditApp = async () => {
     if (!editAppName.trim()) { setEditAppError('Student name is required'); return; }
     if (!editAppPhone.trim() || editAppPhone.trim().length < 10) { setEditAppError('Valid phone number is required'); return; }
-    if (!editAppEmail.trim()) { setEditAppError('Email address is required'); return; }
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAppEmail.trim())) { setEditAppError('Enter a valid email address'); return; }
+    if (editAppEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAppEmail.trim())) { setEditAppError('Enter a valid email address'); return; }
     setEditingApp(true); setEditAppError('');
     try {
       const res = await fetch(`/api/school/me/olympiad-ids/${editAppModal!.code}/app-account`, {
@@ -210,7 +192,7 @@ export default function SchoolOlympiadIdsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
       setAllocations(prev => prev.map(a =>
-        a.code === editAppModal!.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim(), appUserEmail: editAppEmail.trim().toLowerCase() } : a
+        a.code === editAppModal!.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim(), appUserEmail: editAppEmail.trim().toLowerCase() || null } : a
       ));
       closeEditAppModal();
     } catch (e: any) {
@@ -433,9 +415,6 @@ export default function SchoolOlympiadIdsPage() {
                                   <button onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`} title="Edit name, phone & email">
                                     <Pencil size={12} />
                                   </button>
-                                  <button onClick={() => handleUnassign(a.code)} className={`${BTN_ICON} hover:!text-[#B42323]`} aria-label={`Remove assignment for ${a.code}`} title="Remove">
-                                    <Trash2 size={12} />
-                                  </button>
                                 </div>
                               ) : (
                                 <button
@@ -615,7 +594,7 @@ export default function SchoolOlympiadIdsPage() {
                 </div>
               </div>
               <div>
-                <label htmlFor="allot-email" className={LABEL}>Email address <span className="text-[#B42323]">*</span></label>
+                <label htmlFor="allot-email" className={LABEL}>Email address <span className="font-normal text-[#98A1B2]">(optional)</span></label>
                 <div className="relative">
                   <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
                   <input
@@ -624,7 +603,14 @@ export default function SchoolOlympiadIdsPage() {
                     onKeyDown={e => e.key === 'Enter' && goToDeliveryStep()}
                     className={`${INPUT} pl-8`}
                   />
-                </div>              </div>
+                </div>
+                {!allotEmail.trim() && (
+                  <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] leading-snug text-[#A1530A]">
+                    <AlertCircle size={12} className="mt-[1px] flex-shrink-0" />
+                    If you skip the email, you will have to share the login details with the student yourself.
+                  </p>
+                )}
+              </div>
               {allotError && (
                 <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]" role="alert">
                   <AlertCircle size={12} /> {allotError}
@@ -680,7 +666,7 @@ export default function SchoolOlympiadIdsPage() {
               </div>
             </div>
             <div>
-              <label htmlFor="edit-email" className={LABEL}>Email address</label>
+              <label htmlFor="edit-email" className={LABEL}>Email address <span className="font-normal text-[#98A1B2]">(optional)</span></label>
               <div className="relative">
                 <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#98A1B2]" />
                 <input

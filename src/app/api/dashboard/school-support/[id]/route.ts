@@ -31,7 +31,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         lastMessageAt: true, resolvedAt: true, createdAt: true,
         school: {
           select: {
-            id: true, name: true, schoolId: true, email: true, phone: true, contactPerson: true,
+            id: true, name: true, schoolId: true, olympiadId: true, email: true, phone: true, contactPerson: true,
             city: true, district: true, state: true,
           },
         },

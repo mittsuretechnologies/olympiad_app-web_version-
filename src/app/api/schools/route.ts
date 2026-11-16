@@ -15,21 +15,29 @@ export async function GET(request: Request) {
   const { error, payload } = await requireAdmin(request, ['schools.register', 'schools.bulk', 'schools.view']);
   if (error) return error;
   try {
-    // Paginated: ?page=1&pageSize=25&q=<name | School ID | CRM ID>
+    // Paginated: ?page=1&pageSize=25&q=<name | School ID | CRM ID>&status=active|inactive
+    // (no status = every school).
     const { searchParams } = new URL(request.url);
     const q = (searchParams.get('q') || '').trim();
+    const status = searchParams.get('status');
     const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10) || 1);
     const pageSize = Math.min(100, Math.max(1, parseInt(searchParams.get('pageSize') || '25', 10) || 25));
 
-    const where: Prisma.SchoolWhereInput = q
+    const searchWhere: Prisma.SchoolWhereInput = q
       ? { OR: [
           { name: { contains: q, mode: 'insensitive' } },
           { schoolId: { contains: q, mode: 'insensitive' } },
           { olympiadId: { contains: q, mode: 'insensitive' } },
         ] }
       : {};
+    const where: Prisma.SchoolWhereInput =
+      status === 'active' ? { ...searchWhere, isActive: true }
+      : status === 'inactive' ? { ...searchWhere, isActive: false }
+      : searchWhere;
 
-    const [schools, total, totalAll] = await Promise.all([
+    // activeCount/inactiveCount follow the search but not the status filter,
+    // so each filter button keeps showing its own count.
+    const [schools, total, totalAll, activeCount, inactiveCount] = await Promise.all([
       prisma.school.findMany({
         where,
         orderBy: { createdAt: 'desc' },
@@ -38,6 +46,8 @@ export async function GET(request: Request) {
       }),
       prisma.school.count({ where }),
       prisma.school.count(),
+      prisma.school.count({ where: { ...searchWhere, isActive: true } }),
+      prisma.school.count({ where: { ...searchWhere, isActive: false } }),
     ]);
     await recordAccessLog(payload, {
       action: 'CREDENTIALS_VIEWED', entityType: 'School', subjectIds: schools.map((s) => s.id), request,
@@ -46,6 +56,8 @@ export async function GET(request: Request) {
       schools: schools.map(({ password, ...s }) => ({ ...s, plainPassword: decryptPassword(s.plainPassword) })),
       total,
       totalAll,
+      activeCount,
+      inactiveCount,
       page,
       pageSize,
     });

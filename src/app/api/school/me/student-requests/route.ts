@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireActiveSchool } from '@/lib/auth-guard';
 import { recordAccessLog } from '@/lib/audit-log';
 
 // GET /api/school/me/student-requests
@@ -11,7 +11,7 @@ import { recordAccessLog } from '@/lib/audit-log';
 // Each row carries enough of the requester for the school to judge it - their
 // handle, contact, and a preview of the videos that would surface once linked.
 export async function GET(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {

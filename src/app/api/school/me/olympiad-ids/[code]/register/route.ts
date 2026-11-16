@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { generateUserId } from '@/lib/generateUserId';
 import { sendStudentCredentialsEmail } from '@/lib/mailer';
 import { sendStudentCredentialsSms } from '@/lib/sms';
@@ -29,6 +30,8 @@ export async function POST(
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL' || !payload?.id)
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    const blocked = await inactiveSchoolResponse(payload.id);
+    if (blocked) return blocked;
 
     const { code } = await params;
     const { name, guardianName, phone, password, email, sendEmail, sendSms } = await request.json();
@@ -49,9 +52,9 @@ export async function POST(
     }
     const finalPassword = password?.trim() || generatePassword();
 
+    // Optional: without one, the school shares the credentials shown after allotment.
     const emailNormalized = email?.trim().toLowerCase() || null;
-    if (!emailNormalized) return NextResponse.json({ message: 'Email address is required' }, { status: 400 });
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
+    if (emailNormalized && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailNormalized)) {
       return NextResponse.json({ message: 'Invalid email address' }, { status: 400 });
     }
 
@@ -73,10 +76,8 @@ export async function POST(
     const existingOlympiadLink = await prisma.appUser.findFirst({ where: { olympiadId: code } });
     if (existingOlympiadLink) return NextResponse.json({ message: 'This Olympiad ID is already linked to an app account' }, { status: 409 });
 
-    if (emailNormalized) {
-      const existingEmail = await prisma.appUser.findFirst({ where: { email: emailNormalized } });
-      if (existingEmail) return NextResponse.json({ message: 'This email is already registered on the app' }, { status: 409 });
-    }
+    // No uniqueness check on email or mobile: siblings usually share a parent's
+    // contact, and login picks the right account by password.
 
     // Generate userId from student's name → e.g. "Suraj Joshi" → surajjoshi_4f2a
     const userId = await generateUserId(name.trim());

@@ -5,6 +5,7 @@ import path from 'path';
 import { spawn } from 'child_process';
 import { probeVideo, compressVideo } from '@/lib/videoProbe';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
 import { optimizeForStreaming } from '@/lib/videoOptimize';
 import { getJwtSecret } from '@/lib/jwt-secret';
@@ -57,6 +58,8 @@ export async function POST(request: Request) {
   if (!school) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  const blocked = await inactiveSchoolResponse(school.id);
+  if (blocked) return blocked;
 
   try {
     const formData  = await request.formData();

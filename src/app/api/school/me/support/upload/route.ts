@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { writeFile, mkdir } from 'fs/promises';
 import path from 'path';
-import { requireRole } from '@/lib/auth-guard';
+import { requireActiveSchool } from '@/lib/auth-guard';
 import { detectImageExtension } from '@/lib/fileSignature';
 import { s3Enabled, uploadBufferToS3, imageContentType } from '@/lib/s3';
 import { SUPPORT_LIMITS, type SupportAttachment } from '@/lib/schoolSupport';
@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic';
 // decided from its bytes, never from the name or Content-Type.
 
 export async function POST(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {

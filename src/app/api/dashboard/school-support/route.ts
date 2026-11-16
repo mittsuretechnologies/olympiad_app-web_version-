@@ -20,6 +20,14 @@ export async function GET(request: Request) {
     const category = searchParams.get('category');
     const q = (searchParams.get('q') || '').trim();
 
+    // ?countsOnly=1 — for the Support tab badge; skips loading the list.
+    if (searchParams.get('countsOnly') === '1') {
+      const grouped = await prisma.schoolSupportTicket.groupBy({ by: ['status'], _count: { _all: true } });
+      const counts = { OPEN: 0, IN_PROGRESS: 0, AWAITING_SCHOOL: 0, RESOLVED: 0 } as Record<string, number>;
+      for (const g of grouped) counts[g.status] = g._count._all;
+      return NextResponse.json({ counts });
+    }
+
     const refNo = /^(?:hs-?)?(\d+)$/i.exec(q)?.[1];
     const where: Record<string, any> = {
       ...(isSupportStatus(status) ? { status } : {}),

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
 import { videoPercent } from '@/lib/kosh';
 import { getJwtSecret } from '@/lib/jwt-secret';
@@ -91,6 +92,8 @@ export async function GET(request: Request) {
     if (payload?.role !== 'SCHOOL' || !payload?.id) {
       return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
     }
+    const blocked = await inactiveSchoolResponse(payload.id);
+    if (blocked) return blocked;
 
     // Every allocation this school has ever had sent out — this is the
     // report's spine. A student who never registered still gets a row.

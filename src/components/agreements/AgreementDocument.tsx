@@ -57,8 +57,14 @@ function Items({ items, depth = 0 }: { items?: AgreementItem[]; depth?: number }
 }
 
 export default function AgreementDocument({
-  doc, compact = false, preparedFor,
-}: { doc: AgreementDoc; compact?: boolean; preparedFor?: string }) {
+  doc, compact = false, preparedFor, policyLinks,
+}: {
+  doc: AgreementDoc;
+  compact?: boolean;
+  preparedFor?: string;
+  /** Related policies listed under the agreement (display only, not hashed). */
+  policyLinks?: { label: string; href: string }[];
+}) {
   // Preamble shape: an opening line, one paragraph per party, a closing line.
   const [opening, ...rest] = doc.preamble;
   const closing = rest.length > 2 ? rest[rest.length - 1] : undefined;
@@ -161,7 +167,28 @@ export default function AgreementDocument({
         </section>
       ))}
 
-      <div className="mt-10 flex items-center gap-3 text-[11.5px] text-[#677285]">
+      {policyLinks && policyLinks.length > 0 && (
+        <nav aria-label="Policies" className="mt-10 rounded-lg border border-[#E6E8EC] bg-[#F8F9FB] px-4 py-3.5">
+          <p className="text-[12px] font-semibold text-[#2A3446]">Policies</p>
+          <ul className="mt-2 grid sm:grid-cols-2 gap-x-6 gap-y-1.5 list-none">
+            {policyLinks.map(l => (
+              <li key={l.href} className="flex items-start gap-2 text-[13px] leading-snug">
+                <span aria-hidden="true" className="mt-[7px] h-1 w-1 flex-shrink-0 rounded-full bg-[#9AA3B2]" />
+                <a
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[#1559C7] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#1559C7]/40 rounded-sm"
+                >
+                  {l.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </nav>
+      )}
+
+      <div className={`${policyLinks?.length ? 'mt-6' : 'mt-10'} flex items-center gap-3 text-[11.5px] text-[#677285]`}>
         <span className="h-px flex-1 bg-[#E6E8EC]" />
         End of agreement · Version {doc.version}
         <span className="h-px flex-1 bg-[#E6E8EC]" />

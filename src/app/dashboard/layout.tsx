@@ -6,6 +6,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { isTokenExpired, tokenRole } from '@/lib/session-token';
 import { DASHBOARD_TOKEN_KEYS, clearDashboardSession } from '@/lib/swr';
+import { resolveAllowedModules } from '@/lib/permission-modules';
 import TermsAcceptanceModal from '@/components/TermsAcceptanceModal';
 import EvaluatorTermsGate from '@/components/EvaluatorTermsGate';
 import {
@@ -39,6 +40,7 @@ import {
   ShieldAlert,
   History,
   UserX,
+  CalendarClock,
   Menu,
   X,
   Image as ImageIcon,
@@ -138,14 +140,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         .then(r => r.json())
         .then((data: { global: { role: string; allowedModules: string[] }[]; individual: { memberId: string; allowedModules: string[] }[] } | { message: string }) => {
           if ('global' in data) {
-            // check individual override first
-            if (memberId) {
-              const individual = data.individual?.find(p => p.memberId === memberId);
-              if (individual) { setAllowedModules(individual.allowedModules); return; }
-            }
-            // fall back to global role permissions
-            const global = data.global?.find(p => p.role === detectedRole);
-            setAllowedModules(global ? global.allowedModules : []);
+            // The member's own override wins over the role's global list —
+            // same rule as requireModule() on the server.
+            const global = data.global?.find(p => p.role === detectedRole)?.allowedModules ?? [];
+            const individual = memberId ? data.individual?.find(p => p.memberId === memberId)?.allowedModules : null;
+            setAllowedModules(resolveAllowedModules(global, individual));
           } else {
             setAllowedModules([]);
           }
@@ -249,13 +248,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'Create Moderator', href: '/dashboard/moderation/moderators', icon: UserPlus },
   ];
 
+  // Each item carries its own permission key, so adding or reordering items
+  // can't shift an item onto another item's key.
   const schoolSubItems = [
-    { name: 'Register School', href: '/dashboard/schools/register', icon: PlusCircle },
-    { name: 'Bulk Upload', href: '/dashboard/schools/bulk', icon: FileSpreadsheet },
-    { name: 'View / Edit Schools', href: '/dashboard/schools', icon: Eye },
-    { name: 'Attendance Reports', href: '/dashboard/schools/attendance', icon: ClipboardCheck },
-    // { name: 'Paper Dispatch', href: '/dashboard/schools/paper-dispatch', icon: PackageCheck },
-    // { name: 'Answer Sheet Received', href: '/dashboard/schools/answer-sheet-dispatch', icon: FileCheck2 },
+    { name: 'Register School', href: '/dashboard/schools/register', icon: PlusCircle, key: 'schools.register' },
+    { name: 'Bulk Upload', href: '/dashboard/schools/bulk', icon: FileSpreadsheet, key: 'schools.bulk' },
+    { name: 'View / Edit Schools', href: '/dashboard/schools', icon: Eye, key: 'schools.view' },
+    { name: 'Attendance Reports', href: '/dashboard/schools/attendance', icon: ClipboardCheck, key: 'schools.attendance' },
+    { name: 'Exam Date Requests', href: '/dashboard/schools/exam-date-requests', icon: CalendarClock, key: 'schools.examDateRequests' },
+    // { name: 'Paper Dispatch', href: '/dashboard/schools/paper-dispatch', icon: PackageCheck, key: 'schools.paperDispatch' },
+    // { name: 'Answer Sheet Received', href: '/dashboard/schools/answer-sheet-dispatch', icon: FileCheck2, key: 'schools.answerSheetDispatch' },
   ];
 
   const credentialsSubItems = [
@@ -391,7 +393,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
-                    {schoolSubItems.filter((_, i) => canSeeSubItem(['schools.register','schools.bulk','schools.view','schools.attendance','schools.paperDispatch','schools.answerSheetDispatch'][i])).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
+                    {schoolSubItems.filter(item => canSeeSubItem(item.key)).map(item => <Link key={item.name} href={item.href} className={subItemClass(pathname === item.href)}><span>{item.name}</span></Link>)}
                   </div>
                   </div>
                 </div>
@@ -590,7 +592,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span className="text-sm font-semibold">Deletion Requests</span>
               </Link>
             )}
-
             {/* Agreements — legal acceptance register, superadmin only */}
             {canSeeAdmin('agreements') && (
               <Link href="/dashboard/agreements"
@@ -623,21 +624,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )}
 
-            {/* Support */}
+            {/* Support — School Panel requests and app-user tickets, one tab each */}
             {canSee('support') && (
-              <Link href="/dashboard/support-tickets"
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support-tickets') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+              <Link href="/dashboard/support"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <LifeBuoy size={20} />
                 <span className="text-sm font-semibold">Support</span>
-              </Link>
-            )}
-
-            {/* School Support — requests raised from the School Panel */}
-            {canSee('support') && (
-              <Link href="/dashboard/school-support"
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/school-support') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
-                <LifeBuoy size={20} />
-                <span className="text-sm font-semibold">School Support</span>
               </Link>
             )}
 

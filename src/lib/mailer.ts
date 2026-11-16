@@ -948,7 +948,7 @@ export interface DailyVideoReportMail {
   total: number;
   today: number;
   approved: number;
-  rejected: number;
+  todayRejected: number;
   pending: number;
   /** Upload date-time of each pending video, oldest first, formatted in IST. */
   pendingUploadedAt: string[];
@@ -965,7 +965,7 @@ export function renderDailyVideoReportText(d: DailyVideoReportMail): string {
     `Total videos received: ${d.total}\n` +
     `Today videos received: ${d.today}\n` +
     `Total approved videos: ${d.approved}\n` +
-    `Total rejected videos: ${d.rejected}\n` +
+    `Today rejected videos: ${d.todayRejected}\n` +
     `Total pending videos: ${d.pending}\n` +
     `* Pending videos uploaded on:\n${pendingLines}\n\n` +
     `Updated`
@@ -981,7 +981,7 @@ export async function sendDailyVideoReportEmail(d: DailyVideoReportMail): Promis
     ['Total videos received', d.total],
     ['Today videos received', d.today],
     ['Total approved videos', d.approved],
-    ['Total rejected videos', d.rejected],
+    ['Today rejected videos', d.todayRejected],
     ['Total pending videos', d.pending],
   ];
 
@@ -1051,7 +1051,7 @@ export async function sendSchoolSupportTeamEmail(data: SchoolSupportTeamMail): P
   }
 
   const heading = data.event === 'NEW' ? 'New support request' : 'School replied';
-  const link = PANEL_URL ? `${PANEL_URL}/dashboard/school-support?ticket=${encodeURIComponent(data.ticketId)}` : null;
+  const link = PANEL_URL ? `${PANEL_URL}/dashboard/support?tab=schools&ticket=${encodeURIComponent(data.ticketId)}` : null;
   const rows: [string, string][] = [
     ['Reference', data.ticketRef],
     ['School', `${data.schoolName} (${data.schoolCode})`],

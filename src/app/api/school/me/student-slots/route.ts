@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { resolveSchoolStudent, slotsForStudent, computeOlympiadSlots } from '@/lib/olympiadSlots';
 
 // GET /api/school/me/student-slots?studentId=<Student.id or AppUser.id>
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
     try { payload = jwt.verify(token, getJwtSecret()); }
     catch { return NextResponse.json({ message: 'Invalid token' }, { status: 401 }); }
     if (payload?.role !== 'SCHOOL') return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
+    const blocked = await inactiveSchoolResponse(payload.id);
+    if (blocked) return blocked;
 
     const { searchParams } = new URL(request.url);
     const studentId = searchParams.get('studentId');

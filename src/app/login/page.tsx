@@ -375,7 +375,7 @@ export default function LoginPage() {
               {/* Identifier */}
               <div>
                 <label className="mb-1.5 block text-sm font-semibold text-slate-700">
-                  Email or School ID
+                  Username
                 </label>
                 <div className="relative">
                   <User
@@ -385,7 +385,7 @@ export default function LoginPage() {
                   <input
                     type="text"
                     className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm text-slate-900 placeholder:text-slate-400 transition-all focus:border-[#0e4f8a] focus:outline-none focus:ring-4 focus:ring-[#0e4f8a]/10"
-                    placeholder="admin@mittsure.com or MITT001"
+                    placeholder="Enter your username"
                     value={identifier}
                     onChange={(e) => setIdentifier(e.target.value)}
                     required

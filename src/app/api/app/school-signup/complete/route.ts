@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     const districtDef = findDistrictByName(stateDef.code, districtIn);
     if (!districtDef) return NextResponse.json({ message: 'Select your district' }, { status: 400 });
 
-    // Agreement: the same document and the same four declarations an Olympiad
+    // Agreement: the same document and the same declarations an Olympiad
     // school accepts. Never record an acceptance against wording the school did
     // not see, and never without every box ticked.
     const agreement = body.agreement;

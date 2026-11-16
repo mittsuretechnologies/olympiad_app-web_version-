@@ -3,6 +3,7 @@ import {
   SCHOOL_AGREEMENT,
   SCHOOL_AGREEMENT_KEY,
   SCHOOL_AGREEMENT_VERSION,
+  SCHOOL_AGREEMENT_POLICY_LINKS,
   schoolAgreementDeclarations,
 } from '@/lib/agreements/school-onboarding';
 
@@ -18,5 +19,6 @@ export async function GET() {
     version: SCHOOL_AGREEMENT_VERSION,
     document: SCHOOL_AGREEMENT,
     declarations: schoolAgreementDeclarations(),
+    policyLinks: SCHOOL_AGREEMENT_POLICY_LINKS,
   });
 }

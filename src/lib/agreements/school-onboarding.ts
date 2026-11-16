@@ -393,10 +393,33 @@ export const SCHOOL_AGREEMENT: AgreementDoc = {
   ],
 };
 
-/* ── Acceptance declarations ─────────────────────────────────────────────── */
+/* ── Related policies ────────────────────────────────────────────────────── */
 
 /**
- * The four checkboxes from the "Acceptance screen" note at the end of the
+ * Links shown under the agreement on screen. Deliberately kept OUT of
+ * SCHOOL_AGREEMENT, so adding/changing a link doesn't change the hashed text
+ * or force a version bump.
+ */
+export const SCHOOL_AGREEMENT_POLICY_LINKS: { label: string; href: string }[] = [
+  { label: 'Terms of Use', href: 'https://www.mittmee.com/terms-of-use' },
+  { label: 'Terms of Use for Children and Parent', href: 'https://www.mittmee.com/terms-of-use-for-children-and-parent' },
+  { label: 'Privacy Policy', href: 'https://www.mittmee.com/privacy-policy' },
+  { label: "Children's Privacy Policy", href: 'https://www.mittmee.com/childrens-privacy-policy' },
+  { label: 'Community Guidelines', href: 'https://www.mittmee.com/community-guidelines' },
+  { label: 'Copyright and IP Policy', href: 'https://www.mittmee.com/copyright-and-ip-policy' },
+  { label: 'Infringement Policy', href: 'https://www.mittmee.com/infringement-policy' },
+  { label: 'Account Deletion Policy', href: 'https://www.mittmee.com/account-deletion-policy' },
+  { label: 'Report Infringement', href: 'https://www.mittmee.com/report-infringement' },
+];
+
+/* ── Acceptance declarations ─────────────────────────────────────────────── */
+
+/** "A, B and C" */
+const listOf = (xs: string[]) =>
+  xs.length > 1 ? `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}` : xs.join('');
+
+/**
+ * The checkboxes from the "Acceptance screen" note at the end of the
  * agreement. All are required before "I Accept" is enabled. The rendered text
  * (with the school's name filled in) is stored on the acceptance record.
  */
@@ -405,6 +428,7 @@ export function schoolAgreementDeclarations(): string[] {
     'I confirm that I am authorized to accept this Agreement on behalf of the School and the trust, society or company that runs it.',
     'I confirm that the School details I have entered are true and complete.',
     'I have read and understood this Agreement, including that the School acts as a joint Data Fiduciary with Mittsure Technologies for parental consent, student registration, credentials and School Uploads, and I accept it on behalf of the School.',
+    `I have read and understood the MITTMEE policies linked with this Agreement (${listOf(SCHOOL_AGREEMENT_POLICY_LINKS.map(l => l.label))}), and I accept them on behalf of the School.`,
     'I understand that this Agreement is accepted electronically and is legally binding on the School without a physical signature.',
   ];
 }

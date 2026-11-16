@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
+import { recordAuditLog } from '@/lib/audit-log';
 import { crmIdProblem } from '@/lib/schoolCrm';
 
 export async function PUT(
@@ -74,7 +75,7 @@ export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const { error } = await requireAdmin(request, 'schools.view');
+  const { payload, error } = await requireAdmin(request, 'schools.view');
   if (error) return error;
   try {
     const { id } = await params;
@@ -83,10 +84,27 @@ export async function PATCH(
     if (typeof isActive !== 'boolean') {
       return NextResponse.json({ message: 'isActive must be a boolean' }, { status: 400 });
     }
+    // Deactivating locks the school out at once (see inactiveSchoolResponse), so
+    // the reason is required and goes on the Activity Log; optional when reactivating.
+    const reason = typeof body.reason === 'string' && body.reason.trim() ? body.reason.trim().slice(0, 500) : null;
+    if (!isActive && !reason) {
+      return NextResponse.json({ message: 'Please write the reason for deactivating this school.' }, { status: 400 });
+    }
+    const before = await prisma.school.findUnique({ where: { id }, select: { isActive: true } });
     const updated = await prisma.school.update({
       where: { id },
       data: { isActive },
     });
+    if (before?.isActive !== isActive) {
+      await recordAuditLog({
+        actorId: payload.id, actorRole: payload.role, actorName: payload.name || payload.email || null,
+        action: isActive ? 'SCHOOL_ACTIVATED' : 'SCHOOL_DEACTIVATED',
+        entityType: 'School', entityId: id,
+        previousValue: { isActive: before?.isActive ?? null },
+        newValue: { isActive },
+        reason,
+      });
+    }
     return NextResponse.json(updated);
   } catch (error: any) {
     console.error('PATCH /api/schools/[id] failed:', error);

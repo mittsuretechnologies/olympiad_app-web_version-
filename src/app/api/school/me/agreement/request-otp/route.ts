@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { requireRole } from '@/lib/auth-guard';
+import { requireActiveSchool } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { issueOtp } from '@/lib/resetOtp';
 import { sendAgreementOtpEmail } from '@/lib/mailer';
@@ -16,7 +16,7 @@ const TICKET_TTL_SECONDS = 15 * 60;
 // Returns a short-lived signed ticket recording where the code actually went,
 // which the accept call stores as the verification evidence.
 export async function POST(request: Request) {
-  const { payload, error } = requireRole(request, ['SCHOOL']);
+  const { payload, error } = await requireActiveSchool(request);
   if (error) return error;
 
   try {
