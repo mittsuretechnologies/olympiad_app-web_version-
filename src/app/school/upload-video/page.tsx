@@ -9,6 +9,7 @@ import {
 import VideoCropModal from './VideoCropModal';
 import { OLYMPIAD_CAT_A_OPTIONS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, getCatBSubs } from '@/lib/olympiad-categories';
 import { SCHOOL_CATEGORY_GROUPS } from '@/lib/schoolUploadCategories';
+import { classLetter, uploadChoices, type CategoryDTO } from '@/lib/uploadCategoryShared';
 import { schoolAutoTags, mainCategoryTag } from '@/lib/videoAutoTags';
 import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, MAX_VIDEO_SECONDS, VIDEO_TOO_LONG_MESSAGE, cleanHashtag } from '@/lib/uploadRules';
 
@@ -25,14 +26,17 @@ type Slots = { slotA: boolean; slotB: boolean; rejectedA: boolean; rejectedB: bo
 // choice as the app's "For a student" / "Our own video").
 type Mode = 'student' | 'own';
 
-// The school's own-video categories, same as the app (lib/schoolUploadCategories).
+// The school's own-video categories: the Olympiad School list from dashboard →
+// Upload Categories (GET /api/app/categories), the same one the school's app
+// account uploads from. The built-in list (lib/schoolUploadCategories) is only
+// used if that request fails.
 const OWN_ICONS: Record<string, typeof Music> = {
   'Talent Performance': Sparkles,
   Rhymes: Music,
   'Speech & Presentation': Mic,
   'School Activity': School,
 };
-const OWN_CATEGORIES = SCHOOL_CATEGORY_GROUPS.map(g => ({
+const BUILT_IN_OWN_CATEGORIES = SCHOOL_CATEGORY_GROUPS.map(g => ({
   label: g.label, value: g.label, icon: OWN_ICONS[g.label] ?? Palette, subCategories: [...g.subs],
 }));
 
@@ -103,6 +107,15 @@ export default function UploadVideoPage() {
       .catch(() => {});
   }, [token]);
 
+  // Categories managed in dashboard → Upload Categories; null = use the built-in lists.
+  const [managedCategories, setManagedCategories] = useState<CategoryDTO[] | null>(null);
+  useEffect(() => {
+    fetch('/api/app/categories')
+      .then(r => (r.ok ? r.json() : null))
+      .then(d => { if (Array.isArray(d?.categories)) setManagedCategories(d.categories); })
+      .catch(() => {});
+  }, []);
+
   useEffect(() => {
     fetch('/api/school/me/upload-students', { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.ok ? r.json() : [])
@@ -135,20 +148,36 @@ export default function UploadVideoPage() {
     students.filter(s => s.classCode).map(s => [s.classCode as string, s.className || (s.classCode as string)])
   ).entries()];
 
-  const CATEGORIES = [
-    {
-      label: OLYMPIAD_CAT_A_LABEL,
-      value: OLYMPIAD_CAT_A_LABEL,
-      icon: Music,
-      subCategories: OLYMPIAD_CAT_A_OPTIONS,
-    },
-    {
-      label: selectedStudent?.classCode === 'U' ? 'Speech / Talent' : OLYMPIAD_CAT_B_LABEL,
-      value: OLYMPIAD_CAT_B_LABEL,
-      icon: Palette,
-      subCategories: getCatBSubs(selectedStudent?.classCode),
-    },
-  ];
+  // A student's Olympiad categories: the two slot categories, with the options
+  // offered to the student's class — the same lists the app shows.
+  const studentLetter = classLetter(selectedStudent?.classCode, selectedStudent?.olympiadCode);
+  const CATEGORIES = managedCategories
+    ? uploadChoices(managedCategories, 'OLYMPIAD_STUDENT', { classLetter: studentLetter }).map(c => ({
+        label: c.slotKind === 'OLY_B' && studentLetter === 'U' ? 'Speech / Talent' : c.label,
+        value: c.label,
+        icon: c.slotKind === 'OLY_A' ? Music : Palette,
+        subCategories: c.subs.map(s => s.label),
+      }))
+    : [
+        {
+          label: OLYMPIAD_CAT_A_LABEL,
+          value: OLYMPIAD_CAT_A_LABEL,
+          icon: Music,
+          subCategories: OLYMPIAD_CAT_A_OPTIONS,
+        },
+        {
+          label: selectedStudent?.classCode === 'U' ? 'Speech / Talent' : OLYMPIAD_CAT_B_LABEL,
+          value: OLYMPIAD_CAT_B_LABEL,
+          icon: Palette,
+          subCategories: getCatBSubs(selectedStudent?.classCode),
+        },
+      ];
+
+  const OWN_CATEGORIES = managedCategories
+    ? uploadChoices(managedCategories, 'OLYMPIAD_SCHOOL').map(c => ({
+        label: c.label, value: c.label, icon: OWN_ICONS[c.label] ?? Palette, subCategories: c.subs.map(s => s.label),
+      }))
+    : BUILT_IN_OWN_CATEGORIES;
 
   const categories = isOwn ? OWN_CATEGORIES : CATEGORIES;
   const selectedCat = categories.find(c => c.value === category);

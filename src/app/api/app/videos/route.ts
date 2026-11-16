@@ -13,14 +13,9 @@ import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } fro
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { recordCoinEvent } from '@/lib/coins/tasks';
-import {
-  ACCOUNT_TYPE_SCHOOL,
-  UPLOADER_SCHOOL_OWN,
-  SCHOOL_UPLOAD_CATEGORIES,
-  SCHOOL_ACTIVITY_SUBS,
-  isSchoolActivity,
-} from '@/lib/generalSchool';
+import { ACCOUNT_TYPE_SCHOOL, UPLOADER_SCHOOL_OWN } from '@/lib/generalSchool';
 import { getSchoolIdentity } from '@/lib/schoolAccount';
+import { checkOlympiadCategory, checkUploadCategory } from '@/lib/uploadCategories';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -87,19 +82,16 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       }
-      if (!(SCHOOL_UPLOAD_CATEGORIES as readonly string[]).includes(category)) {
-        return NextResponse.json({ error: 'This category is not available for school accounts.' }, { status: 400 });
-      }
-      if (isSchoolActivity(category) && !(SCHOOL_ACTIVITY_SUBS as readonly string[]).includes(subCategory)) {
-        return NextResponse.json({ error: 'Pick a valid School Activity type.' }, { status: 400 });
-      }
+      // Only the categories the SuperAdmin gives this kind of school (dashboard
+      // → Upload Categories). Enforced here, not just in the app, so a
+      // hand-made request cannot post into another list.
+      const problem = await checkUploadCategory(
+        school.kind === 'OLYMPIAD' ? 'OLYMPIAD_SCHOOL' : 'GENERAL_SCHOOL', category, subCategory,
+      );
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       // Same auto hashtags student videos get (state, district, school name; an
       // Olympiad school also carries its CRM ID).
       schoolAutoTags.push(...school.autoTags);
-    } else if (isSchoolActivity(category)) {
-      // School Activity belongs to schools. Enforced here, not just hidden in
-      // the app, so an older build or a hand-made request cannot post into it.
-      return NextResponse.json({ error: 'School Activity is only available to school accounts.' }, { status: 403 });
     }
 
     const olympiadCode = isSchoolAccount
@@ -107,6 +99,17 @@ export async function POST(request: Request) {
       : (bodyOlympiadId as string | undefined)?.trim().toUpperCase()
         || user?.olympiadId
         || null;
+
+    if (!isSchoolAccount) {
+      // An Olympiad video goes into one of the two Olympiad categories, with an
+      // option offered to the student's class (the class letter is part of the
+      // Olympiad ID). Any other upload uses the General User list — Olympiad
+      // students included, once both their Olympiad videos are in.
+      const problem = isOlympiadUpload || isEvaluation === true
+        ? await checkOlympiadCategory(category, subCategory, { olympiadCode })
+        : await checkUploadCategory('NORMAL', category, subCategory);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+    }
 
     // ---------- Student path ----------
     let studentId: string | null = null;

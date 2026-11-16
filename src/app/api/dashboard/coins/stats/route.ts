@@ -14,8 +14,8 @@ export async function GET(request: Request) {
     const since = new Date(Date.now() - 30 * 86_400_000);
     const [cfg, wallets, byType, pending, pendingRef] = await Promise.all([
       getCoinConfig(),
-      prisma.coinWallet.aggregate({ _sum: { balance: true, lifetimeEarned: true, lifetimeSpent: true }, _count: true }),
-      prisma.coinTransaction.groupBy({ by: ['type'], where: { createdAt: { gte: since } }, _sum: { amount: true }, _count: true }),
+      prisma.coinWallet.aggregate({ _sum: { balance: true, balanceInr: true, lifetimeEarned: true, lifetimeSpent: true }, _count: true }),
+      prisma.coinTransaction.groupBy({ by: ['type'], where: { createdAt: { gte: since } }, _sum: { amount: true, amountInr: true }, _count: true }),
       prisma.coinRedemption.count({ where: { status: 'PENDING' } }),
       prisma.referral.count({ where: { status: 'PENDING' } }),
     ]);
@@ -24,10 +24,11 @@ export async function GET(request: Request) {
       inrPerCoin: cfg.inrPerCoin,
       wallets: wallets._count,
       outstandingCoins: outstanding,
-      liabilityInr: Math.round(outstanding * cfg.inrPerCoin * 100) / 100,
+      // Each coin at the rate it was earned at (CoinWallet.balanceInr).
+      liabilityInr: Math.round((wallets._sum.balanceInr ?? 0) * 100) / 100,
       lifetimeEarned: wallets._sum.lifetimeEarned ?? 0,
       lifetimeSpent: wallets._sum.lifetimeSpent ?? 0,
-      last30Days: byType.map((t) => ({ type: t.type, coins: t._sum.amount ?? 0, count: t._count })),
+      last30Days: byType.map((t) => ({ type: t.type, coins: t._sum.amount ?? 0, inr: t._sum.amountInr ?? 0, count: t._count })),
       pendingRedemptions: pending,
       pendingReferrals: pendingRef,
     });

@@ -52,6 +52,8 @@ import {
   BookOpen,
   Palette,
   Coins,
+  LayoutGrid,
+  Megaphone,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'MASTER_ADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -541,6 +543,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/home-videos') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <GraduationCap size={20} />
                 <span className="text-sm font-semibold">Learning &amp; Parenting</span>
+              </Link>
+            )}
+
+            {/* Upload Categories — only superadmin. The app's upload categories
+                for each kind of user, and the Search / Home category lists. */}
+            {canSeeAdmin('uploadCategories') && (
+              <Link href="/dashboard/upload-categories"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/upload-categories') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <LayoutGrid size={20} />
+                <span className="text-sm font-semibold">Upload Categories</span>
+              </Link>
+            )}
+
+            {/* App Notifications — only superadmin. A message to a chosen set of
+                app users, shown in the app's notification list. */}
+            {canSeeAdmin('appNotifications') && (
+              <Link href="/dashboard/app-notifications"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/app-notifications') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <Megaphone size={20} />
+                <span className="text-sm font-semibold">App Notifications</span>
               </Link>
             )}
 

@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { ensureSchoolAccount, getSchoolIdentity } from '@/lib/schoolAccount';
 import { UPLOADER_SCHOOL_OWN } from '@/lib/generalSchool';
-import { SCHOOL_CATEGORY_GROUPS } from '@/lib/schoolUploadCategories';
+import { checkUploadCategory } from '@/lib/uploadCategories';
 import { mergeTags } from '@/lib/videoAutoTags';
 import { hasMittfestTag } from '@/lib/mittfest';
 
@@ -39,13 +39,10 @@ export async function POST(request: Request) {
     if (!videoUrl || !category || !subCategory) {
       return NextResponse.json({ error: 'Missing required fields: videoUrl, category, subCategory' }, { status: 400 });
     }
-    const group = SCHOOL_CATEGORY_GROUPS.find((g) => g.label === category);
-    if (!group) {
-      return NextResponse.json({ error: 'This category is not available for school accounts.' }, { status: 400 });
-    }
-    if (!group.subs.includes(subCategory)) {
-      return NextResponse.json({ error: `Pick a valid ${category} type.` }, { status: 400 });
-    }
+    // The web portal is the Olympiad school's: the same Olympiad School list
+    // its app account uploads from (dashboard → Upload Categories).
+    const categoryProblem = await checkUploadCategory('OLYMPIAD_SCHOOL', category, subCategory);
+    if (categoryProblem) return NextResponse.json({ error: categoryProblem }, { status: 400 });
 
     const userTags: string[] = typeof tags === 'string'
       ? tags.split(',').map((t: string) => t.trim().replace(/^#+/, '')).filter(Boolean).slice(0, 30)

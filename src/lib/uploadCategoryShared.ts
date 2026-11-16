@@ -1,0 +1,201 @@
+// Upload categories: types and pure helpers shared by the server
+// (lib/uploadCategories.ts) and the browser pages (admin page, school portal,
+// moderation). Client-safe: no server imports.
+//
+// The mobile app has the same rules in Components/store/uploadCategories.js —
+// keep the two in step.
+
+export const AUDIENCES = ['NORMAL', 'OLYMPIAD_STUDENT', 'GENERAL_SCHOOL', 'OLYMPIAD_SCHOOL'] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
+export const AUDIENCE_LABELS: Record<Audience, string> = {
+  NORMAL: 'General User',
+  OLYMPIAD_STUDENT: 'Olympiad Student',
+  GENERAL_SCHOOL: 'General School',
+  OLYMPIAD_SCHOOL: 'Olympiad School',
+};
+
+/** Audiences a normal (non-slot) category can be given. Olympiad students use
+ *  the General User list for their normal uploads. */
+export const NORMAL_AUDIENCES: Audience[] = ['NORMAL', 'GENERAL_SCHOOL', 'OLYMPIAD_SCHOOL'];
+
+export const SLOT_KINDS = ['NONE', 'OLY_A', 'OLY_B'] as const;
+export type SlotKind = (typeof SLOT_KINDS)[number];
+
+export interface SubCategoryDTO {
+  id: string;
+  label: string;
+  aliases: string[];
+  icon: string;
+  /** Single-letter class codes (lib/classes.ts); empty = every class. */
+  classCodes: string[];
+  sortOrder: number;
+  isActive: boolean;
+}
+
+export interface CategoryDTO {
+  id: string;
+  key: string;
+  label: string;
+  aliases: string[];
+  audiences: string[];
+  slotKind: string;
+  icon: string;
+  color: string;
+  imageUrl: string | null;
+  /** Open for uploads. A closed category can still show on Search / Home. */
+  isActive: boolean;
+  sortOrder: number;
+  showInSearch: boolean;
+  searchSortOrder: number;
+  searchLabel: string | null;
+  /** Extra stored category names the Search card also shows videos of. */
+  searchCats: string[];
+  showOnHome: boolean;
+  homeSortOrder: number;
+  subs: SubCategoryDTO[];
+}
+
+export const isSlot = (c: Pick<CategoryDTO, 'slotKind'>) => c.slotKind === 'OLY_A' || c.slotKind === 'OLY_B';
+
+const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
+
+/** Unique names, first spelling wins, ignoring case. */
+export function uniqueNames(names: (string | null | undefined)[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const n of names) {
+    const t = (n ?? '').trim();
+    if (!t || seen.has(t.toLowerCase())) continue;
+    seen.add(t.toLowerCase());
+    out.push(t);
+  }
+  return out;
+}
+
+/** Every stored category name that belongs to this category (Home rows). */
+export const categoryNames = (c: Pick<CategoryDTO, 'label' | 'aliases'>) => uniqueNames([c.label, ...c.aliases]);
+
+/** Every stored category name its Search card shows. */
+export const searchNames = (c: Pick<CategoryDTO, 'label' | 'aliases' | 'searchCats'>) =>
+  uniqueNames([c.label, ...c.aliases, ...c.searchCats]);
+
+/** Every stored name of an option (current + earlier ones). */
+export const subNames = (s: Pick<SubCategoryDTO, 'label' | 'aliases'>) => uniqueNames([s.label, ...s.aliases]);
+
+/**
+ * What a Search card / Home row of a normal category shows. The two Olympiad
+ * categories have no card or row of their own — their videos show inside the
+ * normal ones:
+ *  - videos saved under the category's own names (any option). The normal and
+ *    the Olympiad "Talent Performance" save the same name, so Olympiad Talent
+ *    videos land here;
+ *  - videos saved under an extra name it lists (searchCats, e.g. Rhymes and
+ *    Speech & Presentation both list the Olympiad "Rhymes / Speech"), except
+ *    those whose option belongs to another category listing that name. So an
+ *    Olympiad rhyme goes to Rhymes and a UKG speech topic to Speech; an option
+ *    no list knows (old free text) shows in all of them.
+ */
+export interface BrowseGroup {
+  category: CategoryDTO;
+  ownNames: string[];
+  extras: { name: string; excludeSubs: string[] }[];
+}
+
+export function browseGroups(categories: CategoryDTO[]): BrowseGroup[] {
+  const normal = categories.filter((c) => !isSlot(c));
+  const optionsOf = (c: CategoryDTO) => c.subs.flatMap((s) => subNames(s));
+  return normal.map((c) => {
+    const ownNames = categoryNames(c);
+    const own = new Set(ownNames.map((n) => n.toLowerCase()));
+    const mine = new Set(optionsOf(c).map((n) => n.toLowerCase()));
+    const extras = c.searchCats
+      .filter((name) => !own.has(name.toLowerCase()))
+      .map((name) => {
+        const siblings = normal.filter(
+          (o) => o.id !== c.id && searchNames(o).some((n) => n.toLowerCase() === name.toLowerCase()),
+        );
+        const excludeSubs = uniqueNames(siblings.flatMap(optionsOf)).filter((s) => !mine.has(s.toLowerCase()));
+        return { name, excludeSubs };
+      });
+    return { category: c, ownNames, extras };
+  });
+}
+
+/**
+ * A student's class letter: from the Olympiad ID (<CRM><LETTER><seq>, e.g.
+ * 976586L0001 → L) when there is one, else from the class code / name.
+ * Null when it can't be told.
+ */
+export function classLetter(classCode?: string | null, olympiadCode?: string | null): string | null {
+  const m = (olympiadCode || '').match(/([A-Za-z]+)\d+$/);
+  if (m) return m[1].slice(-1).toUpperCase();
+  const c = norm(classCode);
+  if (!c) return null;
+  if (c.length === 1) return c.toUpperCase();
+  if (c === 'ukg' || c === 'sr.kg' || c === 'srkg' || c === 'sr kg') return 'U';
+  if (c === 'lkg' || c === 'jr.kg' || c === 'jrkg' || c === 'jr kg') return 'L';
+  if (c === 'nursery') return 'N';
+  if (c === 'pg' || c.replace(/[\s_-]/g, '') === 'prenursery') return 'P';
+  return null;
+}
+
+/** Whether an option is offered to a class. An unknown class sees every option. */
+export function subForClass(s: Pick<SubCategoryDTO, 'classCodes'>, letter: string | null): boolean {
+  if (!s.classCodes.length || !letter) return true;
+  return s.classCodes.includes(letter);
+}
+
+/** The Olympiad slot category (A or B). */
+export function slotCategory(categories: CategoryDTO[], slot: 'A' | 'B'): CategoryDTO | undefined {
+  return categories.find((c) => c.slotKind === (slot === 'A' ? 'OLY_A' : 'OLY_B'));
+}
+
+/**
+ * What a picker offers. `audience` NORMAL / GENERAL_SCHOOL / OLYMPIAD_SCHOOL:
+ * the open normal categories given to it. OLYMPIAD_STUDENT: the two slot
+ * categories, their options cut to the student's class.
+ * Only options that are switched on; categories left with none are dropped.
+ */
+export function uploadChoices(
+  categories: CategoryDTO[],
+  audience: Audience,
+  opts: { classLetter?: string | null } = {},
+): CategoryDTO[] {
+  const forSlots = audience === 'OLYMPIAD_STUDENT';
+  return categories
+    .filter((c) => (forSlots ? isSlot(c) : !isSlot(c) && c.isActive && c.audiences.includes(audience)))
+    .sort((a, b) => (forSlots ? a.slotKind.localeCompare(b.slotKind) : a.sortOrder - b.sortOrder))
+    .map((c) => ({
+      ...c,
+      subs: c.subs
+        .filter((s) => s.isActive && (!forSlots || subForClass(s, opts.classLetter ?? null)))
+        .sort((a, b) => a.sortOrder - b.sortOrder),
+    }))
+    .filter((c) => c.subs.length > 0);
+}
+
+/**
+ * Whether `category` / `subCategory` may be uploaded by this audience. Returns
+ * an error message, or null when fine. Names compare ignoring case and outer
+ * spaces; only the current names count (not aliases), as the app sends them.
+ */
+export function uploadProblem(
+  categories: CategoryDTO[],
+  audience: Audience,
+  category: string,
+  subCategory: string,
+  opts: { classLetter?: string | null } = {},
+): string | null {
+  const choices = uploadChoices(categories, audience, opts);
+  const cat = choices.find((c) => norm(c.label) === norm(category));
+  if (!cat) {
+    return audience === 'OLYMPIAD_STUDENT'
+      ? 'Pick one of the two Olympiad categories.'
+      : `"${category}" is not available for upload any more. Please update the app or pick another category.`;
+  }
+  if (!cat.subs.some((s) => norm(s.label) === norm(subCategory))) {
+    return `"${subCategory}" is not available in ${cat.label} any more. Please update the app or pick another option.`;
+  }
+  return null;
+}

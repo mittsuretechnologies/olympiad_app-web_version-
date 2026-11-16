@@ -40,6 +40,7 @@ export interface WalletRow {
   id: string;
   appUserId: string;
   balance: number;
+  balanceInr: number;
   lifetimeEarned: number;
   lifetimeSpent: number;
   currentStreak: number;
@@ -80,7 +81,12 @@ export interface ApplyInput {
   sourceId?: string;
   note?: string;
   meta?: Prisma.InputJsonValue;
+  // Key of the entry this one undoes (a refund): its ₹ value comes back exactly.
+  reverses?: string;
 }
+
+// ₹ amounts are kept to 4 decimals (|| 0 turns −0 into 0).
+const round4 = (n: number) => Math.round(n * 10_000) / 10_000 || 0;
 
 // Applies one ledger entry. `applied: false` means this key was used before —
 // nothing changed and `balance` is what that earlier entry left.
@@ -98,10 +104,30 @@ export async function applyCoins(tx: Tx, input: ApplyInput): Promise<{ applied: 
   else if (type === 'REDEEM') spent = -amount;
   else earned = amount;
 
+  // ₹ value. Coins already held keep the value they were earned at, so a change
+  // of ₹-per-coin only affects coins earned after it: new coins add at today's
+  // rate (a refund gives back exactly what its redemption took), and spending
+  // takes ₹ off in proportion to the coins spent.
+  const cfg = await getCoinConfig();
+  const [w] = await tx.$queryRaw<{ balance: number; balanceInr: number }[]>`
+    SELECT "balance", "balanceInr" FROM "public"."CoinWalletV2" WHERE "appUserId" = ${appUserId} FOR UPDATE`;
+  if (!w) throw new CoinError('NO_WALLET', 'Wallet not found.', 404);
+  let amountInr: number;
+  if (amount > 0) {
+    const undone = input.reverses
+      ? await tx.coinTransaction.findUnique({ where: { idempotencyKey: input.reverses }, select: { amountInr: true } })
+      : null;
+    amountInr = undone?.amountInr != null ? round4(-undone.amountInr) : round4(amount * cfg.inrPerCoin);
+  } else {
+    amountInr = w.balance + amount <= 0 ? round4(-w.balanceInr) : round4((w.balanceInr * amount) / w.balance);
+  }
+  const balanceInr = Math.max(0, round4(w.balanceInr + amountInr));
+
   // Single atomic statement: refuses to go below zero, returns the new balance.
   const rows = await tx.$queryRaw<{ balance: number }[]>`
     UPDATE "public"."CoinWalletV2"
        SET "balance" = "balance" + ${amount}::int,
+           "balanceInr" = ${balanceInr}::float8,
            "lifetimeEarned" = "lifetimeEarned" + ${earned}::int,
            "lifetimeSpent" = "lifetimeSpent" + ${spent}::int,
            "updatedAt" = now()
@@ -109,7 +135,6 @@ export async function applyCoins(tx: Tx, input: ApplyInput): Promise<{ applied: 
  RETURNING "balance"`;
   if (!rows[0]) throw new CoinError('INSUFFICIENT', "You don't have enough coins for this.", 409);
 
-  const cfg = await getCoinConfig();
   await tx.coinTransaction.create({
     data: {
       appUserId,
@@ -120,6 +145,7 @@ export async function applyCoins(tx: Tx, input: ApplyInput): Promise<{ applied: 
       idempotencyKey: key,
       balanceAfter: rows[0].balance,
       inrPerCoin: cfg.inrPerCoin,
+      amountInr,
       note: input.note ?? null,
       meta: input.meta ?? undefined,
     },

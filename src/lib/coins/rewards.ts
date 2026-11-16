@@ -156,6 +156,7 @@ export async function cancelRedemption(redemptionId: string, note: string | null
       await applyCoins(tx, {
         appUserId: red.appUserId, amount: red.coinsSpent, type: 'REFUND',
         key: `refund:${redemptionId}`, sourceType: 'reward', sourceId: red.rewardId, note: `Refund: ${red.reward.title}`,
+        reverses: `redeem:${redemptionId}`,
       });
     },
     async () => undefined,

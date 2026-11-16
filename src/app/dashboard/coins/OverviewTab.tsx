@@ -28,7 +28,7 @@ export default function OverviewTab() {
     <div className="space-y-5">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <Stat label="Coins in circulation" value={n(data.outstandingCoins)} sub={`across ${n(data.wallets)} wallets`} />
-        <Stat label="Your liability" value={inr(data.liabilityInr)} sub={`at ₹${data.inrPerCoin} per coin`} />
+        <Stat label="Your liability" value={inr(data.liabilityInr)} sub="each coin at the rate it was earned at" />
         <Stat label="Earned, all time" value={n(data.lifetimeEarned)} />
         <Stat label="Spent, all time" value={n(data.lifetimeSpent)} />
       </div>
@@ -48,7 +48,7 @@ export default function OverviewTab() {
                 <td className="py-2">{TYPE_LABEL[r.type] ?? r.type}</td>
                 <td className="py-2 text-right">{n(r.count)}</td>
                 <td className={`py-2 text-right font-semibold ${r.coins < 0 ? 'text-red-600' : 'text-green-700'}`}>{r.coins > 0 ? '+' : ''}{n(r.coins)}</td>
-                <td className="py-2 text-right text-gray-500">{inr(Math.abs(r.coins) * data.inrPerCoin)}</td>
+                <td className="py-2 text-right text-gray-500">{inr(Math.abs(r.inr ?? r.coins * data.inrPerCoin))}</td>
               </tr>
             ))}
           </tbody>

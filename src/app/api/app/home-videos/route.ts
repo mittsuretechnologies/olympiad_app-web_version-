@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { visibilityWhere } from '@/lib/videoVisibility';
+import { loadCategoriesSafe } from '@/lib/uploadCategories';
 
 export const dynamic = 'force-dynamic';
 
@@ -104,7 +105,14 @@ export async function GET(request: Request) {
     }
     const all = [...curatedRows, ...fromUsers];
 
+    // The SuperAdmin's "Home" switch of the Learning / Parenting categories
+    // (dashboard → Upload Categories → Home Screen). The Home screen hides a
+    // row that is switched off; Search still uses the videos either way.
+    const categories = await loadCategoriesSafe();
+    const onHome = (key: string) => categories.find((c) => c.key === key)?.showOnHome !== false;
+
     return NextResponse.json({
+      home: { learning: onHome('learning'), parenting: onHome('parenting') },
       learning: all.filter((r) => r.section === 'LEARNING'),
       parenting: all.filter((r) => r.section === 'PARENTING'),
       // Videos the SuperAdmin picked for the home carousel. Learning first,

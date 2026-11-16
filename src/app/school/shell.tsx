@@ -10,7 +10,7 @@ import {
 } from 'lucide-react';
 import { initialsOf } from './ui';
 import { jakarta } from './fonts';
-// import NotificationBell from './NotificationBell';
+import NotificationBell from './NotificationBell';
 
 /**
  * School Panel frame: a light sidebar grouped by task, a slim top bar with
@@ -115,7 +115,7 @@ export default function SchoolShell({
           <Wordmark size={15} />
         </div>
         <div className="ml-auto flex items-center gap-2">
-          {/* <NotificationBell /> */}
+          <NotificationBell />
           <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#0B1B33] text-[11px] font-semibold text-white">
             {initials}
           </span>
@@ -219,7 +219,7 @@ export default function SchoolShell({
       <div className="min-h-screen pt-14 lg:ml-[256px] lg:pt-0">
         {/* Desktop top bar: just the bell, right-aligned (mobile has it in the header) */}
         <div className="mx-auto hidden max-w-[1440px] justify-end px-6 pt-3 lg:flex">
-          {/* <NotificationBell /> */}
+          <NotificationBell />
         </div>
         <main className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-5">{children}</main>
       </div>

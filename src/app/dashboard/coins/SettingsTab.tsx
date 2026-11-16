@@ -54,7 +54,7 @@ export default function SettingsTab() {
         </div>
       </Card>
 
-      <Card title="Coin value in rupees" hint="Used to show ₹ next to coins and to work out what you owe in unspent coins. Prices and earnings are in coins, so changing this never changes what users earn or what rewards cost.">
+      <Card title="Coin value in rupees" hint="Used to show ₹ next to coins and to work out what you owe in unspent coins. A change only values coins earned from now on: coins users already hold keep the ₹ value they were earned at, and the app shows users that the value changed. Prices and earnings are in coins, so changing this never changes what users earn or what rewards cost.">
         <div className="max-w-xs">
           <Field label="₹ per 1 coin" hint={`100 coins = ${inr(100 * c.inrPerCoin)}`}>
             <Num value={c.inrPerCoin} min={0} max={1000} step={0.01} onChange={(v) => set(['inrPerCoin'], v)} />
