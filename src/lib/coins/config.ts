@@ -25,7 +25,12 @@ export const coinConfigSchema = z.object({
   }).default({}),
   // Rupee value of one coin. Display and finance reporting only: prices and
   // earn amounts are in coins, so changing this never changes what anyone earns.
+  // It values coins earned from now on; coins already held keep the ₹ value
+  // they were earned at (CoinWallet.balanceInr, see lib/coins/ledger).
   inrPerCoin: z.number().min(0).max(1000).default(0.1),
+  // The last change of inrPerCoin, so the app can say "coin value changed".
+  // Set by saveCoinConfig, never by the form.
+  rateChange: z.object({ from: z.number(), to: z.number(), at: z.string() }).nullable().default(null),
   streak: z.object({
     // Missed days tolerated before the streak resets (0 = strict: miss a day, start over).
     graceDays:     int(0, 7, 0),
@@ -89,7 +94,15 @@ export function getCoinConfig(): Promise<CoinConfig> {
 }
 
 export async function saveCoinConfig(input: unknown): Promise<CoinConfig> {
-  const next = coinConfigSchema.parse(input);
+  const parsed = coinConfigSchema.parse(input);
+  const prev = await getCoinConfig();
+  // The form sends rateChange back as it got it; only a real rate change moves it.
+  const next: CoinConfig = {
+    ...parsed,
+    rateChange: parsed.inrPerCoin !== prev.inrPerCoin
+      ? { from: prev.inrPerCoin, to: parsed.inrPerCoin, at: new Date().toISOString() }
+      : prev.rateChange,
+  };
   await prisma.appSetting.upsert({
     where: { key: KEY },
     create: { key: KEY, value: JSON.stringify(next) },

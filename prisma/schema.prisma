@@ -1393,6 +1393,9 @@ model CoinWallet {
   id              String   @id @default(uuid())
   appUserId       String   @unique
   balance         Int      @default(0)
+  // ₹ value of the coins held, each counted at the rate it was earned at, so
+  // changing ₹-per-coin never changes it for coins already held (lib/coins/ledger).
+  balanceInr      Float    @default(0)
   lifetimeEarned  Int      @default(0)
   lifetimeSpent   Int      @default(0)
   currentStreak   Int      @default(0)
@@ -1425,6 +1428,8 @@ model CoinTransaction {
   balanceAfter   Int
   // ₹ per coin when this row was written, so history keeps its value.
   inrPerCoin     Float?
+  // ₹ this entry added (+) to or took off (−) the wallet's balanceInr.
+  amountInr      Float?
   note           String?
   meta           Json?
   createdAt      DateTime @default(now())
