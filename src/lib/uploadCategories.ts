@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma';
 import {
-  type Audience, type BrowseGroup, type CategoryDTO, type SlotKind, browseGroups, classLetter, uniqueNames,
-  uploadProblem,
+  type Audience, type BrowseGroup, type CategoryDTO, type SlotKind, type UploadAudience, browseGroups, classLetter,
+  uniqueNames, uploadProblem,
 } from '@/lib/uploadCategoryShared';
 
 // Upload categories managed by the SuperAdmin (dashboard → Upload Categories).
@@ -49,6 +49,18 @@ const SPEECH_SUBS: SeedSub[] = [
   ['My Best Friend', 'heart-outline'], ['My Favourite Toy', 'gift-outline'], ['Any Other', 'mic-outline'],
 ];
 const withClass = (subs: SeedSub[], codes: string[]): SeedSub[] => subs.map(([l, i]) => [l, i, codes]);
+
+/**
+ * The State Level competition category: only students forwarded to the State
+ * Level (Result → State Level) can upload into it, one video each
+ * (lib/stateCompetition.ts). No audiences, no Search card or Home row.
+ */
+const STATE_LEVEL_DEFAULT: SeedCategory = {
+  key: 'state_level', label: 'State Level', audiences: [], slotKind: 'STATE',
+  icon: 'ribbon-outline', color: '#B8860B',
+  showInSearch: false, searchSortOrder: 90, showOnHome: false, homeSortOrder: 90,
+  subs: [['Thoughts & Execution', 'bulb-outline']],
+};
 
 export const DEFAULT_CATEGORIES: SeedCategory[] = [
   {
@@ -114,6 +126,7 @@ export const DEFAULT_CATEGORIES: SeedCategory[] = [
     showInSearch: true, searchSortOrder: 6, showOnHome: true, homeSortOrder: 5,
     subs: [['Others', 'apps-outline']],
   },
+  STATE_LEVEL_DEFAULT,
 ];
 
 /** The defaults as DTOs — used when the tables cannot be read. */
@@ -129,9 +142,29 @@ function defaultDTOs(): CategoryDTO[] {
   }));
 }
 
+/** Adds the State Level category to a database seeded before it existed. */
+async function ensureStateCategory(): Promise<void> {
+  if ((await prisma.uploadCategory.count({ where: { slotKind: 'STATE' } })) > 0) return;
+  const c = STATE_LEVEL_DEFAULT;
+  const max = await prisma.uploadCategory.aggregate({ _max: { sortOrder: true } });
+  try {
+    await prisma.uploadCategory.create({
+      data: {
+        key: c.key, label: c.label, audiences: c.audiences, slotKind: c.slotKind, icon: c.icon, color: c.color,
+        showInSearch: c.showInSearch, searchSortOrder: c.searchSortOrder,
+        showOnHome: c.showOnHome, homeSortOrder: c.homeSortOrder,
+        sortOrder: (max._max.sortOrder ?? -1) + 1,
+        subs: { create: c.subs.map(([label, icon], j) => ({ label, icon, sortOrder: j })) },
+      },
+    });
+  } catch (e: any) {
+    if (e?.code !== 'P2002') throw e; // another request added it first
+  }
+}
+
 /** Fills empty tables with the defaults. `key` is unique, so a race just skips duplicates. */
 async function ensureSeeded(): Promise<void> {
-  if ((await prisma.uploadCategory.count()) > 0) return;
+  if ((await prisma.uploadCategory.count()) > 0) return ensureStateCategory();
   for (let i = 0; i < DEFAULT_CATEGORIES.length; i++) {
     const c = DEFAULT_CATEGORIES[i];
     try {
@@ -246,7 +279,7 @@ export async function schoolKindOf(appUserId: string): Promise<'OLYMPIAD' | 'GEN
 
 /** Error message when this audience may not upload into category / subCategory, else null. */
 export async function checkUploadCategory(
-  audience: Audience, category: string, subCategory: string,
+  audience: UploadAudience, category: string, subCategory: string,
 ): Promise<string | null> {
   return uploadProblem(await loadCategoriesSafe(), audience, category, subCategory);
 }

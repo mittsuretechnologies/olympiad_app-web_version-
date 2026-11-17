@@ -3,7 +3,7 @@ import { CLASSES } from '@/lib/classes';
 import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 import { IONICON_NAMES } from '@/lib/ioniconNames';
 import {
-  invalidateCategoryCache, loadAllCategories, NORMAL_AUDIENCES, isSlot, uniqueNames,
+  invalidateCategoryCache, loadAllCategories, NORMAL_AUDIENCES, isSlot, isStateCategory, uniqueNames,
   type CategoryDTO,
 } from '@/lib/uploadCategories';
 
@@ -113,6 +113,18 @@ export async function checkAgainstOthers(input: CategoryInput, existing: Categor
   const others = all.filter((c) => c.id !== existing?.id);
   const slot = existing && isSlot(existing);
 
+  // The State Level category: rename and edit its options freely (its videos
+  // are told apart by Video.competitionStage, not by name); nobody picks it
+  // as an audience.
+  if (existing && isStateCategory(existing)) {
+    const clash = others.find((c) => [c.label, ...c.aliases].some((n) => lower(n) === lower(input.label)));
+    if (clash) return `There is already a category called "${clash.label}".`;
+    if (input.isActive && !input.subs.some((s) => s.isActive)) {
+      return 'Switch on at least one option, or close the State Level category for uploads.';
+    }
+    return null;
+  }
+
   if (slot) {
     if (lower(input.label) !== lower(existing.label)) {
       return `The Olympiad category "${existing.label}" can't be renamed: marks and results recognise its videos by this name.`;
@@ -202,6 +214,7 @@ export async function createCategory(input: CategoryInput): Promise<string> {
 
 export async function updateCategory(existing: CategoryDTO, input: CategoryInput): Promise<void> {
   const slot = isSlot(existing);
+  const state = isStateCategory(existing);
   const oldSubs = new Map(existing.subs.map((s) => [s.id, s]));
   await prisma.$transaction(async (tx) => {
     await tx.uploadCategory.update({
@@ -210,7 +223,8 @@ export async function updateCategory(existing: CategoryDTO, input: CategoryInput
         // A slot category keeps its name, audience and stays open.
         label: slot ? existing.label : input.label,
         aliases: slot ? existing.aliases : withOldName(existing.aliases, existing.label, input.label),
-        audiences: slot ? existing.audiences : input.audiences ?? [],
+        // The State Level category has no audiences: forwarding decides who uploads.
+        audiences: slot || state ? existing.audiences : input.audiences ?? [],
         isActive: slot ? true : input.isActive !== false,
         icon: input.icon!, color: input.color!, imageUrl: input.imageUrl ?? null,
         showInSearch: input.showInSearch !== false, searchLabel: input.searchLabel ?? null,
@@ -270,6 +284,7 @@ export async function saveOrder(list: keyof typeof ORDER_LISTS, ids: string[]): 
 /** Deletes a normal category. Videos keep their category name as text. */
 export async function deleteCategory(existing: CategoryDTO): Promise<string | null> {
   if (isSlot(existing)) return 'The Olympiad categories can\'t be deleted.';
+  if (isStateCategory(existing)) return 'The State Level category can\'t be deleted. Close it for uploads instead.';
   await prisma.uploadCategory.delete({ where: { id: existing.id } });
   invalidateCategoryCache();
   return null;

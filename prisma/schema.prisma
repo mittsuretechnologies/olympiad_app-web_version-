@@ -1647,6 +1647,32 @@ model CoinGameRule {
 // those on the top 10 distinct holistic percentages across all schools. One row
 // per student (olympiadCode is unique); deleting the row withdraws them.
 // holisticPercent is what it was when they were forwarded.
+// A student on a frozen State Toppers / National Winners list (Result → State &
+// National → Freeze). level 'STATE' = a state's top 3 distinct State Holistic
+// %s, 'NATIONAL' = the top 3 across all states. Freezing a level replaces its
+// rows. Table from prisma/manual-migrations/2026-11-17-competition-winners.sql.
+model CompetitionWinner {
+  id                    String   @id @default(uuid())
+  level                 String
+  rank                  Int
+  olympiadCode          String
+  name                  String
+  className             String?
+  schoolName            String?
+  schoolCode            String?
+  district              String?
+  state                 String?
+  stateHolisticPercent  Float
+  stage1HolisticPercent Float?
+  koshPercents          Json?
+  frozenAt              DateTime @default(now())
+  frozenBy              String?
+
+  @@unique([level, olympiadCode])
+  @@index([level])
+  @@schema("public")
+}
+
 // A student forwarded to the State Level competition (overall top 3 distinct
 // holistic %s). Columns examSource / koshPercents come from
 // prisma/manual-migrations/2026-11-17-state-level-competition.sql: the exam

@@ -1,6 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { isSlot, loadCategoriesSafe, subNames, uniqueNames, type CategoryDTO } from '@/lib/uploadCategories';
+import { isNormalCategory, isSlot, loadCategoriesSafe, subNames, uniqueNames, type CategoryDTO } from '@/lib/uploadCategories';
 import { visibilityWhere } from '@/lib/videoVisibility';
 import {
   DEFAULT_TRENDING_SETTINGS, cleanTrendingSettings, isOptionOn, istDay, pickForDay,
@@ -54,7 +54,7 @@ export async function saveTrendingSettings(raw: unknown): Promise<TrendingSettin
  */
 export function trendingOptions(categories: CategoryDTO[], counts: Map<string, number>): TrendingOption[] {
   const byName = new Map<string, TrendingOption>();
-  const normal = categories.filter((c) => !isSlot(c)).sort((a, b) => a.sortOrder - b.sortOrder);
+  const normal = categories.filter(isNormalCategory).sort((a, b) => a.sortOrder - b.sortOrder);
   for (const c of normal) {
     for (const s of [...c.subs].sort((a, b) => a.sortOrder - b.sortOrder)) {
       const key = s.label.trim().toLowerCase();
