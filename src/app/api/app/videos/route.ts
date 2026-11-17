@@ -2,12 +2,6 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
-import {
-  OLYMPIAD_CAT_A_SUBS,
-  OLYMPIAD_CAT_B_SUBS,
-  OLYMPIAD_CAT_A_LABEL,
-  OLYMPIAD_CAT_B_LABEL,
-} from '@/lib/olympiad-categories';
 import { hasMittfestTag } from '@/lib/mittfest';
 import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
@@ -15,7 +9,8 @@ import { getJwtSecret } from '@/lib/jwt-secret';
 import { recordCoinEvent } from '@/lib/coins/tasks';
 import { ACCOUNT_TYPE_SCHOOL, UPLOADER_SCHOOL_OWN } from '@/lib/generalSchool';
 import { getSchoolIdentity } from '@/lib/schoolAccount';
-import { checkOlympiadCategory, checkUploadCategory } from '@/lib/uploadCategories';
+import { checkOlympiadCategory, checkUploadCategory, loadCategoriesSafe } from '@/lib/uploadCategories';
+import { olympiadSlotOf } from '@/lib/olympiadSlots';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -156,11 +151,13 @@ export async function POST(request: Request) {
     let finalIsEvaluation = !isSchoolAccount && isEvaluation !== undefined ? Boolean(isEvaluation) : false;
     if (isOlympiadUpload && !isSchoolAccount) {
       finalIsEvaluation = true;
-      // Use category label to detect slot — subCategory may be a custom "special talent" label
-      const isCatA = category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(subCategory);
-      const isCatB = category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(subCategory);
+      // The category label decides the slot first — subCategory may be a custom
+      // "special talent" label. The slot categories' options (dashboard → Upload
+      // Categories, plus the built-in spellings) fill in for older records.
+      const categories = await loadCategoriesSafe();
+      const slot = olympiadSlotOf(category, subCategory, categories);
 
-      if (isCatA || isCatB) {
+      if (slot) {
         // No deletedAt filter — an evaluated video must keep blocking this slot even if it
         // was later soft-deleted (e.g. an admin removing a reported video). See the matching
         // comment in GET /api/app/olympiad-video-slots for the full reasoning.
@@ -172,9 +169,7 @@ export async function POST(request: Request) {
           select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
         });
         const matchesSlot = (v: { category: string | null; subCategory: string | null }) =>
-          isCatA
-            ? v.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '')
-            : v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
+          olympiadSlotOf(v.category, v.subCategory, categories) === slot;
         // Blocked if evaluated (regardless of delete state) or if an active, non-rejected video occupies it.
         const slotTaken = existingOlympiadVideos.some(v =>
           matchesSlot(v) && (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
