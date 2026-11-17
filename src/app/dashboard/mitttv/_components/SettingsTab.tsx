@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AlertCircle, ChevronLeft, Loader2, Power, Save, Search, Tv } from 'lucide-react';
+import { AlertCircle, ChevronLeft, Loader2, Power, Save, Search } from 'lucide-react';
 import { MITTTV_AUDIENCES, MITTTV_LIMITS, type MittTvAudience, type MittTvSettings } from '@/lib/mittTvShared';
 import { api } from '../_lib/api';
 import { Label, Switch, inputCls } from './common';
@@ -76,9 +76,16 @@ export default function SettingsTab({ settings, onSaved }: { settings: MittTvSet
               <PreviewTitle title={draft.screenTitle || 'MittTV'} />
               {draft.searchEnabled && <Search size={16} className="text-white ml-auto" />}
             </div>
-            <div className="rounded-xl bg-[#FBF6EE] px-4 py-2.5">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#1FAE8E] to-[#3E82E0] text-white text-xs font-extrabold px-3.5 py-2 shadow-lg ring-2 ring-white">
-                <Tv size={14} /> {draft.buttonLabel || 'MittTV'}
+            <div className="rounded-xl bg-[#FBF6EE] px-5 pt-3 pb-2.5 flex flex-col items-center" title="Users can drag this button anywhere on Home">
+              <span className="w-12 h-12 rounded-full bg-gradient-to-br from-[#1FAE8E] to-[#3E82E0] border-[3px] border-white shadow-lg flex items-center justify-center">
+                <svg width="24" height="22" viewBox="0 0 30 28" aria-hidden="true">
+                  <path d="M10 1.8 L15 6.8 L20 1.8" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+                  <rect x="2" y="7" width="26" height="19" rx="5.5" fill="#fff" />
+                  <path d="M12.8 12 L19.6 16.5 L12.8 21 Z" fill="#3E82E0" stroke="#3E82E0" strokeWidth="1.4" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <span className="-mt-1.5 relative rounded-full bg-white shadow px-2 py-0.5 text-[11px] font-black tracking-tight">
+                <PreviewLabel label={draft.buttonLabel || 'MittTV'} />
               </span>
             </div>
           </div>
@@ -111,4 +118,10 @@ function splitTitle(title: string): [string, string] {
   const space = title.indexOf(' ');
   if (space > 0) return [title.slice(0, space), title.slice(space)];
   return [title, ''];
+}
+
+/** The Home button's name as the app draws it in the chip under the button. */
+function PreviewLabel({ label }: { label: string }) {
+  const [a, b] = splitTitle(label);
+  return <><span className="text-[#1FAE8E]">{a}</span><span className="text-[#3E82E0]">{b}</span></>;
 }
