@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic';
 // acceptances, per role:
 //   SCHOOL    — School Onboarding Agreement (AgreementAcceptance records)
 //   MODERATOR — first-login Terms & Conditions (Moderator.termsAccepted/At)
-//   EVALUATOR — Evaluator Terms & Privacy Policy (AgreementAcceptance records)
+//   EVALUATOR — Evaluator Terms, Privacy Policy & Handbook (AgreementAcceptance records)
 // Query: role (SCHOOL|MODERATOR|EVALUATOR), status (all|accepted|pending), q, page,
 //        pageSize, all=1 (no pagination — for CSV export)
 
@@ -172,7 +172,7 @@ async function moderatorRegister({ status, q, all, page, pageSize }: ListParams)
   };
 }
 
-// Evaluator Terms & Privacy Policy: one AgreementAcceptance per acceptance
+// Evaluator Terms, Privacy Policy & Handbook: one AgreementAcceptance per acceptance
 // (version, text hash, IP, browser, reading times). An evaluator counts as
 // accepted only while they hold an unrevoked record for the CURRENT version.
 async function evaluatorRegister({ status, q, all, page, pageSize }: ListParams) {
@@ -212,7 +212,7 @@ async function evaluatorRegister({ status, q, all, page, pageSize }: ListParams)
 
   return {
     role: 'EVALUATOR',
-    document: 'Evaluator Terms & Privacy Policy',
+    document: 'Evaluator Terms, Privacy Policy & Handbook',
     currentVersion: EVALUATOR_TERMS_VERSION,
     summary: { total, accepted, pending: total - accepted, orphaned: 0 },
     rows: evaluators.map(evaluator => ({ evaluator, acceptance: byActor.get(evaluator.id) ?? null })),

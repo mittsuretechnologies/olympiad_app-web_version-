@@ -6,6 +6,7 @@ import { createNotification, notifyFollowersOfNewVideo } from '@/lib/notificatio
 import { ensureSchoolAccount } from '@/lib/schoolAccount';
 import { OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL, OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS } from '@/lib/olympiad-categories';
 import { currentGroupLabel, isAllowedCategory } from '@/lib/moderationCategories';
+import { type CategoryDTO, loadCategoriesSafe, schoolKindOf, slotCategory, slotOfNames } from '@/lib/uploadCategories';
 import { CLEAR_CLAIM, claimFreeFor, claimIsLive } from '@/lib/videoClaim';
 import { mergeTags, schoolAutoTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
 import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
@@ -235,7 +236,7 @@ export async function GET(request: Request) {
     const appUsers = appUserIds.length > 0
       ? await prisma.appUser.findMany({
           where: { id: { in: appUserIds } },
-          select: { id: true, userId: true, email: true, mobile: true, olympiadId: true },
+          select: { id: true, userId: true, email: true, mobile: true, olympiadId: true, schoolRefId: true },
         })
       : [];
 
@@ -253,10 +254,13 @@ export async function GET(request: Request) {
       : [];
     const allocationMap = Object.fromEntries(allocations.map(a => [a.code, a]));
 
-    const appUserMap = Object.fromEntries(appUsers.map(u => {
+    const appUserMap = Object.fromEntries(appUsers.map(({ schoolRefId, ...u }) => {
       const allocation = u.olympiadId ? allocationMap[u.olympiadId] : null;
       return [u.id, {
         ...u,
+        // A school account linked to a School row is an Olympiad school; the
+        // moderation page offers its own videos that school kind's categories.
+        isOlympiadSchool: Boolean(schoolRefId),
         assignedName: allocation?.assignedName ?? null,
         school: allocation?.school ?? null,
       }];
@@ -364,10 +368,27 @@ export async function DELETE(request: Request) {
 // Older records store the raw 'Cat A' / 'Cat B' values rather than the current
 // display labels, so both forms have to be recognised here — same as
 // school/me/student-slots and school/me/reports already do.
-function resolveSlot(category: string | null | undefined, subCategory: string | null | undefined) {
-  if (category === OLYMPIAD_CAT_A_LABEL || category === 'Cat A' || OLYMPIAD_CAT_A_SUBS.includes(subCategory ?? '')) return 'A';
-  if (category === OLYMPIAD_CAT_B_LABEL || category === 'Cat B' || OLYMPIAD_CAT_B_SUBS.includes(subCategory ?? '')) return 'B';
+// The slot categories' names and options come from dashboard → Upload
+// Categories; the built-in lists still catch records older than those.
+function resolveSlot(
+  categories: CategoryDTO[], category: string | null | undefined, subCategory: string | null | undefined,
+): 'A' | 'B' | null {
+  if ((category ?? '').trim()) {
+    const byName = slotOfNames(categories, category, null);
+    if (byName) return byName;
+    if (category === OLYMPIAD_CAT_A_LABEL) return 'A';
+    if (category === OLYMPIAD_CAT_B_LABEL) return 'B';
+  }
+  const bySub = slotOfNames(categories, null, subCategory);
+  if (bySub) return bySub;
+  if (OLYMPIAD_CAT_A_SUBS.includes(subCategory ?? '')) return 'A';
+  if (OLYMPIAD_CAT_B_SUBS.includes(subCategory ?? '')) return 'B';
   return null;
+}
+
+/** The slot category's current name (built-in name if it can't be read). */
+function slotLabel(categories: CategoryDTO[], slot: 'A' | 'B') {
+  return slotCategory(categories, slot)?.label ?? (slot === 'A' ? OLYMPIAD_CAT_A_LABEL : OLYMPIAD_CAT_B_LABEL);
 }
 
 /**
@@ -379,8 +400,9 @@ async function slotTakenBySibling(appUserId: string, videoId: string, slot: 'A' 
     where: { appUserId, isEvaluation: true, id: { not: videoId } },
     select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
   });
+  const categories = await loadCategoriesSafe();
   return siblings.some(v =>
-    resolveSlot(v.category, v.subCategory) === slot &&
+    resolveSlot(categories, v.category, v.subCategory) === slot &&
     (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
   );
 }
@@ -421,7 +443,7 @@ async function moveToPending(payload: { id: string; role: string; name?: string;
   // A rejected jury video frees its A/B slot, so the student may have uploaded
   // a replacement since. Reviving the old one would put two videos in a slot.
   if (expected === 'REJECTED' && before.isEvaluation && before.appUserId) {
-    const slot = resolveSlot(before.category, before.subCategory);
+    const slot = resolveSlot(await loadCategoriesSafe(), before.category, before.subCategory);
     if (slot && await slotTakenBySibling(before.appUserId, videoId, slot)) {
       return NextResponse.json(
         { message: 'This student has since uploaded another video in the same category slot, so this one cannot be moved back to Pending.' },
@@ -568,11 +590,14 @@ export async function POST(request: Request) {
     // a corrected category can't create a second video occupying that same A/B slot.
     const subCategoryChanged = typeof newSubCategory === 'string' && newSubCategory !== before?.subCategory;
     const categoryChanged    = typeof newCategory === 'string' && newCategory !== before?.category;
+    // dashboard → Upload Categories (built-in lists if they can't be read).
+    const categories = (subCategoryChanged || categoryChanged) ? await loadCategoriesSafe() : [];
 
     if (status === 'APPROVED' && before?.isEvaluation && (subCategoryChanged || categoryChanged)) {
       // An explicit main category from the moderator is authoritative; only fall
       // back to the video's existing one when they didn't change it.
       const targetSlot = resolveSlot(
+        categories,
         categoryChanged ? newCategory : before.category,
         subCategoryChanged ? newSubCategory : before.subCategory,
       );
@@ -592,9 +617,14 @@ export async function POST(request: Request) {
     // gets in the app (a school's own video can't become Parenting, a general
     // user's can't become School Activity). Jury videos keep the A/B rules above.
     if (recategorizing && !before.isEvaluation) {
-      const targetCategory = categoryChanged ? newCategory : currentGroupLabel(before);
+      const uploader = {
+        isEvaluation: false,
+        uploaderType: before.uploaderType,
+        schoolKind: before.uploaderType === 'SCHOOL_OWN' && before.appUserId ? await schoolKindOf(before.appUserId) : null,
+      };
+      const targetCategory = categoryChanged ? newCategory : currentGroupLabel({ ...before, ...uploader }, categories);
       const targetSub      = subCategoryChanged ? newSubCategory : before.subCategory;
-      if (!isAllowedCategory(before, targetCategory, targetSub ?? '')) {
+      if (!isAllowedCategory(uploader, targetCategory, targetSub ?? '', categories)) {
         return NextResponse.json(
           { message: `"${targetSub}" under "${targetCategory}" is not a category this uploader can use.` },
           { status: 400 },
@@ -606,12 +636,13 @@ export async function POST(request: Request) {
     // custom subcategory ("Any Other Special Talent", a typed-in rhyme name) is
     // in neither subs list, so resolveSlot returns null for it — previously that
     // silently kept the old main category while the subcategory changed.
-    const derivedSlot = recategorizing
-      ? resolveSlot(categoryChanged ? newCategory : null, subCategoryChanged ? newSubCategory : before?.subCategory)
+    // Jury videos only: a normal video's option can share a name with a slot
+    // option (a Rhymes video's "Twinkle Twinkle…"), and it must not be pulled
+    // into the Olympiad category by it.
+    const derivedSlot = recategorizing && before.isEvaluation
+      ? resolveSlot(categories, categoryChanged ? newCategory : null, subCategoryChanged ? newSubCategory : before?.subCategory)
       : null;
-    const derivedCategory =
-      derivedSlot === 'A' ? OLYMPIAD_CAT_A_LABEL :
-      derivedSlot === 'B' ? OLYMPIAD_CAT_B_LABEL : null;
+    const derivedCategory = derivedSlot ? slotLabel(categories, derivedSlot) : null;
 
     // Conditional write: lands only if the video is still in the state the
     // moderator saw and nobody else holds a live review claim on it. Two

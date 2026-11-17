@@ -11,7 +11,7 @@ import {
  * Superadmin — Agreement Acceptance Register, one tab per role:
  *   Schools    — School Onboarding Agreement, with full legal metadata per row
  *   Moderators — first-login Terms & Conditions (acceptance time only)
- *   Evaluators — Evaluator Terms & Privacy Policy (version, IP and time per acceptance)
+ *   Evaluators — Evaluator Terms, Privacy Policy & Handbook (version, IP and time per acceptance)
  * CSV export with all rows is available for both.
  */
 
@@ -66,7 +66,7 @@ type Role = 'SCHOOL' | 'MODERATOR' | 'EVALUATOR';
 const ROLES: { key: Role; label: string; icon: typeof Users; document: string; noun: string }[] = [
   { key: 'SCHOOL', label: 'Schools', icon: Building2, document: 'School Onboarding Agreement', noun: 'schools' },
   { key: 'MODERATOR', label: 'Moderators', icon: ShieldCheck, document: 'Terms and Conditions', noun: 'moderators' },
-  { key: 'EVALUATOR', label: 'Evaluators', icon: User, document: 'Evaluator Terms & Privacy Policy', noun: 'evaluators' },
+  { key: 'EVALUATOR', label: 'Evaluators', icon: User, document: 'Evaluator Terms, Privacy Policy & Handbook', noun: 'evaluators' },
 ];
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */

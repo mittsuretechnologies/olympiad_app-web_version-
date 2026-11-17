@@ -175,6 +175,83 @@ export function uploadChoices(
     .filter((c) => c.subs.length > 0);
 }
 
+// ── Moderation: what an existing video may be moved to ──────────────────────
+
+/** uploaderType stored on a school's own videos (see lib/generalSchool.ts). */
+const UPLOADER_SCHOOL_OWN = 'SCHOOL_OWN';
+
+/** Who uploaded a video, as far as categories go. */
+export interface VideoUploader {
+  isEvaluation: boolean;
+  uploaderType?: string | null;
+  /** For a school's own video: which kind of school. Unknown = either list. */
+  schoolKind?: 'OLYMPIAD' | 'GENERAL' | null;
+}
+
+/** The upload list(s) the video's uploader picks from in the app. */
+export function videoAudiences(v: VideoUploader): Audience[] {
+  if (v.isEvaluation) return ['OLYMPIAD_STUDENT'];
+  if (v.uploaderType === UPLOADER_SCHOOL_OWN) {
+    if (v.schoolKind === 'OLYMPIAD') return ['OLYMPIAD_SCHOOL'];
+    if (v.schoolKind === 'GENERAL') return ['GENERAL_SCHOOL'];
+    return ['OLYMPIAD_SCHOOL', 'GENERAL_SCHOOL'];
+  }
+  return ['NORMAL'];
+}
+
+export interface CategoryGroup { label: string; subs: string[] }
+
+/**
+ * The categories (with their switched-on options) a moderator may move this
+ * video between: exactly what its uploader gets in the app. An Olympiad video
+ * gets both slot categories with every class's options.
+ */
+export function moveChoices(categories: CategoryDTO[], v: VideoUploader): CategoryGroup[] {
+  const groups: CategoryGroup[] = [];
+  for (const audience of videoAudiences(v)) {
+    for (const c of uploadChoices(categories, audience)) {
+      const subs = c.subs.map((s) => s.label);
+      const same = groups.find((g) => norm(g.label) === norm(c.label));
+      if (same) same.subs = uniqueNames([...same.subs, ...subs]);
+      else groups.push({ label: c.label, subs });
+    }
+  }
+  return groups;
+}
+
+/** Error message when the video may not be moved to category / subCategory, else null. */
+export function moveProblem(
+  categories: CategoryDTO[], v: VideoUploader, category: string, subCategory: string,
+): string | null {
+  const group = moveChoices(categories, v).find((g) => norm(g.label) === norm(category));
+  if (!group || !group.subs.some((s) => norm(s) === norm(subCategory))) {
+    return `"${subCategory}" under "${category}" is not a category this uploader can use.`;
+  }
+  return null;
+}
+
+/**
+ * The Olympiad slot (A / B) a stored category / sub-category belongs to, from
+ * the slot categories' current and earlier names. Null when neither. Only
+ * meaningful for Olympiad videos: the normal Talent Performance shares slot
+ * A's name. Callers keep the built-in lists as a fallback for old records.
+ */
+export function slotOfNames(
+  categories: CategoryDTO[], category: string | null | undefined, subCategory: string | null | undefined,
+): 'A' | 'B' | null {
+  const cat = norm(category);
+  if (cat === 'cat a') return 'A';
+  if (cat === 'cat b') return 'B';
+  const slots = categories.filter(isSlot);
+  const slotLetter = (c: CategoryDTO) => (c.slotKind === 'OLY_A' ? 'A' : 'B');
+  const byName = slots.find((c) => categoryNames(c).some((n) => norm(n) === cat));
+  if (byName) return slotLetter(byName);
+  const sub = norm(subCategory);
+  if (!sub) return null;
+  const bySub = slots.find((c) => c.subs.some((s) => subNames(s).some((n) => norm(n) === sub)));
+  return bySub ? slotLetter(bySub) : null;
+}
+
 /**
  * Whether `category` / `subCategory` may be uploaded by this audience. Returns
  * an error message, or null when fine. Names compare ignoring case and outer

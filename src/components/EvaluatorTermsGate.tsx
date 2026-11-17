@@ -2,8 +2,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { AlertCircle, Check, FileText, Loader2, Lock, LogOut } from 'lucide-react';
+import { AlertCircle, Check, FileText, Loader2, Lock, LogOut, RotateCw } from 'lucide-react';
 import {
+  EVALUATOR_HANDBOOK_PART,
   EVALUATOR_TERMS_DECLARATIONS,
   EVALUATOR_TERMS_INTRO,
   EVALUATOR_TERMS_PARTS,
@@ -11,13 +12,20 @@ import {
   type TermsBlock,
 } from '@/lib/evaluatorTerms';
 import { BTN_PRIMARY, FOCUS } from '@/app/school/ui';
+import { rich } from '@/components/handbook/rich';
+import type { Handbook, HandbookBlock } from '@/lib/handbook/moderator-handbook';
 
 /**
  * First-login gate for Evaluators: a full page (same look as the School
- * Onboarding Agreement), not a popup. The Terms & Conditions and Privacy
- * Policy must be read to the end before the declarations appear; "I Accept"
- * stays disabled until every declaration is ticked. Cannot be dismissed —
- * the only ways out are accepting or logging out.
+ * Onboarding Agreement), not a popup. The Terms & Conditions (Part A), the
+ * Privacy Policy (Part B) and the Evaluator's Handbook (Part C) must be read to
+ * the end before the declarations appear; "I Accept" stays disabled until every
+ * declaration is ticked. Cannot be dismissed — the only ways out are accepting
+ * or logging out.
+ *
+ * The handbook is confidential, so it is loaded from /api/staff/handbook with
+ * the evaluator's token rather than bundled; the end marker (and with it the
+ * declarations) only exists once it has loaded.
  */
 
 const DECLARATIONS = EVALUATOR_TERMS_DECLARATIONS;
@@ -94,6 +102,70 @@ function Blocks({ blocks, n }: { blocks: TermsBlock[]; n: string }) {
   );
 }
 
+/** Part C: the Evaluator's Handbook, in the same layout as Parts A and B. */
+function HandbookBlocks({ blocks }: { blocks: HandbookBlock[] }) {
+  return (
+    <>
+      {blocks.map((b, i) => {
+        if (b.k === 'chapter') {
+          return (
+            <h3 key={i} className={`${NUM_COL} mt-7 items-baseline text-[15px] font-semibold tracking-[-0.01em] text-[#0B1B36]`}>
+              <span className="tabular-nums text-[#1559C7]">{b.n ? `${b.n}.` : ''}</span>
+              <span>{b.title}</span>
+            </h3>
+          );
+        }
+        if (b.k === 'heading') {
+          return <h4 key={i} className={`${NUM_COL} mt-4 text-[14px] font-semibold text-[#0B1B36]`}><span /><span>{b.text}</span></h4>;
+        }
+        if (b.k === 'p') {
+          const pad = b.indent === 1 ? 'pl-4 sm:pl-5' : b.indent === 2 ? 'pl-8 sm:pl-10 text-[#475265]' : '';
+          return <div key={i} className={`${NUM_COL} mt-2.5`}><span /><p className={`${pad} [&_b]:font-semibold [&_b]:text-[#0B1B36] [&_a]:text-[#1559C7] [&_a]:underline`}>{rich(b.text)}</p></div>;
+        }
+        if (b.k === 'table') {
+          return (
+            <div key={i} className={`${NUM_COL} mt-3`}>
+              <span />
+              <div className="overflow-x-auto rounded-lg border border-[#E6E8EC]">
+                <table className="w-full border-collapse text-[12.5px] leading-[1.5]">
+                  <thead>
+                    <tr className="bg-[#F4F5F7]">
+                      {b.head.map(h => (
+                        <th key={h} scope="col" className="px-4 py-2.5 text-left text-[11.5px] font-semibold text-[#475265] border-b border-[#E6E8EC]">{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {b.rows.map((r, ri) => (
+                      <tr key={ri} className="align-top border-b border-[#E6E8EC] last:border-0">
+                        {r.map((c, ci) => (
+                          <td key={ci} style={b.cols?.[ci] ? { width: b.cols[ci] } : undefined}
+                            className={`px-4 py-3 [&_b]:font-semibold ${ci === 0 ? 'font-semibold text-[#0B1B36]' : 'text-[#2A3446] border-l border-[#E6E8EC]'}`}>
+                            {rich(c)}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        }
+        return (
+          <div key={i} className={`${NUM_COL} mt-3`}>
+            <span />
+            <div className="rounded-md border border-[#E6E8EC] bg-[#F8F9FB] px-4 py-3">
+              <p className="font-semibold text-[#0B1B36]">{b.title}</p>
+              {b.lines.map((l, li) => <p key={li} className="mt-1 text-[#475265]">{rich(l)}</p>)}
+            </div>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
 function Stepper({ step }: { step: number }) {
   const steps = ['Read', 'Declarations', 'Accepted'];
   return (
@@ -121,9 +193,12 @@ function Stepper({ step }: { step: number }) {
 }
 
 export default function EvaluatorTermsGate({
+  token,
   onAccept,
   onLogout,
 }: {
+  /** The evaluator's token, to load the handbook (Part C). */
+  token: string | null;
   onAccept: (payload: TermsAcceptancePayload) => Promise<void>;
   onLogout: () => void;
 }) {
@@ -138,6 +213,32 @@ export default function EvaluatorTermsGate({
   const [ticks, setTicks] = useState<boolean[]>(DECLARATIONS.map(() => false));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [handbook, setHandbook] = useState<Handbook | null>(null);
+  const [handbookState, setHandbookState] = useState<'loading' | 'error' | 'ready'>('loading');
+  const [handbookAttempt, setHandbookAttempt] = useState(0);
+  // The parent may hand a new function each render; the fetch must not rerun for it.
+  const onLogoutRef = useRef(onLogout);
+  useEffect(() => { onLogoutRef.current = onLogout; }, [onLogout]);
+
+  // Part C. Without it the document is incomplete, so there is no end to reach.
+  useEffect(() => {
+    if (!token) { setHandbookState('error'); return; }
+    let live = true;
+    setHandbookState('loading');
+    fetch('/api/staff/handbook', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => {
+        if (r.status === 401) { onLogoutRef.current(); return null; }
+        if (!r.ok) throw new Error();
+        return r.json();
+      })
+      .then((json: Handbook | null) => {
+        if (!live || !json) return;
+        setHandbook(json);
+        setHandbookState('ready');
+      })
+      .catch(() => { if (live) setHandbookState('error'); });
+    return () => { live = false; };
+  }, [token, handbookAttempt]);
 
   // The page behind stays put while the gate is open.
   useEffect(() => {
@@ -181,7 +282,7 @@ export default function EvaluatorTermsGate({
     }, { threshold: 1 });
     io.observe(el);
     return () => io.disconnect();
-  }, [reachedEnd]);
+  }, [reachedEnd, handbookState]);
 
   useEffect(() => {
     if (reachedEnd) panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -227,7 +328,7 @@ export default function EvaluatorTermsGate({
             <span className="text-[15px] font-bold tracking-tight"><span className="text-[#1559C7]">mitt</span><span className="text-[#3CB043]">mee</span></span>
             <span className="hidden md:inline-flex items-center gap-1.5 h-7 ml-1 rounded-md border border-[#1559C7]/20 bg-[#1559C7]/[0.06] px-2.5 text-[12.5px] font-semibold text-[#0B1B33] min-w-0">
               <FileText size={13} className="flex-shrink-0 text-[#1559C7]" />
-              <span className="truncate">Evaluator Terms &amp; Privacy Policy</span>
+              <span className="truncate">Evaluator Terms, Privacy Policy &amp; Handbook</span>
             </span>
           </div>
           <div className="hidden md:flex justify-center"><Stepper step={step} /></div>
@@ -250,7 +351,7 @@ export default function EvaluatorTermsGate({
             <article className="text-[14px] leading-[1.65] text-[#1F2937] [font-feature-settings:'cv11','ss01']">
               <header className="pb-4 border-b border-[#E6E8EC]">
                 <h1 id="terms-title" className="text-[18px] sm:text-[19px] leading-[1.3] font-semibold tracking-[-0.01em] text-[#0B1B36]">
-                  Evaluator Terms &amp; Conditions and Privacy Policy
+                  Evaluator Terms &amp; Conditions, Privacy Policy and Handbook
                 </h1>
                 <p className="mt-1 text-[12px] leading-snug text-[#677285]">Mittsure Technologies <span aria-hidden="true">·</span> Mittmee portal</p>
               </header>
@@ -279,13 +380,43 @@ export default function EvaluatorTermsGate({
                 </div>
               ))}
 
-              <div className="mt-10 flex items-center gap-3 text-[11.5px] text-[#677285]">
-                <span className="h-px flex-1 bg-[#E6E8EC]" />
-                End of document
-                <span className="h-px flex-1 bg-[#E6E8EC]" />
+              {/* Part C: the Evaluator's Handbook */}
+              <div className="mt-12 pt-8 border-t border-[#E6E8EC]">
+                <h2 className="text-[16px] font-semibold tracking-[-0.01em] text-[#0B1B36]">{EVALUATOR_HANDBOOK_PART.heading}</h2>
+                <p className="mt-2 text-[#2A3446]">{EVALUATOR_HANDBOOK_PART.intro}</p>
+                {handbookState === 'loading' && (
+                  <div className="mt-6 flex items-center gap-2 text-[13px] text-[#677285]">
+                    <Loader2 size={16} className="animate-spin text-[#1559C7]" /> Loading the handbook…
+                  </div>
+                )}
+                {handbookState === 'error' && (
+                  <div role="alert" className="mt-6 flex flex-wrap items-center gap-3 rounded-lg border border-[#B42323]/20 bg-[#B42323]/[0.06] px-3.5 py-3 text-[13px] text-[#B42323]">
+                    <AlertCircle size={15} className="flex-shrink-0" />
+                    <span className="flex-1 min-w-0">Couldn&apos;t load the handbook. You need it to continue.</span>
+                    <button onClick={() => setHandbookAttempt(a => a + 1)} className={`inline-flex items-center gap-1.5 h-8 px-3 rounded-lg bg-white border border-[#B42323]/30 text-[12.5px] font-medium cursor-pointer ${FOCUS}`}>
+                      <RotateCw size={13} /> Retry
+                    </button>
+                  </div>
+                )}
+                {handbookState === 'ready' && handbook && (
+                  <>
+                    <p className="mt-4 text-[12px] text-[#677285]">
+                      {handbook.title} <span aria-hidden="true">·</span> Version {handbook.version}
+                    </p>
+                    <HandbookBlocks blocks={handbook.blocks} />
+                  </>
+                )}
               </div>
+
+              {handbookState === 'ready' && (
+                <div className="mt-10 flex items-center gap-3 text-[11.5px] text-[#677285]">
+                  <span className="h-px flex-1 bg-[#E6E8EC]" />
+                  End of document
+                  <span className="h-px flex-1 bg-[#E6E8EC]" />
+                </div>
+              )}
             </article>
-            <div ref={endRef} aria-hidden="true" className="h-1" />
+            {handbookState === 'ready' && <div ref={endRef} aria-hidden="true" className="h-1" />}
           </div>
 
           {reachedEnd ? (

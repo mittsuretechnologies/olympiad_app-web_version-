@@ -237,6 +237,13 @@ export async function findBrowseGroup(key: string): Promise<BrowseGroup | null> 
 
 // ── Upload checks ────────────────────────────────────────────────────────────
 
+/** Which kind of school a school account is: Olympiad (linked to a School row) or General. */
+export async function schoolKindOf(appUserId: string): Promise<'OLYMPIAD' | 'GENERAL' | null> {
+  const user = await prisma.appUser.findUnique({ where: { id: appUserId }, select: { schoolRefId: true } });
+  if (!user) return null;
+  return user.schoolRefId ? 'OLYMPIAD' : 'GENERAL';
+}
+
 /** Error message when this audience may not upload into category / subCategory, else null. */
 export async function checkUploadCategory(
   audience: Audience, category: string, subCategory: string,

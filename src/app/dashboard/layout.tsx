@@ -372,8 +372,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-sm font-semibold">Dashboard</span>
             </Link>
 
-            {/* Moderator Handbook — always shown to moderators, not permission-gated */}
-            {role === 'MODERATOR' && (
+            {/* Staff handbook — always shown to moderators (Moderator Handbook) and
+                evaluators (Evaluator's Handbook), not permission-gated */}
+            {(role === 'MODERATOR' || role === 'EVALUATOR') && (
               <Link href="/dashboard/handbook"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/handbook') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <BookOpen size={20} />
@@ -705,7 +706,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {showTermsModal && (
         role === 'EVALUATOR'
-          ? <EvaluatorTermsGate onAccept={handleAcceptTerms} onLogout={handleLogout} />
+          ? <EvaluatorTermsGate token={termsToken} onAccept={handleAcceptTerms} onLogout={handleLogout} />
           : <TermsAcceptanceModal onAccept={handleAcceptTerms} onLogout={handleLogout} />
       )}
     </div>

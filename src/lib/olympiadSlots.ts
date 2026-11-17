@@ -5,6 +5,7 @@ import {
   OLYMPIAD_CAT_A_LABEL,
   OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
+import { type CategoryDTO, loadCategoriesSafe, slotOfNames } from '@/lib/uploadCategories';
 
 /**
  * The Olympiad "slots" of one student: category A (Talent Performance) and
@@ -30,19 +31,30 @@ type SlotVideo = {
   evaluations: { id: string }[];
 };
 
-/** Which slot a category/sub-category belongs to, or null if it is not an Olympiad category. */
-export function olympiadSlotOf(category: string | null | undefined, subCategory?: string | null): OlympiadSlot | null {
+/**
+ * Which slot a category/sub-category belongs to, or null if it is not an
+ * Olympiad category. With `categories` (dashboard → Upload Categories) the slot
+ * categories' current and earlier option names count too; the built-in lists
+ * always do, for older records.
+ */
+export function olympiadSlotOf(
+  category: string | null | undefined, subCategory?: string | null, categories?: CategoryDTO[] | null,
+): OlympiadSlot | null {
   if (category === OLYMPIAD_CAT_A_LABEL || category === 'Cat A') return 'A';
   if (category === OLYMPIAD_CAT_B_LABEL || category === 'Cat B') return 'B';
+  if (categories?.length) {
+    const slot = slotOfNames(categories, category, subCategory);
+    if (slot) return slot;
+  }
   const sub = subCategory ?? '';
   if (OLYMPIAD_CAT_A_SUBS.includes(sub)) return 'A';
   if (OLYMPIAD_CAT_B_SUBS.includes(sub)) return 'B';
   return null;
 }
 
-export function computeOlympiadSlots(videos: SlotVideo[]) {
-  const isA = (v: SlotVideo) => olympiadSlotOf(v.category, v.subCategory) === 'A';
-  const isB = (v: SlotVideo) => olympiadSlotOf(v.category, v.subCategory) === 'B';
+export function computeOlympiadSlots(videos: SlotVideo[], categories?: CategoryDTO[] | null) {
+  const isA = (v: SlotVideo) => olympiadSlotOf(v.category, v.subCategory, categories) === 'A';
+  const isB = (v: SlotVideo) => olympiadSlotOf(v.category, v.subCategory, categories) === 'B';
   const active = videos.filter(v => v.deletedAt === null && v.status !== 'REJECTED');
 
   const lockedA = videos.some(v => isA(v) && v.evaluations.length > 0);
@@ -128,5 +140,5 @@ export async function slotsForStudent(student: SchoolStudent) {
     where: { OR: owners, isEvaluation: true },
     select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
   });
-  return computeOlympiadSlots(videos);
+  return computeOlympiadSlots(videos, await loadCategoriesSafe());
 }

@@ -18,15 +18,24 @@ interface Row {
   rank: number;
   forwarded: boolean;
   forwardedAt: string | null;
+  /** Exam marks the student was forwarded on; null for rows forwarded before this was saved. */
+  forwardedExamSource: 'manual' | 'ai' | null;
   outOfPool: boolean;
 }
-interface Response { topN: number; topPercents: number[]; tableReady: boolean; students: Row[] }
+interface Response { topN: number; examSource: 'manual' | 'ai'; topPercents: number[]; tableReady: boolean; students: Row[] }
+
+const SOURCE_LABEL = { manual: 'Manual', ai: 'AI' } as const;
 
 const fmtDate = (iso: string | null) =>
   iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '';
 
 export default function DistrictForwardPage() {
-  const { data, error, isLoading, mutate } = useSWR<Response>('/api/result/district-forward', fetcher, { revalidateOnFocus: false });
+  // Same Manual / AI exam-marks toggle as the Result page: the pool, and what a
+  // forward saves, use the exam marks picked here.
+  const [examSource, setExamSource] = useState<'manual' | 'ai'>('manual');
+  const { data, error, isLoading, mutate } = useSWR<Response>(
+    `/api/result/district-forward?examSource=${examSource}`, fetcher, { revalidateOnFocus: false },
+  );
   const [busy, setBusy] = useState<string | null>(null); // 'all' | olympiad code
   const [notice, setNotice] = useState<{ ok: boolean; text: string } | null>(null);
 
@@ -68,8 +77,8 @@ export default function DistrictForwardPage() {
   };
 
   const forwardAll = async () => {
-    if (!window.confirm(`Forward ${pending} student${pending === 1 ? '' : 's'} to the state level?\n\nThese are everyone on the top ${data?.topN} holistic percentages across all schools.`)) return;
-    const j = await call('all', 'POST');
+    if (!window.confirm(`Forward ${pending} student${pending === 1 ? '' : 's'} to the state level?\n\nThese are everyone on the top ${data?.topN} holistic percentages across all schools, using ${SOURCE_LABEL[examSource]} exam marks.`)) return;
+    const j = await call('all', 'POST', { examSource });
     if (j) setNotice({ ok: true, text: `${j.forwarded} student${j.forwarded === 1 ? '' : 's'} forwarded to the state level.` });
   };
 
@@ -86,10 +95,11 @@ export default function DistrictForwardPage() {
   };
 
   const exportCsv = () => {
-    const header = ['Rank', 'Holistic %', 'Student', 'Olympiad ID', 'Class', 'School', 'School ID', 'District', 'State', 'Forwarded'];
+    const header = ['Rank', 'Holistic %', 'Student', 'Olympiad ID', 'Class', 'School', 'School ID', 'District', 'State', 'Forwarded', 'Forwarded on exam marks'];
     const lines = students.map(s => [
       s.outOfPool ? '' : s.rank, s.holisticPercent, s.name, s.olympiadCode, s.className || '', s.schoolName || '', s.schoolCode || '',
       s.district || '', s.state || '', s.forwarded ? fmtDate(s.forwardedAt) : 'No',
+      s.forwardedExamSource ? SOURCE_LABEL[s.forwardedExamSource] : '',
     ]);
     const csv = [header, ...lines].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
@@ -118,7 +128,22 @@ export default function DistrictForwardPage() {
         <div>
             <h1 className="text-2xl font-medium text-[#004f9f]">State Level</h1>
           </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1 bg-white border border-gray-200 rounded-xl shadow-sm p-1">
+            <span className="pl-2 pr-1 text-xs font-bold text-gray-400 uppercase tracking-wide">Exam Score:</span>
+            {(['manual', 'ai'] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => { setExamSource(s); setNotice(null); }}
+                disabled={busy !== null}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer disabled:opacity-50 ${
+                  examSource === s ? 'bg-[#06013E] text-[#F5E9C8] shadow-sm' : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >
+                {SOURCE_LABEL[s]}
+              </button>
+            ))}
+          </div>
           <button onClick={exportCsv} disabled={students.length === 0}
             className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-50 cursor-pointer">
             <Download size={16} /> Export CSV
@@ -240,6 +265,9 @@ export default function DistrictForwardPage() {
                       <span className="inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 border border-amber-200 text-amber-700">Not forwarded</span>
                     )}
                     {s.outOfPool && <p className="text-[10px] text-red-500 font-semibold mt-0.5">No longer in the top {data.topN}</p>}
+                    {s.forwarded && s.forwardedExamSource && (
+                      <p className="text-[10px] text-gray-400 font-semibold mt-0.5">on {SOURCE_LABEL[s.forwardedExamSource]} exam marks</p>
+                    )}
                   </td>
                   <td className="py-3 px-3 text-right">
                     {s.forwarded && (

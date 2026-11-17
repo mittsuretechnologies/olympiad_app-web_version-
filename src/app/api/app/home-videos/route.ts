@@ -3,7 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { visibilityWhere } from '@/lib/videoVisibility';
-import { loadCategoriesSafe } from '@/lib/uploadCategories';
+import { categoryNames, loadCategoriesSafe } from '@/lib/uploadCategories';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +31,18 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const includeUsers = new URL(request.url).searchParams.get('includeUsers') === '1';
   try {
+    // The Learning / Parenting categories (dashboard → Upload Categories), found
+    // by key so a renamed one keeps its videos: they carry the current and
+    // every earlier name.
+    const categories = await loadCategoriesSafe();
+    const namesOf = (key: string, fallback: string) => {
+      const c = categories.find((x) => x.key === key);
+      return c ? categoryNames(c) : [fallback];
+    };
+    const learningNames = namesOf('learning', 'Learning');
+    const parentingNames = namesOf('parenting', 'Parenting');
+    const isParenting = (category: string | null) =>
+      parentingNames.some((n) => n.toLowerCase() === (category ?? '').trim().toLowerCase());
     const rows = await prisma.homeSectionVideo.findMany({
       where: { isActive: true },
       orderBy: { order: 'asc' },
@@ -55,10 +67,9 @@ export async function GET(request: Request) {
           status: 'APPROVED',
           isPublic: true,
           isEvaluation: false,
-          OR: [
-            { category: { equals: 'Learning',  mode: 'insensitive' } },
-            { category: { equals: 'Parenting', mode: 'insensitive' } },
-          ],
+          OR: [...learningNames, ...parentingNames].map((name) => ({
+            category: { equals: name, mode: 'insensitive' as const },
+          })),
           ...visWhere,
         },
         orderBy: { createdAt: 'desc' },
@@ -81,7 +92,7 @@ export async function GET(request: Request) {
       const likedIds = new Set(myLikes.map((l) => l.videoId));
       fromUsers = userRows.map((v) => {
         const caption = (v.caption ?? '').trim();
-        const section = v.category?.toLowerCase() === 'parenting' ? 'PARENTING' : 'LEARNING';
+        const section = isParenting(v.category) ? 'PARENTING' : 'LEARNING';
         return {
           id: v.id,
           section,
@@ -108,7 +119,6 @@ export async function GET(request: Request) {
     // The SuperAdmin's "Home" switch of the Learning / Parenting categories
     // (dashboard → Upload Categories → Home Screen). The Home screen hides a
     // row that is switched off; Search still uses the videos either way.
-    const categories = await loadCategoriesSafe();
     const onHome = (key: string) => categories.find((c) => c.key === key)?.showOnHome !== false;
 
     return NextResponse.json({
