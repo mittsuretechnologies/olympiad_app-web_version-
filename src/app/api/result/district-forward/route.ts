@@ -2,28 +2,43 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
 import { rankForDistrict, schoolIdsByCode, DISTRICT_TOP_N } from '@/lib/district-forward';
+import type { ExamSource } from '@/lib/result-overview';
 
 export const dynamic = 'force-dynamic';
 
-// GET    /api/result/district-forward   the qualifying pool: top 10 distinct holistic %s across all
-//                                       schools, everyone on them, and who is already forwarded
-// POST   /api/result/district-forward   forward everyone currently in the pool
+// GET    /api/result/district-forward?examSource=manual|ai   the qualifying pool: top 3 distinct
+//                                       holistic %s across all schools, everyone on them, and who is
+//                                       already forwarded
+// POST   /api/result/district-forward   { examSource } forward everyone currently in the pool
 // DELETE /api/result/district-forward   { olympiadCode } withdraw one student, or { all: true } everyone
 // Forwarding is always recomputed here from the live results, never taken from the client.
+// examSource is the Result page's Manual / AI exam-marks toggle (Manual if not
+// given). Each forward saves it, with the student's stage-1 kosha %s, so the
+// State Level result is built on exactly the result that qualified them.
+
+const examSourceOf = (v: unknown): ExamSource => (v === 'ai' ? 'ai' : 'manual');
 
 export async function GET(request: Request) {
   const { error } = await requireAdmin(request, 'result');
   if (error) return error;
   try {
-    const { topPercents, qualifying, byCode } = await rankForDistrict();
+    const examSource = examSourceOf(new URL(request.url).searchParams.get('examSource'));
+    const { topPercents, qualifying, byCode } = await rankForDistrict(examSource);
 
     // Tolerates the DistrictForward table not existing yet, so the page still loads.
     let tableReady = true;
-    const forwards = new Map<string, { forwardedAt: Date; holisticPercent: number }>();
+    const forwards = new Map<string, { forwardedAt: Date; holisticPercent: number; examSource: string | null }>();
     try {
       for (const f of await prisma.districtForward.findMany({ select: { olympiadCode: true, forwardedAt: true, holisticPercent: true } })) {
-        forwards.set(f.olympiadCode, f);
+        forwards.set(f.olympiadCode, { ...f, examSource: null });
       }
+      // Separate read: works before the 2026-11-17 columns exist.
+      try {
+        for (const f of await prisma.districtForward.findMany({ select: { olympiadCode: true, examSource: true } })) {
+          const row = forwards.get(f.olympiadCode);
+          if (row) row.examSource = f.examSource;
+        }
+      } catch { /* columns not added yet */ }
     } catch (err) {
       tableReady = false;
       console.warn('result/district-forward: DistrictForward unavailable', err);
@@ -34,6 +49,7 @@ export async function GET(request: Request) {
       ...s,
       forwarded: forwards.has(s.olympiadCode),
       forwardedAt: forwards.get(s.olympiadCode)?.forwardedAt ?? null,
+      forwardedExamSource: forwards.get(s.olympiadCode)?.examSource ?? null,
       outOfPool: false,
     }));
     // Forwarded earlier but no longer in the pool (their result changed): keep them visible.
@@ -43,12 +59,12 @@ export async function GET(request: Request) {
       students.push({
         studentKey: r?.studentKey ?? code, name: r?.name ?? code, olympiadCode: code, className: r?.className ?? null,
         schoolName: r?.schoolName ?? null, schoolCode: r?.schoolId ?? null, state: r?.state ?? null, district: r?.district ?? null,
-        holisticPercent: r?.holisticPercent ?? f.holisticPercent, rank: 0,
-        forwarded: true, forwardedAt: f.forwardedAt, outOfPool: true,
+        holisticPercent: r?.holisticPercent ?? f.holisticPercent, rank: 0, koshPercents: {},
+        forwarded: true, forwardedAt: f.forwardedAt, forwardedExamSource: f.examSource, outOfPool: true,
       });
     }
 
-    return NextResponse.json({ topN: DISTRICT_TOP_N, topPercents, tableReady, students });
+    return NextResponse.json({ topN: DISTRICT_TOP_N, examSource, topPercents, tableReady, students });
   } catch (err: any) {
     console.error('GET result/district-forward failed:', err);
     return NextResponse.json({ message: 'Failed to load the state-level pool' }, { status: 500 });
@@ -59,10 +75,15 @@ export async function POST(request: Request) {
   const { payload, error } = await requireAdmin(request, 'result');
   if (error) return error;
   try {
-    const [{ qualifying }, schoolIds] = await Promise.all([rankForDistrict(), schoolIdsByCode()]);
+    const body = await request.json().catch(() => ({}));
+    const examSource = examSourceOf(body?.examSource);
+    const [{ qualifying }, schoolIds] = await Promise.all([rankForDistrict(examSource), schoolIdsByCode()]);
     const data = qualifying.flatMap(s => {
       const schoolId = s.schoolCode ? schoolIds.get(s.schoolCode) : undefined;
-      return schoolId ? [{ olympiadCode: s.olympiadCode, schoolId, holisticPercent: s.holisticPercent, forwardedBy: payload?.id ?? null }] : [];
+      return schoolId ? [{
+        olympiadCode: s.olympiadCode, schoolId, holisticPercent: s.holisticPercent, forwardedBy: payload?.id ?? null,
+        examSource, koshPercents: s.koshPercents,
+      }] : [];
     });
     if (data.length === 0) return NextResponse.json({ message: 'Nobody is in the state-level pool yet' }, { status: 400 });
     // Already-forwarded students are left exactly as they were.

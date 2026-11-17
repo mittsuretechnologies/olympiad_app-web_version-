@@ -360,6 +360,11 @@ model Video {
   isMittfest         Boolean           @default(false)
   isPublic           Boolean           @default(true)
   olympiadVisibility String? // "public" | "private" — only meaningful when isEvaluation = true
+  // 'STATE' = a State Level competition video (lib/stateCompetition.ts); null
+  // for every other video. Kept apart from the two Olympiad videos
+  // (isEvaluation stays false), so it never counts in the stage-1 result.
+  // Column from prisma/manual-migrations/2026-11-17-state-level-competition.sql.
+  competitionStage   String?
   likesCount         Int               @default(0)
   viewsCount         Int               @default(0)
   deletedAt          DateTime?
@@ -383,6 +388,7 @@ model Video {
   @@index([status, isPublic])
   @@index([deletedAt])
   @@index([isMittfest])
+  @@index([competitionStage])
   @@schema("public")
 }
 
@@ -1641,12 +1647,20 @@ model CoinGameRule {
 // those on the top 10 distinct holistic percentages across all schools. One row
 // per student (olympiadCode is unique); deleting the row withdraws them.
 // holisticPercent is what it was when they were forwarded.
+// A student forwarded to the State Level competition (overall top 3 distinct
+// holistic %s). Columns examSource / koshPercents come from
+// prisma/manual-migrations/2026-11-17-state-level-competition.sql: the exam
+// marks used ('manual' | 'ai') and the stage-1 final % of each kosha at the
+// moment of forwarding, which the State Level result combines 50-50 with the
+// State video.
 model DistrictForward {
   id              String   @id @default(uuid())
   olympiadCode    String   @unique
   schoolId        String
   school          School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   holisticPercent Float
+  examSource      String?
+  koshPercents    Json?
   forwardedAt     DateTime @default(now())
   forwardedBy     String?
 

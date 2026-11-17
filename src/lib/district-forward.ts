@@ -1,9 +1,10 @@
 import { prisma } from '@/lib/prisma';
-import { getResultOverview } from '@/lib/result-overview';
+import { getResultOverview, type ExamSource } from '@/lib/result-overview';
+import type { KoshKey } from '@/lib/kosh';
 
 // How many distinct holistic percentages count as "top" when picking students
 // to forward to the next level.
-export const DISTRICT_TOP_N = 10;
+export const DISTRICT_TOP_N = 3;
 
 export interface RankedStudent {
   studentKey: string;
@@ -16,15 +17,18 @@ export interface RankedStudent {
   district: string | null;
   holisticPercent: number;
   rank: number; // 1 = highest distinct percentage
+  /** Stage-1 final % of each kosha (exam + both videos), saved when forwarded. */
+  koshPercents: Partial<Record<KoshKey, number>>;
 }
 
 // The qualifying pool: across ALL schools together, every student with a
 // complete result (exam + both videos), take the top DISTRICT_TOP_N distinct
 // holistic percentages; everyone sitting on one of those percentages qualifies,
-// so ties can make it more than ten students. Uses the same numbers as the
-// Result page (reviewer's exam marks), so what the passport shows is what ranks.
-export async function rankForDistrict() {
-  const overview = await getResultOverview('', 'manual');
+// so ties can make it more than three students. Uses the same numbers as the
+// Result page for the chosen exam marks (its Manual / AI toggle), so what the
+// passport shows is what ranks.
+export async function rankForDistrict(examSource: ExamSource = 'manual') {
+  const overview = await getResultOverview('', examSource);
   const rows = overview?.rows ?? [];
 
   const eligible = rows.filter(r =>
@@ -46,6 +50,9 @@ export async function rankForDistrict() {
     district: r.district,
     holisticPercent: r.holisticPercent as number,
     rank,
+    koshPercents: Object.fromEntries(
+      r.koshBreakdown.filter(k => k.combinedPercent !== null).map(k => [k.kosh, k.combinedPercent as number]),
+    ),
   });
 
   const qualifying = eligible
