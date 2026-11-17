@@ -691,6 +691,9 @@ model AppUser {
   coinRedemptions        CoinRedemption[]
   referralsMade          Referral[]      @relation("ReferralReferrer")
   referralReceived       Referral?       @relation("ReferralReferee")
+  // MittTV (see the MittTv* models at the end of this file).
+  mittTvProgress         MittTvProgress[]
+  mittTvViews            MittTvView[]
 
   @@index([email])
   @@index([mobile])
@@ -1651,5 +1654,108 @@ model DistrictForward {
   forwardedBy     String?
 
   @@index([schoolId])
+  @@schema("public")
+}
+
+// ─── MittTV ──────────────────────────────────────────────────────────────────
+// The app's Netflix-style video screen (floating MittTV button on Home),
+// managed in dashboard → MittTV. Logic: src/lib/mittTv.ts (+ mittTvShared.ts).
+// Tables made by prisma/manual-migrations/2026-11-17-mitttv.sql — never
+// `prisma db push`.
+
+model MittTvVideo {
+  id           String   @id @default(uuid())
+  title        String
+  description  String   @default("")
+  videoUrl     String
+  // 16:9 picture for cards and the banner; posterUrl is an optional tall one.
+  thumbnailUrl String   @default("")
+  posterUrl    String   @default("")
+  durationSec  Int      @default(0)
+  tags         String   @default("")
+  // UPLOAD = added in the dashboard. Videos pulled in later from the class &
+  // subject platform get their own source, their id there in externalId, and
+  // anything else they carry (class, subject…) in meta.
+  source       String   @default("UPLOAD")
+  externalId   String?
+  meta         Json     @default("{}")
+  isActive     Boolean  @default(true)
+  viewsCount   Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  rowItems     MittTvRowItem[]
+  progress     MittTvProgress[]
+  views        MittTvView[]
+
+  @@unique([source, externalId])
+  @@index([isActive, createdAt])
+  @@schema("public")
+}
+
+model MittTvRow {
+  id        String   @id @default(uuid())
+  title     String
+  subtitle  String   @default("")
+  // BANNER | CONTINUE | CURATED | MOST_WATCHED | NEW (see mittTvShared.ts)
+  kind      String
+  // LANDSCAPE | POSTER | TOP10 | LARGE
+  style     String   @default("LANDSCAPE")
+  settings  Json     @default("{}")
+  sortOrder Int      @default(0)
+  isVisible Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  items     MittTvRowItem[]
+
+  @@index([sortOrder])
+  @@schema("public")
+}
+
+model MittTvRowItem {
+  id        String      @id @default(uuid())
+  rowId     String
+  videoId   String
+  sortOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  row       MittTvRow   @relation(fields: [rowId], references: [id], onDelete: Cascade)
+  video     MittTvVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([rowId, videoId])
+  @@index([rowId, sortOrder])
+  @@index([videoId])
+  @@schema("public")
+}
+
+model MittTvProgress {
+  id          String      @id @default(uuid())
+  userId      String
+  videoId     String
+  positionSec Int         @default(0)
+  durationSec Int         @default(0)
+  finished    Boolean     @default(false)
+  hidden      Boolean     @default(false)
+  updatedAt   DateTime    @default(now()) @updatedAt
+  user        AppUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video       MittTvVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoId])
+  @@index([userId, updatedAt])
+  @@index([videoId])
+  @@schema("public")
+}
+
+// One per user, video and India-time day (YYYY-MM-DD) — "most watched".
+model MittTvView {
+  id        String      @id @default(uuid())
+  videoId   String
+  userId    String
+  day       String
+  createdAt DateTime    @default(now())
+  user      AppUser     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  video     MittTvVideo @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  @@unique([videoId, userId, day])
+  @@index([day])
+  @@index([userId])
   @@schema("public")
 }

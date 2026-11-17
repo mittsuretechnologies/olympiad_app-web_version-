@@ -47,5 +47,7 @@ export const config = {
   // limit. It's a same-origin dashboard call, so it needs no CORS headers.
   // Also skips the development-only local-put video upload (see lib/localUploads.ts),
   // which streams a whole video and must not be cut off at the body-size limit.
-  matcher: '/api/((?!dashboard/home-videos/upload(?:/|$)|app/upload-video/local-put(?:/|$)).*)',
+  // The MittTV video upload (dashboard/mitttv/upload) is skipped for the same
+  // reason as the Learning & Parenting one.
+  matcher: '/api/((?!dashboard/(?:home-videos|mitttv)/upload(?:/|$)|app/upload-video/local-put(?:/|$)).*)',
 };

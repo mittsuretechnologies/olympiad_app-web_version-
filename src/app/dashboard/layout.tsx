@@ -54,6 +54,7 @@ import {
   Coins,
   LayoutGrid,
   Megaphone,
+  Tv,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'MASTER_ADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -563,6 +564,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/app-notifications') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <Megaphone size={20} />
                 <span className="text-sm font-semibold">App Notifications</span>
+              </Link>
+            )}
+
+            {/* MittTV — only superadmin. The app's Netflix-style video screen
+                (floating MittTV button on Home): videos, banner, rows. */}
+            {canSeeAdmin('mittTv') && (
+              <Link href="/dashboard/mitttv"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/mitttv') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <Tv size={20} />
+                <span className="text-sm font-semibold">MittTV</span>
               </Link>
             )}
 
