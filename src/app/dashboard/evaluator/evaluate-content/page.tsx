@@ -77,8 +77,16 @@ export default function EvaluateContentPage() {
 
   // Both TalentEvaluator and SuperAdmin accounts can submit scores.
   const [canScore, setCanScore] = useState(false);
+  // Real evaluators are blind: they see only the Olympiad ID (no student or
+  // school name). SuperAdmin / MasterAdmin / Reviewer still see everything.
+  const [hideIdentity, setHideIdentity] = useState(true);
   useEffect(() => {
     setCanScore(!!sessionStorage.getItem('evaluatorToken') || !!sessionStorage.getItem('token'));
+    setHideIdentity(
+      !!sessionStorage.getItem('evaluatorToken') &&
+      !sessionStorage.getItem('token') &&
+      !sessionStorage.getItem('reviewerToken'),
+    );
   }, []);
 
   const fetchQueue = () => {
@@ -248,10 +256,16 @@ export default function EvaluateContentPage() {
                 <div className="px-4 pt-3 pb-2">
                   <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800 truncate">
                     <User className="w-3.5 h-3.5 flex-shrink-0 text-[#004f9f]" />
-                    <span className="truncate">{s.studentName}</span>
-                    <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
+                    {hideIdentity ? (
+                      <span className="truncate">{s.olympiadCode}</span>
+                    ) : (
+                      <>
+                        <span className="truncate">{s.studentName}</span>
+                        <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
+                      </>
+                    )}
                   </div>
-                  {s.schoolName && (
+                  {!hideIdentity && s.schoolName && (
                     <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-400 truncate">
                       <School className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{s.schoolName}</span>
                     </div>
@@ -303,7 +317,7 @@ export default function EvaluateContentPage() {
           <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto ${activeColor}`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 z-10 ${HEADER_COLORS[activeColor] || activeColor}`}>
               <div>
-                <h2 className="text-base font-bold text-gray-800">{active.studentName} — {active.olympiadCode}</h2>
+                <h2 className="text-base font-bold text-gray-800">{hideIdentity ? active.olympiadCode : `${active.studentName} — ${active.olympiadCode}`}</h2>
                 <p className="text-xs text-gray-400">{active.category} · {active.subCategory} · Video {active.slot + 1}</p>
               </div>
               <button onClick={() => setActive(null)} className="text-gray-300 hover:text-gray-500 p-1">

@@ -970,8 +970,9 @@ function EvaluatorDashboard() {
               data.recentEvaluations.map(e => (
                 <div key={e.id} className="px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-gray-800 truncate">{e.studentName}</p>
-                    <p className="text-xs text-gray-400 truncate mt-0.5">{e.olympiadCode} Â· {e.category} / {e.subCategory}</p>
+                    {/* Evaluators are blind: show only the Olympiad ID, never the student name. */}
+                    <p className="text-sm font-bold text-gray-800 truncate">{e.olympiadCode}</p>
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{e.category} / {e.subCategory}</p>
                   </div>
                   <div className="flex items-center gap-4 shrink-0">
                     <span className="text-xs text-gray-400 font-medium">
