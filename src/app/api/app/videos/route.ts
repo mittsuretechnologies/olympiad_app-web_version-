@@ -11,6 +11,7 @@ import { ACCOUNT_TYPE_SCHOOL, UPLOADER_SCHOOL_OWN } from '@/lib/generalSchool';
 import { getSchoolIdentity } from '@/lib/schoolAccount';
 import { checkOlympiadCategory, checkUploadCategory, loadCategoriesSafe } from '@/lib/uploadCategories';
 import { olympiadSlotOf } from '@/lib/olympiadSlots';
+import { STATE_STAGE, checkStateUpload, isStateCategoryName, stateCategory } from '@/lib/stateCompetition';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
     const {
       videoUrl, thumbnailUrl, caption, category, subCategory,
       tags, isPublic, isEvaluation, olympiadId: bodyOlympiadId,
-      isOlympiadUpload, olympiadVisibility, isMittfest,
+      isOlympiadUpload, olympiadVisibility, isMittfest, isStateLevel,
     } = await request.json();
 
     if (!videoUrl || !category || !subCategory) {
@@ -95,7 +96,16 @@ export async function POST(request: Request) {
         || user?.olympiadId
         || null;
 
-    if (!isSchoolAccount) {
+    // A State Level video (lib/stateCompetition.ts): flagged by the app, or sent
+    // into the State Level category by name. Only a student forwarded to the
+    // State Level — matched by the Olympiad ID saved on their account, never one
+    // typed into this request — and only one video each.
+    const isStateUpload = !isSchoolAccount
+      && (isStateLevel === true || isStateCategoryName(await stateCategory(), category));
+    if (isStateUpload) {
+      const problem = await checkStateUpload(appUser.id, user?.olympiadId, category, subCategory);
+      if (problem) return NextResponse.json({ error: problem.error }, { status: problem.status });
+    } else if (!isSchoolAccount) {
       // An Olympiad video goes into one of the two Olympiad categories, with an
       // option offered to the student's class (the class letter is part of the
       // Olympiad ID). Any other upload uses the General User list — Olympiad
@@ -147,9 +157,10 @@ export async function POST(request: Request) {
 
     const uploaderType = isSchoolAccount ? UPLOADER_SCHOOL_OWN : olympiadCode ? 'STUDENT' : 'VIEWER';
 
-    // Olympiad upload: auto-set isEvaluation and enforce 1-per-category slot limit
-    let finalIsEvaluation = !isSchoolAccount && isEvaluation !== undefined ? Boolean(isEvaluation) : false;
-    if (isOlympiadUpload && !isSchoolAccount) {
+    // Olympiad upload: auto-set isEvaluation and enforce 1-per-category slot limit.
+    // A State Level video is never an Olympiad (stage-1) video.
+    let finalIsEvaluation = !isSchoolAccount && !isStateUpload && isEvaluation !== undefined ? Boolean(isEvaluation) : false;
+    if (isOlympiadUpload && !isSchoolAccount && !isStateUpload) {
       finalIsEvaluation = true;
       // The category label decides the slot first — subCategory may be a custom
       // "special talent" label. The slot categories' options (dashboard → Upload
@@ -189,14 +200,19 @@ export async function POST(request: Request) {
       : [];
     // An Olympiad video also carries its main category (e.g. #TalentPerformance).
     const mergedTags = mergeTags(
-      [...schoolAutoTags, finalIsEvaluation ? mainCategoryTag(category, subCategory) : null],
+      [
+        ...schoolAutoTags,
+        finalIsEvaluation ? mainCategoryTag(category, subCategory) : null,
+        isStateUpload ? 'StateLevel' : null,
+      ],
       userTags,
     );
 
     // A "#mittfest" hashtag counts as an entry too, exactly like ticking the
     // MittFest checkbox — see src/lib/mittfest.ts.
-    const finalIsMittfest =
-      (isMittfest !== undefined ? Boolean(isMittfest) : false) || hasMittfestTag(userTags);
+    // A State Level competition video is not a MittFest entry.
+    const finalIsMittfest = !isStateUpload
+      && ((isMittfest !== undefined ? Boolean(isMittfest) : false) || hasMittfestTag(userTags));
 
     const newVideo = await prisma.video.create({
       data: {
@@ -215,6 +231,7 @@ export async function POST(request: Request) {
         olympiadVisibility: finalIsEvaluation
           ? (olympiadVisibility === 'private' ? 'private' : 'public')
           : null,
+        competitionStage: isStateUpload ? STATE_STAGE : null,
         status: 'PENDING',
       },
     });

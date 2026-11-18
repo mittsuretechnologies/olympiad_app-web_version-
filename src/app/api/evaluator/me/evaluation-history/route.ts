@@ -135,6 +135,8 @@ export async function GET(request: Request) {
 
     const groupMap = new Map<string, {
       studentKey: string;
+      /** 'STATE' for the State Level video's group, else null (Olympiad videos). */
+      stage: string | null;
       studentName: string;
       username: string | null;
       olympiadCode: string;
@@ -177,8 +179,13 @@ export async function GET(request: Request) {
       // Evaluators only see students from schools assigned to them.
       if (schoolFilter && (!schoolId || !schoolFilter.has(schoolId))) continue;
 
+      // A State Level video is its own group: it must not count as one of the
+      // student's two Olympiad videos in the kosha totals below.
+      const stage = v.competitionStage === 'STATE' ? 'STATE' : null;
+      if (stage) key = `${key}:state`;
+
       if (!groupMap.has(key)) {
-        groupMap.set(key, { studentKey: key, studentName, username, olympiadCode, className, schoolName, videosByVideoId: new Map() });
+        groupMap.set(key, { studentKey: key, stage, studentName, username, olympiadCode, className, schoolName, videosByVideoId: new Map() });
       }
       const group = groupMap.get(key)!;
 
@@ -188,7 +195,7 @@ export async function GET(request: Request) {
         thumbnailUrl: v.thumbnailUrl,
         category: v.category || '',
         subCategory: v.subCategory || '',
-        slot: slotForVideo(e.videoId),
+        slot: stage ? 0 : slotForVideo(e.videoId),
         evaluation: {
           id: e.id,
           coordinationScore: e.coordinationScore,
@@ -238,6 +245,7 @@ export async function GET(request: Request) {
 
       return {
         studentKey: g.studentKey,
+        stage: g.stage,
         studentName: g.studentName,
         username: g.username,
         olympiadCode: g.olympiadCode,

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, Star, Loader2, Calendar, Pencil, Lock, Unlock, ChevronDown, ChevronUp, User, School } from 'lucide-react';
-import { KOSH_LABELS, KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, KOSH_MAX_SCORE, type KoshKey, type KoshGrade } from '@/lib/kosh';
+import { KOSH_LABELS, KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, KOSH_MAX_SCORE, criterionLabelFor, type KoshKey, type KoshGrade } from '@/lib/kosh';
 
 interface EvaluationRecord {
   id: string;
@@ -43,6 +43,8 @@ interface KoshBreakdownEntry {
 
 interface StudentHistory {
   studentKey: string;
+  /** 'STATE' for a student's State Level video (its own row), else null. */
+  stage?: string | null;
   studentName: string;
   username: string | null;
   olympiadCode: string;
@@ -265,9 +267,10 @@ export default function EvaluationHistoryPage() {
                       {hideIdentity ? s.olympiadCode.slice(-2).toUpperCase() : s.studentName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      {!hideIdentity && (
-                        <p className="font-semibold text-[15px] text-gray-900 truncate tracking-tight">{s.studentName}</p>
-                      )}
+                      <p className="font-semibold text-[15px] text-gray-900 truncate tracking-tight">
+                        {s.studentName}
+                        {s.stage === 'STATE' && <span className="ml-2 align-middle text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">State Level</span>}
+                      </p>
                       <div className="flex items-center gap-2 text-[11.5px] text-gray-500 mt-0.5">
                         <span className="font-mono font-semibold text-[#004f9f] bg-[#004f9f]/[0.06] px-1.5 py-0.5 rounded-md">{s.olympiadCode}</span>
                         {!hideIdentity && s.schoolName && (
@@ -302,7 +305,8 @@ export default function EvaluationHistoryPage() {
                 {/* Expanded detail — per-kosha grades + each video's 5 criteria */}
                 {isOpen && (
                   <div className="border-t border-gray-100 bg-gray-50/40 p-5 space-y-4">
-                    {/* Kosh grade summary (V1 + V2 sums, banded) */}
+                    {/* Kosh grade summary (V1 + V2 sums, banded) — Olympiad videos only */}
+                    {s.stage !== 'STATE' && (
                     <div className="bg-white border border-gray-100 rounded-xl p-4">
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2.5">Kosh Grades (both videos, /{KOSH_MAX_SCORE} each)</p>
                       <div className="flex flex-wrap gap-2">
@@ -323,6 +327,7 @@ export default function EvaluationHistoryPage() {
                         <p className="text-[10px] text-amber-600 font-semibold mt-2">Grades finalize once both videos are scored.</p>
                       )}
                     </div>
+                    )}
 
                     {s.videos.map(v => {
                       const slot = Math.min(Math.max(v.slot, 0), 1);
@@ -332,7 +337,7 @@ export default function EvaluationHistoryPage() {
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
                               <User size={13} className="text-gray-400" />
-                              <span className="text-xs font-bold text-gray-700">Video {v.slot + 1}</span>
+                              <span className="text-xs font-bold text-gray-700">{s.stage === 'STATE' ? 'State Level video' : `Video ${v.slot + 1}`}</span>
                               {v.category && <span className="text-[10px] font-semibold bg-blue-50 text-[#004f9f] px-2 py-0.5 rounded-full">{v.category}</span>}
                               {v.subCategory && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{v.subCategory}</span>}
                             </div>
@@ -354,7 +359,7 @@ export default function EvaluationHistoryPage() {
                                   return (
                                     <div key={c.key} className="space-y-1">
                                       <div className="flex items-center justify-between text-[10.5px] font-semibold text-gray-700">
-                                        <span>{c.labelBySlot[slot]} <span className="text-[9px] text-[#004f9f] font-bold uppercase">· {KOSH_LABELS[c.kosh]}</span></span>
+                                        <span>{criterionLabelFor(c, slot, s.stage === 'STATE')} <span className="text-[9px] text-[#004f9f] font-bold uppercase">· {KOSH_LABELS[c.kosh]}</span></span>
                                         <span className="font-bold text-[#004f9f]">{score}/{MAX_PER_CRITERION}</span>
                                       </div>
                                       <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">

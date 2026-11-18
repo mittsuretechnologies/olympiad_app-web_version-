@@ -1,5 +1,5 @@
 import { prisma } from '@/lib/prisma';
-import { isSlot, type CategoryDTO } from '@/lib/uploadCategoryShared';
+import { isNormalCategory, type CategoryDTO } from '@/lib/uploadCategoryShared';
 
 // The order of everything on the app's Home screen, managed in dashboard →
 // Upload Categories → Home Screen. One list: the normal categories (rows; their
@@ -47,7 +47,7 @@ export async function loadHomeLayout(categories: CategoryDTO[]): Promise<HomeLay
       key: s.key, label: s.label, kind: 'section' as const,
       visible: saved.get(s.key)?.visible ?? true, sortOrder: rank(s.key, 0),
     })),
-    ...categories.filter((c) => !isSlot(c)).map((c) => ({
+    ...categories.filter(isNormalCategory).map((c) => ({
       key: catKey(c), label: c.label, kind: 'category' as const,
       visible: c.showOnHome, sortOrder: rank(catKey(c), c.homeSortOrder),
       curated: c.key === 'learning' || c.key === 'parenting',
@@ -58,7 +58,7 @@ export async function loadHomeLayout(categories: CategoryDTO[]): Promise<HomeLay
 
 /** Saves the whole order (keys, top to bottom). Unknown keys are ignored. */
 export async function saveHomeOrder(keys: string[], categories: CategoryDTO[]): Promise<void> {
-  const valid = new Set([...SYSTEM_SECTIONS.map((s) => s.key as string), ...categories.filter((c) => !isSlot(c)).map(catKey)]);
+  const valid = new Set([...SYSTEM_SECTIONS.map((s) => s.key as string), ...categories.filter(isNormalCategory).map(catKey)]);
   const ordered = keys.filter((k) => valid.has(k));
   const byKey = new Map(categories.map((c) => [catKey(c), c]));
   await prisma.$transaction([

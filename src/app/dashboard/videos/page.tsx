@@ -40,6 +40,8 @@ interface Video {
   createdAt: string;
   deletedAt: string | null;
   uploaderType: string | null;
+  /** 'STATE' for a State Level competition video, else null. */
+  competitionStage?: string | null;
   /** Live review claim by a moderator (see lib/videoClaim.ts). */
   claimedById?: string | null;
   claimedByName?: string | null;
@@ -168,11 +170,13 @@ function getCategoryLabel(cat: string, opts: { a: string[]; b: string[] }) {
 }
 
 /** The uploader as the category lists see it (lib/uploadCategoryShared → videoAudiences). */
-function uploaderOf(video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'appUser'>) {
+function uploaderOf(video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'appUser' | 'competitionStage'>) {
   const known = video.uploaderType === 'SCHOOL_OWN' && video.appUser?.isOlympiadSchool !== undefined;
   return {
     isEvaluation: video.isEvaluation,
     uploaderType: video.uploaderType,
+    // A State Level video only moves within the State Level category.
+    competitionStage: video.competitionStage ?? null,
     schoolKind: known ? (video.appUser!.isOlympiadSchool ? 'OLYMPIAD' as const : 'GENERAL' as const) : null,
   };
 }
@@ -190,7 +194,7 @@ function homeSectionBadge(category: string | null) {
 // values instead of the display labels, and some have no usable category at all
 // — fall back to deriving it from the subcategory so the select is never blank.
 function normalizeCat(
-  video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'appUser' | 'category' | 'subCategory'>,
+  video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'appUser' | 'competitionStage' | 'category' | 'subCategory'>,
   categories?: CategoryDTO[] | null,
 ): string {
   return currentGroupLabel({ ...uploaderOf(video), category: video.category, subCategory: video.subCategory }, categories);
@@ -302,7 +306,7 @@ export default function VideoModerationPage() {
   // vs General (neither) — a video can't be both, since jury videos don't set
   // isMittfest. Client-side only, like search, since it's a cheap boolean split
   // of the already-fetched per-status page.
-  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'GENERAL'>('ALL');
+  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'STATE' | 'GENERAL'>('ALL');
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
@@ -367,7 +371,8 @@ export default function VideoModerationPage() {
 
     if (contentFilter === 'MITTFEST') allVideos = allVideos.filter(v => v.isMittfest);
     else if (contentFilter === 'OLYMPIAD') allVideos = allVideos.filter(v => v.isEvaluation);
-    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation);
+    else if (contentFilter === 'STATE') allVideos = allVideos.filter(v => v.competitionStage === 'STATE');
+    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation && v.competitionStage !== 'STATE');
 
     // Videos someone else is reviewing go to the end of the pending queue, so
     // each moderator naturally picks up a different one.
@@ -845,6 +850,7 @@ export default function VideoModerationPage() {
           { value: 'ALL',      label: 'All' },
           { value: 'MITTFEST', label: 'MittFest' },
           { value: 'OLYMPIAD', label: 'Olympiad' },
+          { value: 'STATE',    label: 'State Level' },
           { value: 'GENERAL',  label: 'General' },
         ] as const).map(opt => (
           <button
@@ -1081,6 +1087,11 @@ export default function VideoModerationPage() {
                       {video.isEvaluation && (
                         <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-700 bg-amber-400 px-2 py-0.5 rounded-full shadow">
                           <Award size={9} /> Olympiad
+                        </span>
+                      )}
+                      {video.competitionStage === 'STATE' && (
+                        <span className="flex items-center gap-0.5 text-[10px] font-black text-white bg-[#B8860B] px-2 py-0.5 rounded-full shadow">
+                          <Award size={9} /> State Level
                         </span>
                       )}
                       {(() => { const hb = homeSectionBadge(video.category); return hb ? (
@@ -1357,6 +1368,11 @@ export default function VideoModerationPage() {
                   {previewVideo.isEvaluation && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
                       <Award size={10} /> Olympiad
+                    </span>
+                  )}
+                  {previewVideo.competitionStage === 'STATE' && (
+                    <span className="flex items-center gap-1 text-[10px] font-black bg-[#B8860B] text-white px-2 py-1 rounded-full">
+                      <Award size={10} /> State Level
                     </span>
                   )}
                   {(() => { const hb = homeSectionBadge(previewVideo.category); return hb ? (

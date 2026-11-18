@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { Video as VideoIcon, User, School, CheckCircle, X, Star, Loader2, LayoutGrid } from 'lucide-react';
-import { KOSH_LABELS, KOSH_CRITERIA, criterionRubric, MAX_PER_CRITERION, VIDEO_MAX_SCORE, type CriterionKey } from '@/lib/kosh';
+import { KOSH_LABELS, KOSH_CRITERIA, criterionLabelFor, criterionRubricFor, MAX_PER_CRITERION, VIDEO_MAX_SCORE, type CriterionKey } from '@/lib/kosh';
 
 interface ExistingScore {
   coordinationScore: number;
@@ -27,6 +27,8 @@ interface QueueVideo {
   schoolName: string | null;
   slot: number;
   ownerKey: string;
+  /** 'STATE' for a State Level competition video (its own card, one video). */
+  stage?: string | null;
   existingScore: ExistingScore | null;
   isFullyScored?: boolean;
   isFullyPublished?: boolean;
@@ -143,12 +145,13 @@ export default function EvaluateContentPage() {
   // Group the queue into one card per student, with videos placed by slot
   // (Video 1 left, Video 2 right) regardless of queue order.
   const students = useMemo(() => {
-    const map = new Map<string, { ownerKey: string; studentName: string; olympiadCode: string; schoolName: string | null; slots: (QueueVideo | undefined)[] }>();
+    const map = new Map<string, { ownerKey: string; studentName: string; olympiadCode: string; schoolName: string | null; isState: boolean; slots: (QueueVideo | undefined)[] }>();
     for (const v of queue) {
       if (!map.has(v.ownerKey)) {
-        map.set(v.ownerKey, { ownerKey: v.ownerKey, studentName: v.studentName, olympiadCode: v.olympiadCode, schoolName: v.schoolName, slots: [undefined, undefined] });
+        const isState = v.stage === 'STATE';
+        map.set(v.ownerKey, { ownerKey: v.ownerKey, studentName: v.studentName, olympiadCode: v.olympiadCode, schoolName: v.schoolName, isState, slots: isState ? [undefined] : [undefined, undefined] });
       }
-      map.get(v.ownerKey)!.slots[Math.min(Math.max(v.slot, 0), 1)] = v;
+      map.get(v.ownerKey)!.slots[v.stage === 'STATE' ? 0 : Math.min(Math.max(v.slot, 0), 1)] = v;
     }
     return Array.from(map.values());
   }, [queue]);
@@ -201,6 +204,8 @@ export default function EvaluateContentPage() {
   };
 
   const activeSlot = Math.min(Math.max(active?.slot ?? 0, 0), 1);
+  const activeIsState = active?.stage === 'STATE';
+  const videoTitle = (v: QueueVideo, slot: number) => (v.stage === 'STATE' ? 'State Level video' : `Video ${slot + 1}`);
 
   return (
     <div className="space-y-6">
@@ -256,14 +261,9 @@ export default function EvaluateContentPage() {
                 <div className="px-4 pt-3 pb-2">
                   <div className="flex items-center gap-1.5 text-sm font-bold text-gray-800 truncate">
                     <User className="w-3.5 h-3.5 flex-shrink-0 text-[#004f9f]" />
-                    {hideIdentity ? (
-                      <span className="truncate">{s.olympiadCode}</span>
-                    ) : (
-                      <>
-                        <span className="truncate">{s.studentName}</span>
-                        <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
-                      </>
-                    )}
+                    <span className="truncate">{s.studentName}</span>
+                    <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
+                    {s.isState && <span className="ml-auto flex-shrink-0 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">State Level</span>}
                   </div>
                   {!hideIdentity && s.schoolName && (
                     <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-400 truncate">
@@ -271,8 +271,8 @@ export default function EvaluateContentPage() {
                     </div>
                   )}
                 </div>
-                <div className="grid grid-cols-2 gap-3 p-3 pt-1">
-                  {[0, 1].map(slot => {
+                <div className={`grid ${s.isState ? 'grid-cols-1' : 'grid-cols-2'} gap-3 p-3 pt-1`}>
+                  {s.slots.map((_, slot) => {
                     const v = s.slots[slot];
                     if (!v) {
                       return (
@@ -292,7 +292,7 @@ export default function EvaluateContentPage() {
                             <VideoIcon className="w-8 h-8 text-white/40" />
                           )}
                           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors" />
-                          <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-white/80 text-gray-700 px-2 py-0.5 rounded-full">Video {slot + 1}</span>
+                          <span className="absolute top-1.5 left-1.5 text-[10px] font-bold bg-white/80 text-gray-700 px-2 py-0.5 rounded-full">{videoTitle(v, slot)}</span>
                           <span className={`absolute top-1.5 right-1.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${v.isFullyScored ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
                             {v.isFullyScored ? 'Scored' : 'Pending'}
                           </span>
@@ -317,8 +317,8 @@ export default function EvaluateContentPage() {
           <div className={`rounded-2xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-y-auto ${activeColor}`} onClick={e => e.stopPropagation()}>
             <div className={`flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 z-10 ${HEADER_COLORS[activeColor] || activeColor}`}>
               <div>
-                <h2 className="text-base font-bold text-gray-800">{hideIdentity ? active.olympiadCode : `${active.studentName} — ${active.olympiadCode}`}</h2>
-                <p className="text-xs text-gray-400">{active.category} · {active.subCategory} · Video {active.slot + 1}</p>
+                <h2 className="text-base font-bold text-gray-800">{active.studentName} — {active.olympiadCode}</h2>
+                <p className="text-xs text-gray-400">{active.category} · {active.subCategory} · {videoTitle(active, active.slot)}</p>
               </div>
               <button onClick={() => setActive(null)} className="text-gray-300 hover:text-gray-500 p-1">
                 <X className="w-5 h-5" />
@@ -333,7 +333,7 @@ export default function EvaluateContentPage() {
                 </div>
                 {active.caption && <p className="text-sm text-gray-500 mt-3">{active.caption}</p>}
 
-                {/* Each criterion feeds its own kosha (0-4 per video, both videos sum to /8 per kosha) */}
+                {/* Each criterion feeds its own kosha (0-4 per video; an Olympiad student's two videos sum to /8 per kosha) */}
                 <div className="mt-3 flex items-center gap-2 flex-wrap">
                   {KOSH_CRITERIA.map(c => (
                     <span key={c.kosh} className="inline-flex items-center gap-1.5 text-[11px] font-bold bg-[#F6F9FF] text-[#004f9f] pl-2.5 pr-1 py-1 rounded-full border border-blue-100">
@@ -358,13 +358,13 @@ export default function EvaluateContentPage() {
                 )}
                 <fieldset disabled={!canScore || active.isFullyPublished} className="space-y-5 disabled:opacity-60">
                   {KOSH_CRITERIA.map(c => {
-                    const rubric = criterionRubric(c, activeSlot);
+                    const rubric = criterionRubricFor(c, activeSlot, activeIsState);
                     const val = scores[c.key];
                     return (
                       <div key={c.key}>
                         <div className="flex items-start justify-between mb-1.5 gap-3">
                           <div className="min-w-0">
-                            <label className="text-sm font-semibold text-gray-700">{c.labelBySlot[activeSlot]}</label>
+                            <label className="text-sm font-semibold text-gray-700">{criterionLabelFor(c, activeSlot, activeIsState)}</label>
                             <p className="text-[10px] font-bold text-[#004f9f] uppercase tracking-wide">{KOSH_LABELS[c.kosh]}</p>
                             <p className="text-[11px] text-gray-400 mt-0.5 leading-snug">{c.hint}</p>
                           </div>

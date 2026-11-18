@@ -6,7 +6,7 @@ import {
   UploadCloud, ChevronUp, ChevronDown, Eye, EyeOff, LayoutGrid, Flame, Shuffle, ListOrdered,
 } from 'lucide-react';
 import {
-  AUDIENCE_LABELS, NORMAL_AUDIENCES, browseGroups, categoryNames, isSlot,
+  AUDIENCE_LABELS, NORMAL_AUDIENCES, browseGroups, categoryNames, isNormalCategory, isSlot, isStateCategory,
   type Audience, type BrowseGroup, type CategoryDTO,
 } from '@/lib/uploadCategoryShared';
 import { IONICON_NAMES, IONICON_VERSION } from '@/lib/ioniconNames';
@@ -21,10 +21,11 @@ import {
 // Home screens. Read side: src/lib/uploadCategories.ts; rules on saving:
 // src/lib/uploadCategoriesAdmin.ts.
 
-type Tab = Audience | 'SEARCH' | 'HOME';
+type Tab = Audience | 'STATE' | 'SEARCH' | 'HOME';
 const TABS: { key: Tab; label: string }[] = [
   { key: 'NORMAL', label: 'General User' },
   { key: 'OLYMPIAD_STUDENT', label: 'Olympiad Student' },
+  { key: 'STATE', label: 'State Level' },
   { key: 'GENERAL_SCHOOL', label: 'General School' },
   { key: 'OLYMPIAD_SCHOOL', label: 'Olympiad School' },
   { key: 'SEARCH', label: 'Search Screen' },
@@ -302,7 +303,7 @@ export default function UploadCategoriesPage() {
             Changes reach the app within a minute.
           </p>
         </div>
-        {tab !== 'OLYMPIAD_STUDENT' && (
+        {tab !== 'OLYMPIAD_STUDENT' && tab !== 'STATE' && (
           <button
             onClick={() => setDraft(blankDraft(tab === 'SEARCH' || tab === 'HOME' ? null : tab))}
             className="inline-flex items-center gap-2 bg-[#004f9f] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#003d7a] transition-colors"
@@ -330,7 +331,7 @@ export default function UploadCategoriesPage() {
       ) : loadError ? (
         <div className="py-16 flex flex-col items-center gap-2 text-red-500 text-sm"><AlertCircle size={18} /> {loadError}</div>
       ) : tab === 'SEARCH' ? (
-        <SearchList items={bySearch.filter((c) => !isSlot(c))} slots={byUpload.filter(isSlot)} groups={groups}
+        <SearchList items={bySearch.filter(isNormalCategory)} slots={byUpload.filter(isSlot)} groups={groups}
           counts={browseCounts} onToggle={(c, v) => setFlag(c, 'showInSearch', v)}
           onEdit={(c) => setDraft(toDraft(c))} onOrder={(ids) => saveOrder('search', ids)} />
       ) : tab === 'HOME' ? (
@@ -354,10 +355,13 @@ export default function UploadCategoriesPage() {
         </>
       ) : tab === 'OLYMPIAD_STUDENT' ? (
         <SlotList items={byUpload.filter(isSlot)} countFor={countFor} onEdit={(c) => setDraft(toDraft(c))} />
+      ) : tab === 'STATE' ? (
+        <StateList items={byUpload.filter(isStateCategory)} countFor={countFor}
+          onEdit={(c) => setDraft(toDraft(c))} onToggleOpen={(c, v) => setFlag(c, 'isActive', v)} />
       ) : (
         <AudienceList
           audience={tab}
-          items={byUpload.filter((c) => !isSlot(c) && c.audiences.includes(tab))}
+          items={byUpload.filter((c) => isNormalCategory(c) && c.audiences.includes(tab))}
           countFor={countFor}
           onEdit={(c) => setDraft(toDraft(c))}
           onToggleOpen={(c, v) => setFlag(c, 'isActive', v)}
@@ -502,6 +506,36 @@ function SlotList({ items, countFor, onEdit }: { items: CategoryDTO[]; countFor:
               <p className="text-[11px] text-gray-400 mt-0.5">{subSummary(c)} · {videos(countFor(categoryNames(c)))} named &quot;{c.label}&quot;</p>
             </div>
             <IconBtn onClick={() => onEdit(c)} title="Edit options"><Pencil size={13} /></IconBtn>
+          </div>
+        ))}
+      </Panel>
+    </>
+  );
+}
+
+function StateList({ items, countFor, onEdit, onToggleOpen }: {
+  items: CategoryDTO[]; countFor: (n: string[]) => number;
+  onEdit: (c: CategoryDTO) => void; onToggleOpen: (c: CategoryDTO, v: boolean) => void;
+}) {
+  return (
+    <>
+      <Note>
+        <p>The State Level competition category. Only students forwarded from Result → State Level see it in the app, and each can upload <strong>one</strong> video into it.</p>
+        <p>Its videos are moderated and evaluated like Olympiad videos and make up the State Level result; they never count in the Olympiad result. Close it to stop new State Level uploads.</p>
+      </Note>
+      <Panel empty={items.length ? undefined : 'State Level category not found. It is added automatically the next time this page loads.'}>
+        {items.map((c) => (
+          <div key={c.id} className="flex items-center gap-3 px-4 py-3">
+            <CategoryTile c={c} />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+                {c.label} <Badge tone="amber">State Level</Badge>
+                {c.isActive ? <Badge tone="green">Open</Badge> : <Badge tone="gray">Closed</Badge>}
+              </p>
+              <p className="text-[11px] text-gray-400 mt-0.5">{subSummary(c)} · {videos(countFor(categoryNames(c)))} named &quot;{c.label}&quot;</p>
+            </div>
+            <Toggle on={c.isActive} onChange={(v) => onToggleOpen(c, v)} title={c.isActive ? 'Close for uploads' : 'Open for uploads'} />
+            <IconBtn onClick={() => onEdit(c)} title="Edit"><Pencil size={13} /></IconBtn>
           </div>
         ))}
       </Panel>
@@ -818,7 +852,8 @@ function Editor({ draft, setDraft, classLetters, knownNames, onClose, onSaved }:
   draft: Draft; setDraft: (d: Draft) => void; classLetters: string[]; knownNames: string[];
   onClose: () => void; onSaved: () => Promise<void>;
 }) {
-  const slot = draft.slotKind !== 'NONE';
+  const slot = draft.slotKind === 'OLY_A' || draft.slotKind === 'OLY_B';
+  const state = draft.slotKind === 'STATE';
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState('');
@@ -874,7 +909,7 @@ function Editor({ draft, setDraft, classLetters, knownNames, onClose, onSaved }:
         <div className="bg-[#004f9f] px-5 py-4 flex items-center justify-between">
           <div>
             <p className="text-[10px] font-bold uppercase tracking-widest text-white/50">
-              {draft.id ? (slot ? 'Olympiad category' : 'Edit category') : 'New category'}
+              {draft.id ? (slot ? 'Olympiad category' : state ? 'State Level category' : 'Edit category') : 'New category'}
             </p>
             <p className="text-white font-bold text-sm mt-0.5">{draft.label || 'Untitled'}</p>
           </div>
@@ -910,7 +945,15 @@ function Editor({ draft, setDraft, classLetters, knownNames, onClose, onSaved }:
           </Section>
 
           <Section title="Who can upload into it">
-            {slot ? (
+            {state ? (
+              <>
+                <p className="text-xs text-gray-600">Only students forwarded to the State Level (Result → State Level), one video each.</p>
+                <label className="flex items-center gap-2 text-sm text-gray-700">
+                  <Toggle on={draft.isActive} onChange={(v) => set({ isActive: v })} />
+                  {draft.isActive ? 'Open for State Level uploads' : 'Closed for uploads'}
+                </label>
+              </>
+            ) : slot ? (
               <p className="text-xs text-gray-600">Olympiad students (their Olympiad video for slot {draft.slotKind === 'OLY_A' ? 'A' : 'B'}), and Olympiad schools uploading for a student. Always open.</p>
             ) : (
               <>
@@ -981,7 +1024,11 @@ function Editor({ draft, setDraft, classLetters, knownNames, onClose, onSaved }:
               className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#004f9f] hover:underline"><Plus size={13} /> Add option</button>
           </Section>
 
-          {slot ? (
+          {state ? (
+            <Section title="Search and Home screens" icon={<Search size={11} />}>
+              <p className="text-xs text-gray-600">No card on Search and no row on Home: it is a competition category.</p>
+            </Section>
+          ) : slot ? (
             <Section title="Search and Home screens" icon={<Search size={11} />}>
               <p className="text-xs text-gray-600">
                 No card or row of its own: its videos show inside the normal categories that carry the name

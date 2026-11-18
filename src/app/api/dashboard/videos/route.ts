@@ -570,6 +570,7 @@ export async function POST(request: Request) {
       where: { id: videoId },
       select: {
         status: true, rejectionReason: true, quality: true, isEvaluation: true, uploaderType: true, appUserId: true, uploadedBySchoolId: true,
+        competitionStage: true,
         caption: true, category: true, subCategory: true, isPublic: true, olympiadVisibility: true, tags: true,
         _count: { select: { evaluations: true } },
       },
@@ -620,6 +621,8 @@ export async function POST(request: Request) {
       const uploader = {
         isEvaluation: false,
         uploaderType: before.uploaderType,
+        // A State Level video stays in the State Level category.
+        competitionStage: before.competitionStage,
         schoolKind: before.uploaderType === 'SCHOOL_OWN' && before.appUserId ? await schoolKindOf(before.appUserId) : null,
       };
       const targetCategory = categoryChanged ? newCategory : currentGroupLabel({ ...before, ...uploader }, categories);
