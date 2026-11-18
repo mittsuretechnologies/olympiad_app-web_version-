@@ -330,7 +330,7 @@ export default function VideoModerationPage() {
   // single-video: bulk-approve doesn't exist, since quality is necessarily a
   // per-video judgment call (see the API route, which also rejects a bulk
   // APPROVED call as defense in depth).
-  const [approveModal,  setApproveModal]  = useState<{ video: Video; subCategoryOverride?: string } | null>(null);
+  const [approveModal,  setApproveModal]  = useState<{ video: Video; subCategoryOverride?: string; categoryOverride?: string } | null>(null);
   const [approveQuality, setApproveQuality] = useState<'HIGH' | 'MEDIUM' | 'LOW' | null>(null);
   const [deleteModal,  setDeleteModal]  = useState<{ ids: string[] } | null>(null);
 
@@ -479,7 +479,9 @@ export default function VideoModerationPage() {
     }
   };
 
-  const approve = async (video: Video, quality: 'HIGH' | 'MEDIUM' | 'LOW', subCategoryOverride?: string) => {
+  const approve = async (
+    video: Video, quality: 'HIGH' | 'MEDIUM' | 'LOW', subCategoryOverride?: string, categoryOverride?: string,
+  ) => {
     setProcessingId(video.id);
     try {
       const res = await fetch('/api/dashboard/videos', {
@@ -491,6 +493,9 @@ export default function VideoModerationPage() {
           quality,
           expectedStatus: video.status,
           ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
+          // Without this the server checks the new option against the video's
+          // old main category (e.g. a Rhymes option under "Others") and refuses.
+          ...(categoryOverride ? { category: categoryOverride } : {}),
         }),
       });
       if (res.ok) {
@@ -670,15 +675,15 @@ export default function VideoModerationPage() {
     setRejectModal({ video: null, bulk: true });
   };
 
-  const openApproveModal = async (video: Video, subCategoryOverride?: string) => {
+  const openApproveModal = async (video: Video, subCategoryOverride?: string, categoryOverride?: string) => {
     if (!(await claimVideo(video))) return;
     setApproveQuality(null);
-    setApproveModal({ video, subCategoryOverride });
+    setApproveModal({ video, subCategoryOverride, categoryOverride });
   };
 
   const confirmApprove = async () => {
     if (!approveModal || !approveQuality) return;
-    await approve(approveModal.video, approveQuality, approveModal.subCategoryOverride);
+    await approve(approveModal.video, approveQuality, approveModal.subCategoryOverride, approveModal.categoryOverride);
     setApproveModal(null);
     setApproveQuality(null);
   };
@@ -1589,7 +1594,13 @@ export default function VideoModerationPage() {
               <div className="flex gap-2 pt-1">
                 {filter === 'PENDING' && (
                   <>
-                    <button onClick={() => openApproveModal(previewVideo, editedSubCat !== previewVideo.subCategory ? editedSubCat : undefined)} disabled={processingId === previewVideo.id}
+                    <button onClick={() => openApproveModal(
+                        previewVideo,
+                        editedSubCat !== previewVideo.subCategory ? editedSubCat : undefined,
+                        // Compared with the dropdown's starting value, so an untouched
+                        // legacy name ("Cat A") isn't sent as a change.
+                        editedCat !== normalizeCat(previewVideo, managedCategories) ? editedCat : undefined,
+                      )} disabled={processingId === previewVideo.id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
                       <CheckCircle size={14} /> Approve
                     </button>
