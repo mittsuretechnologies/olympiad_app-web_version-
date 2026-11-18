@@ -107,8 +107,16 @@ export default function EvaluationHistoryPage() {
   const [currentEvaluatorId, setCurrentEvaluatorId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
 
+  // Real evaluators see only the Olympiad ID (no student/school name or username).
+  const [hideIdentity, setHideIdentity] = useState(true);
+
   useEffect(() => {
     setIsSuperAdmin(!!sessionStorage.getItem('token'));
+    setHideIdentity(
+      !!sessionStorage.getItem('evaluatorToken') &&
+      !sessionStorage.getItem('token') &&
+      !sessionStorage.getItem('reviewerToken'),
+    );
     try {
       const evaluatorData = sessionStorage.getItem('evaluatorData');
       if (evaluatorData) setCurrentEvaluatorId(JSON.parse(evaluatorData).id);
@@ -165,11 +173,12 @@ export default function EvaluationHistoryPage() {
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
-      const matchesSearch =
-        s.studentName.toLowerCase().includes(search.toLowerCase()) ||
-        (s.username || '').toLowerCase().includes(search.toLowerCase()) ||
-        s.olympiadCode.toLowerCase().includes(search.toLowerCase()) ||
-        (s.schoolName || '').toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = hideIdentity
+        ? s.olympiadCode.toLowerCase().includes(search.toLowerCase())
+        : s.studentName.toLowerCase().includes(search.toLowerCase()) ||
+          (s.username || '').toLowerCase().includes(search.toLowerCase()) ||
+          s.olympiadCode.toLowerCase().includes(search.toLowerCase()) ||
+          (s.schoolName || '').toLowerCase().includes(search.toLowerCase());
 
       const matchesCategory = !categoryFilter || s.videos.some(v => v.category === categoryFilter);
 
@@ -179,7 +188,7 @@ export default function EvaluationHistoryPage() {
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [students, search, categoryFilter, statusFilter]);
+  }, [students, search, categoryFilter, statusFilter, hideIdentity]);
 
   return (
     <div className="space-y-6">
@@ -194,7 +203,7 @@ export default function EvaluationHistoryPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search student, code, school..."
+            placeholder={hideIdentity ? 'Search Olympiad ID...' : 'Search student, code, school...'}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#004f9f] focus:ring-2 focus:ring-[#004f9f]/10"
@@ -255,7 +264,7 @@ export default function EvaluationHistoryPage() {
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
                     <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${theme.avatar} text-white text-sm font-bold flex items-center justify-center flex-shrink-0 shadow-sm ring-1 ring-black/5`}>
-                      {s.studentName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                      {hideIdentity ? s.olympiadCode.slice(-2).toUpperCase() : s.studentName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
                     </div>
                     <div className="min-w-0">
                       <p className="font-semibold text-[15px] text-gray-900 truncate tracking-tight">
@@ -264,7 +273,7 @@ export default function EvaluationHistoryPage() {
                       </p>
                       <div className="flex items-center gap-2 text-[11.5px] text-gray-500 mt-0.5">
                         <span className="font-mono font-semibold text-[#004f9f] bg-[#004f9f]/[0.06] px-1.5 py-0.5 rounded-md">{s.olympiadCode}</span>
-                        {s.schoolName && (
+                        {!hideIdentity && s.schoolName && (
                           <>
                             <span className="text-gray-300">•</span>
                             <span className="flex items-center gap-1 truncate text-gray-500"><School size={11} className="text-gray-400 flex-shrink-0" /> {s.schoolName}</span>

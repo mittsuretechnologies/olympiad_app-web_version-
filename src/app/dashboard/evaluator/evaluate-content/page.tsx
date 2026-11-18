@@ -79,8 +79,16 @@ export default function EvaluateContentPage() {
 
   // Both TalentEvaluator and SuperAdmin accounts can submit scores.
   const [canScore, setCanScore] = useState(false);
+  // Real evaluators are blind: they see only the Olympiad ID (no student or
+  // school name). SuperAdmin / MasterAdmin / Reviewer still see everything.
+  const [hideIdentity, setHideIdentity] = useState(true);
   useEffect(() => {
     setCanScore(!!sessionStorage.getItem('evaluatorToken') || !!sessionStorage.getItem('token'));
+    setHideIdentity(
+      !!sessionStorage.getItem('evaluatorToken') &&
+      !sessionStorage.getItem('token') &&
+      !sessionStorage.getItem('reviewerToken'),
+    );
   }, []);
 
   const fetchQueue = () => {
@@ -257,7 +265,7 @@ export default function EvaluateContentPage() {
                     <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
                     {s.isState && <span className="ml-auto flex-shrink-0 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">State Level</span>}
                   </div>
-                  {s.schoolName && (
+                  {!hideIdentity && s.schoolName && (
                     <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-400 truncate">
                       <School className="w-3 h-3 flex-shrink-0" /> <span className="truncate">{s.schoolName}</span>
                     </div>
