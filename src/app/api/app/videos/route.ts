@@ -11,7 +11,7 @@ import { ACCOUNT_TYPE_SCHOOL, UPLOADER_SCHOOL_OWN } from '@/lib/generalSchool';
 import { getSchoolIdentity } from '@/lib/schoolAccount';
 import { checkOlympiadCategory, checkUploadCategory, loadCategoriesSafe } from '@/lib/uploadCategories';
 import { olympiadSlotOf } from '@/lib/olympiadSlots';
-import { STATE_STAGE, checkStateUpload, isStateCategoryName, stateCategory } from '@/lib/stateCompetition';
+import { type CompetitionStage, checkStateUpload, isCompetitionCategoryName } from '@/lib/stateCompetition';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -96,15 +96,18 @@ export async function POST(request: Request) {
         || user?.olympiadId
         || null;
 
-    // A State Level video (lib/stateCompetition.ts): flagged by the app, or sent
-    // into the State Level category by name. Only a student forwarded to the
-    // State Level — matched by the Olympiad ID saved on their account, never one
-    // typed into this request — and only one video each.
+    // A State / National Level video (lib/stateCompetition.ts): flagged by the
+    // app ("isStateLevel" covers both), or sent into either category by name.
+    // Only a student forwarded to that level — matched by the Olympiad ID saved
+    // on their account, never one typed into this request — and only one video
+    // each. The stage stored is the student's current one.
     const isStateUpload = !isSchoolAccount
-      && (isStateLevel === true || isStateCategoryName(await stateCategory(), category));
+      && (isStateLevel === true || await isCompetitionCategoryName(category));
+    let competitionStage: CompetitionStage | null = null;
     if (isStateUpload) {
-      const problem = await checkStateUpload(appUser.id, user?.olympiadId, category, subCategory);
-      if (problem) return NextResponse.json({ error: problem.error }, { status: problem.status });
+      const checked = await checkStateUpload(appUser.id, user?.olympiadId, category, subCategory);
+      if (checked.error !== undefined) return NextResponse.json({ error: checked.error }, { status: checked.status });
+      competitionStage = checked.stage;
     } else if (!isSchoolAccount) {
       // An Olympiad video goes into one of the two Olympiad categories, with an
       // option offered to the student's class (the class letter is part of the
@@ -203,7 +206,7 @@ export async function POST(request: Request) {
       [
         ...schoolAutoTags,
         finalIsEvaluation ? mainCategoryTag(category, subCategory) : null,
-        isStateUpload ? 'StateLevel' : null,
+        competitionStage === 'NATIONAL' ? 'NationalLevel' : isStateUpload ? 'StateLevel' : null,
       ],
       userTags,
     );
@@ -231,7 +234,7 @@ export async function POST(request: Request) {
         olympiadVisibility: finalIsEvaluation
           ? (olympiadVisibility === 'private' ? 'private' : 'public')
           : null,
-        competitionStage: isStateUpload ? STATE_STAGE : null,
+        competitionStage,
         status: 'PENDING',
       },
     });

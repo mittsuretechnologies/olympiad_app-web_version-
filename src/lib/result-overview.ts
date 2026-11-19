@@ -245,9 +245,20 @@ export async function getResultOverview(schoolCode: string, examSource: ExamSour
           : (exam.manualTotalScore !== null && exam.manualMaxScore ? Math.round((exam.manualTotalScore / exam.manualMaxScore) * 1000) / 10 : null))
       : null;
 
+    // The exam counts as done only once a sheet with questions is scanned and,
+    // on reviewer (Manual) marks, every one of its questions has been reviewed:
+    // a partly reviewed sheet's manual % comes from just the reviewed questions.
+    const examReady = !!exam && exam.questions.length > 0
+      && (examSource === 'ai' || exam.manualQuestionCount === exam.questions.length);
+
     return {
       ...g,
       examSource,
+      examReady,
+      // Who may be ranked (school / district toppers, State Level forwarding):
+      // both videos' marks published AND the exam done. `status` stays
+      // videos-only so the passport pages behave as before.
+      rankEligible: videosReady && examReady && holisticPercent !== null,
       examPercentage,
       examTotalScore: exam?.totalScore ?? null,
       examMaxScore: exam?.maxTotalScore ?? null,

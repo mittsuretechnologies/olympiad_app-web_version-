@@ -22,7 +22,20 @@ interface Row {
   forwardedExamSource: 'manual' | 'ai' | null;
   outOfPool: boolean;
 }
-interface Response { topN: number; examSource: 'manual' | 'ai'; topPercents: number[]; tableReady: boolean; students: Row[] }
+interface DistrictRow { key: string; district: string; state: string | null; eligible: number; topPercents: number[]; inPool: number }
+interface Response {
+  topN: number;
+  examSource: 'manual' | 'ai';
+  /** Exam marks the existing forwards were made on; forwarding on the other is refused. */
+  lockedExamSource: 'manual' | 'ai' | null;
+  districts: DistrictRow[];
+  /** Both videos scored, but the exam is not scanned / not fully reviewed yet. */
+  waitingForExam: number;
+  /** Rankable, but their school has no district set. */
+  noDistrict: number;
+  tableReady: boolean;
+  students: Row[];
+}
 
 const SOURCE_LABEL = { manual: 'Manual', ai: 'AI' } as const;
 
@@ -43,19 +56,8 @@ export default function DistrictForwardPage() {
   const pool = students.filter(s => !s.outOfPool);
   const pending = pool.filter(s => !s.forwarded).length;
   const forwardedCount = students.filter(s => s.forwarded).length;
-  const noDistrict = pool.filter(s => !s.district || !s.district.trim()).length;
-
-  const countByPercent = useMemo(() => {
-    const m = new Map<number, number>();
-    for (const s of pool) m.set(s.holisticPercent, (m.get(s.holisticPercent) || 0) + 1);
-    return m;
-  }, [pool]);
-
-  const districts = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const s of pool) { const k = s.district?.trim() || '(no district)'; m.set(k, (m.get(k) || 0) + 1); }
-    return Array.from(m.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
-  }, [pool]);
+  const districts = useMemo(() => data?.districts ?? [], [data]);
+  const lockedOther = !!data?.lockedExamSource && data.lockedExamSource !== examSource;
 
   const call = async (key: string, method: 'POST' | 'DELETE', body?: object) => {
     setBusy(key);
@@ -77,20 +79,22 @@ export default function DistrictForwardPage() {
   };
 
   const forwardAll = async () => {
-    if (!window.confirm(`Forward ${pending} student${pending === 1 ? '' : 's'} to the state level?\n\nThese are everyone on the top ${data?.topN} holistic percentages across all schools, using ${SOURCE_LABEL[examSource]} exam marks.`)) return;
+    if (!window.confirm(`Forward ${pending} student${pending === 1 ? '' : 's'} to the state level?\n\nThese are everyone on the top ${data?.topN} holistic percentages of each district, using ${SOURCE_LABEL[examSource]} exam marks.`)) return;
     const j = await call('all', 'POST', { examSource });
     if (j) setNotice({ ok: true, text: `${j.forwarded} student${j.forwarded === 1 ? '' : 's'} forwarded to the state level.` });
   };
 
   const withdraw = async (s: Row) => {
-    if (!window.confirm(`Withdraw ${s.name} (${s.olympiadCode}) from the state level?`)) return;
-    const j = await call(s.olympiadCode, 'DELETE', { olympiadCode: s.olympiadCode });
+    const reason = window.prompt(`Withdraw ${s.name} (${s.olympiadCode}) from the state level?\n\nReason (saved in the Activity Log):`)?.trim();
+    if (!reason) return;
+    const j = await call(s.olympiadCode, 'DELETE', { olympiadCode: s.olympiadCode, reason });
     if (j) setNotice({ ok: true, text: `${s.name} withdrawn.` });
   };
 
   const withdrawAll = async () => {
-    if (!window.confirm(`Withdraw ALL ${forwardedCount} forwarded students from the state level?`)) return;
-    const j = await call('all', 'DELETE', { all: true });
+    const reason = window.prompt(`Withdraw ALL ${forwardedCount} forwarded students from the state level?\n\nReason (saved in the Activity Log):`)?.trim();
+    if (!reason) return;
+    const j = await call('all', 'DELETE', { all: true, reason });
     if (j) setNotice({ ok: true, text: `${j.withdrawn} withdrawn.` });
   };
 
@@ -154,7 +158,7 @@ export default function DistrictForwardPage() {
               <Undo2 size={16} /> Withdraw all
             </button>
           )}
-          <button onClick={forwardAll} disabled={pending === 0 || busy !== null || !data.tableReady}
+          <button onClick={forwardAll} disabled={pending === 0 || busy !== null || !data.tableReady || lockedOther}
             className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#06013E] text-[#F5E9C8] text-sm font-bold shadow-md hover:bg-[#0a0258] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer">
             {busy === 'all' ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             Forward {pending > 0 ? `${pending} ` : ''}to state
@@ -168,10 +172,25 @@ export default function DistrictForwardPage() {
           <span>The DistrictForward table has not been created in the database yet, so forwarding is switched off. You can still see the pool below.</span>
         </div>
       )}
-      {noDistrict > 0 && (
+      {lockedOther && (
         <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
           <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
-          <span>{noDistrict} student{noDistrict === 1 ? '' : 's'} in the pool belong to a school with no district set.</span>
+          <span>Students are already forwarded on {SOURCE_LABEL[data.lockedExamSource!]} exam marks, so forwarding on {SOURCE_LABEL[examSource]} marks is switched off. Switch the toggle back, or withdraw everyone first.</span>
+        </div>
+      )}
+      {data.waitingForExam > 0 && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+          <span>
+            {data.waitingForExam} student{data.waitingForExam === 1 ? ' has' : 's have'} both videos scored but {data.waitingForExam === 1 ? 'is' : 'are'} not ranked yet:
+            {examSource === 'manual' ? ' the exam sheet is not scanned, or not every question is reviewed.' : ' no exam sheet is scanned.'}
+          </span>
+        </div>
+      )}
+      {data.noDistrict > 0 && (
+        <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+          <span>{data.noDistrict} student{data.noDistrict === 1 ? '' : 's'} with a complete result belong to a school with no district set, so they are in no district&apos;s ranking. Set the district on those schools.</span>
         </div>
       )}
       {notice && (
@@ -197,35 +216,33 @@ export default function DistrictForwardPage() {
         ))}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 lg:col-span-2">
-          <p className="text-sm font-bold text-gray-700 mb-3">Top {data.topN} holistic percentages</p>
-          {data.topPercents.length === 0 ? (
-            <p className="text-sm text-gray-400">No student has a complete result yet.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {data.topPercents.map((p, i) => (
-                <span key={p} className="inline-flex items-center gap-2 pl-3 pr-2 py-1.5 rounded-full bg-amber-50 border border-amber-200 text-sm font-bold text-amber-900">
-                  <span className="text-[11px] font-semibold text-amber-600">#{i + 1}</span>{p}%
-                  <span className="text-[11px] font-bold bg-white rounded-full px-2 py-0.5 text-gray-600">{countByPercent.get(p) || 0} student{(countByPercent.get(p) || 0) === 1 ? '' : 's'}</span>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
-          <p className="text-sm font-bold text-gray-700 mb-3">By district</p>
-          {districts.length === 0 ? <p className="text-sm text-gray-400">—</p> : (
-            <ul className="space-y-1 max-h-40 overflow-y-auto pr-1">
-              {districts.map(([d, n]) => (
-                <li key={d} className="flex items-center justify-between text-sm">
-                  <span className={`truncate ${d === '(no district)' ? 'text-amber-700 font-semibold' : 'text-gray-700'}`}>{d}</span>
-                  <span className="font-bold text-gray-900 ml-2">{n}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <p className="text-sm font-bold text-gray-700 mb-1">By district</p>
+        <p className="text-xs text-gray-400 mb-3">Each district&apos;s top {data.topN} distinct holistic percentages qualify; ties share a rank, so a district can send more than {data.topN}.</p>
+        {districts.length === 0 ? <p className="text-sm text-gray-400">No student has a complete result yet.</p> : (
+          <div className="max-h-72 overflow-y-auto pr-1">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left border-b border-gray-100">
+                  {['District', 'State', 'Ranked', 'Qualifying', 'Cut-off %'].map(h => (
+                    <th key={h} className="py-2 px-2 text-xs font-bold text-gray-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {districts.map(d => (
+                  <tr key={d.key} className="border-b border-gray-50">
+                    <td className="py-1.5 px-2 font-semibold text-gray-800">{d.district}</td>
+                    <td className="py-1.5 px-2 text-gray-500">{d.state || '—'}</td>
+                    <td className="py-1.5 px-2 text-gray-700">{d.eligible}</td>
+                    <td className="py-1.5 px-2 font-bold text-gray-900">{d.inPool}</td>
+                    <td className="py-1.5 px-2 text-gray-700">{d.topPercents.length ? `${d.topPercents[d.topPercents.length - 1]}%` : '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
@@ -264,7 +281,7 @@ export default function DistrictForwardPage() {
                     ) : (
                       <span className="inline-flex px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 border border-amber-200 text-amber-700">Not forwarded</span>
                     )}
-                    {s.outOfPool && <p className="text-[10px] text-red-500 font-semibold mt-0.5">No longer in the top {data.topN}</p>}
+                    {s.outOfPool && <p className="text-[10px] text-red-500 font-semibold mt-0.5">No longer in their district&apos;s top {data.topN}</p>}
                     {s.forwarded && s.forwardedExamSource && (
                       <p className="text-[10px] text-gray-400 font-semibold mt-0.5">on {SOURCE_LABEL[s.forwardedExamSource]} exam marks</p>
                     )}

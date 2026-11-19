@@ -1664,6 +1664,9 @@ model CompetitionWinner {
   state                 String?
   stateHolisticPercent  Float
   stage1HolisticPercent Float?
+  /// NATIONAL rows only: the National % that ranked them
+  /// (2026-11-18-national-level.sql).
+  nationalPercent       Float?
   koshPercents          Json?
   frozenAt              DateTime @default(now())
   frozenBy              String?
@@ -1673,8 +1676,37 @@ model CompetitionWinner {
   @@schema("public")
 }
 
-// A student forwarded to the State Level competition (overall top 3 distinct
-// holistic %s). Columns examSource / koshPercents come from
+// A student forwarded to the National Level: Rank 1 of their state on the
+// frozen State Toppers list (lib/national-result.ts). One row per student;
+// deleting it withdraws them. The Level 1 and State video %s are snapshots
+// taken when forwarded; the Virtual Assessment marks are typed in by
+// SuperAdmin (the assessment runs outside the app). National % = the average
+// of Level 1 %, State video %, Assessment % and National video %.
+// Table from prisma/manual-migrations/2026-11-18-national-level.sql.
+model NationalForward {
+  id                   String    @id @default(uuid())
+  olympiadCode         String    @unique
+  name                 String
+  className            String?
+  schoolName           String?
+  schoolCode           String?
+  district             String?
+  state                String?
+  stage1Percent        Float
+  stateVideoPercent    Float
+  stateHolisticPercent Float
+  assessmentScore      Float?
+  assessmentMax        Float?
+  assessmentBy         String?
+  assessmentAt         DateTime?
+  forwardedAt          DateTime  @default(now())
+  forwardedBy          String?
+
+  @@schema("public")
+}
+
+// A student forwarded to the State Level competition (each district's top 10
+// distinct holistic %s). Columns examSource / koshPercents come from
 // prisma/manual-migrations/2026-11-17-state-level-competition.sql: the exam
 // marks used ('manual' | 'ai') and the stage-1 final % of each kosha at the
 // moment of forwarding, which the State Level result combines 50-50 with the

@@ -43,7 +43,7 @@ interface KoshBreakdownEntry {
 
 interface StudentHistory {
   studentKey: string;
-  /** 'STATE' for a student's State Level video (its own row), else null. */
+  /** 'STATE' / 'NATIONAL' for a student's State / National Level video (its own row), else null. */
   stage?: string | null;
   studentName: string;
   username: string | null;
@@ -270,6 +270,7 @@ export default function EvaluationHistoryPage() {
                       <p className="font-semibold text-[15px] text-gray-900 truncate tracking-tight">
                         {s.studentName}
                         {s.stage === 'STATE' && <span className="ml-2 align-middle text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">State Level</span>}
+                        {s.stage === 'NATIONAL' && <span className="ml-2 align-middle text-[10px] font-bold bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full">National Level</span>}
                       </p>
                       <div className="flex items-center gap-2 text-[11.5px] text-gray-500 mt-0.5">
                         <span className="font-mono font-semibold text-[#004f9f] bg-[#004f9f]/[0.06] px-1.5 py-0.5 rounded-md">{s.olympiadCode}</span>
@@ -306,7 +307,7 @@ export default function EvaluationHistoryPage() {
                 {isOpen && (
                   <div className="border-t border-gray-100 bg-gray-50/40 p-5 space-y-4">
                     {/* Kosh grade summary (V1 + V2 sums, banded) — Olympiad videos only */}
-                    {s.stage !== 'STATE' && (
+                    {!s.stage && (
                     <div className="bg-white border border-gray-100 rounded-xl p-4">
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2.5">Kosh Grades (both videos, /{KOSH_MAX_SCORE} each)</p>
                       <div className="flex flex-wrap gap-2">
@@ -337,7 +338,7 @@ export default function EvaluationHistoryPage() {
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
                               <User size={13} className="text-gray-400" />
-                              <span className="text-xs font-bold text-gray-700">{s.stage === 'STATE' ? 'State Level video' : `Video ${v.slot + 1}`}</span>
+                              <span className="text-xs font-bold text-gray-700">{s.stage === 'NATIONAL' ? 'National Level video' : s.stage === 'STATE' ? 'State Level video' : `Video ${v.slot + 1}`}</span>
                               {v.category && <span className="text-[10px] font-semibold bg-blue-50 text-[#004f9f] px-2 py-0.5 rounded-full">{v.category}</span>}
                               {v.subCategory && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{v.subCategory}</span>}
                             </div>
@@ -359,7 +360,7 @@ export default function EvaluationHistoryPage() {
                                   return (
                                     <div key={c.key} className="space-y-1">
                                       <div className="flex items-center justify-between text-[10.5px] font-semibold text-gray-700">
-                                        <span>{criterionLabelFor(c, slot, s.stage === 'STATE')} <span className="text-[9px] text-[#004f9f] font-bold uppercase">· {KOSH_LABELS[c.kosh]}</span></span>
+                                        <span>{criterionLabelFor(c, slot, !!s.stage)} <span className="text-[9px] text-[#004f9f] font-bold uppercase">· {KOSH_LABELS[c.kosh]}</span></span>
                                         <span className="font-bold text-[#004f9f]">{score}/{MAX_PER_CRITERION}</span>
                                       </div>
                                       <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">

@@ -62,6 +62,19 @@ const STATE_LEVEL_DEFAULT: SeedCategory = {
   subs: [['Thoughts & Execution', 'bulb-outline']],
 };
 
+/**
+ * The National Level competition category: only students forwarded to the
+ * National Level (Result → National Level, their state's Rank 1) can upload
+ * into it, one theme-based video each. Added closed: SuperAdmin opens it
+ * (Upload Categories → National Level) when the theme is announced.
+ */
+const NATIONAL_LEVEL_DEFAULT: SeedCategory = {
+  key: 'national_level', label: 'National Level', audiences: [], slotKind: 'NATIONAL',
+  icon: 'trophy-outline', color: '#8E44AD',
+  showInSearch: false, searchSortOrder: 91, showOnHome: false, homeSortOrder: 91,
+  subs: [['Theme Video', 'bulb-outline']],
+};
+
 export const DEFAULT_CATEGORIES: SeedCategory[] = [
   {
     key: 'oly_a', label: 'Talent Performance', audiences: ['OLYMPIAD_STUDENT'], slotKind: 'OLY_A',
@@ -127,13 +140,14 @@ export const DEFAULT_CATEGORIES: SeedCategory[] = [
     subs: [['Others', 'apps-outline']],
   },
   STATE_LEVEL_DEFAULT,
+  NATIONAL_LEVEL_DEFAULT,
 ];
 
 /** The defaults as DTOs — used when the tables cannot be read. */
 function defaultDTOs(): CategoryDTO[] {
   return DEFAULT_CATEGORIES.map((c, i) => ({
     id: `default_${c.key}`, key: c.key, label: c.label, aliases: [], audiences: c.audiences, slotKind: c.slotKind,
-    icon: c.icon, color: c.color, imageUrl: null, isActive: true, sortOrder: i,
+    icon: c.icon, color: c.color, imageUrl: null, isActive: c.slotKind !== 'NATIONAL', sortOrder: i,
     showInSearch: c.showInSearch, searchSortOrder: c.searchSortOrder, searchLabel: c.searchLabel ?? null,
     searchCats: c.searchCats ?? [], showOnHome: c.showOnHome, homeSortOrder: c.homeSortOrder,
     subs: c.subs.map(([label, icon, classCodes], j) => ({
@@ -142,15 +156,19 @@ function defaultDTOs(): CategoryDTO[] {
   }));
 }
 
-/** Adds the State Level category to a database seeded before it existed. */
+/** Adds the State / National Level categories to a database seeded before they existed. */
 async function ensureStateCategory(): Promise<void> {
-  if ((await prisma.uploadCategory.count({ where: { slotKind: 'STATE' } })) > 0) return;
-  const c = STATE_LEVEL_DEFAULT;
+  await ensureCompetitionCategory(STATE_LEVEL_DEFAULT, true);
+  await ensureCompetitionCategory(NATIONAL_LEVEL_DEFAULT, false);
+}
+
+async function ensureCompetitionCategory(c: SeedCategory, isActive: boolean): Promise<void> {
+  if ((await prisma.uploadCategory.count({ where: { slotKind: c.slotKind } })) > 0) return;
   const max = await prisma.uploadCategory.aggregate({ _max: { sortOrder: true } });
   try {
     await prisma.uploadCategory.create({
       data: {
-        key: c.key, label: c.label, audiences: c.audiences, slotKind: c.slotKind, icon: c.icon, color: c.color,
+        key: c.key, label: c.label, audiences: c.audiences, slotKind: c.slotKind, icon: c.icon, color: c.color, isActive,
         showInSearch: c.showInSearch, searchSortOrder: c.searchSortOrder,
         showOnHome: c.showOnHome, homeSortOrder: c.homeSortOrder,
         sortOrder: (max._max.sortOrder ?? -1) + 1,
@@ -171,6 +189,7 @@ async function ensureSeeded(): Promise<void> {
       await prisma.uploadCategory.create({
         data: {
           key: c.key, label: c.label, audiences: c.audiences, slotKind: c.slotKind, icon: c.icon, color: c.color,
+          isActive: c.slotKind !== 'NATIONAL', // the National Level opens when SuperAdmin opens it
           searchCats: c.searchCats?.length ? [c.label, ...c.searchCats].join(',') : null,
           searchLabel: c.searchLabel ?? null,
           showInSearch: c.showInSearch, searchSortOrder: c.searchSortOrder,

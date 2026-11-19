@@ -20,14 +20,18 @@ export const AUDIENCE_LABELS: Record<Audience, string> = {
 export const NORMAL_AUDIENCES: Audience[] = ['NORMAL', 'GENERAL_SCHOOL', 'OLYMPIAD_SCHOOL'];
 
 /** NONE = a normal category; OLY_A / OLY_B = the two Olympiad slot categories;
- *  STATE = the State Level competition category (one video per competitor). */
-export const SLOT_KINDS = ['NONE', 'OLY_A', 'OLY_B', 'STATE'] as const;
+ *  STATE / NATIONAL = the State / National Level competition categories (one
+ *  video per competitor). */
+export const SLOT_KINDS = ['NONE', 'OLY_A', 'OLY_B', 'STATE', 'NATIONAL'] as const;
 export type SlotKind = (typeof SLOT_KINDS)[number];
 
 /** Who uploads into the State Level category: students forwarded to the State
  *  Level (Result → State Level). Not an admin-pickable audience. */
 export const STATE_COMPETITOR = 'STATE_COMPETITOR';
-export type UploadAudience = Audience | typeof STATE_COMPETITOR;
+/** Who uploads into the National Level category: students forwarded to the
+ *  National Level (Result → National Level). */
+export const NATIONAL_COMPETITOR = 'NATIONAL_COMPETITOR';
+export type UploadAudience = Audience | typeof STATE_COMPETITOR | typeof NATIONAL_COMPETITOR;
 
 export interface SubCategoryDTO {
   id: string;
@@ -68,9 +72,15 @@ export const isSlot = (c: Pick<CategoryDTO, 'slotKind'>) => c.slotKind === 'OLY_
 /** The State Level competition category. */
 export const isStateCategory = (c: Pick<CategoryDTO, 'slotKind'>) => c.slotKind === 'STATE';
 
-/** A normal category: neither an Olympiad slot nor the State Level one. Only
+/** The National Level competition category. */
+export const isNationalCategory = (c: Pick<CategoryDTO, 'slotKind'>) => c.slotKind === 'NATIONAL';
+
+/** The State or the National Level category: no audiences, forwarding decides who uploads. */
+export const isCompetitionCategory = (c: Pick<CategoryDTO, 'slotKind'>) => isStateCategory(c) || isNationalCategory(c);
+
+/** A normal category: neither an Olympiad slot nor a competition one. Only
  *  these get Search cards, Home rows and the audiences' upload lists. */
-export const isNormalCategory = (c: Pick<CategoryDTO, 'slotKind'>) => !isSlot(c) && !isStateCategory(c);
+export const isNormalCategory = (c: Pick<CategoryDTO, 'slotKind'>) => !isSlot(c) && !isCompetitionCategory(c);
 
 const norm = (s: string | null | undefined) => (s ?? '').trim().toLowerCase();
 
@@ -168,8 +178,8 @@ export function slotCategory(categories: CategoryDTO[], slot: 'A' | 'B'): Catego
 /**
  * What a picker offers. `audience` NORMAL / GENERAL_SCHOOL / OLYMPIAD_SCHOOL:
  * the open normal categories given to it. OLYMPIAD_STUDENT: the two slot
- * categories, their options cut to the student's class. STATE_COMPETITOR: the
- * State Level category, while it is open.
+ * categories, their options cut to the student's class. STATE_COMPETITOR /
+ * NATIONAL_COMPETITOR: the State / National Level category, while it is open.
  * Only options that are switched on; categories left with none are dropped.
  */
 export function uploadChoices(
@@ -179,9 +189,11 @@ export function uploadChoices(
 ): CategoryDTO[] {
   const forSlots = audience === 'OLYMPIAD_STUDENT';
   const forState = audience === STATE_COMPETITOR;
+  const forNational = audience === NATIONAL_COMPETITOR;
   return categories
     .filter((c) => (forSlots ? isSlot(c)
       : forState ? isStateCategory(c) && c.isActive
+      : forNational ? isNationalCategory(c) && c.isActive
       : isNormalCategory(c) && c.isActive && c.audiences.includes(audience)))
     .sort((a, b) => (forSlots ? a.slotKind.localeCompare(b.slotKind) : a.sortOrder - b.sortOrder))
     .map((c) => ({
@@ -204,13 +216,14 @@ export interface VideoUploader {
   uploaderType?: string | null;
   /** For a school's own video: which kind of school. Unknown = either list. */
   schoolKind?: 'OLYMPIAD' | 'GENERAL' | null;
-  /** 'STATE' for a State Level competition video. */
+  /** 'STATE' / 'NATIONAL' for a State / National Level competition video. */
   competitionStage?: string | null;
 }
 
 /** The upload list(s) the video's uploader picks from in the app. */
 export function videoAudiences(v: VideoUploader): UploadAudience[] {
   if (v.competitionStage === 'STATE') return [STATE_COMPETITOR];
+  if (v.competitionStage === 'NATIONAL') return [NATIONAL_COMPETITOR];
   if (v.isEvaluation) return ['OLYMPIAD_STUDENT'];
   if (v.uploaderType === UPLOADER_SCHOOL_OWN) {
     if (v.schoolKind === 'OLYMPIAD') return ['OLYMPIAD_SCHOOL'];
@@ -292,6 +305,8 @@ export function uploadProblem(
       ? 'Pick one of the two Olympiad categories.'
       : audience === STATE_COMPETITOR
         ? 'The State Level category is not open for uploads right now.'
+        : audience === NATIONAL_COMPETITOR
+          ? 'The National Level category is not open for uploads right now.'
         : `"${category}" is not available for upload any more. Please update the app or pick another category.`;
   }
   if (!cat.subs.some((s) => norm(s.label) === norm(subCategory))) {

@@ -35,7 +35,7 @@ export async function topPerSchool(): Promise<SchoolToppers[]> {
 
   const bySchool = new Map<string, typeof rows>();
   for (const r of rows) {
-    if (r.status !== 'Complete' || r.holisticPercent === null || !r.schoolId) continue;
+    if (!r.rankEligible || r.holisticPercent === null || !r.schoolId) continue;
     (bySchool.get(r.schoolId) || bySchool.set(r.schoolId, []).get(r.schoolId)!).push(r);
   }
 

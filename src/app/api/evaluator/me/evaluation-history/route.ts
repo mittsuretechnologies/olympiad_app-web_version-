@@ -135,7 +135,7 @@ export async function GET(request: Request) {
 
     const groupMap = new Map<string, {
       studentKey: string;
-      /** 'STATE' for the State Level video's group, else null (Olympiad videos). */
+      /** 'STATE' / 'NATIONAL' for a State / National Level video's group, else null (Olympiad videos). */
       stage: string | null;
       studentName: string;
       username: string | null;
@@ -181,8 +181,8 @@ export async function GET(request: Request) {
 
       // A State Level video is its own group: it must not count as one of the
       // student's two Olympiad videos in the kosha totals below.
-      const stage = v.competitionStage === 'STATE' ? 'STATE' : null;
-      if (stage) key = `${key}:state`;
+      const stage = v.competitionStage === 'STATE' || v.competitionStage === 'NATIONAL' ? v.competitionStage : null;
+      if (stage) key = `${key}:${stage.toLowerCase()}`;
 
       if (!groupMap.has(key)) {
         groupMap.set(key, { studentKey: key, stage, studentName, username, olympiadCode, className, schoolName, videosByVideoId: new Map() });

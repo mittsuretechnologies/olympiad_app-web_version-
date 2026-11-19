@@ -87,8 +87,8 @@ export async function POST(request: Request) {
 
     const video = await prisma.video.findUnique({ where: { id: videoId, deletedAt: null }, include: { evaluations: true } });
     if (!video) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
-    // An Olympiad video, or a State Level competition video (Video.competitionStage).
-    if (!video.isEvaluation && video.competitionStage !== 'STATE') {
+    // An Olympiad video, or a State / National Level competition video (Video.competitionStage).
+    if (!video.isEvaluation && video.competitionStage !== 'STATE' && video.competitionStage !== 'NATIONAL') {
       return NextResponse.json({ message: 'This video is not an olympiad evaluation submission' }, { status: 400 });
     }
 

@@ -40,7 +40,7 @@ interface Video {
   createdAt: string;
   deletedAt: string | null;
   uploaderType: string | null;
-  /** 'STATE' for a State Level competition video, else null. */
+  /** 'STATE' / 'NATIONAL' for a State / National Level competition video, else null. */
   competitionStage?: string | null;
   /** Live review claim by a moderator (see lib/videoClaim.ts). */
   claimedById?: string | null;
@@ -175,7 +175,7 @@ function uploaderOf(video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'appUse
   return {
     isEvaluation: video.isEvaluation,
     uploaderType: video.uploaderType,
-    // A State Level video only moves within the State Level category.
+    // A State / National Level video only moves within its own category.
     competitionStage: video.competitionStage ?? null,
     schoolKind: known ? (video.appUser!.isOlympiadSchool ? 'OLYMPIAD' as const : 'GENERAL' as const) : null,
   };
@@ -306,7 +306,7 @@ export default function VideoModerationPage() {
   // vs General (neither) — a video can't be both, since jury videos don't set
   // isMittfest. Client-side only, like search, since it's a cheap boolean split
   // of the already-fetched per-status page.
-  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'STATE' | 'GENERAL'>('ALL');
+  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'STATE' | 'NATIONAL' | 'GENERAL'>('ALL');
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
@@ -372,7 +372,8 @@ export default function VideoModerationPage() {
     if (contentFilter === 'MITTFEST') allVideos = allVideos.filter(v => v.isMittfest);
     else if (contentFilter === 'OLYMPIAD') allVideos = allVideos.filter(v => v.isEvaluation);
     else if (contentFilter === 'STATE') allVideos = allVideos.filter(v => v.competitionStage === 'STATE');
-    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation && v.competitionStage !== 'STATE');
+    else if (contentFilter === 'NATIONAL') allVideos = allVideos.filter(v => v.competitionStage === 'NATIONAL');
+    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation && !v.competitionStage);
 
     // Videos someone else is reviewing go to the end of the pending queue, so
     // each moderator naturally picks up a different one.
@@ -856,6 +857,7 @@ export default function VideoModerationPage() {
           { value: 'MITTFEST', label: 'MittFest' },
           { value: 'OLYMPIAD', label: 'Olympiad' },
           { value: 'STATE',    label: 'State Level' },
+          { value: 'NATIONAL', label: 'National Level' },
           { value: 'GENERAL',  label: 'General' },
         ] as const).map(opt => (
           <button
@@ -1097,6 +1099,11 @@ export default function VideoModerationPage() {
                       {video.competitionStage === 'STATE' && (
                         <span className="flex items-center gap-0.5 text-[10px] font-black text-white bg-[#B8860B] px-2 py-0.5 rounded-full shadow">
                           <Award size={9} /> State Level
+                        </span>
+                      )}
+                      {video.competitionStage === 'NATIONAL' && (
+                        <span className="flex items-center gap-0.5 text-[10px] font-black text-white bg-[#8E44AD] px-2 py-0.5 rounded-full shadow">
+                          <Award size={9} /> National Level
                         </span>
                       )}
                       {(() => { const hb = homeSectionBadge(video.category); return hb ? (
@@ -1378,6 +1385,11 @@ export default function VideoModerationPage() {
                   {previewVideo.competitionStage === 'STATE' && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-[#B8860B] text-white px-2 py-1 rounded-full">
                       <Award size={10} /> State Level
+                    </span>
+                  )}
+                  {previewVideo.competitionStage === 'NATIONAL' && (
+                    <span className="flex items-center gap-1 text-[10px] font-black bg-[#8E44AD] text-white px-2 py-1 rounded-full">
+                      <Award size={10} /> National Level
                     </span>
                   )}
                   {(() => { const hb = homeSectionBadge(previewVideo.category); return hb ? (

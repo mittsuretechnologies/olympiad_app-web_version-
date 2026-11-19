@@ -63,10 +63,11 @@ export async function GET(request: Request) {
       orderBy: { createdAt: 'asc' },
     });
 
-    // State Level competition videos (lib/stateCompetition.ts): one per
-    // competitor, scored on the same 5 criteria, kept out of the Olympiad slots.
+    // State / National Level competition videos (lib/stateCompetition.ts): one
+    // per competitor per stage, scored on the same 5 criteria, kept out of the
+    // Olympiad slots.
     const stateVideos = await prisma.video.findMany({
-      where: { competitionStage: 'STATE', status: 'APPROVED', appUserId: { not: null }, deletedAt: null },
+      where: { competitionStage: { in: ['STATE', 'NATIONAL'] }, status: 'APPROVED', appUserId: { not: null }, deletedAt: null },
       include: { evaluations: true },
       orderBy: { createdAt: 'asc' },
     });
@@ -98,9 +99,9 @@ export async function GET(request: Request) {
       if (!bySlotKey.has(key)) bySlotKey.set(key, []);
       (bySlotKey.get(key) as any[]).push(v);
     }
-    // Its own card ("st:"), never mixed into the student's Video 1 / Video 2.
+    // Its own card ("st:" State, "nt:" National), never mixed into the student's Video 1 / Video 2.
     for (const v of stateVideos) {
-      const key = `st:${v.appUserId}`;
+      const key = `${v.competitionStage === 'NATIONAL' ? 'nt' : 'st'}:${v.appUserId}`;
       if (!bySlotKey.has(key)) bySlotKey.set(key, []);
       (bySlotKey.get(key) as any[]).push(v);
     }
@@ -120,7 +121,7 @@ export async function GET(request: Request) {
       schoolId: string | null;
       ownerKey: string;
       slot: number;
-      /** 'STATE' for a State Level video, else null (an Olympiad video). */
+      /** 'STATE' / 'NATIONAL' for a State / National Level video, else null (an Olympiad video). */
       stage: string | null;
       // One evaluation row per video: 5 criteria (0-4 each), one per kosha.
       existingScore: {
@@ -161,7 +162,7 @@ export async function GET(request: Request) {
           className = v.student?.allocation?.className || v.student?.allocation?.classCode || null;
           schoolName = v.student?.allocation?.school?.name || null;
           schoolId = v.student?.allocation?.school?.id || null;
-        } else { // 'a:' Olympiad app video, or 'st:' State Level video
+        } else { // 'a:' Olympiad app video, 'st:' State or 'nt:' National Level video
           const u = appUserById.get(v.appUserId!);
           const alloc = u?.olympiadId ? allocByCode.get(u.olympiadId) : null;
           studentName = alloc?.assignedName || u?.userId || '-';
@@ -186,7 +187,7 @@ export async function GET(request: Request) {
           schoolId,
           ownerKey: key,
           slot,
-          stage: key.startsWith('st:') ? 'STATE' : null,
+          stage: key.startsWith('st:') ? 'STATE' : key.startsWith('nt:') ? 'NATIONAL' : null,
           existingScore,
           isFullyScored,
           isFullyPublished,

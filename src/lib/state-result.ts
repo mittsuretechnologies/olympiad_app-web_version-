@@ -2,12 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { KOSH_CRITERIA, KOSH_KEYS, KOSH_LABELS, MAX_PER_CRITERION, type KoshKey } from '@/lib/kosh';
 import { getResultOverview, type ExamSource } from '@/lib/result-overview';
 import { STATE_STAGE } from '@/lib/stateCompetition';
+import { areaKey } from '@/lib/district-forward';
 
 /**
  * State Level result → State Toppers → National Winners.
  *
- * Who: every student forwarded to the State Level (DistrictForward — the
- * overall top 3 distinct stage-1 holistic %s).
+ * Who: every student forwarded to the State Level (DistrictForward — each
+ * district's top 10 distinct stage-1 holistic %s, lib/district-forward.ts).
  *
  * Per kosha:   final % = (stage-1 % + State video %) ÷ 2
  *   stage-1 %       the student's final kosha % (exam + both Olympiad videos),
@@ -20,11 +21,12 @@ import { STATE_STAGE } from '@/lib/stateCompetition';
  *
  * State Toppers:    per state, the top STATE_TOP_N distinct State Holistic %s
  *                   and everyone on them (ties share a rank).
- * National Winners: across all states, the top NATIONAL_TOP_N distinct ones.
+ * Each state's Rank 1 on the frozen list goes on to the National Level, which
+ * is scored separately (lib/national-result.ts).
  */
 
-export const STATE_TOP_N = 3;
-export const NATIONAL_TOP_N = 3;
+export const STATE_TOP_N = 10;
+/** CompetitionWinner.level values: 'STATE' here, 'NATIONAL' in lib/national-result.ts. */
 export const WINNER_LEVELS = ['STATE', 'NATIONAL'] as const;
 export type WinnerLevel = (typeof WINNER_LEVELS)[number];
 
@@ -180,28 +182,23 @@ export function topTiers(list: StateCompetitorResult[], n: number): WinnerTier[]
 
 /** State Toppers per state. Competitors whose school has no state set are left out (and counted). */
 export function stateToppers(results: StateCompetitorResult[]) {
+  // Grouped case/space-insensitively ("Rajasthan" and "rajasthan " are one state).
   const byState = new Map<string, StateCompetitorResult[]>();
   let noState = 0;
   for (const r of results) {
-    if (!r.state) { noState++; continue; }
-    (byState.get(r.state) || byState.set(r.state, []).get(r.state)!).push(r);
+    const key = areaKey(r.state);
+    if (!key) { noState++; continue; }
+    (byState.get(key) || byState.set(key, []).get(key)!).push(r);
   }
-  const states = Array.from(byState.entries())
-    .sort((a, b) => a[0].localeCompare(b[0]))
-    .map(([state, list]) => ({ state, competitors: list.length, tiers: topTiers(list, STATE_TOP_N) }));
+  const states = Array.from(byState.values())
+    .map(list => ({ state: list[0].state!, competitors: list.length, tiers: topTiers(list, STATE_TOP_N) }))
+    .sort((a, b) => a.state.localeCompare(b.state));
   return { states, noState };
 }
 
-/** National Winners: the top distinct State Holistic %s across all states. */
-export function nationalWinners(results: StateCompetitorResult[]): WinnerTier[] {
-  return topTiers(results, NATIONAL_TOP_N);
-}
-
-/** The rows a freeze of `level` saves. */
-export function winnerRows(level: WinnerLevel, results: StateCompetitorResult[], frozenBy: string | null) {
-  const tiers = level === 'NATIONAL'
-    ? nationalWinners(results)
-    : stateToppers(results).states.flatMap(s => s.tiers);
+/** The rows a freeze of the State Toppers saves. */
+export function winnerRows(level: 'STATE', results: StateCompetitorResult[], frozenBy: string | null) {
+  const tiers = stateToppers(results).states.flatMap(s => s.tiers);
   return tiers.flatMap(t => t.students.map(r => ({
     level,
     rank: t.rank,

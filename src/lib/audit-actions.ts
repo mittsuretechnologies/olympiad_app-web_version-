@@ -58,8 +58,13 @@ export const AUDIT_ACTIONS: Record<string, AuditActionDef> = {
   EVALUATION_PUBLISHED:    { label: 'Result Published',          category: 'evaluation', tone: 'success' },
   EVALUATION_UNPUBLISHED:  { label: 'Result Unpublished',        category: 'evaluation', tone: 'neutral' },
   EVALUATOR_SCHOOLS_ASSIGNED: { label: 'Evaluator Schools Assigned', category: 'evaluation', tone: 'info' },
+  STATE_LEVEL_FORWARDED:      { label: 'Forwarded to State Level',    category: 'evaluation', tone: 'success' },
+  STATE_LEVEL_WITHDRAWN:      { label: 'Withdrawn from State Level',  category: 'evaluation', tone: 'warning' },
   STATE_TOPPERS_FROZEN:       { label: 'State Toppers Frozen',        category: 'evaluation', tone: 'success' },
   STATE_TOPPERS_UNFROZEN:     { label: 'State Toppers Un-frozen',     category: 'evaluation', tone: 'neutral' },
+  NATIONAL_LEVEL_FORWARDED:   { label: 'Forwarded to National Level',   category: 'evaluation', tone: 'success' },
+  NATIONAL_LEVEL_WITHDRAWN:   { label: 'Withdrawn from National Level', category: 'evaluation', tone: 'warning' },
+  NATIONAL_ASSESSMENT_ENTERED:{ label: 'Virtual Assessment Marks Saved', category: 'evaluation', tone: 'warning' },
   NATIONAL_WINNERS_FROZEN:    { label: 'National Winners Frozen',     category: 'evaluation', tone: 'success' },
   NATIONAL_WINNERS_UNFROZEN:  { label: 'National Winners Un-frozen',  category: 'evaluation', tone: 'neutral' },
 

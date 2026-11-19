@@ -4,16 +4,17 @@ import { Fragment, useMemo, useState } from 'react';
 import useSWR from 'swr';
 import {
   AlertTriangle, Award, CheckCircle2, ChevronDown, ChevronUp, Clock, Download, Loader2, Lock, MapPin, School,
-  Search, Snowflake, Trophy, Undo2, Users, Video,
+  Search, Snowflake, Undo2, Users, Video,
 } from 'lucide-react';
 import { fetcher, authFetch } from '@/lib/swr';
 
-// Result → State & National (lib/state-result.ts): every State Level
-// competitor's State Holistic %, the State Toppers (per state, top 3 distinct
-// %s) and the National Winners (all states, top 3 distinct %s). Each list can
-// be frozen: the saved copy stays as it was while the live list keeps moving.
+// Result → State Toppers (lib/state-result.ts): every State Level
+// competitor's State Holistic %, and the State Toppers (per state, top 10
+// distinct %s). The list can be frozen: the saved copy stays as it was while
+// the live list keeps moving. Each state's frozen Rank 1 goes on to the
+// National Level (Result → National Level).
 
-type Level = 'STATE' | 'NATIONAL';
+type Level = 'STATE';
 type Tab = 'COMPETITORS' | Level;
 
 interface KoshRow { kosh: string; label: string; stage1Percent: number | null; stateVideoPercent: number | null; finalPercent: number }
@@ -33,10 +34,9 @@ interface FrozenRow {
   stateHolisticPercent: number; stage1HolisticPercent: number | null; frozenAt: string;
 }
 interface Response {
-  stateTopN: number; nationalTopN: number; tableReady: boolean;
+  stateTopN: number; tableReady: boolean;
   competitors: Competitor[];
   stateToppers: { states: { state: string; competitors: number; tiers: Tier[] }[]; noState: number };
-  nationalWinners: Tier[];
   frozen: Record<Level, { frozenAt: string | null; rows: FrozenRow[] }>;
 }
 
@@ -105,14 +105,12 @@ export default function StateNationalPage() {
   // The list shown on a toppers tab: the frozen copy, or the live one.
   const groups: ListGroup[] = useMemo(() => {
     if (!data || !level) return [];
-    if (showFrozen) return groupFrozen(data.frozen[level].rows, level === 'STATE');
+    if (showFrozen) return groupFrozen(data.frozen[level].rows, true);
     const toList = (tiers: Tier[]): ListTier[] =>
       tiers.map(t => ({ rank: t.rank, percent: t.stateHolisticPercent, students: t.students }));
-    return level === 'NATIONAL'
-      ? [{ title: null, subtitle: null, tiers: toList(data.nationalWinners) }]
-      : data.stateToppers.states.map(s => ({
-          title: s.state, subtitle: `${s.competitors} competitor${s.competitors === 1 ? '' : 's'}`, tiers: toList(s.tiers),
-        }));
+    return data.stateToppers.states.map(s => ({
+      title: s.state, subtitle: `${s.competitors} competitor${s.competitors === 1 ? '' : 's'}`, tiers: toList(s.tiers),
+    }));
   }, [data, level, showFrozen]);
 
   const filteredGroups = groups
@@ -139,7 +137,7 @@ export default function StateNationalPage() {
   };
 
   const freeze = async (lv: Level) => {
-    const name = lv === 'NATIONAL' ? 'National Winners' : 'State Toppers';
+    const name = 'State Toppers';
     const pending = counts.awaiting + counts.noVideo;
     const warn = pending ? `\n\n${pending} competitor${pending === 1 ? ' is' : 's are'} not scored yet and count 0 on the State video side.` : '';
     const again = data?.frozen[lv].rows.length ? '\n\nThe list frozen earlier will be replaced.' : '';
@@ -148,7 +146,7 @@ export default function StateNationalPage() {
     if (j) { setView('FROZEN'); setNotice({ ok: true, text: `${name} frozen: ${j.frozen} student${j.frozen === 1 ? '' : 's'}.` }); }
   };
   const unfreeze = async (lv: Level) => {
-    const name = lv === 'NATIONAL' ? 'National Winners' : 'State Toppers';
+    const name = 'State Toppers';
     if (!window.confirm(`Un-freeze ${name}? The saved list is removed; the live list stays.`)) return;
     const j = await call(lv, 'DELETE', { level: lv });
     if (j) setNotice({ ok: true, text: `${name} un-frozen.` });
@@ -167,13 +165,13 @@ export default function StateNationalPage() {
       ];
     } else {
       rows = [
-        [...(tab === 'STATE' ? ['State'] : []), 'Rank', 'State Holistic %', 'Student', 'Olympiad ID', 'Class', 'School', 'School ID', 'District', 'State'],
+        ['State', 'Rank', 'State Holistic %', 'Student', 'Olympiad ID', 'Class', 'School', 'School ID', 'District', 'State'],
         ...filteredGroups.flatMap(g => g.tiers.flatMap(t => t.students.map(s => [
-          ...(tab === 'STATE' ? [g.title] : []), t.rank, t.percent, s.name, s.olympiadCode, s.className, s.schoolName, s.schoolCode, s.district, s.state,
+          g.title, t.rank, t.percent, s.name, s.olympiadCode, s.className, s.schoolName, s.schoolCode, s.district, s.state,
         ]))),
       ];
     }
-    const name = tab === 'COMPETITORS' ? 'state-level-result' : tab === 'STATE' ? 'state-toppers' : 'national-winners';
+    const name = tab === 'COMPETITORS' ? 'state-level-result' : 'state-toppers';
     const url = URL.createObjectURL(new Blob([rows.map(r => r.map(esc).join(',')).join('\n')], { type: 'text/csv;charset=utf-8;' }));
     const a = document.createElement('a');
     a.href = url; a.download = `${name}${showFrozen ? '-frozen' : ''}-${new Date().toISOString().split('T')[0]}.csv`; a.click();
@@ -197,14 +195,13 @@ export default function StateNationalPage() {
   const TABS: { key: Tab; label: string }[] = [
     { key: 'COMPETITORS', label: `Competitors (${competitors.length})` },
     { key: 'STATE', label: 'State Toppers' },
-    { key: 'NATIONAL', label: 'National Winners' },
   ];
 
   return (
     <div className="space-y-6 pb-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-medium text-[#004f9f]">State &amp; National</h1>
+          <h1 className="text-2xl font-medium text-[#004f9f]">State Toppers</h1>
           <p className="text-xs text-gray-400 mt-0.5">
             Each kosha: (stage-1 % + State video %) ÷ 2. State Holistic % = average of the 5. No State video or no published marks counts 0.
           </p>
@@ -250,7 +247,7 @@ export default function StateNationalPage() {
             className={`px-4 py-2 rounded-xl text-sm font-bold border transition-colors cursor-pointer ${
               tab === t.key ? 'bg-[#06013E] text-[#F5E9C8] border-[#06013E]' : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
             }`}>
-            {t.key === 'NATIONAL' ? <Trophy size={14} className="inline mr-1.5 -mt-0.5" /> : t.key === 'STATE' ? <Award size={14} className="inline mr-1.5 -mt-0.5" /> : null}
+            {t.key === 'STATE' ? <Award size={14} className="inline mr-1.5 -mt-0.5" /> : null}
             {t.label}
           </button>
         ))}
@@ -342,7 +339,7 @@ export default function StateNationalPage() {
               <p className="text-sm text-gray-700">
                 {frozen.rows.length
                   ? <>Frozen on <strong>{fmtDate(frozen.frozenAt)}</strong> · {frozen.rows.length} student{frozen.rows.length === 1 ? '' : 's'}</>
-                  : <>Not frozen yet. {level === 'NATIONAL' ? `Top ${data.nationalTopN} distinct %s across all states.` : `Top ${data.stateTopN} distinct %s in each state.`}</>}
+                  : <>Not frozen yet. Top {data.stateTopN} distinct %s in each state. Freeze it before forwarding Rank 1s to the National Level.</>}
               </p>
             </div>
             {frozen.rows.length > 0 && (
@@ -406,7 +403,6 @@ export default function StateNationalPage() {
                               <span className="font-mono text-[11px] text-gray-500">{st.olympiadCode}{st.className ? ` · ${st.className}` : ''}</span>
                               <span className="text-[11px] text-gray-400 truncate">
                                 <School size={10} className="inline mr-1 -mt-0.5" />{st.schoolName || st.schoolCode || '—'}
-                                {level === 'NATIONAL' && st.state ? ` · ${st.state}` : ''}
                               </span>
                             </span>
                           ))}

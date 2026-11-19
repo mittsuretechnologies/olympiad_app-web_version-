@@ -27,7 +27,7 @@ interface QueueVideo {
   schoolName: string | null;
   slot: number;
   ownerKey: string;
-  /** 'STATE' for a State Level competition video (its own card, one video). */
+  /** 'STATE' / 'NATIONAL' for a State / National Level competition video (its own card, one video). */
   stage?: string | null;
   existingScore: ExistingScore | null;
   isFullyScored?: boolean;
@@ -145,13 +145,13 @@ export default function EvaluateContentPage() {
   // Group the queue into one card per student, with videos placed by slot
   // (Video 1 left, Video 2 right) regardless of queue order.
   const students = useMemo(() => {
-    const map = new Map<string, { ownerKey: string; studentName: string; olympiadCode: string; schoolName: string | null; isState: boolean; slots: (QueueVideo | undefined)[] }>();
+    const map = new Map<string, { ownerKey: string; studentName: string; olympiadCode: string; schoolName: string | null; isState: boolean; stage: string | null; slots: (QueueVideo | undefined)[] }>();
     for (const v of queue) {
       if (!map.has(v.ownerKey)) {
-        const isState = v.stage === 'STATE';
-        map.set(v.ownerKey, { ownerKey: v.ownerKey, studentName: v.studentName, olympiadCode: v.olympiadCode, schoolName: v.schoolName, isState, slots: isState ? [undefined] : [undefined, undefined] });
+        const isState = v.stage === 'STATE' || v.stage === 'NATIONAL';
+        map.set(v.ownerKey, { ownerKey: v.ownerKey, studentName: v.studentName, olympiadCode: v.olympiadCode, schoolName: v.schoolName, isState, stage: v.stage ?? null, slots: isState ? [undefined] : [undefined, undefined] });
       }
-      map.get(v.ownerKey)!.slots[v.stage === 'STATE' ? 0 : Math.min(Math.max(v.slot, 0), 1)] = v;
+      map.get(v.ownerKey)!.slots[v.stage === 'STATE' || v.stage === 'NATIONAL' ? 0 : Math.min(Math.max(v.slot, 0), 1)] = v;
     }
     return Array.from(map.values());
   }, [queue]);
@@ -204,8 +204,10 @@ export default function EvaluateContentPage() {
   };
 
   const activeSlot = Math.min(Math.max(active?.slot ?? 0, 0), 1);
-  const activeIsState = active?.stage === 'STATE';
-  const videoTitle = (v: QueueVideo, slot: number) => (v.stage === 'STATE' ? 'State Level video' : `Video ${slot + 1}`);
+  // A State or National Level video: one video, scored on the State Level rubric.
+  const activeIsState = active?.stage === 'STATE' || active?.stage === 'NATIONAL';
+  const videoTitle = (v: QueueVideo, slot: number) =>
+    (v.stage === 'NATIONAL' ? 'National Level video' : v.stage === 'STATE' ? 'State Level video' : `Video ${slot + 1}`);
 
   return (
     <div className="space-y-6">
@@ -263,7 +265,7 @@ export default function EvaluateContentPage() {
                     <User className="w-3.5 h-3.5 flex-shrink-0 text-[#004f9f]" />
                     <span className="truncate">{s.studentName}</span>
                     <span className="text-xs font-medium text-gray-400 flex-shrink-0">· {s.olympiadCode}</span>
-                    {s.isState && <span className="ml-auto flex-shrink-0 text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">State Level</span>}
+                    {s.isState && <span className={`ml-auto flex-shrink-0 text-[10px] font-bold px-2 py-0.5 rounded-full ${s.stage === 'NATIONAL' ? 'bg-purple-100 text-purple-800' : 'bg-amber-100 text-amber-800'}`}>{s.stage === 'NATIONAL' ? 'National Level' : 'State Level'}</span>}
                   </div>
                   {!hideIdentity && s.schoolName && (
                     <div className="flex items-center gap-1.5 mt-0.5 text-xs text-gray-400 truncate">
