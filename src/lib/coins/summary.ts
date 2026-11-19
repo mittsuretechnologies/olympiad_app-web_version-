@@ -5,6 +5,9 @@ import { tasksForUser } from './tasks';
 import { gameRules } from './games';
 import { ensureReferralCode } from './referral';
 
+// How long the app shows "coin value changed" after ₹-per-coin changes.
+const RATE_NOTICE_MS = 30 * 86_400_000;
+
 // Everything the Coins screen and the home-screen chip need, in one request:
 // settings and the ladder come from memory, the wallet and task progress are
 // the only two database reads.
@@ -34,6 +37,9 @@ export async function coinSummary(appUserId: string) {
   return {
     enabled: true as const,
     inrPerCoin: cfg.inrPerCoin,
+    // ₹ value of the coins held, each at the rate it was earned at.
+    balanceInr: Math.round(wallet.balanceInr * 100) / 100,
+    rateChange: cfg.rateChange && Date.now() - Date.parse(cfg.rateChange.at) < RATE_NOTICE_MS ? cfg.rateChange : null,
     features: cfg.features,
     balance: wallet.balance,
     lifetimeEarned: wallet.lifetimeEarned,

@@ -5,6 +5,7 @@ import {
   SCHOOL_AGREEMENT,
   SCHOOL_AGREEMENT_KEY,
   SCHOOL_AGREEMENT_VERSION,
+  SCHOOL_AGREEMENT_POLICY_LINKS,
   schoolAgreementDeclarations,
 } from '@/lib/agreements/school-onboarding';
 import { clientIp, userAgent, schoolAgreementHash } from '@/lib/agreements/server';
@@ -49,6 +50,7 @@ export async function GET(request: Request) {
         key: SCHOOL_AGREEMENT_KEY,
         document: SCHOOL_AGREEMENT,
         declarations: schoolAgreementDeclarations(),
+        policyLinks: SCHOOL_AGREEMENT_POLICY_LINKS,
       }),
     });
   } catch (err) {

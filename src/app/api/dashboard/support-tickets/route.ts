@@ -20,6 +20,16 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status');
 
+    // ?countsOnly=1 — for the Support tab badge, polled in the background, so
+    // it returns no user details and writes no access-log entry.
+    if (searchParams.get('countsOnly') === '1') {
+      const [OPEN, RESOLVED] = await Promise.all([
+        prisma.supportTicket.count({ where: { status: 'OPEN' } }),
+        prisma.supportTicket.count({ where: { status: 'RESOLVED' } }),
+      ]);
+      return NextResponse.json({ counts: { OPEN, RESOLVED } });
+    }
+
     const where: Record<string, any> = {};
     if (status && ['OPEN', 'RESOLVED'].includes(status)) where.status = status;
 

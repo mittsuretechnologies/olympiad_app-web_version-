@@ -5,6 +5,7 @@ import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
 import { schoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { checkOlympiadCategory, checkUploadCategory } from '@/lib/uploadCategories';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -59,6 +60,16 @@ export async function POST(request: Request) {
     // Olympiad video also carries its main category.
     const school = studentRecord?.allocation?.school;
     const finalIsEvaluation = isEvaluation !== undefined ? Boolean(isEvaluation) : false;
+
+    // Only the categories dashboard → Upload Categories offers: an Olympiad
+    // video one of the two slot categories (with an option for the student's
+    // class), any other video the General User list — same as /api/app/videos.
+    const categoryProblem = finalIsEvaluation
+      ? await checkOlympiadCategory(category, subCategory, { olympiadCode: studentRecord?.olympiadCode })
+      : await checkUploadCategory('NORMAL', category, subCategory);
+    if (categoryProblem) {
+      return NextResponse.json({ error: categoryProblem }, { status: 400 });
+    }
     const autoTags = [
       ...schoolAutoTags(school),
       finalIsEvaluation ? mainCategoryTag(category, subCategory) : null,

@@ -1269,7 +1269,7 @@ function PhonePreview({ config: c }: { config: AppThemeConfig }) {
             <div key={s.key}>
               <div className="flex items-center justify-between mb-1">
                 <p className="text-[10px] font-extrabold" style={{ color: c.colors.sectionTitle || pageText }}>
-                  {s.key === 'rows' ? 'Most Watched This Week' : (s.title || SECTION_LABELS[s.key])}
+                  {s.key === 'rows' ? 'Trending Tots' : (s.title || SECTION_LABELS[s.key])}
                 </p>
                 <span className="text-[7px] font-bold px-1.5 py-0.5 rounded-full border"
                   style={c.colors.sectionAccent

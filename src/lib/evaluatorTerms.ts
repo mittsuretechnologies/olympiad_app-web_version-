@@ -22,7 +22,28 @@ export interface TermsPart {
 }
 
 export const EVALUATOR_TERMS_INTRO =
-  'By accessing this portal as an Evaluator, you confirm that you have read, understood and agree to the Evaluator Terms & Conditions (Part A) and the Evaluator Privacy Policy (Part B).';
+  'By accessing this portal as an Evaluator, you confirm that you have read, understood and agree to the Evaluator Terms & Conditions (Part A) and the Evaluator Privacy Policy (Part B), and that you give the undertaking in Section 11 of the Evaluator’s Handbook (Part C).';
+
+/**
+ * Part C: the Evaluator's Handbook (lib/handbook/evaluator-handbook.ts). Its
+ * text is confidential, so the gate loads it from /api/staff/handbook; only
+ * the heading, the intro and Section 11's undertaking live here.
+ */
+export const EVALUATOR_HANDBOOK_PART = {
+  heading: 'Part C: Evaluator’s Handbook',
+  intro: 'The rules every Evaluator must follow when marking Olympiad videos. Section 11 is your acknowledgement and undertaking, which you give by accepting below.',
+};
+
+/** Section 11 of the Evaluator's Handbook, point by point (verbatim). */
+export const EVALUATOR_HANDBOOK_UNDERTAKING = [
+  'I have read and understood this Evaluator’s Handbook, and I will follow it, the Community Guidelines and the Olympiad Rules.',
+  'I understand that all videos and details I access are confidential personal data of children, and I will use them only to evaluate the videos assigned to me.',
+  'I will not download, record, copy, share or disclose any video, Olympiad ID, mark or other detail, during or after my engagement.',
+  'I will mark every video fairly, independently and in line with the marking procedure decided by Mittmee.',
+  'I have declared any conflict of interest, and I will declare any that arises later.',
+  'I will report any breach, suspected breach or child-safety concern to Mittmee immediately.',
+  'I understand that breaching this undertaking may lead to termination, a claim for compensation and criminal action.',
+];
 
 export const EVALUATOR_TERMS_CONSENT =
   'I have read and agree to the Evaluator Terms & Conditions and the Evaluator Privacy Policy. I consent to the Company processing my personal data as described in them.';
@@ -30,11 +51,13 @@ export const EVALUATOR_TERMS_CONSENT =
 // Bump the version whenever the wording changes: every evaluator is then asked
 // to accept again, and each acceptance row pins the version + a hash of the text.
 export const EVALUATOR_TERMS_KEY = 'EVALUATOR_TERMS';
-export const EVALUATOR_TERMS_VERSION = '1.0';
+// 1.1: Part C, the Evaluator's Handbook, and its undertaking added.
+export const EVALUATOR_TERMS_VERSION = '1.1';
 
 export const EVALUATOR_TERMS_DECLARATIONS = [
   EVALUATOR_TERMS_CONSENT,
   'I understand that Submissions show children, and that I must not download, record, copy or share them.',
+  'I have read and understood the Evaluator’s Handbook (Part C), and I give the Acknowledgement and Undertaking in its Section 11.',
 ];
 
 export const EVALUATOR_TERMS_PARTS: TermsPart[] = [

@@ -52,6 +52,8 @@ import {
   BookOpen,
   Palette,
   Coins,
+  LayoutGrid,
+  Megaphone,
 } from 'lucide-react';
 
 type Role = 'SUPERADMIN' | 'MASTER_ADMIN' | 'REVIEWER' | 'EVALUATOR' | 'MODERATOR';
@@ -289,6 +291,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     { name: 'School Toppers', href: '/dashboard/result/school-toppers', icon: Trophy },
     { name: 'District Toppers', href: '/dashboard/result/district-toppers', icon: Trophy },
     { name: 'State Level', href: '/dashboard/result/district-forward', icon: Trophy },
+    { name: 'State & National', href: '/dashboard/result/state-national', icon: Trophy },
   ];
 
   const subItemClass = (isActive: boolean) =>
@@ -370,8 +373,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <span className="text-sm font-semibold">Dashboard</span>
             </Link>
 
-            {/* Moderator Handbook — always shown to moderators, not permission-gated */}
-            {role === 'MODERATOR' && (
+            {/* Staff handbook — always shown to moderators (Moderator Handbook) and
+                evaluators (Evaluator's Handbook), not permission-gated */}
+            {(role === 'MODERATOR' || role === 'EVALUATOR') && (
               <Link href="/dashboard/handbook"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/handbook') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <BookOpen size={20} />
@@ -463,7 +467,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="flex items-center gap-3"><Award size={20} /><span className="text-sm font-semibold">Result</span></div>
                   <ChevronDown size={16} className={`transition-transform duration-200 ${resultOpen ? 'rotate-180' : ''}`} />
                 </button>
-                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${resultOpen ? 'max-h-40 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${resultOpen ? 'max-h-60 opacity-100 mt-1' : 'max-h-0 opacity-0'}`}>
                   <div className="relative ml-6 pl-4 my-1">
                   <span className="absolute left-0 top-0 bottom-1/2 w-3 border-l-[3px] border-b-[3px] border-white/70 rounded-bl-lg" />
                   <div className="space-y-1 bg-white rounded-xl shadow-md border border-gray-100 py-2">
@@ -544,6 +548,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )}
 
+            {/* Upload Categories — only superadmin. The app's upload categories
+                for each kind of user, and the Search / Home category lists. */}
+            {canSeeAdmin('uploadCategories') && (
+              <Link href="/dashboard/upload-categories"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/upload-categories') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <LayoutGrid size={20} />
+                <span className="text-sm font-semibold">Upload Categories</span>
+              </Link>
+            )}
+
+            {/* App Notifications — only superadmin. A message to a chosen set of
+                app users, shown in the app's notification list. */}
+            {canSeeAdmin('appNotifications') && (
+              <Link href="/dashboard/app-notifications"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/app-notifications') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+                <Megaphone size={20} />
+                <span className="text-sm font-semibold">App Notifications</span>
+              </Link>
+            )}
+
             {/* Download Videos — only superadmin. Original files of uploaded videos. */}
             {canSeeAdmin('videoDownloads') && (
               <Link href="/dashboard/video-downloads"
@@ -602,21 +626,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )}
 
-            {/* Support */}
+            {/* Support — School Panel requests and app-user tickets, one tab each */}
             {canSee('support') && (
-              <Link href="/dashboard/support-tickets"
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support-tickets') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
+              <Link href="/dashboard/support"
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/support') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
                 <LifeBuoy size={20} />
                 <span className="text-sm font-semibold">Support</span>
-              </Link>
-            )}
-
-            {/* School Support — requests raised from the School Panel */}
-            {canSee('support') && (
-              <Link href="/dashboard/school-support"
-                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/school-support') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
-                <LifeBuoy size={20} />
-                <span className="text-sm font-semibold">School Support</span>
               </Link>
             )}
 
@@ -698,7 +713,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {showTermsModal && (
         role === 'EVALUATOR'
-          ? <EvaluatorTermsGate onAccept={handleAcceptTerms} onLogout={handleLogout} />
+          ? <EvaluatorTermsGate token={termsToken} onAccept={handleAcceptTerms} onLogout={handleLogout} />
           : <TermsAcceptanceModal onAccept={handleAcceptTerms} onLogout={handleLogout} />
       )}
     </div>

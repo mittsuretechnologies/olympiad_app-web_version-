@@ -7,6 +7,7 @@ import { ChevronLeft, ChevronRight, ListOrdered, ShieldCheck, X, type LucideIcon
 import type { Handbook, HandbookBlock } from '@/lib/handbook/moderator-handbook';
 import { literata } from './fonts';
 import s from './HandbookBook.module.css';
+import { rich } from './rich';
 
 /**
  * A handbook as a hardcover book: the Moderator Handbook, and the School Panel
@@ -175,31 +176,7 @@ function computeGeo(width: number, availH: number): Geo {
 
 /* ── Inline markup: <b> <i> <mark> <a href> ────────────────────────────────── */
 
-export function rich(text: string): ReactNode {
-  type Frame = { tag: string; href?: string; kids: ReactNode[] };
-  const root: Frame = { tag: 'root', kids: [] };
-  const stack: Frame[] = [root];
-  const re = /<(\/?)(b|i|mark|a)(?:\s+href="([^"]*)")?>/g;
-  let last = 0;
-  let k = 0;
-  let m: RegExpExecArray | null;
-  while ((m = re.exec(text))) {
-    if (m.index > last) stack[stack.length - 1].kids.push(text.slice(last, m.index));
-    last = m.index + m[0].length;
-    if (!m[1]) { stack.push({ tag: m[2], href: m[3], kids: [] }); continue; }
-    if (stack.length < 2) continue;
-    const f = stack.pop()!;
-    const el =
-      f.tag === 'b' ? <b key={k++}>{f.kids}</b>
-      : f.tag === 'i' ? <i key={k++}>{f.kids}</i>
-      : f.tag === 'mark' ? <mark key={k++}>{f.kids}</mark>
-      : <a key={k++} href={f.href} target="_blank" rel="noopener noreferrer">{f.kids}</a>;
-    stack[stack.length - 1].kids.push(el);
-  }
-  if (last < text.length) stack[stack.length - 1].kids.push(text.slice(last));
-  while (stack.length > 1) { const f = stack.pop()!; stack[stack.length - 1].kids.push(...f.kids); }
-  return root.kids;
-}
+export { rich };
 
 /* ── Blocks ────────────────────────────────────────────────────────────────── */
 
@@ -611,7 +588,8 @@ export default function HandbookBook({
             <div className={s.ornament} aria-hidden="true">◆</div>
             <h1 className="mt-[1.2em] text-[1.55em] leading-[1.25] font-semibold text-[#1c2a44]">{handbook.title}</h1>
             <p className="mt-[1.1em] font-semibold">{T.version}: {handbook.version}</p>
-            <p className="mt-[0.4em]"><b>{T.effectiveDate}</b>: {handbook.effectiveDate}</p>
+            {/* An empty date (the Evaluator's Handbook) leaves the line out. */}
+            {handbook.effectiveDate && <p className="mt-[0.4em]"><b>{T.effectiveDate}</b>: {handbook.effectiveDate}</p>}
             <div className={`${s.ornament} mt-[1.4em]`} aria-hidden="true">◆</div>
           </div>
           <div className="flex items-center gap-[0.5em] opacity-80">

@@ -3,7 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Search, Star, Loader2, Calendar, Pencil, Lock, Unlock, ChevronDown, ChevronUp, User, School } from 'lucide-react';
-import { KOSH_LABELS, KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, KOSH_MAX_SCORE, type KoshKey, type KoshGrade } from '@/lib/kosh';
+import { KOSH_LABELS, KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, KOSH_MAX_SCORE, criterionLabelFor, type KoshKey, type KoshGrade } from '@/lib/kosh';
 
 interface EvaluationRecord {
   id: string;
@@ -43,6 +43,8 @@ interface KoshBreakdownEntry {
 
 interface StudentHistory {
   studentKey: string;
+  /** 'STATE' for a student's State Level video (its own row), else null. */
+  stage?: string | null;
   studentName: string;
   username: string | null;
   olympiadCode: string;
@@ -105,8 +107,16 @@ export default function EvaluationHistoryPage() {
   const [currentEvaluatorId, setCurrentEvaluatorId] = useState<string | null>(null);
   const [publishing, setPublishing] = useState<string | null>(null);
 
+  // Real evaluators see only the Olympiad ID (no student/school name or username).
+  const [hideIdentity, setHideIdentity] = useState(true);
+
   useEffect(() => {
     setIsSuperAdmin(!!sessionStorage.getItem('token'));
+    setHideIdentity(
+      !!sessionStorage.getItem('evaluatorToken') &&
+      !sessionStorage.getItem('token') &&
+      !sessionStorage.getItem('reviewerToken'),
+    );
     try {
       const evaluatorData = sessionStorage.getItem('evaluatorData');
       if (evaluatorData) setCurrentEvaluatorId(JSON.parse(evaluatorData).id);
@@ -163,11 +173,12 @@ export default function EvaluationHistoryPage() {
 
   const filteredStudents = useMemo(() => {
     return students.filter(s => {
-      const matchesSearch =
-        s.studentName.toLowerCase().includes(search.toLowerCase()) ||
-        (s.username || '').toLowerCase().includes(search.toLowerCase()) ||
-        s.olympiadCode.toLowerCase().includes(search.toLowerCase()) ||
-        (s.schoolName || '').toLowerCase().includes(search.toLowerCase());
+      const matchesSearch = hideIdentity
+        ? s.olympiadCode.toLowerCase().includes(search.toLowerCase())
+        : s.studentName.toLowerCase().includes(search.toLowerCase()) ||
+          (s.username || '').toLowerCase().includes(search.toLowerCase()) ||
+          s.olympiadCode.toLowerCase().includes(search.toLowerCase()) ||
+          (s.schoolName || '').toLowerCase().includes(search.toLowerCase());
 
       const matchesCategory = !categoryFilter || s.videos.some(v => v.category === categoryFilter);
 
@@ -177,7 +188,7 @@ export default function EvaluationHistoryPage() {
 
       return matchesSearch && matchesCategory && matchesStatus;
     });
-  }, [students, search, categoryFilter, statusFilter]);
+  }, [students, search, categoryFilter, statusFilter, hideIdentity]);
 
   return (
     <div className="space-y-6">
@@ -192,7 +203,7 @@ export default function EvaluationHistoryPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
-            placeholder="Search student, code, school..."
+            placeholder={hideIdentity ? 'Search Olympiad ID...' : 'Search student, code, school...'}
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="w-full pl-9 pr-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#004f9f] focus:ring-2 focus:ring-[#004f9f]/10"
@@ -253,13 +264,16 @@ export default function EvaluationHistoryPage() {
                 >
                   <div className="flex items-center gap-3.5 min-w-0">
                     <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${theme.avatar} text-white text-sm font-bold flex items-center justify-center flex-shrink-0 shadow-sm ring-1 ring-black/5`}>
-                      {s.studentName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                      {hideIdentity ? s.olympiadCode.slice(-2).toUpperCase() : s.studentName.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                      <p className="font-semibold text-[15px] text-gray-900 truncate tracking-tight">{s.studentName}</p>
+                      <p className="font-semibold text-[15px] text-gray-900 truncate tracking-tight">
+                        {s.studentName}
+                        {s.stage === 'STATE' && <span className="ml-2 align-middle text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">State Level</span>}
+                      </p>
                       <div className="flex items-center gap-2 text-[11.5px] text-gray-500 mt-0.5">
                         <span className="font-mono font-semibold text-[#004f9f] bg-[#004f9f]/[0.06] px-1.5 py-0.5 rounded-md">{s.olympiadCode}</span>
-                        {s.schoolName && (
+                        {!hideIdentity && s.schoolName && (
                           <>
                             <span className="text-gray-300">•</span>
                             <span className="flex items-center gap-1 truncate text-gray-500"><School size={11} className="text-gray-400 flex-shrink-0" /> {s.schoolName}</span>
@@ -291,7 +305,8 @@ export default function EvaluationHistoryPage() {
                 {/* Expanded detail — per-kosha grades + each video's 5 criteria */}
                 {isOpen && (
                   <div className="border-t border-gray-100 bg-gray-50/40 p-5 space-y-4">
-                    {/* Kosh grade summary (V1 + V2 sums, banded) */}
+                    {/* Kosh grade summary (V1 + V2 sums, banded) — Olympiad videos only */}
+                    {s.stage !== 'STATE' && (
                     <div className="bg-white border border-gray-100 rounded-xl p-4">
                       <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wide mb-2.5">Kosh Grades (both videos, /{KOSH_MAX_SCORE} each)</p>
                       <div className="flex flex-wrap gap-2">
@@ -312,6 +327,7 @@ export default function EvaluationHistoryPage() {
                         <p className="text-[10px] text-amber-600 font-semibold mt-2">Grades finalize once both videos are scored.</p>
                       )}
                     </div>
+                    )}
 
                     {s.videos.map(v => {
                       const slot = Math.min(Math.max(v.slot, 0), 1);
@@ -321,7 +337,7 @@ export default function EvaluationHistoryPage() {
                           <div className="flex items-center justify-between flex-wrap gap-2">
                             <div className="flex items-center gap-2">
                               <User size={13} className="text-gray-400" />
-                              <span className="text-xs font-bold text-gray-700">Video {v.slot + 1}</span>
+                              <span className="text-xs font-bold text-gray-700">{s.stage === 'STATE' ? 'State Level video' : `Video ${v.slot + 1}`}</span>
                               {v.category && <span className="text-[10px] font-semibold bg-blue-50 text-[#004f9f] px-2 py-0.5 rounded-full">{v.category}</span>}
                               {v.subCategory && <span className="text-[10px] font-semibold bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{v.subCategory}</span>}
                             </div>
@@ -343,7 +359,7 @@ export default function EvaluationHistoryPage() {
                                   return (
                                     <div key={c.key} className="space-y-1">
                                       <div className="flex items-center justify-between text-[10.5px] font-semibold text-gray-700">
-                                        <span>{c.labelBySlot[slot]} <span className="text-[9px] text-[#004f9f] font-bold uppercase">· {KOSH_LABELS[c.kosh]}</span></span>
+                                        <span>{criterionLabelFor(c, slot, s.stage === 'STATE')} <span className="text-[9px] text-[#004f9f] font-bold uppercase">· {KOSH_LABELS[c.kosh]}</span></span>
                                         <span className="font-bold text-[#004f9f]">{score}/{MAX_PER_CRITERION}</span>
                                       </div>
                                       <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden">

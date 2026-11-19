@@ -2,26 +2,17 @@ import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
-import {
-  OLYMPIAD_CAT_A_SUBS,
-  OLYMPIAD_CAT_B_SUBS,
-  OLYMPIAD_CAT_A_LABEL,
-  OLYMPIAD_CAT_B_LABEL,
-} from '@/lib/olympiad-categories';
 import { hasMittfestTag } from '@/lib/mittfest';
 import { isMittfestCheckboxEnabled } from '@/lib/mittfestSettings';
 import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { recordCoinEvent } from '@/lib/coins/tasks';
-import {
-  ACCOUNT_TYPE_SCHOOL,
-  UPLOADER_SCHOOL_OWN,
-  SCHOOL_UPLOAD_CATEGORIES,
-  SCHOOL_ACTIVITY_SUBS,
-  isSchoolActivity,
-} from '@/lib/generalSchool';
+import { ACCOUNT_TYPE_SCHOOL, UPLOADER_SCHOOL_OWN } from '@/lib/generalSchool';
 import { getSchoolIdentity } from '@/lib/schoolAccount';
+import { checkOlympiadCategory, checkUploadCategory, loadCategoriesSafe } from '@/lib/uploadCategories';
+import { olympiadSlotOf } from '@/lib/olympiadSlots';
+import { STATE_STAGE, checkStateUpload, isStateCategoryName, stateCategory } from '@/lib/stateCompetition';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -48,7 +39,7 @@ export async function POST(request: Request) {
     const {
       videoUrl, thumbnailUrl, caption, category, subCategory,
       tags, isPublic, isEvaluation, olympiadId: bodyOlympiadId,
-      isOlympiadUpload, olympiadVisibility, isMittfest,
+      isOlympiadUpload, olympiadVisibility, isMittfest, isStateLevel,
     } = await request.json();
 
     if (!videoUrl || !category || !subCategory) {
@@ -88,19 +79,16 @@ export async function POST(request: Request) {
           { status: 403 },
         );
       }
-      if (!(SCHOOL_UPLOAD_CATEGORIES as readonly string[]).includes(category)) {
-        return NextResponse.json({ error: 'This category is not available for school accounts.' }, { status: 400 });
-      }
-      if (isSchoolActivity(category) && !(SCHOOL_ACTIVITY_SUBS as readonly string[]).includes(subCategory)) {
-        return NextResponse.json({ error: 'Pick a valid School Activity type.' }, { status: 400 });
-      }
+      // Only the categories the SuperAdmin gives this kind of school (dashboard
+      // → Upload Categories). Enforced here, not just in the app, so a
+      // hand-made request cannot post into another list.
+      const problem = await checkUploadCategory(
+        school.kind === 'OLYMPIAD' ? 'OLYMPIAD_SCHOOL' : 'GENERAL_SCHOOL', category, subCategory,
+      );
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
       // Same auto hashtags student videos get (state, district, school name; an
       // Olympiad school also carries its CRM ID).
       schoolAutoTags.push(...school.autoTags);
-    } else if (isSchoolActivity(category)) {
-      // School Activity belongs to schools. Enforced here, not just hidden in
-      // the app, so an older build or a hand-made request cannot post into it.
-      return NextResponse.json({ error: 'School Activity is only available to school accounts.' }, { status: 403 });
     }
 
     const olympiadCode = isSchoolAccount
@@ -108,6 +96,26 @@ export async function POST(request: Request) {
       : (bodyOlympiadId as string | undefined)?.trim().toUpperCase()
         || user?.olympiadId
         || null;
+
+    // A State Level video (lib/stateCompetition.ts): flagged by the app, or sent
+    // into the State Level category by name. Only a student forwarded to the
+    // State Level — matched by the Olympiad ID saved on their account, never one
+    // typed into this request — and only one video each.
+    const isStateUpload = !isSchoolAccount
+      && (isStateLevel === true || isStateCategoryName(await stateCategory(), category));
+    if (isStateUpload) {
+      const problem = await checkStateUpload(appUser.id, user?.olympiadId, category, subCategory);
+      if (problem) return NextResponse.json({ error: problem.error }, { status: problem.status });
+    } else if (!isSchoolAccount) {
+      // An Olympiad video goes into one of the two Olympiad categories, with an
+      // option offered to the student's class (the class letter is part of the
+      // Olympiad ID). Any other upload uses the General User list — Olympiad
+      // students included, once both their Olympiad videos are in.
+      const problem = isOlympiadUpload || isEvaluation === true
+        ? await checkOlympiadCategory(category, subCategory, { olympiadCode })
+        : await checkUploadCategory('NORMAL', category, subCategory);
+      if (problem) return NextResponse.json({ error: problem }, { status: 400 });
+    }
 
     // ---------- Student path ----------
     let studentId: string | null = null;
@@ -150,15 +158,18 @@ export async function POST(request: Request) {
 
     const uploaderType = isSchoolAccount ? UPLOADER_SCHOOL_OWN : olympiadCode ? 'STUDENT' : 'VIEWER';
 
-    // Olympiad upload: auto-set isEvaluation and enforce 1-per-category slot limit
-    let finalIsEvaluation = !isSchoolAccount && isEvaluation !== undefined ? Boolean(isEvaluation) : false;
-    if (isOlympiadUpload && !isSchoolAccount) {
+    // Olympiad upload: auto-set isEvaluation and enforce 1-per-category slot limit.
+    // A State Level video is never an Olympiad (stage-1) video.
+    let finalIsEvaluation = !isSchoolAccount && !isStateUpload && isEvaluation !== undefined ? Boolean(isEvaluation) : false;
+    if (isOlympiadUpload && !isSchoolAccount && !isStateUpload) {
       finalIsEvaluation = true;
-      // Use category label to detect slot — subCategory may be a custom "special talent" label
-      const isCatA = category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(subCategory);
-      const isCatB = category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(subCategory);
+      // The category label decides the slot first — subCategory may be a custom
+      // "special talent" label. The slot categories' options (dashboard → Upload
+      // Categories, plus the built-in spellings) fill in for older records.
+      const categories = await loadCategoriesSafe();
+      const slot = olympiadSlotOf(category, subCategory, categories);
 
-      if (isCatA || isCatB) {
+      if (slot) {
         // No deletedAt filter — an evaluated video must keep blocking this slot even if it
         // was later soft-deleted (e.g. an admin removing a reported video). See the matching
         // comment in GET /api/app/olympiad-video-slots for the full reasoning.
@@ -170,9 +181,7 @@ export async function POST(request: Request) {
           select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
         });
         const matchesSlot = (v: { category: string | null; subCategory: string | null }) =>
-          isCatA
-            ? v.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '')
-            : v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
+          olympiadSlotOf(v.category, v.subCategory, categories) === slot;
         // Blocked if evaluated (regardless of delete state) or if an active, non-rejected video occupies it.
         const slotTaken = existingOlympiadVideos.some(v =>
           matchesSlot(v) && (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
@@ -192,7 +201,11 @@ export async function POST(request: Request) {
       : [];
     // An Olympiad video also carries its main category (e.g. #TalentPerformance).
     const mergedTags = mergeTags(
-      [...schoolAutoTags, finalIsEvaluation ? mainCategoryTag(category, subCategory) : null],
+      [
+        ...schoolAutoTags,
+        finalIsEvaluation ? mainCategoryTag(category, subCategory) : null,
+        isStateUpload ? 'StateLevel' : null,
+      ],
       userTags,
     );
 
@@ -202,6 +215,9 @@ export async function POST(request: Request) {
     // (older app builds still show it and may send it regardless).
     const tickCounts = isMittfest !== undefined && Boolean(isMittfest) && await isMittfestCheckboxEnabled();
     const finalIsMittfest = tickCounts || hasMittfestTag(userTags);
+    // A State Level competition video is not a MittFest entry.
+    const finalIsMittfest = !isStateUpload
+      && ((isMittfest !== undefined ? Boolean(isMittfest) : false) || hasMittfestTag(userTags));
 
     const newVideo = await prisma.video.create({
       data: {
@@ -220,6 +236,7 @@ export async function POST(request: Request) {
         olympiadVisibility: finalIsEvaluation
           ? (olympiadVisibility === 'private' ? 'private' : 'public')
           : null,
+        competitionStage: isStateUpload ? STATE_STAGE : null,
         status: 'PENDING',
       },
     });

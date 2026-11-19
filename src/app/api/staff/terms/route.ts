@@ -8,7 +8,7 @@ import {
   EVALUATOR_TERMS_KEY,
   EVALUATOR_TERMS_VERSION,
 } from '@/lib/evaluatorTerms';
-import { evaluatorTermsHash } from '@/lib/evaluatorTermsServer';
+import { currentEvaluatorAcceptance, evaluatorTermsHash } from '@/lib/evaluatorTermsServer';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,18 +25,6 @@ export const dynamic = 'force-dynamic';
 //   record on the Agreements page) asks them to accept again.
 
 const GATED_ROLES = ['MODERATOR', 'EVALUATOR'];
-
-function currentEvaluatorAcceptance(evaluatorId: string) {
-  return prisma.agreementAcceptance.findFirst({
-    where: {
-      role: 'EVALUATOR', actorId: evaluatorId,
-      documentKey: EVALUATOR_TERMS_KEY, documentVersion: EVALUATOR_TERMS_VERSION,
-      revokedAt: null,
-    },
-    orderBy: { acceptedAt: 'desc' },
-    select: { id: true, acceptedAt: true },
-  });
-}
 
 /** Client-reported reading timestamps: kept only when plausible. */
 function plausibleDate(v: unknown): Date | null {

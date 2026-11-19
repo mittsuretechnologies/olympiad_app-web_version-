@@ -54,6 +54,10 @@ interface KoshCriterion {
   rubric: Rubric;
   // Optional per-video overrides, e.g. video 1 = Focus, video 2 = Language.
   rubricBySlot?: [Rubric, Rubric];
+  // State Level video ("Thoughts & Execution"): its own label / rubric where
+  // the criterion means something else there.
+  stateLabel?: string;
+  stateRubric?: Rubric;
 }
 
 // Ordered as on the Talent Round sheet. focusLanguageScore is labeled
@@ -94,7 +98,15 @@ export const KOSH_CRITERIA: KoshCriterion[] = [
   },
   {
     key: 'focusLanguageScore', kosh: 'VIJNANAMAYA', labelBySlot: ['Focus', 'Language'],
-    hint: 'Video 1: attention & concentration. Video 2: clarity of language.',
+    hint: 'Video 1: attention & concentration. Video 2: clarity of language. State Level: clarity of thought.',
+    stateLabel: 'Clarity of Thought',
+    stateRubric: [
+      'Not observable / no attempt',
+      'Idea unclear; steps jumbled or missing',
+      'Idea comes through, but the steps wander',
+      'Clear idea, carried out step by step',
+      'Sharp, well-reasoned idea, carried out with purpose',
+    ],
     // Placeholder (never used directly — rubricBySlot always overrides).
     rubric: ['—', '—', '—', '—', '—'],
     rubricBySlot: [
@@ -131,6 +143,16 @@ export const KOSH_CRITERIA: KoshCriterion[] = [
 export function criterionRubric(c: KoshCriterion, slot: number): Rubric {
   if (c.rubricBySlot) return c.rubricBySlot[Math.min(Math.max(slot, 0), 1)];
   return c.rubric;
+}
+
+/** Label / rubric of a criterion for a video: an Olympiad video by its slot, or the State Level video. */
+export function criterionLabelFor(c: KoshCriterion, slot: number, isState: boolean): string {
+  if (isState && c.stateLabel) return c.stateLabel;
+  return c.labelBySlot[Math.min(Math.max(slot, 0), 1)];
+}
+export function criterionRubricFor(c: KoshCriterion, slot: number, isState: boolean): Rubric {
+  if (isState) return c.stateRubric ?? c.rubric;
+  return criterionRubric(c, slot);
 }
 
 export const CRITERION_KEYS = KOSH_CRITERIA.map(c => c.key) as CriterionKey[];

@@ -16,6 +16,7 @@ import { SCHOOL_ACTIVITY_LABEL, categoryGroupsFor, currentGroupLabel } from '@/l
 import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
 import { CLAIM_RENEW_MS, claimIsLive } from '@/lib/videoClaim';
 import { mergeTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
+import { isSlot, uniqueNames, type CategoryDTO } from '@/lib/uploadCategoryShared';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -41,13 +42,20 @@ interface Video {
   createdAt: string;
   deletedAt: string | null;
   uploaderType: string | null;
+  /** 'STATE' for a State Level competition video, else null. */
+  competitionStage?: string | null;
   /** Live review claim by a moderator (see lib/videoClaim.ts). */
   claimedById?: string | null;
   claimedByName?: string | null;
   claimedAt?: string | null;
   /** Jury evaluations recorded — an evaluated video can't be un-approved. */
   _count?: { evaluations: number };
-  appUser: { userId: string; email: string | null; mobile: string | null; olympiadId: string | null; assignedName: string | null; school: { name: string; city: string; district: string; state: string } | null } | null;
+  appUser: {
+    userId: string; email: string | null; mobile: string | null; olympiadId: string | null; assignedName: string | null;
+    /** School account linked to a School row (Olympiad school); else General school. */
+    isOlympiadSchool?: boolean;
+    school: { name: string; city: string; district: string; state: string } | null;
+  } | null;
   student: {
     name: string;
     olympiadCode: string;
@@ -82,8 +90,6 @@ const REJECTION_TEMPLATES = [
   'Inappropriate content detected.',
   'Wrong category submitted.',
 ];
-
-const ALL_SUBCATEGORIES = [...OLYMPIAD_CAT_A_SUBS, ...OLYMPIAD_CAT_B_SUBS];
 
 const QUALITY_OPTIONS: { value: 'HIGH' | 'MEDIUM' | 'LOW'; label: string; hint: string }[] = [
   { value: 'HIGH',   label: 'High',   hint: 'Clear footage, good lighting and audio' },
@@ -149,15 +155,32 @@ function allTags(video: Video): string[] {
   return mergeTags(defaultTagsOf(video), editableTags(video)).split(',').filter(Boolean);
 }
 
-// App upload categories for general users with a single sub-option each; the
-// filter lists them. What a video can be moved to is decided per uploader by
+// Built-in filter lists, used until dashboard → Upload Categories loads (or if
+// it can't). What a video can be moved to is decided per uploader by
 // categoryGroupsFor (lib/moderationCategories.ts).
 const GENERAL_ONLY_CATEGORIES = ['Learning', 'Parenting', 'Others'];
+const BUILT_IN_MAIN_CATEGORIES = [
+  'Talent Performance', 'Rhymes', 'Speech & Presentation', ...GENERAL_ONLY_CATEGORIES, SCHOOL_ACTIVITY_LABEL,
+];
 
-function getCategoryLabel(cat: string) {
-  if (OLYMPIAD_CAT_A_SUBS.includes(cat)) return { label: 'Talent Performance', color: 'bg-violet-50 text-violet-700 border-violet-200' };
-  if (OLYMPIAD_CAT_B_SUBS.includes(cat)) return { label: 'Rhymes / Speech', color: 'bg-teal-50 text-teal-700 border-teal-200' };
+/** Slot badge from the sub-category: the slot lists (current + built-in spellings). */
+function getCategoryLabel(cat: string, opts: { a: string[]; b: string[] }) {
+  const has = (list: string[]) => list.some(s => s.toLowerCase() === (cat ?? '').toLowerCase());
+  if (has(opts.a) || OLYMPIAD_CAT_A_SUBS.includes(cat)) return { label: OLYMPIAD_CAT_A_LABEL, color: 'bg-violet-50 text-violet-700 border-violet-200' };
+  if (has(opts.b) || OLYMPIAD_CAT_B_SUBS.includes(cat)) return { label: OLYMPIAD_CAT_B_LABEL, color: 'bg-teal-50 text-teal-700 border-teal-200' };
   return null;
+}
+
+/** The uploader as the category lists see it (lib/uploadCategoryShared → videoAudiences). */
+function uploaderOf(video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'appUser' | 'competitionStage'>) {
+  const known = video.uploaderType === 'SCHOOL_OWN' && video.appUser?.isOlympiadSchool !== undefined;
+  return {
+    isEvaluation: video.isEvaluation,
+    uploaderType: video.uploaderType,
+    // A State Level video only moves within the State Level category.
+    competitionStage: video.competitionStage ?? null,
+    schoolKind: known ? (video.appUser!.isOlympiadSchool ? 'OLYMPIAD' as const : 'GENERAL' as const) : null,
+  };
 }
 
 // Videos uploaded under Learning / Parenting are shown on the app's home
@@ -172,8 +195,11 @@ function homeSectionBadge(category: string | null) {
 // Seeds the main-category dropdown. Older rows store the raw 'Cat A' / 'Cat B'
 // values instead of the display labels, and some have no usable category at all
 // — fall back to deriving it from the subcategory so the select is never blank.
-function normalizeCat(video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'category' | 'subCategory'>): string {
-  return currentGroupLabel(video);
+function normalizeCat(
+  video: Pick<Video, 'isEvaluation' | 'uploaderType' | 'appUser' | 'competitionStage' | 'category' | 'subCategory'>,
+  categories?: CategoryDTO[] | null,
+): string {
+  return currentGroupLabel({ ...uploaderOf(video), category: video.category, subCategory: video.subCategory }, categories);
 }
 
 // Must check every role's token key (token / reviewerToken / evaluatorToken /
@@ -241,6 +267,37 @@ export default function VideoModerationPage() {
   const [canChangeVisibility] = useState(() => myRole() === 'SUPERADMIN');
   const [myId] = useState(myUserId);
 
+  // Options for the category filter and the recategorise dropdowns: the current
+  // lists from dashboard → Upload Categories (the built-in ones until they load,
+  // or if they can't).
+  const [catOptions, setCatOptions] = useState({
+    a: OLYMPIAD_CAT_A_OPTIONS, b: OLYMPIAD_CAT_B_OPTIONS, general: GENERAL_ONLY_CATEGORIES,
+    main: BUILT_IN_MAIN_CATEGORIES,
+  });
+  // The full lists, for what each video may be moved to. Null until loaded.
+  const [managedCategories, setManagedCategories] = useState<CategoryDTO[] | null>(null);
+  useEffect(() => {
+    fetch('/api/app/categories')
+      .then(r => (r.ok ? r.json() : null))
+      .then((d: { categories?: CategoryDTO[] } | null) => {
+        if (!Array.isArray(d?.categories)) return;
+        const labels = (slot: string) => uniqueNames(
+          d.categories!.filter(c => c.slotKind === slot).flatMap(c => c.subs.map(s => s.label)),
+        );
+        const a = labels('OLY_A');
+        const b = labels('OLY_B');
+        if (!a.length || !b.length) return;
+        const inSlots = new Set([...a, ...b].map(s => s.toLowerCase()));
+        const general = uniqueNames(
+          d.categories!.filter(c => !isSlot(c)).flatMap(c => c.subs.map(s => s.label)),
+        ).filter(s => !inSlots.has(s.toLowerCase()));
+        const main = uniqueNames(d.categories!.filter(c => !isSlot(c)).map(c => c.label));
+        setCatOptions({ a, b, general, main });
+        setManagedCategories(d.categories!);
+      })
+      .catch(() => {});
+  }, []);
+
   // ── Tab & Filters ─────────────────────────────────────────────────────────
   const [filter,       setFilter]       = useState<StatusFilter>('PENDING');
   const [search,       setSearch]       = useState('');
@@ -252,6 +309,7 @@ export default function VideoModerationPage() {
   // isMittfest. Client-side only, like search, since it's a cheap boolean split
   // of the already-fetched per-status page.
   const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'GENERAL' | 'INFLUENCER'>('ALL');
+  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'STATE' | 'GENERAL'>('ALL');
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
@@ -277,7 +335,7 @@ export default function VideoModerationPage() {
   // single-video: bulk-approve doesn't exist, since quality is necessarily a
   // per-video judgment call (see the API route, which also rejects a bulk
   // APPROVED call as defense in depth).
-  const [approveModal,  setApproveModal]  = useState<{ video: Video; subCategoryOverride?: string } | null>(null);
+  const [approveModal,  setApproveModal]  = useState<{ video: Video; subCategoryOverride?: string; categoryOverride?: string } | null>(null);
   const [approveQuality, setApproveQuality] = useState<'HIGH' | 'MEDIUM' | 'LOW' | null>(null);
   const [deleteModal,  setDeleteModal]  = useState<{ ids: string[] } | null>(null);
 
@@ -320,6 +378,8 @@ export default function VideoModerationPage() {
     else if (contentFilter === 'OLYMPIAD') allVideos = allVideos.filter(v => v.isEvaluation);
     else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation);
     else if (contentFilter === 'INFLUENCER') allVideos = allVideos.filter(v => v.isInfluencer);
+    else if (contentFilter === 'STATE') allVideos = allVideos.filter(v => v.competitionStage === 'STATE');
+    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation && v.competitionStage !== 'STATE');
 
     // Videos someone else is reviewing go to the end of the pending queue, so
     // each moderator naturally picks up a different one.
@@ -408,7 +468,7 @@ export default function VideoModerationPage() {
     if (!(await claimVideo(video))) return;
     setPreviewVideo(video);
     setEditedSubCat(video.subCategory || '');
-    setEditedCat(normalizeCat(video));
+    setEditedCat(normalizeCat(video, managedCategories));
     setEditedQuality(video.quality as 'HIGH' | 'MEDIUM' | 'LOW' | null);
     setEditedTags(editableTags(video));
     setEditedCaption(video.caption || '');
@@ -426,7 +486,9 @@ export default function VideoModerationPage() {
     }
   };
 
-  const approve = async (video: Video, quality: 'HIGH' | 'MEDIUM' | 'LOW', subCategoryOverride?: string) => {
+  const approve = async (
+    video: Video, quality: 'HIGH' | 'MEDIUM' | 'LOW', subCategoryOverride?: string, categoryOverride?: string,
+  ) => {
     setProcessingId(video.id);
     try {
       const res = await fetch('/api/dashboard/videos', {
@@ -438,6 +500,9 @@ export default function VideoModerationPage() {
           quality,
           expectedStatus: video.status,
           ...(subCategoryOverride && subCategoryOverride !== video.subCategory ? { subCategory: subCategoryOverride } : {}),
+          // Without this the server checks the new option against the video's
+          // old main category (e.g. a Rhymes option under "Others") and refuses.
+          ...(categoryOverride ? { category: categoryOverride } : {}),
         }),
       });
       if (res.ok) {
@@ -667,15 +732,15 @@ export default function VideoModerationPage() {
     setRejectModal({ video: null, bulk: true });
   };
 
-  const openApproveModal = async (video: Video, subCategoryOverride?: string) => {
+  const openApproveModal = async (video: Video, subCategoryOverride?: string, categoryOverride?: string) => {
     if (!(await claimVideo(video))) return;
     setApproveQuality(null);
-    setApproveModal({ video, subCategoryOverride });
+    setApproveModal({ video, subCategoryOverride, categoryOverride });
   };
 
   const confirmApprove = async () => {
     if (!approveModal || !approveQuality) return;
-    await approve(approveModal.video, approveQuality, approveModal.subCategoryOverride);
+    await approve(approveModal.video, approveQuality, approveModal.subCategoryOverride, approveModal.categoryOverride);
     setApproveModal(null);
     setApproveQuality(null);
   };
@@ -775,7 +840,17 @@ export default function VideoModerationPage() {
   const canEditCategory = !!previewVideo && !previewVideo.deletedAt &&
     (filter === 'PENDING' || filter === 'APPROVED');
   // The groups this uploader gets in the app (see lib/moderationCategories.ts).
-  const categoryGroups = previewVideo ? categoryGroupsFor(previewVideo) : [];
+  // Plus the video's own category when it is no longer offered (closed, or an
+  // older name), so the select shows what is saved.
+  const categoryGroups = (() => {
+    if (!previewVideo) return [];
+    const groups = categoryGroupsFor(uploaderOf(previewVideo), managedCategories);
+    const own = normalizeCat(previewVideo, managedCategories);
+    return own && !groups.some(g => g.label === own)
+      ? [...groups, { label: own, subs: previewVideo.subCategory ? [previewVideo.subCategory] : [] }]
+      : groups;
+  })();
+  const subsOf = (label: string) => categoryGroups.find(g => g.label === label)?.subs ?? [];
 
   // ─────────────────────────────────────────────────────────────────────────
   return (
@@ -837,6 +912,7 @@ export default function VideoModerationPage() {
           { value: 'ALL',      label: 'All' },
           { value: 'MITTFEST', label: 'MittFest' },
           { value: 'OLYMPIAD', label: 'Olympiad' },
+          { value: 'STATE',    label: 'State Level' },
           { value: 'GENERAL',  label: 'General' },
           { value: 'INFLUENCER', label: 'Influencer' },
         ] as const).map(opt => (
@@ -902,16 +978,17 @@ export default function VideoModerationPage() {
                 >
                   <option value="">All categories</option>
                   <optgroup label={OLYMPIAD_CAT_A_LABEL}>
-                    {OLYMPIAD_CAT_A_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {catOptions.a.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                   <optgroup label={OLYMPIAD_CAT_B_LABEL}>
-                    {OLYMPIAD_CAT_B_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                    {catOptions.b.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
-                  <optgroup label="General uploads">
-                    {GENERAL_ONLY_CATEGORIES.map(s => <option key={s} value={s}>{s}</option>)}
+                  {/* "cat:<name>": every video saved under that main category. */}
+                  <optgroup label="Main categories">
+                    {catOptions.main.map(c => <option key={c} value={`cat:${c}`}>{c} (all)</option>)}
                   </optgroup>
-                  <optgroup label="School uploads">
-                    <option value={`cat:${SCHOOL_ACTIVITY_LABEL}`}>{SCHOOL_ACTIVITY_LABEL} (all)</option>
+                  <optgroup label="Other options">
+                    {catOptions.general.map(s => <option key={s} value={s}>{s}</option>)}
                   </optgroup>
                 </select>
               </div>
@@ -1021,7 +1098,7 @@ export default function VideoModerationPage() {
               const busy      = processingId === video.id;
               const tagList   = allTags(video);
               const isChecked = selected.has(video.id);
-              const catBadge  = getCategoryLabel(video.subCategory);
+              const catBadge  = getCategoryLabel(video.subCategory, catOptions);
               const isStudent = isStudentVideo(video);
               const lockedBy  = claimedByOther(video) ? (video.claimedByName || 'Another moderator') : null;
 
@@ -1073,6 +1150,11 @@ export default function VideoModerationPage() {
                       {video.isEvaluation && (
                         <span className="flex items-center gap-0.5 text-[10px] font-black text-amber-700 bg-amber-400 px-2 py-0.5 rounded-full shadow">
                           <Award size={9} /> Olympiad
+                        </span>
+                      )}
+                      {video.competitionStage === 'STATE' && (
+                        <span className="flex items-center gap-0.5 text-[10px] font-black text-white bg-[#B8860B] px-2 py-0.5 rounded-full shadow">
+                          <Award size={9} /> State Level
                         </span>
                       )}
                       {(() => { const hb = homeSectionBadge(video.category); return hb ? (
@@ -1312,8 +1394,8 @@ export default function VideoModerationPage() {
                         onChange={e => {
                           const cat = e.target.value;
                           setEditedCat(cat);
-                          const subs = categoryGroups.find(g => g.label === cat)?.subs ?? [];
-                          if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0]);
+                          const subs = subsOf(cat);
+                          if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0] ?? '');
                         }}
                         className="text-[11px] font-black text-amber-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-300"
                       >
@@ -1328,7 +1410,9 @@ export default function VideoModerationPage() {
                       >
                         {/* The app's options, plus the video's own value if it is an
                             older spelling, so the dropdown shows what is saved. */}
-                        {withCurrent([...(categoryGroups.find(g => g.label === editedCat)?.subs ?? [])], previewVideo.subCategory)
+                        {(editedCat === normalizeCat(previewVideo, managedCategories)
+                          ? withCurrent(subsOf(editedCat), previewVideo.subCategory)
+                          : subsOf(editedCat))
                           .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
                       </select>
                     </>
@@ -1340,12 +1424,12 @@ export default function VideoModerationPage() {
                   {/* Only a read-only view needs this derived badge — while editing,
                       the main-category select above already shows it. */}
                   {!canEditCategory &&
-                    (() => { const b = getCategoryLabel(previewVideo.subCategory); return b ? (
+                    (() => { const b = getCategoryLabel(previewVideo.subCategory, catOptions); return b ? (
                       <span className="text-[10px] font-black px-2 py-1 rounded-full bg-white/10 text-white/70">{b.label}</span>
                     ) : null; })()}
                   {canEditCategory &&
                    ((editedSubCat && editedSubCat !== previewVideo.subCategory) ||
-                    (editedCat && editedCat !== normalizeCat(previewVideo))) && (
+                    (editedCat && editedCat !== normalizeCat(previewVideo, managedCategories))) && (
                     <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-400/20 text-amber-300">
                       Recategorized
                     </span>
@@ -1353,6 +1437,11 @@ export default function VideoModerationPage() {
                   {previewVideo.isEvaluation && (
                     <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
                       <Award size={10} /> Olympiad
+                    </span>
+                  )}
+                  {previewVideo.competitionStage === 'STATE' && (
+                    <span className="flex items-center gap-1 text-[10px] font-black bg-[#B8860B] text-white px-2 py-1 rounded-full">
+                      <Award size={10} /> State Level
                     </span>
                   )}
                   {(() => { const hb = homeSectionBadge(previewVideo.category); return hb ? (
@@ -1611,7 +1700,13 @@ export default function VideoModerationPage() {
               <div className="flex gap-2 pt-1">
                 {filter === 'PENDING' && (
                   <>
-                    <button onClick={() => openApproveModal(previewVideo, editedSubCat !== previewVideo.subCategory ? editedSubCat : undefined)} disabled={processingId === previewVideo.id}
+                    <button onClick={() => openApproveModal(
+                        previewVideo,
+                        editedSubCat !== previewVideo.subCategory ? editedSubCat : undefined,
+                        // Compared with the dropdown's starting value, so an untouched
+                        // legacy name ("Cat A") isn't sent as a change.
+                        editedCat !== normalizeCat(previewVideo, managedCategories) ? editedCat : undefined,
+                      )} disabled={processingId === previewVideo.id}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
                       <CheckCircle size={14} /> Approve
                     </button>
@@ -1626,7 +1721,7 @@ export default function VideoModerationPage() {
                     onClick={() => saveRecategorization(previewVideo, editedSubCat, editedCat, editedQuality)}
                     disabled={
                       processingId === previewVideo.id || !editedQuality ||
-                      (editedSubCat === previewVideo.subCategory && editedCat === normalizeCat(previewVideo) && editedQuality === previewVideo.quality)
+                      (editedSubCat === previewVideo.subCategory && editedCat === normalizeCat(previewVideo, managedCategories) && editedQuality === previewVideo.quality)
                     }
                     className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
                     <CheckCircle size={14} /> {previewVideo.quality ? 'Save Category' : 'Set Quality & Save'}

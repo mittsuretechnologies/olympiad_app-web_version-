@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_LABEL, OLYMPIAD_CAT_B_LABEL } from '@/lib/olympiad-categories';
+import { computeOlympiadSlots } from '@/lib/olympiadSlots';
+import { loadCategoriesSafe } from '@/lib/uploadCategories';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 const JWT_SECRET = getJwtSecret();
@@ -54,22 +55,11 @@ export async function GET(request: Request) {
     // the slot is locked forever — whether the student tries to delete it (blocked outright,
     // see DELETE /api/app/videos/:id) or an admin removes it via the reported-videos queue
     // (soft-delete succeeds, but the slot must not reopen).
-    const activeVideos = videos.filter(v => v.deletedAt === null && v.status !== 'REJECTED');
-
-    const isVideoA = (v: { category: string | null; subCategory: string | null }) =>
-      v.category === OLYMPIAD_CAT_A_LABEL || OLYMPIAD_CAT_A_SUBS.includes(v.subCategory ?? '');
-    const isVideoB = (v: { category: string | null; subCategory: string | null }) =>
-      v.category === OLYMPIAD_CAT_B_LABEL || OLYMPIAD_CAT_B_SUBS.includes(v.subCategory ?? '');
-
-    // Locked = evaluation marks assigned, regardless of the video's current delete state.
-    const lockedA = videos.some(v => isVideoA(v) && v.evaluations.length > 0);
-    const lockedB = videos.some(v => isVideoB(v) && v.evaluations.length > 0);
-
-    const usedA = lockedA || activeVideos.some(isVideoA);
-    const usedB = lockedB || activeVideos.some(isVideoB);
-
-    const rejectedA = !usedA && videos.some(v => v.deletedAt === null && v.status === 'REJECTED' && isVideoA(v));
-    const rejectedB = !usedB && videos.some(v => v.deletedAt === null && v.status === 'REJECTED' && isVideoB(v));
+    // The one slot rule (lib/olympiadSlots), with the slot categories' options
+    // from dashboard → Upload Categories.
+    const {
+      slotA: usedA, slotB: usedB, lockedA, lockedB, rejectedA, rejectedB,
+    } = computeOlympiadSlots(videos, await loadCategoriesSafe());
 
     // Fetch school via the olympiadId → allocation → school chain
     let schoolName: string | null = null;

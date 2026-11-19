@@ -6,6 +6,7 @@ import { Check, CheckCircle2, Loader2, Lock, LogOut, AlertCircle, RotateCw, Scho
 import AgreementDocument from '@/components/agreements/AgreementDocument';
 import {
   SCHOOL_AGREEMENT,
+  SCHOOL_AGREEMENT_POLICY_LINKS,
   SCHOOL_AGREEMENT_VERSION,
   schoolAgreementDeclarations,
 } from '@/lib/agreements/school-onboarding';
@@ -198,7 +199,7 @@ function GateScreen({
             <div className="md:hidden mb-3 rounded-lg border border-[#E6E8EC] bg-white px-3 py-2.5"><Stepper step={step} /></div>
 
             <div ref={docRef} className="rounded-lg border border-[#E6E8EC] bg-white px-5 py-7 sm:px-10 sm:py-9 shadow-[0_1px_3px_rgba(16,24,40,0.06),0_1px_2px_rgba(16,24,40,0.04)]">
-              <AgreementDocument doc={SCHOOL_AGREEMENT} preparedFor={data.school.name} />
+              <AgreementDocument doc={SCHOOL_AGREEMENT} preparedFor={data.school.name} policyLinks={SCHOOL_AGREEMENT_POLICY_LINKS} />
               <div ref={endRef} aria-hidden="true" className="h-1" />
             </div>
 
