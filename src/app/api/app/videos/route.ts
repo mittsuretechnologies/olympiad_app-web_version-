@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { captionTagsAbuseMessage } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { isMittfestCheckboxEnabled } from '@/lib/mittfestSettings';
 import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 import { getJwtSecret } from '@/lib/jwt-secret';
@@ -210,6 +211,10 @@ export async function POST(request: Request) {
 
     // A "#mittfest" hashtag counts as an entry too, exactly like ticking the
     // MittFest checkbox — see src/lib/mittfest.ts.
+    // The tick only counts while a SuperAdmin has the checkbox switched on
+    // (older app builds still show it and may send it regardless).
+    const tickCounts = isMittfest !== undefined && Boolean(isMittfest) && await isMittfestCheckboxEnabled();
+    const finalIsMittfest = tickCounts || hasMittfestTag(userTags);
     // A State Level competition video is not a MittFest entry.
     const finalIsMittfest = !isStateUpload
       && ((isMittfest !== undefined ? Boolean(isMittfest) : false) || hasMittfestTag(userTags));

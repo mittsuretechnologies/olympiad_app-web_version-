@@ -16,6 +16,8 @@ interface CampaignVideo {
   thumbnailUrl: string | null;
   caption: string | null;
   tags: string | null;
+  // True when the uploader ticked the "Is this video for MittFest?" checkbox.
+  isMittfest?: boolean;
   category: string | null;
   subCategory: string | null;
   status: string;
@@ -96,6 +98,16 @@ export default function HashtagCampaignPage() {
   const clearDateRange = () => {
     setFromInput(''); setToInput('');
     setActiveFrom(''); setActiveTo('');
+  };
+
+  // A MittFest video counts the same whether the uploader typed #mittfest or
+  // ticked the MittFest checkbox, so a ticked-only video is shown with the
+  // #mittfest tag too and looks exactly like a typed one.
+  const tagsFor = (v: CampaignVideo): string[] => {
+    const list = (v.tags || '').split(',').map(t => t.trim().replace(/^#+/, '')).filter(Boolean);
+    const hasActive = list.some(t => t.toLowerCase() === activeTag.toLowerCase());
+    if (!hasActive && activeTag.toLowerCase() === 'mittfest' && v.isMittfest) list.unshift(activeTag);
+    return list;
   };
 
   const downloadCSV = () => {
@@ -285,7 +297,7 @@ export default function HashtagCampaignPage() {
                                         )}
                                       </div>
                                       {v.caption && <p className="text-xs text-gray-500 truncate">{v.caption}</p>}
-                                      {v.tags && <p className="text-[11px] text-rose-500 truncate">#{v.tags.split(',').map(t => t.trim()).filter(Boolean).join(' #')}</p>}
+                                      {tagsFor(v).length > 0 && <p className="text-[11px] text-rose-500 truncate">#{tagsFor(v).join(' #')}</p>}
                                       <p className="text-[10px] text-gray-400 mt-0.5">Uploaded: {new Date(v.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
                                     </div>
                                   </div>

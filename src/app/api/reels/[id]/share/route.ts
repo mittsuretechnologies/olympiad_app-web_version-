@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { sendPushToUsers } from '@/lib/push';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -55,7 +56,7 @@ export async function POST(
     // Verify sender exists
     const sender = await prisma.appUser.findUnique({
       where: { id: senderUserId },
-      select: { id: true },
+      select: { id: true, userId: true },
     });
     if (!sender) {
       return NextResponse.json({ message: 'Sender not found' }, { status: 404 });
@@ -73,6 +74,14 @@ export async function POST(
     }
 
     await prisma.reelShare.createMany({ data: rows, skipDuplicates: false });
+
+    // Push to each recipient's phone; tapping it opens this chat. Not awaited,
+    // so a slow Firebase call never delays the share.
+    void sendPushToUsers(rows.map(r => r.recipientId), {
+      title: 'New message',
+      body: `${sender.userId} sent you a video`,
+      data: { type: 'REEL_SHARE', senderId: senderUserId, senderName: sender.userId },
+    });
 
     return NextResponse.json({ success: true, shared: rows.length });
   } catch (error) {

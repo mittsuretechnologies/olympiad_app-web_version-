@@ -7,6 +7,7 @@ import { signAppUserToken } from '@/lib/appUserToken';
 import { encryptPassword } from '@/lib/password-crypto';
 import { recordConsent } from '@/lib/consent';
 import { attachReferral, ensureReferralCode } from '@/lib/coins/referral';
+import { isMailerConfigured, sendAppWelcomeEmail } from '@/lib/mailer';
 
 const MAX_APP_OTP_ATTEMPTS = 5;
 
@@ -203,6 +204,17 @@ export async function POST(request: Request) {
     }
     // The new user gets their own invite code straight away.
     void ensureReferralCode(user.id).catch(() => {});
+
+    // Welcome email to the registered address. Sent in the background so a
+    // slow or failing mail server never delays or breaks the signup.
+    if (user.email && isMailerConfigured()) {
+      void sendAppWelcomeEmail({
+        to: user.email,
+        guardianName: user.guardianName,
+        childName: user.childName,
+        username: user.userId,
+      }).catch((e) => console.error('welcome email failed:', e?.message || e));
+    }
 
     const token = signAppUserToken(user);
 

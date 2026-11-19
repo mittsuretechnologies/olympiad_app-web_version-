@@ -20,6 +20,10 @@ export async function GET(request: Request) {
         termsAccepted: true,
         accountType: true,
         plainPassword: true,
+        suspendedAt: true,
+        suspendedUntil: true,
+        suspensionType: true,
+        suspensionReason: true,
         createdAt: true,
       },
     });

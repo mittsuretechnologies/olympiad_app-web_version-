@@ -6,7 +6,7 @@ import { fetcher, getDashboardToken } from '@/lib/swr';
 import {
   Play, CheckCircle, XCircle, Clock, School,
   Eye, Globe, Lock, Award, RefreshCw, Trash2, RotateCcw,
-  Search, Filter, ChevronDown, X, Copy, Check,
+  Search, Filter, ChevronDown, X, Copy, Check, Star,
 } from 'lucide-react';
 import {
   OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_OPTIONS, OLYMPIAD_CAT_B_OPTIONS,
@@ -33,6 +33,8 @@ interface Video {
   isPublic: boolean;
   isEvaluation: boolean;
   isMittfest: boolean;
+  /** Moderator's influencer pick: leads its category's row on the app home. */
+  isInfluencer?: boolean;
   olympiadVisibility: string | null;
   status: string;
   rejectionReason: string | null;
@@ -306,6 +308,7 @@ export default function VideoModerationPage() {
   // vs General (neither) — a video can't be both, since jury videos don't set
   // isMittfest. Client-side only, like search, since it's a cheap boolean split
   // of the already-fetched per-status page.
+  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'GENERAL' | 'INFLUENCER'>('ALL');
   const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'STATE' | 'GENERAL'>('ALL');
 
   // ── Selection ─────────────────────────────────────────────────────────────
@@ -322,6 +325,8 @@ export default function VideoModerationPage() {
   const [editedTags,   setEditedTags]   = useState<string[]>([]);
   const [tagInput,     setTagInput]     = useState('');
   const [savingTags,   setSavingTags]   = useState(false);
+  const [savingMittfest, setSavingMittfest] = useState(false);
+  const [savingInfluencer, setSavingInfluencer] = useState(false);
   const [editedCaption, setEditedCaption] = useState('');
   const [savingCaption, setSavingCaption] = useState(false);
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
@@ -371,6 +376,8 @@ export default function VideoModerationPage() {
 
     if (contentFilter === 'MITTFEST') allVideos = allVideos.filter(v => v.isMittfest);
     else if (contentFilter === 'OLYMPIAD') allVideos = allVideos.filter(v => v.isEvaluation);
+    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation);
+    else if (contentFilter === 'INFLUENCER') allVideos = allVideos.filter(v => v.isInfluencer);
     else if (contentFilter === 'STATE') allVideos = allVideos.filter(v => v.competitionStage === 'STATE');
     else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation && v.competitionStage !== 'STATE');
 
@@ -614,15 +621,65 @@ export default function VideoModerationPage() {
         const newTags: string = body.video?.tags || '';
         mutate(cur => cur ? {
           ...cur,
-          videos: cur.videos.map(v => v.id === video.id ? { ...v, tags: newTags } : v),
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, tags: newTags, isMittfest: body.video?.isMittfest ?? v.isMittfest } : v),
         } : cur, { revalidate: false });
-        setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, tags: newTags } : cur);
-        setEditedTags(editableTags({ ...video, tags: newTags }));
+        setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, tags: newTags, isMittfest: body.video?.isMittfest ?? cur.isMittfest } : cur);
+        setEditedTags(editableTags({ ...video, tags: newTags, isMittfest: body.video?.isMittfest ?? video.isMittfest }));
       } else {
         const body = await res.json().catch(() => null);
         alert(body?.message || 'Failed to update tags');
       }
     } finally { setSavingTags(false); }
+  };
+
+  // Add to / remove from MittFest — open to moderators and admins, and
+  // independent of moderation status like the tag and caption edits.
+  const setMittfest = async (video: Video, mittfest: boolean) => {
+    setSavingMittfest(true);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ videoId: video.id, mittfest }),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        const newTags: string = body?.video?.tags || '';
+        const isMittfest: boolean = !!body?.video?.isMittfest;
+        mutate(cur => cur ? {
+          ...cur,
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, tags: newTags, isMittfest } : v),
+        } : cur, { revalidate: false });
+        setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, tags: newTags, isMittfest } : cur);
+        setEditedTags(editableTags({ ...video, tags: newTags, isMittfest }));
+      } else {
+        alert(body?.message || 'Failed to update MittFest');
+      }
+    } finally { setSavingMittfest(false); }
+  };
+
+  // Mark / unmark as an influencer video — open to moderators and admins. The
+  // app home puts influencer videos first in their category's row.
+  const setInfluencer = async (video: Video, influencer: boolean) => {
+    setSavingInfluencer(true);
+    try {
+      const res = await fetch('/api/dashboard/videos', {
+        method: 'PATCH',
+        headers: authHeaders(),
+        body: JSON.stringify({ videoId: video.id, influencer }),
+      });
+      const body = await res.json().catch(() => null);
+      if (res.ok) {
+        const isInfluencer: boolean = !!body?.video?.isInfluencer;
+        mutate(cur => cur ? {
+          ...cur,
+          videos: cur.videos.map(v => v.id === video.id ? { ...v, isInfluencer } : v),
+        } : cur, { revalidate: false });
+        setPreviewVideo(cur => cur && cur.id === video.id ? { ...cur, isInfluencer } : cur);
+      } else {
+        alert(body?.message || 'Failed to update influencer');
+      }
+    } finally { setSavingInfluencer(false); }
   };
 
   // Caption save — same status-independent PATCH endpoint as tags.
@@ -857,6 +914,7 @@ export default function VideoModerationPage() {
           { value: 'OLYMPIAD', label: 'Olympiad' },
           { value: 'STATE',    label: 'State Level' },
           { value: 'GENERAL',  label: 'General' },
+          { value: 'INFLUENCER', label: 'Influencer' },
         ] as const).map(opt => (
           <button
             key={opt.value}
@@ -1121,6 +1179,12 @@ export default function VideoModerationPage() {
                       {catBadge && (
                         <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full border ${catBadge.color}`}>
                           {catBadge.label}
+                        </span>
+                      )}
+                      {video.isInfluencer && (
+                        <span title="Influencer — shown first in its category on the app home"
+                          className="flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.5 rounded-full border text-amber-700 bg-amber-50 border-amber-200">
+                          <Star size={8} className="fill-amber-500 text-amber-500" /> Influencer
                         </span>
                       )}
                       {(() => {
@@ -1420,6 +1484,48 @@ export default function VideoModerationPage() {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* MittFest — moderators and admins can add this video to, or
+                  take it out of, the MittFest row in the app. */}
+              {!previewVideo.deletedAt && (
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold text-white">MittFest</p>
+                    <p className="text-[10px] text-white/40">
+                      {previewVideo.isMittfest ? 'This video is in the MittFest row.' : 'This video is not in MittFest.'}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setMittfest(previewVideo, !previewVideo.isMittfest)} disabled={savingMittfest}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40 whitespace-nowrap ${
+                      previewVideo.isMittfest ? 'bg-red-500/90 text-white hover:bg-red-600' : 'bg-fuchsia-500 text-white hover:bg-fuchsia-600'
+                    }`}>
+                    {savingMittfest ? 'Saving…' : previewVideo.isMittfest ? 'Remove from MittFest' : 'Add to MittFest'}
+                  </button>
+                </div>
+              )}
+
+              {/* Influencer — moderators and admins can pick this video to lead
+                  its category's row on the app home (once it's approved). */}
+              {!previewVideo.deletedAt && (
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-bold text-white flex items-center gap-1">
+                      <Star size={11} className={previewVideo.isInfluencer ? 'fill-amber-400 text-amber-400' : 'text-white/60'} /> Influencer
+                    </p>
+                    <p className="text-[10px] text-white/40">
+                      {previewVideo.isInfluencer
+                        ? `Shown first in "${previewVideo.category}" on the app home.`
+                        : `Not an influencer video. Marking it shows it first in "${previewVideo.category}" on the app home.`}
+                    </p>
+                  </div>
+                  <button type="button" onClick={() => setInfluencer(previewVideo, !previewVideo.isInfluencer)} disabled={savingInfluencer}
+                    className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40 whitespace-nowrap ${
+                      previewVideo.isInfluencer ? 'bg-red-500/90 text-white hover:bg-red-600' : 'bg-amber-500 text-white hover:bg-amber-600'
+                    }`}>
+                    {savingInfluencer ? 'Saving…' : previewVideo.isInfluencer ? 'Remove Influencer' : 'Mark as Influencer'}
+                  </button>
                 </div>
               )}
 

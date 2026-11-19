@@ -587,6 +587,94 @@ export async function sendMasterReviewerCredentialsEmail(data: MasterReviewerCre
 
 /* ── Video removed after a report ─────────────────────────────────────────── */
 
+/* ── Welcome email (new app sign-up) ─────────────────────────────────────── */
+
+export interface AppWelcomeMail {
+  to: string;
+  guardianName?: string | null;
+  childName?: string | null;
+  username: string;
+}
+
+// Sent once, right after someone registers in the app. Accounts for children
+// are registered with a parent's email, so it greets the parent/guardian.
+// Never includes the password.
+export async function sendAppWelcomeEmail(data: AppWelcomeMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+
+  const greeting = data.guardianName ? `Dear ${data.guardianName},` : 'Hello,';
+  const forWhom = data.childName ? ` for ${data.childName}` : '';
+
+  const html = renderEmailShell({
+    title: 'Welcome to Mittmee',
+    body: `
+      <p style="margin:0 0 12px;">${escapeHtml(greeting)}</p>
+      <p style="margin:0 0 12px;">Welcome to <b>Mittmee</b>! Your account${escapeHtml(forWhom)} has been registered successfully.</p>
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;margin:0 0 14px;border:1px solid #E3EAF5;border-radius:10px;">
+        ${credentialRow('Username', data.username, true)}
+      </table>
+      <p style="margin:0 0 12px;">You can log in to the Mittmee app with this username (or your registered mobile number) and the password you chose while signing up.</p>
+      <p style="margin:0 0 12px;">If you did not create this account, please contact us through <b>Help &amp; Support</b> in the Mittmee app.</p>
+      <p style="margin:0;">Regards,<br>Team Mittsure</p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'Welcome to Mittmee: your account is registered',
+    html,
+    attachments: emailAttachments(),
+    text:
+      `${greeting}\n\nWelcome to Mittmee! Your account${forWhom} has been registered successfully.\n\n` +
+      `Username: ${data.username}\n\n` +
+      `You can log in to the Mittmee app with this username (or your registered mobile number) and the password ` +
+      `you chose while signing up.\n\nIf you did not create this account, please contact us through Help & Support ` +
+      `in the Mittmee app.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
+export interface InactivityNoticeMail {
+  to: string;
+  guardianName?: string | null;
+  username: string;
+  eraseOn: Date;
+}
+
+// Sent ~30 days before an account that has been inactive for a year is erased.
+// Opening the app and signing in is enough to keep the account.
+export async function sendInactivityNoticeEmail(data: InactivityNoticeMail): Promise<void> {
+  if (!isMailerConfigured()) {
+    throw new Error('SMTP is not configured (set SMTP_USER and SMTP_PASS in .env)');
+  }
+  const greeting = data.guardianName ? `Dear ${data.guardianName},` : 'Hello,';
+  const eraseOn = data.eraseOn.toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric' });
+
+  const html = renderEmailShell({
+    title: 'Your Mittmee account will be erased',
+    body: `
+      <p style="margin:0 0 12px;">${escapeHtml(greeting)}</p>
+      <p style="margin:0 0 12px;">The Mittmee account <b>${escapeHtml(data.username)}</b> has not been used for almost 12 months.</p>
+      <p style="margin:0 0 12px;">If it stays unused, it will be <b>erased on ${escapeHtml(eraseOn)}</b>. To keep it, simply open the Mittmee app and sign in before that date.</p>
+      <p style="margin:0 0 12px;">After erasure, a copy of the account record is retained for 180 days as described in our Account Deletion Policy, and then deleted permanently.</p>
+      <p style="margin:0;">Regards,<br>Team Mittsure</p>`,
+  });
+
+  await getTransporter().sendMail({
+    from: SMTP_FROM ? `Mittmee <${SMTP_FROM}>` : undefined,
+    to: data.to,
+    subject: 'Your Mittmee account will be erased due to inactivity',
+    html,
+    attachments: emailAttachments(),
+    text:
+      `${greeting}\n\nThe Mittmee account ${data.username} has not been used for almost 12 months.\n\n` +
+      `If it stays unused, it will be erased on ${eraseOn}. To keep it, open the Mittmee app and sign in before that date.\n\n` +
+      `After erasure, a copy of the account record is retained for 180 days as described in our Account Deletion Policy, ` +
+      `and then deleted permanently.\n\nRegards,\nTeam Mittsure`,
+  });
+}
+
 export interface VideoRemovedMail {
   to: string;
   guardianName?: string | null;

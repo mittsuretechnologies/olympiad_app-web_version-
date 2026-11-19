@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getLinkedSchoolForUser } from '@/lib/schoolMembers';
 import { getJwtSecret } from '@/lib/jwt-secret';
+import { isSuspended, suspensionMessage } from '@/lib/accountSuspension';
 import { signAppUserToken } from '@/lib/appUserToken';
 import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
 import { currentOlympiadSchoolAcceptance, signSchoolToken } from '@/lib/schoolAccount';
@@ -47,12 +48,31 @@ export async function GET(request: Request) {
         accountType:  true,
         schoolRefId:  true,
         createdAt:    true,
+        suspendedAt:      true,
+        suspendedUntil:   true,
+        suspensionReason: true,
       },
     });
 
     if (!user) {
       return NextResponse.json({ message: 'User not found' }, { status: 404 });
     }
+
+    // Suspended / banned by the Super Admin: 401 makes the app log out (it
+    // calls /me on launch and every foreground).
+    if (isSuspended(user)) {
+      return NextResponse.json({ message: suspensionMessage(user) }, { status: 401 });
+    }
+
+    // Counts as activity for the 12-month inactivity rule (lib/inactiveAccounts.ts):
+    // a phone stays signed in for good, so login time alone would make a daily
+    // user look idle. Written at most once a day, and it also cancels any
+    // pending inactivity notice.
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await prisma.appUser.updateMany({
+      where: { id: user.id, OR: [{ lastLoginAt: null }, { lastLoginAt: { lt: dayAgo } }] },
+      data:  { lastLoginAt: new Date(), inactivityNoticeAt: null },
+    }).catch(() => {});
 
     // General School: institution details + whether its agreement acceptance
     // is current. A school the Super Admin switched off is logged out here -
@@ -139,7 +159,11 @@ export async function GET(request: Request) {
     }
 
     // schoolRefId is internal; the app only needs to know the kind (schoolProfile.kind).
-    const { schoolRefId: _schoolRefId, ...publicUser } = user;
+    const {
+      schoolRefId: _schoolRefId,
+      suspendedAt: _sa, suspendedUntil: _su, suspensionReason: _sr,
+      ...publicUser
+    } = user;
     // A token from before app sessions stopped expiring (it carries `exp`) is
     // swapped for a permanent one, so phones logged in earlier never hit the
     // old 30-day logout. The app saves `token` whenever /me sends one.

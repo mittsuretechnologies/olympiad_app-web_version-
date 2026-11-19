@@ -49,7 +49,7 @@ export async function PATCH(
       newValue: { userId: reqRow.appUser.userId },
       reason: 'Approved account deletion request',
     });
-    await hardDeleteAppUser(reqRow.appUserId);
+    await hardDeleteAppUser(reqRow.appUserId, 'STUDENT_APPROVED');
 
     return NextResponse.json({ success: true, status: 'APPROVED' });
   } catch (error) {

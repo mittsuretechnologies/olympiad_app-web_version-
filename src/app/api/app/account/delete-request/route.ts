@@ -102,6 +102,10 @@ export async function POST(request: Request) {
     }
 
     const isStudent = !!user.olympiadId;
+    // The app sends agreed:true once the user ticks "I agree" in the delete
+    // dialog. Older builds have no checkbox and send nothing, so it is recorded
+    // when present rather than required.
+    const agreedAt = body.agreed === true ? new Date() : null;
 
     if (isStudent) {
       const existing = await prisma.accountDeletionRequest.findFirst({
@@ -113,7 +117,7 @@ export async function POST(request: Request) {
         });
       }
       const created = await prisma.accountDeletionRequest.create({
-        data: { appUserId: appUser.id },
+        data: { appUserId: appUser.id, agreedAt },
       });
       return NextResponse.json({
         mode: 'STUDENT_REQUESTED', pending: true, requestedAt: created.createdAt,
@@ -124,7 +128,7 @@ export async function POST(request: Request) {
     if (!user.deletionRequestedAt) {
       await prisma.appUser.update({
         where: { id: appUser.id },
-        data:  { deletionRequestedAt },
+        data:  { deletionRequestedAt, deletionAgreedAt: agreedAt },
       });
     }
     const deleteAt = new Date(deletionRequestedAt.getTime() + 30 * 24 * 60 * 60 * 1000);

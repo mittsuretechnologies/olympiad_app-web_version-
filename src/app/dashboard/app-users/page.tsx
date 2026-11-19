@@ -1,14 +1,31 @@
 ﻿'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import useSWR from 'swr';
-import { fetcher } from '@/lib/swr';
+import { fetcher, authFetch } from '@/lib/swr';
 import {
   Smartphone, Loader2, Search, Download,
-  Users, GraduationCap, Eye, Filter, X
+  Users, GraduationCap, Eye, Filter, X, Ban, ShieldCheck
 } from 'lucide-react';
 
+// Active right now: set, and either permanent or still in the future.
+const isSuspendedNow = (u: { suspendedAt?: string | null; suspendedUntil?: string | null }) =>
+  !!u.suspendedAt && (!u.suspendedUntil || new Date(u.suspendedUntil).getTime() > Date.now());
+
+function isSuperAdmin(): boolean {
+  try {
+    const t = sessionStorage.getItem('token');
+    if (!t) return false;
+    const b64 = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    return JSON.parse(atob(b64)).role === 'SUPERADMIN';
+  } catch { return false; }
+}
+
 interface AppUser {
+  suspendedAt?: string | null;
+  suspendedUntil?: string | null;
+  suspensionType?: string | null;
+  suspensionReason?: string | null;
   id: string;
   userId: string;
   email: string | null;
@@ -22,8 +39,41 @@ interface AppUser {
 }
 
 export default function AppUsersPage() {
-  const { data, isLoading: loading } = useSWR<AppUser[]>('/api/app/users', fetcher);
+  const { data, isLoading: loading, mutate } = useSWR<AppUser[]>('/api/app/users', fetcher);
   const users: AppUser[] = Array.isArray(data) ? data : [];
+
+  // sessionStorage only exists in the browser, so read it after mount - doing
+  // it during render makes the server HTML differ from the client (hydration error).
+  const [canModerate, setCanModerate] = useState(false);
+  useEffect(() => { setCanModerate(isSuperAdmin()); }, []);
+  const [target, setTarget] = useState<AppUser | null>(null);
+  const [mode, setMode] = useState<'suspend' | 'ban'>('suspend');
+  const [days, setDays] = useState('7');
+  const [reason, setReason] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  const openAction = (u: AppUser) => {
+    setTarget(u); setMode('suspend'); setDays('7'); setReason(''); setActionError('');
+  };
+
+  const submitAction = async (action: 'suspend' | 'ban' | 'reinstate') => {
+    if (!target) return;
+    setBusy(true); setActionError('');
+    try {
+      const res = await authFetch(`/api/dashboard/app-users/${target.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, days: Number(days), reason }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) { setActionError(body.message || 'Failed'); return; }
+      await mutate();
+      setTarget(null);
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const [search, setSearch] = useState('');
   const [filterRole, setFilterRole] = useState('All');
@@ -180,6 +230,8 @@ export default function AppUsersPage() {
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Email</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Mobile</th>
                 <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Registered On</th>
+                <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Status</th>
+                {canModerate && <th className="px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider">Action</th>}
               </tr>
             </thead>
             <tbody>
@@ -214,6 +266,24 @@ export default function AppUsersPage() {
                   <td className="px-4 py-2.5 text-gray-400 text-xs whitespace-nowrap">
                     {new Date(u.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                   </td>
+                  <td className="px-4 py-2.5 text-xs">
+                    {isSuspendedNow(u)
+                      ? <span title={u.suspensionReason || ''} className="inline-flex items-center gap-1 text-[11px] font-bold text-red-700 bg-red-50 border border-red-200 px-2 py-0.5">
+                          <Ban size={10} />
+                          {u.suspendedUntil
+                            ? `Suspended till ${new Date(u.suspendedUntil).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}`
+                            : 'Banned'}
+                        </span>
+                      : <span className="text-green-700 font-semibold">Active</span>}
+                  </td>
+                  {canModerate && (
+                    <td className="px-4 py-2.5">
+                      <button onClick={() => openAction(u)}
+                        className="text-xs font-semibold text-[#004f9f] hover:underline">
+                        {isSuspendedNow(u) ? 'Reinstate' : 'Suspend / Ban'}
+                      </button>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
@@ -226,6 +296,70 @@ export default function AppUsersPage() {
           </div>
         )}
       </div>
+
+      {/* Suspend / ban / reinstate dialog (Super Admin only) */}
+      {target && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={() => !busy && setTarget(null)}>
+          <div className="w-full max-w-md bg-white border border-gray-200 p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-[#004f9f]">
+                  {isSuspendedNow(target) ? 'Reinstate account' : 'Suspend / Ban account'}
+                </h2>
+                <p className="text-sm text-gray-500 font-mono">{target.userId}</p>
+              </div>
+              <button onClick={() => setTarget(null)} disabled={busy} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+            </div>
+
+            {isSuspendedNow(target) ? (
+              <>
+                <p className="text-sm text-gray-600">
+                  {target.suspendedUntil
+                    ? `Suspended until ${new Date(target.suspendedUntil).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}.`
+                    : 'Permanently banned.'}
+                  {target.suspensionReason ? ` Reason: ${target.suspensionReason}` : ''}
+                </p>
+                {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+                <button onClick={() => submitAction('reinstate')} disabled={busy}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-green-700 text-white px-4 py-2.5 text-sm font-semibold hover:bg-green-800 disabled:opacity-50">
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} Reinstate account
+                </button>
+              </>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 gap-2">
+                  {(['suspend', 'ban'] as const).map(m => (
+                    <button key={m} onClick={() => setMode(m)}
+                      className={`px-3 py-2 text-sm font-semibold border ${mode === m ? 'bg-[#06013E] text-white border-[#06013E]' : 'bg-white text-gray-600 border-gray-200'}`}>
+                      {m === 'suspend' ? 'Suspend (temporary)' : 'Ban (permanent)'}
+                    </button>
+                  ))}
+                </div>
+                {mode === 'suspend' && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Days (1-365)</label>
+                    <input type="number" min={1} max={365} value={days} onChange={e => setDays(e.target.value)} className={sel} />
+                  </div>
+                )}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Reason (shown to the user)</label>
+                  <textarea value={reason} onChange={e => setReason(e.target.value)} maxLength={500} rows={3}
+                    className="w-full border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#06013E]" />
+                </div>
+                <p className="text-xs text-gray-500">
+                  The user is logged out, cannot sign in, and their videos are hidden from every feed until reinstated.
+                </p>
+                {actionError && <p className="text-sm text-red-600">{actionError}</p>}
+                <button onClick={() => submitAction(mode)} disabled={busy}
+                  className="w-full inline-flex items-center justify-center gap-2 bg-red-700 text-white px-4 py-2.5 text-sm font-semibold hover:bg-red-800 disabled:opacity-50">
+                  {busy ? <Loader2 size={14} className="animate-spin" /> : <Ban size={14} />}
+                  {mode === 'suspend' ? `Suspend for ${days || '?'} day(s)` : 'Ban permanently'}
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
