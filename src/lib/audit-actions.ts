@@ -43,6 +43,8 @@ export const AUDIT_ACTIONS: Record<string, AuditActionDef> = {
   VIDEO_DOWNLOADED:        { label: 'Video Downloaded',          category: 'moderation', tone: 'info' },
   // No longer written; kept so older entries still get a label.
   VISIBILITY_CHANGED:      { label: 'Visibility Changed',        category: 'moderation', tone: 'info' },
+  MITTFEST_CHANGED:        { label: 'MittFest Changed',          category: 'moderation', tone: 'info' },
+  INFLUENCER_CHANGED:      { label: 'Influencer Changed',        category: 'moderation', tone: 'info' },
   REPORT_IGNORED:          { label: 'Report Ignored',            category: 'moderation', tone: 'neutral' },
   REPORT_VIDEO_REMOVED:    { label: 'Reported Video Removed',    category: 'moderation', tone: 'danger' },
 
@@ -77,6 +79,9 @@ export const AUDIT_ACTIONS: Record<string, AuditActionDef> = {
   AGREEMENT_REACCEPTANCE_REQUESTED: { label: 'Agreement Re-acceptance Asked', category: 'accounts', tone: 'info' },
   GENERAL_SCHOOL_ACTIVATED:         { label: 'General School Activated',     category: 'accounts', tone: 'success' },
   GENERAL_SCHOOL_DEACTIVATED:       { label: 'General School Deactivated',   category: 'accounts', tone: 'danger' },
+  APP_USER_SUSPENDED:               { label: 'App User Suspended',           category: 'accounts', tone: 'danger' },
+  APP_USER_BANNED:                  { label: 'App User Banned',              category: 'accounts', tone: 'danger' },
+  APP_USER_REINSTATED:              { label: 'App User Reinstated',          category: 'accounts', tone: 'success' },
 
   SCHOOL_ACTIVATED:        { label: 'School Activated',          category: 'schools', tone: 'success' },
   SCHOOL_DEACTIVATED:      { label: 'School Deactivated',        category: 'schools', tone: 'danger' },

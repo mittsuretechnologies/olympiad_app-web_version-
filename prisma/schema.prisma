@@ -358,6 +358,9 @@ model Video {
   // UI-only before this column existed (the answer was never sent), so there
   // is no historical value to backfill from.
   isMittfest         Boolean           @default(false)
+  // Picked by a moderator: shown first in its category's row on the app home.
+  isInfluencer       Boolean           @default(false)
+  influencerAt       DateTime?
   isPublic           Boolean           @default(true)
   olympiadVisibility String? // "public" | "private" — only meaningful when isEvaluation = true
   likesCount         Int               @default(0)
@@ -383,6 +386,7 @@ model Video {
   @@index([status, isPublic])
   @@index([deletedAt])
   @@index([isMittfest])
+  @@index([isInfluencer])
   @@schema("public")
 }
 
@@ -637,9 +641,24 @@ model AppUser {
   // The sweep (api/cron/sweep-deleted-accounts) hard-deletes anyone still set
   // 30+ days later.
   deletionRequestedAt    DateTime?
+  // When a viewer ticked "I agree" in the delete dialog (students record this
+  // on AccountDeletionRequest.agreedAt instead). Cleared with deletionRequestedAt.
+  deletionAgreedAt       DateTime?
+  // Set when the "your account will be erased for inactivity" notice goes out
+  // (lib/inactiveAccounts.ts). Cleared the moment the user is seen again.
+  inactivityNoticeAt     DateTime?
   // Stamped on every successful login — the only signal the 30-day sweep and
   // the login route need to tell "came back in time" from "still gone".
   lastLoginAt            DateTime?
+  // Super Admin suspend / ban. suspendedAt set + suspendedUntil null = permanent
+  // ban; suspendedUntil in the future = timed suspension that lifts itself (no
+  // cron: lib/accountSuspension.ts just compares against now). A suspended
+  // account cannot log in, is logged out on the next /app/me, and its videos
+  // are hidden from every feed (lib/videoVisibility.ts). Lifting clears all four.
+  suspendedAt            DateTime?
+  suspendedUntil         DateTime?
+  suspensionType         String?
+  suspensionReason       String?
   olympiadCatAApproved   Boolean         @default(false)
   olympiadCatBApproved   Boolean         @default(false)
   // Free-text school name typed by a user whose school is not registered on
@@ -666,6 +685,7 @@ model AppUser {
   reportsSubmitted       VideoReport[]
   supportTickets         SupportTicket[]
   notifications          Notification[]
+  pushTokens             PushToken[]
   schoolLinkRequests     SchoolLinkRequest[]
   deletionRequests       AccountDeletionRequest[]
   // "USER" for every ordinary account (students included); "SCHOOL" for a
@@ -1016,6 +1036,22 @@ model Notification {
   @@schema("public")
 }
 
+// One row per phone that can receive push notifications (Firebase Cloud
+// Messaging). The token belongs to whoever logged in on that phone last, so a
+// shared phone never gets the previous user's alerts.
+model PushToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  appUserId String
+  platform  String   // "android" | "ios"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  appUser   AppUser  @relation(fields: [appUserId], references: [id], onDelete: Cascade)
+
+  @@index([appUserId])
+  @@schema("public")
+}
+
 // Links an app user to a registered school WITHOUT an Olympiad ID.
 // A student who never sat the Olympiad has no OlympiadIdAllocation, so the
 // School -> allocation -> AppUser.olympiadId chain can never reach them. This
@@ -1085,10 +1121,34 @@ model AccountDeletionRequest {
   status     String    @default("PENDING") // PENDING | APPROVED | REJECTED
   createdAt  DateTime  @default(now())
   decidedAt  DateTime?
+  // When the user ticked "I agree" in the app's delete dialog (null for
+  // requests made before the checkbox existed).
+  agreedAt   DateTime?
   appUser    AppUser   @relation(fields: [appUserId], references: [id], onDelete: Cascade)
 
   @@index([appUserId, status])
   @@index([status])
+  @@schema("public")
+}
+
+// Kept for 180 days after an account is permanently deleted (IT Rules retention,
+// see the Account Deletion Policy), then removed by the daily sweep
+// (api/cron/sweep-deleted-accounts). Written by hardDeleteAppUser just before
+// the live rows are wiped. Deliberately NOT a relation to AppUser: the account
+// is gone, so its username/mobile/email are free to register again. The snapshot
+// holds the bcrypt password hash and media links (never plainPassword or OTPs);
+// the media files stay in storage until the purge deletes them.
+model DeletedAccountArchive {
+  id            String   @id @default(uuid())
+  appUserId     String
+  userId        String
+  reason        String
+  snapshot      Json
+  deletedAt     DateTime @default(now())
+  purgeAt       DateTime
+
+  @@index([purgeAt])
+  @@index([userId])
   @@schema("public")
 }
 

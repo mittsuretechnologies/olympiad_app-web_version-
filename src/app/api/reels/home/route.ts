@@ -244,7 +244,9 @@ export async function GET(request: NextRequest) {
           prisma.video.findMany({
             take: ROW_LIMIT,
             where: { ...baseWhere, category: name },
-            orderBy: { viewsCount: 'desc' },
+            // Influencer picks (marked on the moderation page) lead their
+            // category's row, newest pick first; the rest follow by views.
+            orderBy: [{ isInfluencer: 'desc' }, { influencerAt: { sort: 'desc', nulls: 'last' } }, { viewsCount: 'desc' }],
             select: VIDEO_SELECT,
           })
         )

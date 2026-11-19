@@ -10,6 +10,7 @@ import { CLEAR_CLAIM, claimFreeFor, claimIsLive } from '@/lib/videoClaim';
 import { mergeTags, schoolAutoTags, videoDefaultTags, withoutCategoryTags } from '@/lib/videoAutoTags';
 import { MAX_CAPTION_LENGTH, MAX_CUSTOM_TAGS, cleanHashtag } from '@/lib/uploadRules';
 import { captionTagsAbuseMessage } from '@/lib/profanity';
+import { MITTFEST_TAG, hasMittfestTag } from '@/lib/mittfest';
 
 const TAG_SCHOOL_SELECT = { name: true, state: true, district: true, olympiadId: true } as const;
 
@@ -718,8 +719,87 @@ export async function PATCH(request: Request) {
   if (moduleCheck.error) return moduleCheck.error;
 
   try {
-    const { videoId, tags, caption, visibility, reason } = await request.json();
+    const { videoId, tags, caption, visibility, reason, mittfest, influencer } = await request.json();
     if (!videoId) return NextResponse.json({ message: 'videoId required' }, { status: 400 });
+
+    // Influencer pick — moderators and admins may mark a video so it leads its
+    // category's row on the app home (see /api/reels/home). influencerAt orders
+    // several picks in one category: the most recently picked comes first.
+    if (influencer !== undefined) {
+      if (typeof influencer !== 'boolean') return NextResponse.json({ message: 'influencer must be true or false' }, { status: 400 });
+
+      const current = await prisma.video.findUnique({
+        where: { id: videoId },
+        select: { id: true, isInfluencer: true, deletedAt: true },
+      });
+      if (!current) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+      if (current.deletedAt) return NextResponse.json({ message: 'This video has been deleted.' }, { status: 409 });
+      if (current.isInfluencer === influencer) {
+        return NextResponse.json({ message: influencer ? 'Already an influencer video' : 'Not an influencer video', video: { id: current.id, isInfluencer: current.isInfluencer } });
+      }
+
+      const video = await prisma.video.update({
+        where: { id: videoId },
+        data: { isInfluencer: influencer, influencerAt: influencer ? new Date() : null },
+        select: { id: true, isInfluencer: true, influencerAt: true },
+      });
+
+      await recordAuditLog({
+        actorId: payload!.id,
+        actorRole: payload!.role,
+        actorName: payload!.name || payload!.email || null,
+        action: 'INFLUENCER_CHANGED',
+        entityType: 'Video',
+        entityId: videoId,
+        previousValue: { isInfluencer: current.isInfluencer },
+        newValue: { isInfluencer: video.isInfluencer },
+        reason: null,
+      });
+
+      return NextResponse.json({ message: influencer ? 'Marked as influencer video' : 'Removed from influencer videos', video });
+    }
+
+    // MittFest membership — moderators and admins may both add a video to
+    // MittFest or take it out. Video.isMittfest is what the app's MittFest row
+    // reads; the #mittfest hashtag is kept in step with it so the chip shown on
+    // the moderation page never disagrees with the flag.
+    if (mittfest !== undefined) {
+      if (typeof mittfest !== 'boolean') return NextResponse.json({ message: 'mittfest must be true or false' }, { status: 400 });
+
+      const current = await prisma.video.findUnique({
+        where: { id: videoId },
+        select: { id: true, tags: true, isMittfest: true, deletedAt: true },
+      });
+      if (!current) return NextResponse.json({ message: 'Video not found' }, { status: 404 });
+      if (current.deletedAt) return NextResponse.json({ message: 'This video has been deleted.' }, { status: 409 });
+
+      const currentTags = splitTags(current.tags || '');
+      const withoutMittfest = currentTags.filter(t => t.replace(/^#+/, '').toLowerCase() !== MITTFEST_TAG);
+      if (current.isMittfest === mittfest && hasMittfestTag(currentTags) === mittfest) {
+        return NextResponse.json({ message: mittfest ? 'Already in MittFest' : 'Not in MittFest', video: { id: current.id, tags: current.tags, isMittfest: current.isMittfest } });
+      }
+      const nextTags = (mittfest ? [...withoutMittfest, MITTFEST_TAG] : withoutMittfest).join(',');
+
+      const video = await prisma.video.update({
+        where: { id: videoId },
+        data: { isMittfest: mittfest, tags: nextTags || null },
+        select: { id: true, tags: true, isMittfest: true },
+      });
+
+      await recordAuditLog({
+        actorId: payload!.id,
+        actorRole: payload!.role,
+        actorName: payload!.name || payload!.email || null,
+        action: 'MITTFEST_CHANGED',
+        entityType: 'Video',
+        entityId: videoId,
+        previousValue: { isMittfest: current.isMittfest },
+        newValue: { isMittfest: video.isMittfest },
+        reason: null,
+      });
+
+      return NextResponse.json({ message: mittfest ? 'Added to MittFest' : 'Removed from MittFest', video });
+    }
 
     // Visibility override — SUPERADMIN ONLY (not Master Admin, not Moderator).
     // Flips a video between public and private whatever its status, using the
@@ -851,10 +931,15 @@ export async function PATCH(request: Request) {
       }
     }
 
+    // Taking the #mittfest chip off (or an admin typing it) moves the video
+    // out of / into MittFest too — the app reads the flag, not the tag text.
+    const mittfestAfter = hasMittfestTag(finalTags);
+    const mittfestChanged = mittfestAfter !== before.isMittfest;
+
     const video = await prisma.video.update({
       where: { id: videoId },
-      data: { tags: finalTags || null },
-      select: { id: true, tags: true },
+      data: { tags: finalTags || null, ...(mittfestChanged ? { isMittfest: mittfestAfter } : {}) },
+      select: { id: true, tags: true, isMittfest: true },
     });
 
     await recordAuditLog({

@@ -9,6 +9,7 @@ import {
   OLYMPIAD_CAT_B_LABEL,
 } from '@/lib/olympiad-categories';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { isMittfestCheckboxEnabled } from '@/lib/mittfestSettings';
 import { schoolAutoTags as buildSchoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { COPYRIGHT_DISABLED, COPYRIGHT_REMOVED_NOTICE } from '@/lib/copyright';
 import { getJwtSecret } from '@/lib/jwt-secret';
@@ -197,8 +198,10 @@ export async function POST(request: Request) {
 
     // A "#mittfest" hashtag counts as an entry too, exactly like ticking the
     // MittFest checkbox — see src/lib/mittfest.ts.
-    const finalIsMittfest =
-      (isMittfest !== undefined ? Boolean(isMittfest) : false) || hasMittfestTag(userTags);
+    // The tick only counts while a SuperAdmin has the checkbox switched on
+    // (older app builds still show it and may send it regardless).
+    const tickCounts = isMittfest !== undefined && Boolean(isMittfest) && await isMittfestCheckboxEnabled();
+    const finalIsMittfest = tickCounts || hasMittfestTag(userTags);
 
     const newVideo = await prisma.video.create({
       data: {

@@ -1,4 +1,13 @@
 import { prisma } from '@/lib/prisma';
+import { sendPushToUsers } from '@/lib/push';
+
+// Every in-app notification below also goes to the user's phone as a push.
+// Not awaited: a slow or failing Firebase call must never hold up (or break)
+// the like / approval / follow that triggered it. `type` and `videoId` tell
+// the app which screen to open when the push is tapped.
+function push(userIds: string[], title: string, body: string, type: string, videoId?: string | null) {
+  void sendPushToUsers(userIds, { title, body, data: { type, ...(videoId ? { videoId } : {}) } });
+}
 
 interface CreateNotificationInput {
   userId: string;
@@ -21,6 +30,7 @@ export async function createNotification(entry: CreateNotificationInput) {
         videoId: entry.videoId ?? null,
       },
     });
+    push([entry.userId], entry.title, entry.message, entry.type, entry.videoId);
   } catch (error) {
     console.error('Failed to create notification:', error, entry);
   }
@@ -49,6 +59,7 @@ async function upsertActorNotification({
         data: { userId, type, title, message, actorId, count: 1, recentActorIds: [actorId] },
       });
     }
+    push([userId], title, message, type);
   } catch (error) {
     console.error(`Failed to record ${type} notification:`, error);
   }
@@ -120,10 +131,14 @@ export async function notifyFollowersOfNewVideo({
         recentActorIds: [uploaderId],
       })),
     });
+    push(follows.map(f => f.followerId), 'New Video', `${uploaderUserId} uploaded a new video`, 'NEW_VIDEO', videoId);
   } catch (error) {
     console.error('Failed to notify followers of new video:', error);
   }
 }
+
+// At most one "New Star" push per video in this window.
+const LIKE_PUSH_GAP_MS = 10 * 60 * 1000;
 
 function formatLikeMessage(firstActorUserId: string, count: number): string {
   if (count <= 1) return `${firstActorUserId} starred your video`;
@@ -152,16 +167,21 @@ export async function notifyVideoLiked({
     if (existing) {
       const nextCount = existing.count + 1;
       const recentActorIds = [likerUserId, ...existing.recentActorIds.filter(id => id !== likerUserId)].slice(0, 3);
+      // A video getting lots of stars shouldn't buzz the owner's phone for
+      // each one: push only if the last star on it was a while ago.
+      const quietLongEnough = Date.now() - existing.createdAt.getTime() > LIKE_PUSH_GAP_MS;
+      const message = formatLikeMessage(recentActorIds[0], nextCount);
       await prisma.notification.update({
         where: { id: existing.id },
         data: {
           count: nextCount,
           recentActorIds,
-          message: formatLikeMessage(recentActorIds[0], nextCount),
+          message,
           isRead: false,
           createdAt: new Date(), // resurface to the top of the feed
         },
       });
+      if (quietLongEnough) push([ownerId], 'New Star', message, 'VIDEO_LIKED', videoId);
     } else {
       await prisma.notification.create({
         data: {
@@ -174,6 +194,7 @@ export async function notifyVideoLiked({
           recentActorIds: [likerUserId],
         },
       });
+      push([ownerId], 'New Star', formatLikeMessage(likerUserId, 1), 'VIDEO_LIKED', videoId);
     }
   } catch (error) {
     console.error('Failed to record like notification:', error);

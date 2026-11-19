@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { signAppUserToken } from '@/lib/appUserToken';
 import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
+import { isSuspended, suspensionMessage } from '@/lib/accountSuspension';
 import { ensureSchoolAccount, currentOlympiadSchoolAcceptance, signSchoolToken } from '@/lib/schoolAccount';
 
 export async function POST(request: Request) {
@@ -160,6 +161,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Incorrect password. Please try again.' }, { status: 401 });
     }
 
+    // Suspended / banned by the Super Admin. Checked after the password so the
+    // status is not revealed to someone who only guessed a username.
+    if (isSuspended(user)) {
+      return NextResponse.json({ message: suspensionMessage(user) }, { status: 403 });
+    }
+
     // A General School the Super Admin switched off cannot log in. Checked
     // before lastLoginAt / deletion-flag updates so a blocked attempt changes
     // nothing on the account.
@@ -183,7 +190,7 @@ export async function POST(request: Request) {
     // only hides accounts where this is still set).
     await prisma.appUser.update({
       where: { id: user.id },
-      data:  { lastLoginAt: new Date(), deletionRequestedAt: null },
+      data:  { lastLoginAt: new Date(), deletionRequestedAt: null, deletionAgreedAt: null, inactivityNoticeAt: null },
     });
 
     const token = signAppUserToken(user);

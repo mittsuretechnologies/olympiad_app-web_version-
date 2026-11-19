@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { hardDeleteAppUser } from '@/lib/accountDeletion';
+import { recordAuditLog } from '@/lib/audit-log';
+import { runInactiveAccountSweep } from '@/lib/inactiveAccounts';
+import { DELETED_ACCOUNT_RETENTION_DAYS, hardDeleteAppUser, purgeArchivedAccounts } from '@/lib/accountDeletion';
 
 // Daily sweep for viewers whose 30-day grace window has run out.
 // Students never get deletionRequestedAt set by this app (they go through
@@ -29,10 +31,38 @@ export async function GET(request: Request) {
     });
 
     for (const user of due) {
-      await hardDeleteAppUser(user.id);
+      await hardDeleteAppUser(user.id, 'VIEWER_30_DAY');
     }
 
-    return NextResponse.json({ deletedCount: due.length, deletedUserIds: due.map(u => u.userId) });
+    // Accounts banned 180+ days ago (and never reinstated) are permanently
+    // deleted. Their data was kept intact for the whole ban, so no new archive.
+    const banCutoff = new Date(Date.now() - DELETED_ACCOUNT_RETENTION_DAYS * 24 * 60 * 60 * 1000);
+    const bannedDue = await prisma.appUser.findMany({
+      where:  { suspensionType: 'BAN', suspendedAt: { lte: banCutoff }, schoolRefId: null },
+      select: { id: true, userId: true },
+    });
+    for (const user of bannedDue) {
+      await recordAuditLog({
+        actorId: 'system', actorRole: 'SYSTEM', actorName: 'Daily sweep',
+        action: 'ACCOUNT_DELETED', entityType: 'AppUser', entityId: user.id,
+        newValue: { userId: user.userId },
+        reason: `Banned ${DELETED_ACCOUNT_RETENTION_DAYS}+ days ago and not reinstated`,
+      });
+      await hardDeleteAppUser(user.id, 'BANNED_180_DAY', { archive: false });
+    }
+
+    // 12 months unused: notice first, erase 30 days later (kept 180 days).
+    const inactive = await runInactiveAccountSweep();
+
+    // Archived records whose 180-day retention is over go for good.
+    // (record, password hash and video/avatar files).
+    const purged = await purgeArchivedAccounts();
+
+    return NextResponse.json({
+      deletedCount: due.length, deletedUserIds: due.map(u => u.userId), bannedDeletedCount: bannedDue.length,
+      inactiveNoticed: inactive.noticed, inactiveErased: inactive.erased,
+      purgedArchiveCount: purged.purged, purgeFailed: purged.failed,
+    });
   } catch (error: any) {
     console.error('sweep-deleted-accounts error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

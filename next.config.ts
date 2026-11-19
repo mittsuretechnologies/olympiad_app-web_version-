@@ -10,7 +10,7 @@ const nextConfig: NextConfig = {
     root: path.resolve(__dirname),
   },
 
-  serverExternalPackages: ['ffmpeg-static', 'ffprobe-static'],
+  serverExternalPackages: ['ffmpeg-static', 'ffprobe-static', 'firebase-admin'],
 
   experimental: {
     serverActions: {

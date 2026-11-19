@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { verify } from 'jsonwebtoken';
 import { hasMittfestTag } from '@/lib/mittfest';
+import { isMittfestCheckboxEnabled } from '@/lib/mittfestSettings';
 import { schoolAutoTags, mainCategoryTag, mergeTags } from '@/lib/videoAutoTags';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { olympiadSlotOf, resolveSchoolStudent, slotsForStudent } from '@/lib/olympiadSlots';
@@ -116,7 +117,8 @@ export async function POST(request: Request) {
         isEvaluation: true,
         // The school can tick "for MittFest" on the student's behalf (same as the
         // student's own upload form); a #mittfest hashtag counts too.
-        isMittfest: Boolean(isMittfest) || hasMittfestTag(tags),
+        // The tick only counts while a SuperAdmin has the checkbox switched on.
+        isMittfest: (Boolean(isMittfest) && await isMittfestCheckboxEnabled()) || hasMittfestTag(tags),
         olympiadVisibility: wantsPublic ? 'public' : 'private',
         uploaderType: 'SCHOOL',
         uploadedBySchoolId: schoolRow.id,
