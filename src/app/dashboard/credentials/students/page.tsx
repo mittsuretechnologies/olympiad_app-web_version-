@@ -5,7 +5,7 @@ import useSWR from 'swr';
 import { fetcher, authFetch } from '@/lib/swr';
 import {
   KeyRound, Loader2, Search, RotateCw, X,
-  ChevronDown, ChevronRight, Eye, EyeOff, RefreshCw, CheckCircle, Building2
+  ChevronDown, ChevronRight, Eye, EyeOff, RefreshCw, CheckCircle, Building2, MessageSquare
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
@@ -44,6 +44,27 @@ export default function StudentCredentialsPage() {
   const [customUsername, setCustomUsername] = useState('');
   const [usernameError, setUsernameError] = useState('');
   const [toast, setToast] = useState<string | null>(null);
+  // Row whose SMS is in flight — one at a time, so a double click can't send twice.
+  const [smsBusyId, setSmsBusyId] = useState<string | null>(null);
+
+  /** Re-sends the student's current Olympiad ID, username and password by SMS. */
+  const handleSendSms = async (r: StudentCred) => {
+    if (!r.student || smsBusyId) return;
+    if (!confirm(`Send login details by SMS to ${r.student.name} (${r.student.phone})?`)) return;
+    setSmsBusyId(r.student.id);
+    try {
+      const res = await authFetch(`/api/credentials/students/${r.student.id}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ source: r.student.source === 'app' ? 'app' : 'web' }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) { alert(data.message || 'Failed to send SMS'); return; }
+      setToast(`SMS sent to ${data.sentTo || r.student.phone}`);
+      setTimeout(() => setToast(null), 3000);
+    } catch { alert('Network error'); }
+    finally { setSmsBusyId(null); }
+  };
 
   const filtered = useMemo(() => {
     if (!search) return rows;
@@ -294,13 +315,23 @@ export default function StudentCredentialsPage() {
                         </td>
                         <td className="px-3 py-2 text-center">
                           {r.student ? (
-                            <button
-                              onClick={() => { setResetTarget(r); setResetAction('choose'); setCustomUsername(r.student?.username || ''); setCustomPassword(''); setShowPassword(false); }}
-                              className="inline-flex items-center justify-center w-7 h-7 bg-[#009846] text-white hover:bg-[#007a38] transition-colors"
-                              title="Reset password"
-                            >
-                              <RotateCw size={13} />
-                            </button>
+                            <div className="inline-flex items-center gap-1.5">
+                              <button
+                                onClick={() => { setResetTarget(r); setResetAction('choose'); setCustomUsername(r.student?.username || ''); setCustomPassword(''); setShowPassword(false); }}
+                                className="inline-flex items-center justify-center w-7 h-7 bg-[#009846] text-white hover:bg-[#007a38] transition-colors"
+                                title="Reset password"
+                              >
+                                <RotateCw size={13} />
+                              </button>
+                              <button
+                                onClick={() => handleSendSms(r)}
+                                disabled={!!smsBusyId || !r.student.plainPassword || !r.student.phone || r.student.phone === '-'}
+                                className="inline-flex items-center justify-center w-7 h-7 bg-[#004f9f] text-white hover:bg-[#003d7a] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                                title={!r.student.plainPassword ? 'Set a password first' : (!r.student.phone || r.student.phone === '-') ? 'No phone number' : 'Send login details by SMS'}
+                              >
+                                {smsBusyId === r.student.id ? <Loader2 size={13} className="animate-spin" /> : <MessageSquare size={13} />}
+                              </button>
+                            </div>
                           ) : (
                             <span className="text-gray-200">—</span>
                           )}

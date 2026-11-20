@@ -393,19 +393,76 @@ function slotLabel(categories: CategoryDTO[], slot: 'A' | 'B') {
 }
 
 /**
+ * Every owner key one student's Olympiad videos can sit under. A student can
+ * have an app account (AppUser) and a web Student row under the same Olympiad
+ * ID, and a video carries either or both, so a check on appUserId alone misses
+ * the videos the school uploaded for them (and vice versa). Same identity rule
+ * as slotsForStudent in lib/olympiadSlots.ts.
+ */
+async function studentVideoOwners(owner: { appUserId: string | null; studentId: string | null }) {
+  const appUserIds = new Set<string>(owner.appUserId ? [owner.appUserId] : []);
+  const studentIds = new Set<string>(owner.studentId ? [owner.studentId] : []);
+
+  const [appUser, student] = await Promise.all([
+    owner.appUserId ? prisma.appUser.findUnique({ where: { id: owner.appUserId }, select: { olympiadId: true } }) : null,
+    owner.studentId ? prisma.student.findUnique({ where: { id: owner.studentId }, select: { olympiadCode: true } }) : null,
+  ]);
+  const codes = [appUser?.olympiadId, student?.olympiadCode].filter((c): c is string => !!c);
+  if (codes.length) {
+    const [users, students] = await Promise.all([
+      prisma.appUser.findMany({ where: { olympiadId: { in: codes } }, select: { id: true } }),
+      prisma.student.findMany({ where: { olympiadCode: { in: codes } }, select: { id: true } }),
+    ]);
+    users.forEach(u => appUserIds.add(u.id));
+    students.forEach(s => studentIds.add(s.id));
+  }
+
+  return [
+    ...(appUserIds.size ? [{ appUserId: { in: [...appUserIds] } }] : []),
+    ...(studentIds.size ? [{ studentId: { in: [...studentIds] } }] : []),
+  ];
+}
+
+type StudentOwners = Awaited<ReturnType<typeof studentVideoOwners>>;
+type Db = Pick<typeof prisma, 'video' | '$executeRaw'>;
+
+/**
  * Whether another of the student's jury videos already occupies this A/B slot
  * — evaluated, or live and not rejected. Same rule as the student's upload.
  */
-async function slotTakenBySibling(appUserId: string, videoId: string, slot: 'A' | 'B') {
-  const siblings = await prisma.video.findMany({
-    where: { appUserId, isEvaluation: true, id: { not: videoId } },
+async function slotTakenBySibling(
+  owners: StudentOwners, videoId: string, slot: 'A' | 'B', categories: CategoryDTO[], db: Db = prisma,
+) {
+  if (owners.length === 0) return false;
+  const siblings = await db.video.findMany({
+    where: { OR: owners, isEvaluation: true, id: { not: videoId } },
     select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
   });
-  const categories = await loadCategoriesSafe();
   return siblings.some(v =>
     resolveSlot(categories, v.category, v.subCategory) === slot &&
     (v.evaluations.length > 0 || (v.deletedAt === null && v.status !== 'REJECTED'))
   );
+}
+
+/**
+ * Runs a slot check and the write that fills the slot as one step per student.
+ * Without this, two moderators putting two of the same student's videos into
+ * one slot at the same instant would each pass the check before the other
+ * wrote, and both would save.
+ *
+ * Takes a transaction-scoped Postgres advisory lock on every owner id of the
+ * student (released on commit/rollback). Two sibling videos always share at
+ * least one owner id, so their writes queue behind each other; the ids are
+ * locked in sorted order so two such writes can't deadlock.
+ */
+async function withStudentSlotLock<T>(owners: StudentOwners, fn: (tx: Db) => Promise<T>): Promise<T> {
+  const keys = [...new Set(owners.flatMap(o => [...(o.appUserId?.in ?? []), ...(o.studentId?.in ?? [])]))].sort();
+  return prisma.$transaction(async (tx) => {
+    for (const key of keys) {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'olympiad-slot:' + key}::text))`;
+    }
+    return fn(tx);
+  }, { maxWait: 5000, timeout: 15000 });
 }
 
 /**
@@ -427,7 +484,7 @@ async function moveToPending(payload: { id: string; role: string; name?: string;
   const before = await prisma.video.findUnique({
     where: { id: videoId },
     select: {
-      status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true,
+      status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true, studentId: true,
       category: true, subCategory: true, deletedAt: true,
       _count: { select: { evaluations: true } },
     },
@@ -441,22 +498,33 @@ async function moveToPending(payload: { id: string; role: string; name?: string;
     );
   }
 
-  // A rejected jury video frees its A/B slot, so the student may have uploaded
-  // a replacement since. Reviving the old one would put two videos in a slot.
-  if (expected === 'REJECTED' && before.isEvaluation && before.appUserId) {
-    const slot = resolveSlot(await loadCategoriesSafe(), before.category, before.subCategory);
-    if (slot && await slotTakenBySibling(before.appUserId, videoId, slot)) {
-      return NextResponse.json(
-        { message: 'This student has since uploaded another video in the same category slot, so this one cannot be moved back to Pending.' },
-        { status: 409 },
-      );
-    }
-  }
-
-  const written = await prisma.video.updateMany({
+  const writePending = (db: Db) => db.video.updateMany({
     where: { id: videoId, status: expected, deletedAt: null, ...NOT_EVALUATED },
     data: { status: 'PENDING', quality: null, rejectionReason: null, ...CLEAR_CLAIM },
   });
+
+  // A rejected jury video frees its A/B slot, so the student may have uploaded
+  // a replacement since. Reviving the old one would put two videos in a slot.
+  // The check and the write run under the student's slot lock, so a moderator
+  // moving a sibling into the same slot at the same moment can't slip past it.
+  const categories = expected === 'REJECTED' && before.isEvaluation ? await loadCategoriesSafe() : [];
+  const slot = expected === 'REJECTED' && before.isEvaluation
+    ? resolveSlot(categories, before.category, before.subCategory)
+    : null;
+  let written: { count: number } | 'SLOT_TAKEN';
+  if (slot) {
+    const owners = await studentVideoOwners(before);
+    written = await withStudentSlotLock(owners, async (tx) =>
+      await slotTakenBySibling(owners, videoId, slot, categories, tx) ? 'SLOT_TAKEN' as const : writePending(tx));
+  } else {
+    written = await writePending(prisma);
+  }
+  if (written === 'SLOT_TAKEN') {
+    return NextResponse.json(
+      { message: 'This student has since uploaded another video in the same category slot, so this one cannot be moved back to Pending.' },
+      { status: 409 },
+    );
+  }
   if (written.count === 0) return moderationConflict(videoId, payload.id);
 
   await recordAuditLog({
@@ -570,8 +638,8 @@ export async function POST(request: Request) {
     const before = await prisma.video.findUnique({
       where: { id: videoId },
       select: {
-        status: true, rejectionReason: true, quality: true, isEvaluation: true, uploaderType: true, appUserId: true, uploadedBySchoolId: true,
-        competitionStage: true,
+        status: true, rejectionReason: true, quality: true, isEvaluation: true, uploaderType: true, appUserId: true, studentId: true,
+        uploadedBySchoolId: true, competitionStage: true,
         caption: true, category: true, subCategory: true, isPublic: true, olympiadVisibility: true, tags: true,
         _count: { select: { evaluations: true } },
       },
@@ -595,22 +663,34 @@ export async function POST(request: Request) {
     // dashboard → Upload Categories (built-in lists if they can't be read).
     const categories = (subCategoryChanged || categoryChanged) ? await loadCategoriesSafe() : [];
 
-    if (status === 'APPROVED' && before?.isEvaluation && (subCategoryChanged || categoryChanged)) {
-      // An explicit main category from the moderator is authoritative; only fall
-      // back to the video's existing one when they didn't change it.
-      const targetSlot = resolveSlot(
-        categories,
-        categoryChanged ? newCategory : before.category,
-        subCategoryChanged ? newSubCategory : before.subCategory,
+    // An explicit main category from the moderator is authoritative; only fall
+    // back to the video's existing one when they didn't change it.
+    const targetSlot = status === 'APPROVED' && before.isEvaluation && (subCategoryChanged || categoryChanged)
+      ? resolveSlot(
+          categories,
+          categoryChanged ? newCategory : before.category,
+          subCategoryChanged ? newSubCategory : before.subCategory,
+        )
+      : null;
+    // Checked through every account of the student (app + web Student row),
+    // so a video the school uploaded for them counts too.
+    const slotOwners = targetSlot ? await studentVideoOwners(before) : [];
+    const slotTakenResponse = (slot: 'A' | 'B') => {
+      const label = slotLabel(categories, slot);
+      return NextResponse.json(
+        {
+          code: 'OLYMPIAD_SLOT_TAKEN',
+          message: `This account has already uploaded an Olympiad video in "${label}". `
+            + `Only one Olympiad video is allowed per category, so this video cannot be moved to "${label}". `
+            + 'Keep it in its current category, or reject it.',
+        },
+        { status: 409 },
       );
-      if (targetSlot && before.appUserId) {
-        if (await slotTakenBySibling(before.appUserId, videoId, targetSlot)) {
-          return NextResponse.json(
-            { message: 'This student already has a video in that category slot. Reject this one instead.' },
-            { status: 409 },
-          );
-        }
-      }
+    };
+    // Fail fast here; the check is repeated under the student's slot lock
+    // together with the write below, which is what actually closes the race.
+    if (targetSlot && await slotTakenBySibling(slotOwners, videoId, targetSlot, categories)) {
+      return slotTakenResponse(targetSlot);
     }
 
     const recategorizing = status === 'APPROVED' && (subCategoryChanged || categoryChanged);
@@ -651,7 +731,9 @@ export async function POST(request: Request) {
     // Conditional write: lands only if the video is still in the state the
     // moderator saw and nobody else holds a live review claim on it. Two
     // moderators saving at the same instant can't both succeed.
-    const written = await prisma.video.updateMany({
+    // Moving a jury video into a slot: re-check and write under the student's
+    // slot lock, so two moderators can't each fill the same slot at once.
+    const writeDecision = (db: Db) => db.video.updateMany({
       where: { id: videoId, status: expected, ...claimFreeFor(payload!.id, now), ...(unapproving ? NOT_EVALUATED : {}) },
       data: {
         status,
@@ -666,6 +748,11 @@ export async function POST(request: Request) {
         ...CLEAR_CLAIM,
       },
     });
+    const written = targetSlot
+      ? await withStudentSlotLock(slotOwners, async (tx) =>
+          await slotTakenBySibling(slotOwners, videoId, targetSlot, categories, tx) ? 'SLOT_TAKEN' as const : writeDecision(tx))
+      : await writeDecision(prisma);
+    if (written === 'SLOT_TAKEN') return slotTakenResponse(targetSlot!);
     if (written.count === 0) {
       // An evaluator may have scored it between the read above and this write.
       if (unapproving && await prisma.videoEvaluation.count({ where: { videoId } }) > 0) return evaluatedConflict();

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef, useCallback } from 'react';
+import { useState, useMemo, useEffect, useRef, useCallback, type ReactNode } from 'react';
 import useSWR from 'swr';
 import { fetcher, getDashboardToken } from '@/lib/swr';
 import {
   Play, CheckCircle, XCircle, Clock, School,
   Eye, Globe, Lock, Award, RefreshCw, Trash2, RotateCcw,
-  Search, Filter, ChevronDown, X, Copy, Check, Star,
+  Search, Filter, ChevronDown, X, Copy, Check, Star, MoreHorizontal,
 } from 'lucide-react';
 import {
   OLYMPIAD_CAT_A_SUBS, OLYMPIAD_CAT_B_SUBS, OLYMPIAD_CAT_A_OPTIONS, OLYMPIAD_CAT_B_OPTIONS,
@@ -89,7 +89,40 @@ const REJECTION_TEMPLATES = [
   'Video duration is too short.',
   'Inappropriate content detected.',
   'Wrong category submitted.',
+  'Already Uploaded.',
 ];
+
+// ─── Preview modal building blocks ────────────────────────────────────────────
+
+function PanelSection({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="space-y-2">
+      <div className="flex items-center justify-between gap-2 min-h-[22px]">
+        <h3 className="text-[10.5px] font-bold uppercase tracking-[0.08em] text-white/40">{title}</h3>
+        {aside}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/** One on/off setting with a switch, e.g. MittFest or Influencer. */
+function FeatureRow({ title, icon, description, checked, saving, onToggle }: {
+  title: string; icon?: ReactNode; description: string; checked: boolean; saving: boolean; onToggle: () => void;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-3 px-3.5 py-2.5">
+      <div className="min-w-0">
+        <p className="flex items-center gap-1.5 text-[13px] font-semibold text-white">{icon}{title}</p>
+        <p className="text-[11.5px] text-white/40">{saving ? 'Saving…' : description}</p>
+      </div>
+      <button type="button" role="switch" aria-checked={checked} aria-label={title} onClick={onToggle} disabled={saving}
+        className={`relative shrink-0 w-10 h-[22px] rounded-full transition-colors disabled:opacity-50 ${checked ? 'bg-green-500' : 'bg-white/15'}`}>
+        <span className={`absolute top-[3px] left-[3px] w-4 h-4 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-[18px]' : ''}`} />
+      </button>
+    </div>
+  );
+}
 
 const QUALITY_OPTIONS: { value: 'HIGH' | 'MEDIUM' | 'LOW'; label: string; hint: string }[] = [
   { value: 'HIGH',   label: 'High',   hint: 'Clear footage, good lighting and audio' },
@@ -328,6 +361,8 @@ export default function VideoModerationPage() {
   const [savingInfluencer, setSavingInfluencer] = useState(false);
   const [editedCaption, setEditedCaption] = useState('');
   const [savingCaption, setSavingCaption] = useState(false);
+  // The preview's "⋯" menu (Make private/public, Delete).
+  const [previewMenuOpen, setPreviewMenuOpen] = useState(false);
   const [rejectModal,  setRejectModal]  = useState<{ video: Video | null; bulk: boolean }>({ video: null, bulk: false });
   const [rejectReason, setRejectReason] = useState('');
   // Approval is gated behind picking a quality — see QUALITY_OPTIONS. Always
@@ -471,6 +506,7 @@ export default function VideoModerationPage() {
     setEditedTags(editableTags(video));
     setEditedCaption(video.caption || '');
     setTagInput('');
+    setPreviewMenuOpen(false);
   };
 
   // A 409 means someone else decided or is reviewing the video: say who, drop
@@ -478,6 +514,10 @@ export default function VideoModerationPage() {
   const handleConflict = async (res: Response, video: Video, fallback: string) => {
     const body = await res.json().catch(() => null);
     alert(body?.message || fallback);
+    // The student already has an Olympiad video in the category picked: nothing
+    // was saved and nobody else touched the video, so keep it open for the
+    // moderator to choose another category (or reject it).
+    if (body?.code === 'OLYMPIAD_SLOT_TAKEN') return;
     if (res.status === 409) {
       if (previewVideo?.id === video.id) setPreviewVideo(null);
       mutate();
@@ -1365,401 +1405,399 @@ export default function VideoModerationPage() {
       )}
 
       {/* ── Preview modal ────────────────────────────────────────────────────── */}
-      {previewVideo && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setPreviewVideo(null)}>
-          {/* Capped at the screen height: the video stays put and the details
-              below scroll, so a tall card never runs off the top of the screen. */}
-          <div className="bg-[#0f0f0f] rounded-2xl overflow-hidden w-full max-w-lg shadow-2xl max-h-[calc(100dvh-2rem)] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="bg-black flex items-center justify-center relative shrink-0" style={{ maxHeight: 340 }}>
-              <video src={previewVideo.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full max-h-[340px] object-contain" />
-              <button onClick={() => setPreviewVideo(null)}
-                className="absolute top-2 right-2 w-7 h-7 rounded-full bg-black/60 hover:bg-black/90 flex items-center justify-center transition-colors">
-                <X size={14} className="text-white" />
-              </button>
+      {/* Video on the left, details on the right (stacked on a phone). The
+          header and the action footer stay put; only the details scroll. */}
+      {previewVideo && (() => {
+        const v = previewVideo;
+        const busy = processingId === v.id;
+        const school = v.student?.allocation?.school ?? v.appUser?.school ?? null;
+        const olympiadCode = v.student?.olympiadCode ?? v.appUser?.olympiadId ?? null;
+        const contact = !v.student && v.appUser ? (v.appUser.email || v.appUser.mobile) : null;
+        const displayName = v.student?.name ?? v.appUser?.userId ?? '—';
+        const studentVid = isStudentVideo(v);
+        const recategorized = canEditCategory &&
+          ((!!editedSubCat && editedSubCat !== v.subCategory) ||
+           (!!editedCat && editedCat !== normalizeCat(v, managedCategories)));
+        // Only a read-only view needs the derived category badge — while
+        // editing, the main-category select already shows it.
+        const catBadge = !canEditCategory ? getCategoryLabel(v.subCategory, catOptions) : null;
+        const homeBadge = homeSectionBadge(v.category);
+        const isPub = v.isEvaluation ? v.olympiadVisibility === 'public' : v.isPublic;
+        const currentTags = editableTags(v);
+        const tagsChanged = currentTags.length !== editedTags.length || currentTags.some(t => !editedTags.includes(t));
+        const captionChanged = editedCaption.trim() !== (v.caption || '').trim();
+        const defaultTags = defaultTagsOf(v, editedCat || undefined, editedSubCat || undefined);
+        const showVisibility = canChangeVisibility && !v.deletedAt;
+        const showPending = filter !== 'PENDING' && canUnapprove && !v.deletedAt;
+        const showUnapprove = filter === 'APPROVED' && canUnapprove && !v.deletedAt;
+        const showSave = filter === 'APPROVED' && canEditCategory;
+        const hasMenu = showVisibility || canDelete;
+        const location = school ? [school.district, school.state].filter(Boolean).join(', ') : '';
+        // Footer buttons: one size and shape; colour only says what kind of
+        // action it is. Disabled turns neutral grey instead of a faded colour.
+        const btnBase = 'inline-flex items-center justify-center gap-1.5 h-9 px-4 rounded-lg text-[13px] font-medium tracking-[0.01em] transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0f11] disabled:cursor-not-allowed';
+        const btnSecondary = `${btnBase} border border-white/12 bg-white/[0.04] text-white/80 hover:bg-white/[0.08] hover:text-white focus-visible:ring-white/30 disabled:bg-transparent disabled:text-white/25 disabled:border-white/5`;
+        const btnDanger = `${btnBase} border border-red-500/30 bg-transparent text-red-400 hover:bg-red-500/10 hover:border-red-500/50 focus-visible:ring-red-500/40 disabled:text-red-400/30 disabled:border-red-500/10 disabled:hover:bg-transparent`;
+        const btnPrimary = (tone: 'green' | 'blue') => `${btnBase} px-5 text-white shadow-sm ${
+          tone === 'green' ? 'bg-emerald-600 hover:bg-emerald-500 focus-visible:ring-emerald-500/50' : 'bg-indigo-600 hover:bg-indigo-500 focus-visible:ring-indigo-500/50'
+        } disabled:bg-white/[0.06] disabled:text-white/30 disabled:shadow-none`;
+        const selectCls = 'w-full text-[13px] font-medium text-white bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-400/60';
+        return (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4" onClick={() => setPreviewVideo(null)}>
+          <div className="w-full max-w-5xl h-[calc(100dvh-1.5rem)] sm:h-[min(calc(100dvh-2rem),760px)] bg-[#121316] border border-white/10 rounded-2xl overflow-hidden shadow-2xl flex flex-col md:flex-row"
+            onClick={e => e.stopPropagation()}>
+
+            {/* Video */}
+            <div className="bg-black flex items-center justify-center shrink-0 h-[36dvh] md:h-auto md:w-[44%]">
+              <video key={v.id} src={v.videoUrl} controls autoPlay controlsList="nodownload" disablePictureInPicture
+                onContextMenu={e => e.preventDefault()} className="w-full h-full object-contain" />
             </div>
 
-            <div className="p-4 space-y-3 overflow-y-auto min-h-0">
+            <div className="flex-1 min-w-0 min-h-0 flex flex-col">
 
-              {/* Category + date row */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {canEditCategory ? (
-                    <>
-                      {/* Main category — switching it also moves the subcategory
-                          into that category's list, so the two can't disagree. */}
-                      <select
-                        value={editedCat}
-                        onChange={e => {
-                          const cat = e.target.value;
-                          setEditedCat(cat);
-                          const subs = subsOf(cat);
-                          if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0] ?? '');
-                        }}
-                        className="text-[11px] font-black text-amber-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-amber-300"
-                      >
-                        {categoryGroups.map(g => (
-                          <option key={g.label} value={g.label} className="text-black">{g.label}</option>
-                        ))}
-                      </select>
-                      <select
-                        value={editedSubCat}
-                        onChange={e => setEditedSubCat(e.target.value)}
-                        className="text-[11px] font-black text-blue-200 bg-white/10 border border-white/20 px-2.5 py-1 rounded-full focus:outline-none focus:ring-1 focus:ring-blue-300"
-                      >
-                        {/* The app's options, plus the video's own value if it is an
-                            older spelling, so the dropdown shows what is saved. */}
-                        {(editedCat === normalizeCat(previewVideo, managedCategories)
-                          ? withCurrent(subsOf(editedCat), previewVideo.subCategory)
-                          : subsOf(editedCat))
-                          .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
-                      </select>
-                    </>
-                  ) : (
-                    <span className="text-[11px] font-black text-blue-300 bg-white/10 px-2.5 py-1 rounded-full">
-                      {previewVideo.subCategory || previewVideo.category}
+              {/* Header — who uploaded it */}
+              <div className="shrink-0 flex items-start gap-3 px-5 py-4 border-b border-white/10">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0 uppercase ${
+                  studentVid ? 'bg-amber-400/15 text-amber-300' : 'bg-blue-400/15 text-blue-300'
+                }`}>
+                  {displayName[0] ?? '?'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <p className="text-[15px] font-bold text-white truncate">{displayName}</p>
+                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
+                      studentVid ? 'bg-amber-400/15 text-amber-300' : 'bg-blue-400/15 text-blue-300'
+                    }`}>
+                      {v.uploaderType === 'SCHOOL_OWN' ? 'School' : studentVid ? 'Student' : 'Viewer'}
                     </span>
+                  </div>
+                  {(olympiadCode || contact) && (
+                    <p className="text-[12px] text-white/45 truncate mt-0.5">
+                      {olympiadCode && <span className="font-mono text-amber-300/80">{olympiadCode}</span>}
+                      {olympiadCode && contact && ' · '}
+                      {contact}
+                    </p>
                   )}
-                  {/* Only a read-only view needs this derived badge — while editing,
-                      the main-category select above already shows it. */}
-                  {!canEditCategory &&
-                    (() => { const b = getCategoryLabel(previewVideo.subCategory, catOptions); return b ? (
-                      <span className="text-[10px] font-black px-2 py-1 rounded-full bg-white/10 text-white/70">{b.label}</span>
-                    ) : null; })()}
-                  {canEditCategory &&
-                   ((editedSubCat && editedSubCat !== previewVideo.subCategory) ||
-                    (editedCat && editedCat !== normalizeCat(previewVideo, managedCategories))) && (
-                    <span className="text-[10px] font-black px-2 py-1 rounded-full bg-amber-400/20 text-amber-300">
-                      Recategorized
-                    </span>
-                  )}
-                  {previewVideo.isEvaluation && (
-                    <span className="flex items-center gap-1 text-[10px] font-black bg-amber-400 text-amber-900 px-2 py-1 rounded-full">
-                      <Award size={10} /> Olympiad
-                    </span>
-                  )}
-                  {previewVideo.competitionStage === 'STATE' && (
-                    <span className="flex items-center gap-1 text-[10px] font-black bg-[#B8860B] text-white px-2 py-1 rounded-full">
-                      <Award size={10} /> State Level
-                    </span>
-                  )}
-                  {(() => { const hb = homeSectionBadge(previewVideo.category); return hb ? (
-                    <span className={`text-[10px] font-black px-2 py-1 rounded-full ${hb.modal}`}>{hb.label}</span>
-                  ) : null; })()}
-                  {previewVideo.deletedAt && (
-                    <span className="flex items-center gap-1 text-[10px] font-black bg-red-600 text-white px-2 py-1 rounded-full">
-                      <Trash2 size={10} /> Deleted by user
-                    </span>
+                  {school && (
+                    <p className="flex items-center gap-1 text-[12px] text-white/60 mt-0.5 min-w-0">
+                      <School size={11} className="text-blue-400 shrink-0" />
+                      <span className="truncate">{school.name}{location && <span className="text-white/35"> · {location}</span>}</span>
+                    </p>
                   )}
                 </div>
-                <span className="text-[11px] text-white/30">{formatDate(previewVideo.createdAt)}</span>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="hidden sm:inline text-[11px] text-white/35">{formatDate(v.createdAt)}</span>
+                  <button onClick={() => setPreviewVideo(null)} aria-label="Close"
+                    className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors">
+                    <X size={15} className="text-white/70" />
+                  </button>
+                </div>
               </div>
 
-              {/* Caption — editable by moderators via the same status-independent
-                  PATCH endpoint as hashtags. */}
-              {previewVideo.deletedAt ? (previewVideo.caption && (
-                <p className="text-sm font-semibold text-white bg-white/10 rounded-xl px-3 py-2">
-                  {previewVideo.caption}
-                </p>
-              )) : (
-                <div className="space-y-1.5">
-                  <textarea
-                    value={editedCaption}
-                    onChange={e => setEditedCaption(e.target.value)}
-                    maxLength={MAX_CAPTION_LENGTH}
-                    rows={2}
-                    placeholder="Add a caption…"
-                    className="w-full text-sm font-semibold text-white bg-white/10 border border-white/20 rounded-xl px-3 py-2 resize-none placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-300"
-                  />
-                  {editedCaption.trim() !== (previewVideo.caption || '').trim() && (
-                    <div className="flex justify-end gap-1.5">
-                      <button type="button" onClick={() => setEditedCaption(previewVideo.caption || '')} disabled={savingCaption}
-                        className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[11px] font-bold hover:bg-white/15 disabled:opacity-30 transition-colors">
-                        Cancel
-                      </button>
-                      <button type="button" onClick={() => saveCaption(previewVideo)} disabled={savingCaption}
-                        className="px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white text-[11px] font-bold hover:bg-indigo-600 disabled:opacity-40 transition-colors whitespace-nowrap">
-                        {savingCaption ? 'Saving…' : 'Save Caption'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
+              {/* Details */}
+              <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
 
-              {/* MittFest — moderators and admins can add this video to, or
-                  take it out of, the MittFest row in the app. */}
-              {!previewVideo.deletedAt && (
-                <div className="flex items-center justify-between gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold text-white">MittFest</p>
-                    <p className="text-[10px] text-white/40">
-                      {previewVideo.isMittfest ? 'This video is in the MittFest row.' : 'This video is not in MittFest.'}
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => setMittfest(previewVideo, !previewVideo.isMittfest)} disabled={savingMittfest}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40 whitespace-nowrap ${
-                      previewVideo.isMittfest ? 'bg-red-500/90 text-white hover:bg-red-600' : 'bg-fuchsia-500 text-white hover:bg-fuchsia-600'
-                    }`}>
-                    {savingMittfest ? 'Saving…' : previewVideo.isMittfest ? 'Remove from MittFest' : 'Add to MittFest'}
-                  </button>
-                </div>
-              )}
-
-              {/* Influencer — moderators and admins can pick this video to lead
-                  its category's row on the app home (once it's approved). */}
-              {!previewVideo.deletedAt && (
-                <div className="flex items-center justify-between gap-2 rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-bold text-white flex items-center gap-1">
-                      <Star size={11} className={previewVideo.isInfluencer ? 'fill-amber-400 text-amber-400' : 'text-white/60'} /> Influencer
-                    </p>
-                    <p className="text-[10px] text-white/40">
-                      {previewVideo.isInfluencer
-                        ? `Shown first in "${previewVideo.category}" on the app home.`
-                        : `Not an influencer video. Marking it shows it first in "${previewVideo.category}" on the app home.`}
-                    </p>
-                  </div>
-                  <button type="button" onClick={() => setInfluencer(previewVideo, !previewVideo.isInfluencer)} disabled={savingInfluencer}
-                    className={`shrink-0 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-colors disabled:opacity-40 whitespace-nowrap ${
-                      previewVideo.isInfluencer ? 'bg-red-500/90 text-white hover:bg-red-600' : 'bg-amber-500 text-white hover:bg-amber-600'
-                    }`}>
-                    {savingInfluencer ? 'Saving…' : previewVideo.isInfluencer ? 'Remove Influencer' : 'Mark as Influencer'}
-                  </button>
-                </div>
-              )}
-
-              {/* Hashtags — editable regardless of status/tab, via the tags-only
-                  PATCH endpoint, so fixing/adding a tag never touches the
-                  video's moderation status. */}
-              {!previewVideo.deletedAt && (
-                <div className="space-y-1.5">
-                  <div className="flex flex-wrap gap-1.5">
-                    {/* Default tags — added automatically, can't be removed; the
-                        category one follows the category picked above. */}
-                    {defaultTagsOf(previewVideo, editedCat || undefined, editedSubCat || undefined).map(tag => (
-                      <span key={`default-${tag}`} title="Default tag — added automatically"
-                        className="flex items-center gap-1 text-[11px] font-bold text-amber-200 bg-amber-500/15 border border-amber-400/25 px-2 py-1 rounded-lg">
-                        <Lock size={9} className="opacity-70" />
-                        #{tag}
+                {/* Status badges */}
+                {(v.isEvaluation || v.competitionStage === 'STATE' || homeBadge || catBadge || v.deletedAt) && (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {v.isEvaluation && (
+                      <span className="flex items-center gap-1 text-[10.5px] font-bold bg-amber-400 text-amber-950 px-2 py-0.5 rounded-md">
+                        <Award size={11} /> Olympiad
                       </span>
-                    ))}
-                    {editedTags.map((tag, i) => (
-                      <span key={i} className="flex items-center gap-1 text-[11px] font-bold text-indigo-300 bg-indigo-500/15 border border-indigo-400/20 px-2 py-1 rounded-lg">
-                        #{tag}
-                        <button type="button" onClick={() => removeTag(tag)} className="text-indigo-300/60 hover:text-white">
-                          <X size={10} />
-                        </button>
+                    )}
+                    {v.competitionStage === 'STATE' && (
+                      <span className="flex items-center gap-1 text-[10.5px] font-bold bg-[#B8860B] text-white px-2 py-0.5 rounded-md">
+                        <Award size={11} /> State Level
                       </span>
-                    ))}
-                    {editedTags.length === 0 && defaultTagsOf(previewVideo).length === 0 && (
-                      <span className="text-[11px] text-white/30 italic">No hashtags</span>
+                    )}
+                    {catBadge && (
+                      <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-white/10 text-white/70">{catBadge.label}</span>
+                    )}
+                    {homeBadge && (
+                      <span className={`text-[10.5px] font-bold px-2 py-0.5 rounded-md ${homeBadge.modal}`}>{homeBadge.label}</span>
+                    )}
+                    {v.deletedAt && (
+                      <span className="flex items-center gap-1 text-[10.5px] font-bold bg-red-600 text-white px-2 py-0.5 rounded-md">
+                        <Trash2 size={11} /> Deleted by user
+                      </span>
                     )}
                   </div>
-                  <div className="flex gap-1.5">
+                )}
+
+                {/* Rejection reason */}
+                {v.status === 'REJECTED' && v.rejectionReason && (
+                  <div className="bg-red-500/10 border border-red-500/25 rounded-xl px-3.5 py-2.5">
+                    <p className="text-[10.5px] font-bold text-red-400 uppercase tracking-[0.08em] mb-0.5">Rejected</p>
+                    <p className="text-[13px] text-red-200">{v.rejectionReason}</p>
+                  </div>
+                )}
+
+                {/* Category */}
+                <PanelSection title="Category" aside={recategorized && (
+                  <span className="text-[10.5px] font-bold px-2 py-0.5 rounded-md bg-amber-400/15 text-amber-300">Recategorized</span>
+                )}>
+                  {canEditCategory ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {/* Main category — switching it also moves the subcategory
+                          into that category's list, so the two can't disagree. */}
+                      <label className="space-y-1 min-w-0">
+                        <span className="block text-[11px] text-white/40">Main category</span>
+                        <select
+                          value={editedCat}
+                          onChange={e => {
+                            const cat = e.target.value;
+                            setEditedCat(cat);
+                            const subs = subsOf(cat);
+                            if (!subs.includes(editedSubCat)) setEditedSubCat(subs[0] ?? '');
+                          }}
+                          className={selectCls}
+                        >
+                          {categoryGroups.map(g => (
+                            <option key={g.label} value={g.label} className="text-black">{g.label}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="space-y-1 min-w-0">
+                        <span className="block text-[11px] text-white/40">Subcategory</span>
+                        <select value={editedSubCat} onChange={e => setEditedSubCat(e.target.value)} className={selectCls}>
+                          {/* The app's options, plus the video's own value if it is an
+                              older spelling, so the dropdown shows what is saved. */}
+                          {(editedCat === normalizeCat(v, managedCategories)
+                            ? withCurrent(subsOf(editedCat), v.subCategory)
+                            : subsOf(editedCat))
+                            .map(s => <option key={s} value={s} className="text-black">{s}</option>)}
+                        </select>
+                      </label>
+                    </div>
+                  ) : (
+                    <p className="text-[13px] font-medium text-white/85">{v.subCategory || v.category}</p>
+                  )}
+                </PanelSection>
+
+                {/* Caption — editable by moderators via the same status-independent
+                    PATCH endpoint as hashtags. */}
+                {v.deletedAt ? (v.caption && (
+                  <PanelSection title="Caption">
+                    <p className="text-[13px] text-white/85 whitespace-pre-wrap">{v.caption}</p>
+                  </PanelSection>
+                )) : (
+                  <PanelSection title="Caption" aside={
+                    <span className="text-[10.5px] text-white/30 tabular-nums">{editedCaption.length}/{MAX_CAPTION_LENGTH}</span>
+                  }>
+                    <textarea
+                      value={editedCaption}
+                      onChange={e => setEditedCaption(e.target.value)}
+                      maxLength={MAX_CAPTION_LENGTH}
+                      rows={3}
+                      placeholder="Add a caption…"
+                      className="w-full text-[13px] text-white bg-white/[0.06] border border-white/10 rounded-lg px-3 py-2 resize-none placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-400/60"
+                    />
+                    {captionChanged && (
+                      <div className="flex justify-end gap-1.5">
+                        <button type="button" onClick={() => setEditedCaption(v.caption || '')} disabled={savingCaption}
+                          className="px-3 py-1.5 rounded-lg text-white/60 text-[12px] font-semibold hover:bg-white/10 disabled:opacity-30 transition-colors">
+                          Cancel
+                        </button>
+                        <button type="button" onClick={() => saveCaption(v)} disabled={savingCaption}
+                          className="px-3 py-1.5 rounded-lg bg-indigo-500 text-white text-[12px] font-semibold hover:bg-indigo-600 disabled:opacity-40 transition-colors whitespace-nowrap">
+                          {savingCaption ? 'Saving…' : 'Save caption'}
+                        </button>
+                      </div>
+                    )}
+                  </PanelSection>
+                )}
+
+                {/* Hashtags — editable regardless of status/tab, via the tags-only
+                    PATCH endpoint, so fixing/adding a tag never touches the
+                    video's moderation status. */}
+                {!v.deletedAt && (
+                  <PanelSection title="Hashtags" aside={tagsChanged && (
+                    <button type="button" onClick={() => saveTags(v, editedTags)} disabled={savingTags}
+                      className="px-2.5 py-1 rounded-md bg-indigo-500 text-white text-[11px] font-semibold hover:bg-indigo-600 disabled:opacity-40 transition-colors whitespace-nowrap">
+                      {savingTags ? 'Saving…' : 'Save tags'}
+                    </button>
+                  )}>
+                    <div className="flex flex-wrap gap-1.5">
+                      {/* Default tags — added automatically, can't be removed; the
+                          category one follows the category picked above. */}
+                      {defaultTags.map(tag => (
+                        <span key={`default-${tag}`} title="Default tag — added automatically"
+                          className="flex items-center gap-1 text-[11.5px] font-semibold text-amber-200 bg-amber-500/10 border border-amber-400/20 px-2 py-0.5 rounded-md">
+                          <Lock size={9} className="opacity-70" />
+                          #{tag}
+                        </span>
+                      ))}
+                      {editedTags.map((tag, i) => (
+                        <span key={i} className="flex items-center gap-1 text-[11.5px] font-semibold text-indigo-200 bg-indigo-500/10 border border-indigo-400/20 px-2 py-0.5 rounded-md">
+                          #{tag}
+                          <button type="button" onClick={() => removeTag(tag)} aria-label={`Remove #${tag}`} className="text-indigo-300/60 hover:text-white">
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ))}
+                      {editedTags.length === 0 && defaultTags.length === 0 && (
+                        <span className="text-[12px] text-white/30">No hashtags</span>
+                      )}
+                    </div>
                     {canAddTags ? (
-                      <>
+                      <div className="flex gap-1.5">
                         <input
                           type="text"
                           value={tagInput}
                           onChange={e => setTagInput(e.target.value)}
                           onKeyDown={e => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTagFromInput(); } }}
-                          placeholder="Add hashtag…"
-                          className="flex-1 min-w-0 text-[11px] bg-white/10 border border-white/20 rounded-lg px-2.5 py-1.5 text-white placeholder-white/30 focus:outline-none focus:ring-1 focus:ring-indigo-300"
+                          placeholder="Add a hashtag and press Enter"
+                          className="flex-1 min-w-0 text-[12.5px] bg-white/[0.06] border border-white/10 rounded-lg px-3 py-1.5 text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-indigo-400/40 focus:border-indigo-400/60"
                         />
                         <button type="button" onClick={addTagFromInput} disabled={!tagInput.trim()}
-                          className="px-2.5 py-1.5 rounded-lg bg-white/10 text-white/70 text-[11px] font-bold hover:bg-white/15 disabled:opacity-30 transition-colors">
+                          className="px-3 py-1.5 rounded-lg bg-white/10 text-white/80 text-[12px] font-semibold hover:bg-white/15 disabled:opacity-30 transition-colors">
                           Add
                         </button>
-                      </>
+                      </div>
                     ) : (
-                      <span className="flex-1 min-w-0 self-center text-[10px] text-white/40 italic">
-                        Moderators can remove hashtags (✕) but not add new ones.
-                      </span>
+                      <p className="text-[11px] text-white/35">Moderators can remove hashtags (✕) but not add new ones.</p>
                     )}
-                    {(() => {
-                      const currentTags = editableTags(previewVideo);
-                      const changed = currentTags.length !== editedTags.length || currentTags.some(t => !editedTags.includes(t));
-                      return changed && (
-                        <button type="button" onClick={() => saveTags(previewVideo, editedTags)} disabled={savingTags}
-                          className="px-2.5 py-1.5 rounded-lg bg-indigo-500 text-white text-[11px] font-bold hover:bg-indigo-600 disabled:opacity-40 transition-colors whitespace-nowrap">
-                          {savingTags ? 'Saving…' : 'Save Tags'}
+                  </PanelSection>
+                )}
+
+                {/* Quality — set by the moderator at approval time. Editable here too,
+                    mainly to backfill videos approved before this field existed
+                    (quality is null on those — the badge above never showed). */}
+                {v.status === 'APPROVED' && canEditCategory ? (
+                  <PanelSection title="Quality">
+                    <div className="grid grid-cols-3 gap-1 p-1 rounded-lg bg-white/[0.04] border border-white/10">
+                      {QUALITY_OPTIONS.map(opt => (
+                        <button key={opt.value} type="button" onClick={() => setEditedQuality(opt.value)} title={opt.hint}
+                          className={`py-1.5 rounded-md text-[12px] font-semibold transition-colors ${
+                            editedQuality === opt.value
+                              ? (opt.value === 'HIGH' ? 'bg-green-500 text-white' : opt.value === 'MEDIUM' ? 'bg-amber-500 text-white' : 'bg-red-500 text-white')
+                              : 'text-white/55 hover:bg-white/10'
+                          }`}>
+                          {opt.label}
                         </button>
-                      );
-                    })()}
-                  </div>
-                </div>
-              )}
-
-              {/* Rejection reason */}
-              {previewVideo.status === 'REJECTED' && previewVideo.rejectionReason && (
-                <div className="bg-red-500/20 border border-red-500/30 rounded-xl px-3 py-2">
-                  <p className="text-[10px] font-black text-red-400 uppercase tracking-wide mb-0.5">Rejected</p>
-                  <p className="text-[12px] text-red-300">{previewVideo.rejectionReason}</p>
-                </div>
-              )}
-
-              {/* Quality — set by the moderator at approval time. Editable here too,
-                  mainly to backfill videos approved before this field existed
-                  (quality is null on those — the badge above never showed). */}
-              {previewVideo.status === 'APPROVED' && canEditCategory ? (
-                <div className="border border-white/20 bg-white/5 rounded-xl px-3 py-2 space-y-1.5">
-                  <p className="text-[10px] font-black uppercase tracking-wide text-white/70">Quality</p>
-                  <div className="flex gap-1.5">
-                    {QUALITY_OPTIONS.map(opt => (
-                      <button key={opt.value} type="button" onClick={() => setEditedQuality(opt.value)}
-                        title={opt.hint}
-                        className={`flex-1 py-1.5 rounded-lg text-[11px] font-black transition-colors ${
-                          editedQuality === opt.value
-                            ? (opt.value === 'HIGH' ? 'bg-green-500 text-white' : opt.value === 'MEDIUM' ? 'bg-amber-500 text-white' : 'bg-red-500 text-white')
-                            : 'bg-white/10 text-white/60 hover:bg-white/15'
-                        }`}>
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                  {!previewVideo.quality && !editedQuality && (
-                    <p className="text-[10px] text-amber-300">Not set — this video predates the quality feature.</p>
-                  )}
-                </div>
-              ) : previewVideo.status === 'APPROVED' && previewVideo.quality && (
-                <div className={`border rounded-xl px-3 py-2 ${
-                  previewVideo.quality === 'HIGH'   ? 'bg-green-500/20 border-green-500/30' :
-                  previewVideo.quality === 'MEDIUM' ? 'bg-amber-500/20 border-amber-500/30' :
-                                                       'bg-red-500/20 border-red-500/30'
-                }`}>
-                  <p className="text-[10px] font-black uppercase tracking-wide mb-0.5 text-white/70">Quality</p>
-                  <p className="text-[12px] text-white/90">
-                    {previewVideo.quality === 'HIGH' ? 'High' : previewVideo.quality === 'MEDIUM' ? 'Medium' : 'Low'}
-                  </p>
-                </div>
-              )}
-
-              {/* Student / uploader info */}
-              <div className="flex items-center gap-3 bg-white/8 rounded-xl px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.07)' }}>
-                <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black shrink-0 ${
-                  isStudentVideo(previewVideo)
-                    ? 'bg-amber-400/20 text-amber-300'
-                    : 'bg-blue-400/20 text-blue-300'
-                }`}>
-                  {previewVideo.student?.name?.[0] ?? previewVideo.appUser?.userId?.[0] ?? '?'}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-0.5">
-                    <p className="text-sm font-black text-white truncate">
-                      {previewVideo.student?.name ?? previewVideo.appUser?.userId ?? '—'}
-                    </p>
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full shrink-0 ${
-                      isStudentVideo(previewVideo)
-                        ? 'bg-amber-400/20 text-amber-300'
-                        : 'bg-blue-400/20 text-blue-300'
+                      ))}
+                    </div>
+                    {!v.quality && !editedQuality && (
+                      <p className="text-[11px] text-amber-300">Not set — this video predates the quality feature.</p>
+                    )}
+                  </PanelSection>
+                ) : v.status === 'APPROVED' && v.quality && (
+                  <PanelSection title="Quality">
+                    <span className={`inline-block text-[12px] font-semibold px-2.5 py-1 rounded-md ${
+                      v.quality === 'HIGH' ? 'bg-green-500/15 text-green-300' : v.quality === 'MEDIUM' ? 'bg-amber-500/15 text-amber-300' : 'bg-red-500/15 text-red-300'
                     }`}>
-                      {previewVideo.uploaderType === 'SCHOOL_OWN' ? '🏫 School' : isStudentVideo(previewVideo) ? '🎓 Student' : '📱 Viewer'}
+                      {v.quality === 'HIGH' ? 'High' : v.quality === 'MEDIUM' ? 'Medium' : 'Low'}
                     </span>
-                  </div>
-                  {previewVideo.student ? (
-                    <div className="space-y-0.5">
-                      <p className="text-[11px] text-white/40 font-mono">{previewVideo.student.olympiadCode}</p>
-                      {previewVideo.student.allocation?.school && (
-                        <div className="flex items-center gap-1">
-                          <School size={10} className="text-blue-400 shrink-0" />
-                          <p className="text-[12px] font-bold text-blue-300 truncate">
-                            {previewVideo.student.allocation.school.name}
-                          </p>
-                        </div>
-                      )}
-                      {previewVideo.student.allocation?.school && (
-                        <p className="text-[10px] text-white/25 truncate">
-                          {[previewVideo.student.allocation.school.district, previewVideo.student.allocation.school.state].filter(Boolean).join(', ')}
-                        </p>
-                      )}
+                  </PanelSection>
+                )}
+
+                {/* Featuring — MittFest row and the influencer pick that leads its
+                    category's row on the app home (once it's approved). */}
+                {!v.deletedAt && (
+                  <PanelSection title="Featuring in the app">
+                    <div className="rounded-xl border border-white/10 divide-y divide-white/10">
+                      <FeatureRow
+                        title="MittFest"
+                        description={v.isMittfest ? 'Shown in the MittFest row in the app.' : 'Not in the MittFest row.'}
+                        checked={v.isMittfest}
+                        saving={savingMittfest}
+                        onToggle={() => setMittfest(v, !v.isMittfest)}
+                      />
+                      <FeatureRow
+                        title="Influencer"
+                        icon={<Star size={12} className={v.isInfluencer ? 'fill-amber-400 text-amber-400' : 'text-white/50'} />}
+                        description={v.isInfluencer
+                          ? `Shown first in "${v.category}" on the app home.`
+                          : `Turn on to show it first in "${v.category}" on the app home.`}
+                        checked={!!v.isInfluencer}
+                        saving={savingInfluencer}
+                        onToggle={() => setInfluencer(v, !v.isInfluencer)}
+                      />
                     </div>
-                  ) : previewVideo.appUser ? (
-                    <div className="space-y-0.5">
-                      <p className="text-[11px] text-white/40 truncate">{previewVideo.appUser.email || previewVideo.appUser.mobile || '—'}</p>
-                      {previewVideo.appUser.olympiadId && (
-                        <p className="text-[11px] text-amber-400 font-mono">{previewVideo.appUser.olympiadId}</p>
-                      )}
-                      {previewVideo.appUser.school && (
-                        <div className="flex items-center gap-1">
-                          <School size={10} className="text-blue-400 shrink-0" />
-                          <p className="text-[12px] font-bold text-blue-300 truncate">{previewVideo.appUser.school.name}</p>
-                        </div>
-                      )}
-                      {previewVideo.appUser.school && (
-                        <p className="text-[10px] text-white/25 truncate">
-                          {[previewVideo.appUser.school.district, previewVideo.appUser.school.state].filter(Boolean).join(', ')}
-                        </p>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
+                  </PanelSection>
+                )}
               </div>
 
-              {/* Action buttons */}
-              <div className="flex gap-2 pt-1">
+              {/* Actions */}
+              <div className="shrink-0 flex items-center gap-2 px-5 py-3 border-t border-white/10 bg-[#0e0f11]">
+                {hasMenu && (
+                  <div className="relative">
+                    <button type="button" onClick={() => setPreviewMenuOpen(o => !o)} disabled={busy} aria-label="More actions"
+                      className="w-9 h-9 rounded-lg border border-white/12 bg-white/[0.04] text-white/70 hover:bg-white/[0.08] hover:text-white flex items-center justify-center transition-colors disabled:opacity-40">
+                      <MoreHorizontal size={18} />
+                    </button>
+                    {previewMenuOpen && (
+                      <>
+                        <div className="fixed inset-0 z-10" onClick={() => setPreviewMenuOpen(false)} />
+                        <div className="absolute bottom-full left-0 mb-2 z-20 w-52 rounded-xl border border-white/10 bg-[#1b1c20] shadow-xl py-1">
+                          {showVisibility && (
+                            <button type="button" title="Super Admin only"
+                              onClick={() => { setPreviewMenuOpen(false); changeVisibility(v); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-white/85 hover:bg-white/5 text-left">
+                              {isPub ? <Lock size={14} /> : <Globe size={14} />} {isPub ? 'Make private' : 'Make public'}
+                            </button>
+                          )}
+                          {canDelete && (
+                            <button type="button"
+                              onClick={() => { setPreviewMenuOpen(false); setPreviewVideo(null); openDeleteModal([v.id]); }}
+                              className="w-full flex items-center gap-2.5 px-3 py-2 text-[13px] text-red-400 hover:bg-red-500/10 text-left">
+                              <Trash2 size={14} /> Delete video
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex-1" />
+
+                {showPending && (
+                  <button onClick={() => moveToPending(v)} disabled={busy || isEvaluated(v)}
+                    title={isEvaluated(v) ? 'Already evaluated by the jury — cannot be moved back' : 'Move back to Pending for re-review'}
+                    className={btnSecondary}>
+                    <RotateCcw size={14} strokeWidth={2.25} />
+                    <span className="hidden sm:inline">Move to Pending</span>
+                    <span className="sm:hidden">Pending</span>
+                  </button>
+                )}
+                {(filter === 'PENDING' || showUnapprove) && (
+                  <button onClick={() => openRejectModal(v)} disabled={busy || (showUnapprove && isEvaluated(v))}
+                    title={showUnapprove ? (isEvaluated(v) ? 'Already evaluated by the jury — cannot be rejected' : 'Reject this approved video') : undefined}
+                    className={btnDanger}>
+                    <XCircle size={14} strokeWidth={2.25} /> Reject
+                  </button>
+                )}
                 {filter === 'PENDING' && (
-                  <>
-                    <button onClick={() => openApproveModal(
-                        previewVideo,
-                        editedSubCat !== previewVideo.subCategory ? editedSubCat : undefined,
-                        // Compared with the dropdown's starting value, so an untouched
-                        // legacy name ("Cat A") isn't sent as a change.
-                        editedCat !== normalizeCat(previewVideo, managedCategories) ? editedCat : undefined,
-                      )} disabled={processingId === previewVideo.id}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                      <CheckCircle size={14} /> Approve
-                    </button>
-                    <button onClick={() => openRejectModal(previewVideo)} disabled={processingId === previewVideo.id}
-                      className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                      <XCircle size={14} /> Reject
-                    </button>
-                  </>
+                  <button onClick={() => openApproveModal(
+                      v,
+                      editedSubCat !== v.subCategory ? editedSubCat : undefined,
+                      // Compared with the dropdown's starting value, so an untouched
+                      // legacy name ("Cat A") isn't sent as a change.
+                      editedCat !== normalizeCat(v, managedCategories) ? editedCat : undefined,
+                    )} disabled={busy}
+                    className={btnPrimary('green')}>
+                    <CheckCircle size={14} strokeWidth={2.25} /> Approve
+                  </button>
                 )}
-                {filter === 'APPROVED' && canEditCategory && (
+                {showSave && (
                   <button
-                    onClick={() => saveRecategorization(previewVideo, editedSubCat, editedCat, editedQuality)}
+                    onClick={() => saveRecategorization(v, editedSubCat, editedCat, editedQuality)}
                     disabled={
-                      processingId === previewVideo.id || !editedQuality ||
-                      (editedSubCat === previewVideo.subCategory && editedCat === normalizeCat(previewVideo, managedCategories) && editedQuality === previewVideo.quality)
+                      busy || !editedQuality ||
+                      (editedSubCat === v.subCategory && editedCat === normalizeCat(v, managedCategories) && editedQuality === v.quality)
                     }
-                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                    <CheckCircle size={14} /> {previewVideo.quality ? 'Save Category' : 'Set Quality & Save'}
-                  </button>
-                )}
-                {canChangeVisibility && !previewVideo.deletedAt && (() => {
-                  const pub = previewVideo.isEvaluation ? previewVideo.olympiadVisibility === 'public' : previewVideo.isPublic;
-                  return (
-                    <button onClick={() => changeVisibility(previewVideo)} disabled={processingId === previewVideo.id}
-                      title="Super Admin only"
-                      className="flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                      {pub ? <Lock size={14} /> : <Globe size={14} />} {pub ? 'Make Private' : 'Make Public'}
-                    </button>
-                  );
-                })()}
-                {filter !== 'PENDING' && canUnapprove && !previewVideo.deletedAt && (
-                  <button onClick={() => moveToPending(previewVideo)} disabled={processingId === previewVideo.id || isEvaluated(previewVideo)}
-                    title={isEvaluated(previewVideo) ? 'Already evaluated by the jury — cannot be moved back' : 'Move back to Pending for re-review'}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                    <RotateCcw size={14} /> Pending
-                  </button>
-                )}
-                {filter === 'APPROVED' && canUnapprove && !previewVideo.deletedAt && (
-                  <button onClick={() => openRejectModal(previewVideo)} disabled={processingId === previewVideo.id || isEvaluated(previewVideo)}
-                    title={isEvaluated(previewVideo) ? 'Already evaluated by the jury — cannot be rejected' : 'Reject this approved video'}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                    <XCircle size={14} /> Reject
-                  </button>
-                )}
-                {canDelete && (
-                  <button onClick={() => { setPreviewVideo(null); openDeleteModal([previewVideo.id]); }} disabled={processingId === previewVideo.id}
-                    className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/15 text-red-400 rounded-xl font-black text-sm transition-colors disabled:opacity-40">
-                    <Trash2 size={14} />
+                    title={!editedQuality ? 'Pick a quality first' : undefined}
+                    className={btnPrimary('blue')}>
+                    <Check size={14} strokeWidth={2.5} /> {v.quality ? 'Save changes' : 'Set quality & save'}
                   </button>
                 )}
               </div>
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* ── Reject modal (single + bulk) ─────────────────────────────────────── */}
       {(rejectModal.video || rejectModal.bulk) && (
