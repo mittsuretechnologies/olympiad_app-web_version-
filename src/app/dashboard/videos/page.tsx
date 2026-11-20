@@ -308,8 +308,7 @@ export default function VideoModerationPage() {
   // vs General (neither) — a video can't be both, since jury videos don't set
   // isMittfest. Client-side only, like search, since it's a cheap boolean split
   // of the already-fetched per-status page.
-  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'GENERAL' | 'INFLUENCER'>('ALL');
-  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'STATE' | 'GENERAL'>('ALL');
+  const [contentFilter, setContentFilter] = useState<'ALL' | 'MITTFEST' | 'OLYMPIAD' | 'STATE' | 'GENERAL' | 'INFLUENCER'>('ALL');
 
   // ── Selection ─────────────────────────────────────────────────────────────
   const [selected,     setSelected]     = useState<Set<string>>(new Set());
@@ -376,7 +375,6 @@ export default function VideoModerationPage() {
 
     if (contentFilter === 'MITTFEST') allVideos = allVideos.filter(v => v.isMittfest);
     else if (contentFilter === 'OLYMPIAD') allVideos = allVideos.filter(v => v.isEvaluation);
-    else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation);
     else if (contentFilter === 'INFLUENCER') allVideos = allVideos.filter(v => v.isInfluencer);
     else if (contentFilter === 'STATE') allVideos = allVideos.filter(v => v.competitionStage === 'STATE');
     else if (contentFilter === 'GENERAL') allVideos = allVideos.filter(v => !v.isMittfest && !v.isEvaluation && v.competitionStage !== 'STATE');
