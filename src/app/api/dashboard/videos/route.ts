@@ -393,12 +393,47 @@ function slotLabel(categories: CategoryDTO[], slot: 'A' | 'B') {
 }
 
 /**
+ * Every owner key one student's Olympiad videos can sit under. A student can
+ * have an app account (AppUser) and a web Student row under the same Olympiad
+ * ID, and a video carries either or both, so a check on appUserId alone misses
+ * the videos the school uploaded for them (and vice versa). Same identity rule
+ * as slotsForStudent in lib/olympiadSlots.ts.
+ */
+async function studentVideoOwners(owner: { appUserId: string | null; studentId: string | null }) {
+  const appUserIds = new Set<string>(owner.appUserId ? [owner.appUserId] : []);
+  const studentIds = new Set<string>(owner.studentId ? [owner.studentId] : []);
+
+  const [appUser, student] = await Promise.all([
+    owner.appUserId ? prisma.appUser.findUnique({ where: { id: owner.appUserId }, select: { olympiadId: true } }) : null,
+    owner.studentId ? prisma.student.findUnique({ where: { id: owner.studentId }, select: { olympiadCode: true } }) : null,
+  ]);
+  const codes = [appUser?.olympiadId, student?.olympiadCode].filter((c): c is string => !!c);
+  if (codes.length) {
+    const [users, students] = await Promise.all([
+      prisma.appUser.findMany({ where: { olympiadId: { in: codes } }, select: { id: true } }),
+      prisma.student.findMany({ where: { olympiadCode: { in: codes } }, select: { id: true } }),
+    ]);
+    users.forEach(u => appUserIds.add(u.id));
+    students.forEach(s => studentIds.add(s.id));
+  }
+
+  return [
+    ...(appUserIds.size ? [{ appUserId: { in: [...appUserIds] } }] : []),
+    ...(studentIds.size ? [{ studentId: { in: [...studentIds] } }] : []),
+  ];
+}
+
+/**
  * Whether another of the student's jury videos already occupies this A/B slot
  * — evaluated, or live and not rejected. Same rule as the student's upload.
  */
-async function slotTakenBySibling(appUserId: string, videoId: string, slot: 'A' | 'B') {
+async function slotTakenBySibling(
+  owner: { appUserId: string | null; studentId: string | null }, videoId: string, slot: 'A' | 'B',
+) {
+  const owners = await studentVideoOwners(owner);
+  if (owners.length === 0) return false;
   const siblings = await prisma.video.findMany({
-    where: { appUserId, isEvaluation: true, id: { not: videoId } },
+    where: { OR: owners, isEvaluation: true, id: { not: videoId } },
     select: { category: true, subCategory: true, status: true, deletedAt: true, evaluations: { select: { id: true } } },
   });
   const categories = await loadCategoriesSafe();
@@ -427,7 +462,7 @@ async function moveToPending(payload: { id: string; role: string; name?: string;
   const before = await prisma.video.findUnique({
     where: { id: videoId },
     select: {
-      status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true,
+      status: true, rejectionReason: true, quality: true, isEvaluation: true, appUserId: true, studentId: true,
       category: true, subCategory: true, deletedAt: true,
       _count: { select: { evaluations: true } },
     },
@@ -443,9 +478,9 @@ async function moveToPending(payload: { id: string; role: string; name?: string;
 
   // A rejected jury video frees its A/B slot, so the student may have uploaded
   // a replacement since. Reviving the old one would put two videos in a slot.
-  if (expected === 'REJECTED' && before.isEvaluation && before.appUserId) {
+  if (expected === 'REJECTED' && before.isEvaluation) {
     const slot = resolveSlot(await loadCategoriesSafe(), before.category, before.subCategory);
-    if (slot && await slotTakenBySibling(before.appUserId, videoId, slot)) {
+    if (slot && await slotTakenBySibling(before, videoId, slot)) {
       return NextResponse.json(
         { message: 'This student has since uploaded another video in the same category slot, so this one cannot be moved back to Pending.' },
         { status: 409 },
@@ -570,8 +605,8 @@ export async function POST(request: Request) {
     const before = await prisma.video.findUnique({
       where: { id: videoId },
       select: {
-        status: true, rejectionReason: true, quality: true, isEvaluation: true, uploaderType: true, appUserId: true, uploadedBySchoolId: true,
-        competitionStage: true,
+        status: true, rejectionReason: true, quality: true, isEvaluation: true, uploaderType: true, appUserId: true, studentId: true,
+        uploadedBySchoolId: true, competitionStage: true,
         caption: true, category: true, subCategory: true, isPublic: true, olympiadVisibility: true, tags: true,
         _count: { select: { evaluations: true } },
       },
@@ -603,13 +638,19 @@ export async function POST(request: Request) {
         categoryChanged ? newCategory : before.category,
         subCategoryChanged ? newSubCategory : before.subCategory,
       );
-      if (targetSlot && before.appUserId) {
-        if (await slotTakenBySibling(before.appUserId, videoId, targetSlot)) {
-          return NextResponse.json(
-            { message: 'This student already has a video in that category slot. Reject this one instead.' },
-            { status: 409 },
-          );
-        }
+      // Checked through every account of the student (app + web Student row),
+      // so a video the school uploaded for them counts too.
+      if (targetSlot && await slotTakenBySibling(before, videoId, targetSlot)) {
+        const label = slotLabel(categories, targetSlot);
+        return NextResponse.json(
+          {
+            code: 'OLYMPIAD_SLOT_TAKEN',
+            message: `This account has already uploaded an Olympiad video in "${label}". `
+              + `Only one Olympiad video is allowed per category, so this video cannot be moved to "${label}". `
+              + 'Keep it in its current category, or reject it.',
+          },
+          { status: 409 },
+        );
       }
     }
 

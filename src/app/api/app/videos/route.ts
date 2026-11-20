@@ -213,11 +213,9 @@ export async function POST(request: Request) {
     // MittFest checkbox — see src/lib/mittfest.ts.
     // The tick only counts while a SuperAdmin has the checkbox switched on
     // (older app builds still show it and may send it regardless).
-    const tickCounts = isMittfest !== undefined && Boolean(isMittfest) && await isMittfestCheckboxEnabled();
-    const finalIsMittfest = tickCounts || hasMittfestTag(userTags);
     // A State Level competition video is not a MittFest entry.
-    const finalIsMittfest = !isStateUpload
-      && ((isMittfest !== undefined ? Boolean(isMittfest) : false) || hasMittfestTag(userTags));
+    const tickCounts = isMittfest !== undefined && Boolean(isMittfest) && await isMittfestCheckboxEnabled();
+    const finalIsMittfest = !isStateUpload && (tickCounts || hasMittfestTag(userTags));
 
     const newVideo = await prisma.video.create({
       data: {

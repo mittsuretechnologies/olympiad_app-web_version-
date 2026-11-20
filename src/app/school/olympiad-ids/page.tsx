@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Contact, Loader2, Search, Download, Clock, BookOpen, ChevronDown, ChevronUp,
-  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, AlertCircle,
+  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, MessageSquare, AlertCircle,
 } from 'lucide-react';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL, FOCUS,
@@ -55,11 +55,12 @@ export default function SchoolOlympiadIdsPage() {
   /**
    * Delivery step. Pressing Allot on the details form doesn't register anyone —
    * it moves the modal to this step, where the school picks which channels the
-   * credentials go out on. Only email is offered — there is no approved SMS
-   * template for credentials yet.
+   * credentials go out on: email (when an address was given) and/or SMS to the
+   * phone number, through the DLT-approved student credentials template.
    */
   const [allotStep, setAllotStep] = useState<'details' | 'deliver'>('details');
   const [sendEmail, setSendEmail] = useState(false);
+  const [sendSms, setSendSms] = useState(false);
   const [allotSuccess, setAllotSuccess] = useState<{
     code: string; userId: string; password: string;
     email: string; phone: string;
@@ -102,11 +103,13 @@ export default function SchoolOlympiadIdsPage() {
     setAllotSuccess(null);
     setAllotStep('details');
     setSendEmail(false);
+    setSendSms(false);
   };
   const closeAllotModal = () => {
     setAllotRow(null); setAllotName(''); setAllotGuardianName(''); setAllotPhone(''); setAllotEmail('');
     setAllotError(''); setAllotSuccess(null); setAllotStep('details');
     setSendEmail(false);
+    setSendSms(false);
   };
 
   /** Validates the details form, then hands over to the delivery step. Email is
@@ -121,6 +124,9 @@ export default function SchoolOlympiadIdsPage() {
     }
     setAllotError('');
     setSendEmail(!!allotEmail.trim());
+    // No email → SMS is the only way the details reach the family, so it starts
+    // ticked. With an email it's offered but left to the school.
+    setSendSms(!allotEmail.trim());
     setAllotStep('deliver');
   };
 
@@ -139,6 +145,7 @@ export default function SchoolOlympiadIdsPage() {
           phone: allotPhone.trim(),
           email: allotEmail.trim(),
           sendEmail,
+          sendSms,
         }),
       });
       const data = await res.json();
@@ -540,6 +547,23 @@ export default function SchoolOlympiadIdsPage() {
                     </span>
                     <span className="mt-0.5 block truncate text-[11.5px] text-[#677285]">
                       {allotEmail.trim() || 'No email address given'}
+                    </span>
+                  </span>
+                </label>
+                {/* Phone is mandatory on the details step, so SMS is always
+                    offerable — the route for families without an email. */}
+                <label className={`flex cursor-pointer items-start gap-2.5 rounded-lg border px-3 py-2.5 ${FOCUS} ${sendSms ? 'border-[#1559C7] bg-[#1559C7]/[0.05]' : 'border-[#E6E8EC] bg-white'}`}>
+                  <input
+                    type="checkbox" checked={sendSms}
+                    onChange={e => { setSendSms(e.target.checked); setAllotError(''); }}
+                    className="mt-0.5 h-3.5 w-3.5 cursor-pointer accent-[#1559C7]"
+                  />
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-[13px] font-semibold text-[#0F1B2D]">
+                      <MessageSquare size={13} className="text-[#677285]" /> Send by SMS
+                    </span>
+                    <span className="mt-0.5 block truncate text-[11.5px] text-[#677285]">
+                      {allotPhone.trim()}
                     </span>
                   </span>
                 </label>

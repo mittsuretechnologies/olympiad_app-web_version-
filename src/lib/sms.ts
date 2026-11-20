@@ -24,6 +24,9 @@ const SMS_CAMPAIGN_NAME = process.env.SMS_CAMPAIGN_NAME || 'mittmee-otp';
 
 const SEND_TIMEOUT_MS = 10_000;
 
+/** Longest value a DLT {#alp#} / {#var#} template variable accepts. */
+const DLT_VAR_MAX = 30;
+
 export type OtpPurpose = 'signup' | 'reset' | 'delete';
 
 /**
@@ -242,8 +245,14 @@ function renderStudentCredentialsTemplate(vars: {
     }
   }
 
+  // A DLT {#alp#} variable takes at most 30 characters, and the operator
+  // silently drops a message whose variable runs longer. Only the name can:
+  // usernames are at most 21 characters (lib/generateUserId.ts), passwords 8,
+  // Olympiad IDs short — and those must never be cut, or the login breaks.
+  const studentName = [...vars.studentName.trim()].slice(0, DLT_VAR_MAX).join('').trim();
+
   const text = body
-    .replaceAll('{studentName}', vars.studentName)
+    .replaceAll('{studentName}', studentName)
     .replaceAll('{olympiadId}', vars.olympiadId)
     .replaceAll('{username}', vars.username)
     .replaceAll('{password}', vars.password);

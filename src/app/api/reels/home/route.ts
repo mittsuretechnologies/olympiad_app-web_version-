@@ -307,14 +307,12 @@ export async function GET(request: NextRequest) {
         categories.map(row =>
           prisma.video.findMany({
             take: ROW_LIMIT,
-            where: { ...baseWhere, category: name },
-            // Influencer picks (marked on the moderation page) lead their
-            // category's row, newest pick first; the rest follow by views.
-            orderBy: [{ isInfluencer: 'desc' }, { influencerAt: { sort: 'desc', nulls: 'last' } }, { viewsCount: 'desc' }],
             // Its own names (and earlier ones), plus the Olympiad videos that
             // belong to it — the same videos its Search card shows.
             where: { ...baseWhere, ...row.where },
-            orderBy: { viewsCount: 'desc' },
+            // Influencer picks (marked on the moderation page) lead their
+            // category's row, newest pick first; the rest follow by views.
+            orderBy: [{ isInfluencer: 'desc' }, { influencerAt: { sort: 'desc', nulls: 'last' } }, { viewsCount: 'desc' }],
             select: VIDEO_SELECT,
           })
         )
