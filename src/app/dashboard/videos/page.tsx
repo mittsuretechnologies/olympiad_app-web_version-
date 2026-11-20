@@ -89,6 +89,7 @@ const REJECTION_TEMPLATES = [
   'Video duration is too short.',
   'Inappropriate content detected.',
   'Wrong category submitted.',
+  'Already Uploaded.',
 ];
 
 const QUALITY_OPTIONS: { value: 'HIGH' | 'MEDIUM' | 'LOW'; label: string; hint: string }[] = [
