@@ -4,7 +4,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
 import {
   Users, Loader2, Search, Download, BookOpen, Calendar, Phone,
   Mail, CheckCircle2, Send, AlertCircle, ChevronDown, ChevronUp,
-  UserCheck, UserX, Clock, RotateCcw, Pencil, Lock,
+  UserCheck, UserX, Clock, RotateCcw, Pencil, Lock, KeyRound, MessageSquare,
 } from 'lucide-react';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL,
@@ -28,7 +28,14 @@ interface Student {
   olympiadVideos?: number;
   email?: string | null;
   attendance?: 'PRESENT' | 'ABSENT' | null;
+  /** False once an app student has set their own password. */
+  canResendCredentials?: boolean;
 }
+
+type ResendChannel = 'sms' | 'email';
+
+/** A saved phone number the SMS gateway can use ('-' means none on file). */
+const hasPhone = (s: Student) => s.phone.replace(/\D/g, '').length >= 10;
 
 /** Expandable profile shown under a student's row: contact details only.
  *  Login credentials are deliberately not shown anywhere on this page — the
@@ -81,6 +88,13 @@ export default function SchoolRegisteredStudentsPage() {
   const [showResetModal, setShowResetModal] = useState(false);
   const [resetting, setResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
+  // Resend credentials dialog. The school never sees the credentials, only
+  // where they were sent.
+  const [resendFor, setResendFor] = useState<Student | null>(null);
+  const [resendChannel, setResendChannel] = useState<ResendChannel>('sms');
+  const [resending, setResending] = useState(false);
+  const [resendError, setResendError] = useState<string | null>(null);
+  const [resendSentTo, setResendSentTo] = useState<string | null>(null);
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') : '';
 
@@ -177,6 +191,35 @@ export default function SchoolRegisteredStudentsPage() {
       alert(e.message);
     } finally {
       setMarkingId(null);
+    }
+  };
+
+  const openResend = (s: Student) => {
+    setResendFor(s);
+    setResendChannel(hasPhone(s) ? 'sms' : 'email');
+    setResendError(null);
+    setResendSentTo(null);
+  };
+
+  const closeResend = () => { if (!resending) setResendFor(null); };
+
+  const sendCredentials = async () => {
+    if (!resendFor) return;
+    setResending(true);
+    setResendError(null);
+    try {
+      const res = await fetch(`/api/school/me/students/${resendFor.id}/resend-credentials`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ source: resendFor.source === 'app' ? 'app' : 'web', channel: resendChannel }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.message || 'Failed to send credentials');
+      setResendSentTo(data.sentTo || (resendChannel === 'sms' ? resendFor.phone : resendFor.email) || '');
+    } catch (e: any) {
+      setResendError(e.message);
+    } finally {
+      setResending(false);
     }
   };
 
@@ -377,6 +420,7 @@ export default function SchoolRegisteredStudentsPage() {
                       )}
                     </span>
                   </th>
+                  <th className={`${TH} w-32`}>Credentials</th>
                   <th className={`${TH} w-12`} />
                 </tr>
               </thead>
@@ -471,13 +515,32 @@ export default function SchoolRegisteredStudentsPage() {
                             <span className="text-[11px] text-[#98A1B2]">—</span>
                           )}
                         </td>
+                        <td className={TD} onClick={(e) => e.stopPropagation()}>
+                          {s.canResendCredentials === false ? (
+                            <span
+                              title="This student has set their own password. They can use “Forgot password” in the app."
+                              className="inline-flex cursor-help items-center gap-1 text-[11px] text-[#98A1B2]"
+                            >
+                              <Lock size={11} /> Set by student
+                            </span>
+                          ) : (
+                            <button
+                              onClick={() => openResend(s)}
+                              disabled={!hasPhone(s) && !s.email}
+                              title={!hasPhone(s) && !s.email ? 'No phone or email saved for this student' : 'Send login details to the student'}
+                              className="cursor-pointer inline-flex items-center gap-1.5 rounded-md border border-[#1559C7]/25 bg-white px-2.5 py-1 text-[11px] font-semibold text-[#1559C7] hover:bg-[#1559C7]/[0.06] disabled:cursor-not-allowed disabled:border-[#E6E8EC] disabled:text-[#B4BBC6] disabled:hover:bg-white"
+                            >
+                              <Send size={11} /> Resend
+                            </button>
+                          )}
+                        </td>
                         <td className={`${TD} text-center text-[#98A1B2]`}>
                           {isOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                         </td>
                       </tr>
                       {isOpen && (
                         <tr>
-                          <td colSpan={8} className="border border-[#E6E8EC] p-0">
+                          <td colSpan={9} className="border border-[#E6E8EC] p-0">
                             <StudentProfile s={s} />
                           </td>
                         </tr>
@@ -544,6 +607,95 @@ export default function SchoolRegisteredStudentsPage() {
               </button>
             </div>
           </div>
+        </ModalShell>
+      )}
+
+      {/* Resend Credentials Modal */}
+      {resendFor && (
+        <ModalShell
+          eyebrow="Resend credentials"
+          title={resendFor.name}
+          onClose={closeResend}
+          maxWidth="max-w-sm"
+        >
+          {resendSentTo !== null ? (
+            <div className="space-y-4 p-5">
+              <div className="flex items-start gap-2.5 rounded-lg border border-[#2E9E46]/25 bg-[#2E9E46]/[0.08] p-3.5 text-[12.5px] text-[#1D7A3A]">
+                <CheckCircle2 size={15} className="mt-0.5 flex-shrink-0" />
+                <span>
+                  Login details sent by {resendChannel === 'sms' ? 'SMS' : 'email'} to{' '}
+                  <span className="font-semibold">{resendSentTo}</span>.
+                </span>
+              </div>
+              <button onClick={closeResend} className={`cursor-pointer ${BTN_PRIMARY} w-full`}>Done</button>
+            </div>
+          ) : (
+            <div className="space-y-4 p-5">
+              <p className="text-[12.5px] leading-relaxed text-[#475265]">
+                The student&apos;s Olympiad ID, username and password will be sent to the contact saved on their account.
+                For privacy, you won&apos;t see the password here.
+              </p>
+
+              <div className="space-y-2" role="radiogroup" aria-label="Send by">
+                {([
+                  { value: 'sms' as const, label: 'SMS', icon: MessageSquare, to: hasPhone(resendFor) ? resendFor.phone : null, missing: 'No phone number saved' },
+                  { value: 'email' as const, label: 'Email', icon: Mail, to: resendFor.email || null, missing: 'No email saved' },
+                ]).map(opt => {
+                  const active = resendChannel === opt.value;
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      role="radio"
+                      aria-checked={active}
+                      disabled={!opt.to || resending}
+                      onClick={() => setResendChannel(opt.value)}
+                      className={`flex w-full items-center gap-3 rounded-lg border px-3.5 py-3 text-left transition-colors ${
+                        !opt.to
+                          ? 'cursor-not-allowed border-[#E6E8EC] bg-[#F8F9FB] opacity-60'
+                          : active
+                            ? 'cursor-pointer border-[#1559C7] bg-[#1559C7]/[0.05] ring-1 ring-[#1559C7]'
+                            : 'cursor-pointer border-[#E6E8EC] bg-white hover:border-[#C9CED6]'
+                      }`}
+                    >
+                      <span className={`flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full border ${active && opt.to ? 'border-[#1559C7]' : 'border-[#C9CED6]'}`}>
+                        {active && opt.to && <span className="h-2 w-2 rounded-full bg-[#1559C7]" />}
+                      </span>
+                      <Icon size={15} className={active && opt.to ? 'text-[#1559C7]' : 'text-[#98A1B2]'} />
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-[12.5px] font-semibold text-[#0F1B2D]">{opt.label}</span>
+                        <span className={`block truncate text-[11.5px] ${opt.to ? 'font-mono text-[#475265]' : 'text-[#98A1B2]'}`}>
+                          {opt.to || opt.missing}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {resendError && (
+                <p className="flex items-start gap-1.5 text-[12px] text-[#B42323]">
+                  <AlertCircle size={12} className="mt-0.5 flex-shrink-0" /> {resendError}
+                </p>
+              )}
+
+              <div className="flex gap-2 pt-1">
+                <button onClick={closeResend} disabled={resending} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>
+                  Cancel
+                </button>
+                <button
+                  onClick={sendCredentials}
+                  disabled={resending || (resendChannel === 'sms' ? !hasPhone(resendFor) : !resendFor.email)}
+                  className={`cursor-pointer ${BTN_PRIMARY} flex-1`}
+                >
+                  {resending ? <Loader2 size={14} className="animate-spin" /> : <KeyRound size={14} />}
+                  Send
+                </button>
+              </div>
+              <p className="text-[11px] text-[#98A1B2]">Up to 3 sends per student in 24 hours.</p>
+            </div>
+          )}
         </ModalShell>
       )}
 
