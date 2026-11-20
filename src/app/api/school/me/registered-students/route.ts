@@ -91,7 +91,7 @@ export async function GET(request: Request) {
       where: { olympiadId: { in: codes }, isVerified: true },
       select: {
         id: true, userId: true, mobile: true, email: true, olympiadId: true,
-        isVerified: true, createdAt: true,
+        isVerified: true, createdAt: true, mustChangePassword: true,
       },
     });
 
@@ -140,6 +140,8 @@ export async function GET(request: Request) {
           slotA: slots.slotA,
           slotB: slots.slotB,
           attendance: attendanceByCode.get(s.olympiadCode) ?? null,
+          // See school/me/students/[id]/resend-credentials.
+          canResendCredentials: true,
         };
       }),
       ...appUsers
@@ -162,12 +164,15 @@ export async function GET(request: Request) {
             slotA: slots.slotA,
             slotB: slots.slotB,
             attendance: attendanceByCode.get(u.olympiadId!) ?? null,
+            // Off once the student has set their own password.
+            canResendCredentials: u.mustChangePassword,
           };
         }),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     // Login credentials (username / password) are never sent here — a school
-    // sees them only once, in the response to allotting the student.
+    // sees them only once, in the response to allotting the student. It can
+    // re-send them to the student's own phone/email, without seeing them.
     await recordAccessLog(payload, {
       action: 'USER_DETAILS_VIEWED',
       entityType: 'Student', subjectIds: result.map(r => r.id), request,
