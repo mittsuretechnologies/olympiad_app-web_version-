@@ -125,11 +125,11 @@ function normaliseMobile(input: string): string {
  * how the rest of the request looks. Shape verified against the working
  * MittsureERP integration and a live send.
  */
-function buildPayload(mobile: string, text: string, templateId: string): Record<string, unknown> {
+function buildPayload(mobile: string, text: string, templateId: string, sender: string): Record<string, unknown> {
   const payload: Record<string, unknown> = {
     auth_key: SMS_AUTH_KEY,
     receivers: mobile,
-    sender: SMS_SENDER_ID,
+    sender,
     route: SMS_ROUTE,
     campaign_name: SMS_CAMPAIGN_NAME,
     message: {
@@ -171,8 +171,13 @@ function assertGatewayAccepted(body: string): void {
 /**
  * Shared send path: build the payload, POST to the gateway, and assert it was
  * accepted. Every template (OTP or credentials) funnels through this.
+ *
+ * On DLT a template is approved against one sender header, and a message sent
+ * under any other header is dropped by the operator *after* the gateway has
+ * reported success. `sender` lets a template approved under a different header
+ * than SMS_SENDER_ID go out under its own.
  */
-async function dispatch(mobile: string, id: string, text: string): Promise<void> {
+async function dispatch(mobile: string, id: string, text: string, sender?: string): Promise<void> {
   if (!isSmsConfigured()) {
     throw new Error(
       'SMS is not configured (set SMS_API_URL, SMS_SENDER_ID and SMS_AUTH_KEY — ' +
@@ -181,7 +186,8 @@ async function dispatch(mobile: string, id: string, text: string): Promise<void>
   }
 
   const to = normaliseMobile(mobile);
-  const payload = buildPayload(to, text, id);
+  const from = sender || SMS_SENDER_ID!;
+  const payload = buildPayload(to, text, id, from);
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SEND_TIMEOUT_MS);
@@ -205,6 +211,13 @@ async function dispatch(mobile: string, id: string, text: string): Promise<void>
 
   const body = (await response.text()).trim();
   assertGatewayAccepted(body);
+
+  // "Accepted" only means the gateway queued it — DLT scrubbing can still drop
+  // it afterwards. The response carries the id to look up in the gateway's
+  // delivery report. Dev only: the response may echo the message text.
+  if (process.env.NODE_ENV !== 'production') {
+    console.log(`SMS accepted by gateway (template ${id}, sender ${from}, to ${to}): ${body.slice(0, 300)}`);
+  }
 }
 
 /**
@@ -270,5 +283,7 @@ export async function sendStudentCredentialsSms(
   vars: { studentName: string; olympiadId: string; username: string; password: string }
 ): Promise<void> {
   const { id, text } = renderStudentCredentialsTemplate(vars);
-  await dispatch(mobile, id, text);
+  // Optional: this template may be approved under a different header than the
+  // OTP templates. Unset → SMS_SENDER_ID, same as every other message.
+  await dispatch(mobile, id, text, process.env.SMS_SENDER_ID_STUDENT_CREDENTIALS?.trim() || undefined);
 }
