@@ -1753,3 +1753,22 @@ model DistrictForward {
   @@index([schoolId])
   @@schema("public")
 }
+
+// A shared-video link opened in a phone's browser (the person didn't have the
+// app, or it didn't open). On the app's first launch after installing, it asks
+// /api/app/deferred-link, which matches the tap by IP address + platform within
+// a short window and hands back the video, so the new user lands on that qlip.
+// iOS has no Play-style install referrer, so this is its only way; Android
+// uses it as a fallback. Rows are claimed once and are only useful for hours.
+model ShareLinkClick {
+  id        String    @id @default(uuid())
+  videoId   String
+  ip        String
+  platform  String    // "android" | "ios"
+  userAgent String?
+  createdAt DateTime  @default(now())
+  claimedAt DateTime?
+
+  @@index([ip, createdAt])
+  @@schema("public")
+}
