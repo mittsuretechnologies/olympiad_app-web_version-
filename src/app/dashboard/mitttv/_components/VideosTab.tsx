@@ -501,7 +501,7 @@ function VideoForm({ video, rows, onClose, onSaved }: {
                 })}
               </div>
             )}
-            <p className="text-[10px] text-gray-400 mt-1.5">Every active video also appears in automatic rows like Newest and Most Watched.</p>
+            <p className="text-[10px] text-gray-400 mt-1.5">Top 10 and Newest also fill themselves; choosing them here puts this video first in them (if the row uses your videos — Screen Rows → edit).</p>
           </div>
 
           <div className="flex items-center gap-3 rounded-xl border border-gray-100 px-3 py-2.5">

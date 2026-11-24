@@ -2,22 +2,24 @@
 
 import { useState } from 'react';
 import {
-  AlertCircle, ArrowDown, ArrowUp, Flame, GalleryHorizontal, History, ListVideo, Loader2, Pencil, Plus, Sparkles, Trash2,
+  AlertCircle, ArrowDown, ArrowUp, Flame, GalleryHorizontal, GraduationCap, History, ListVideo, Loader2, Pencil, Plus, Sparkles, Trash2,
 } from 'lucide-react';
 import {
-  CREATABLE_KINDS, DAYS_RANGE, LIMIT_RANGE, MITTTV_LIMITS, ROW_DEFAULTS, ROW_KINDS, ROW_STYLES, SEE_ALL_KINDS, SEE_ALL_LAYOUTS,
-  type RowKind, type RowStyle, type SeeAllLayout,
+  CREATABLE_KINDS, DAYS_RANGE, LIMIT_RANGE, MITTTV_LIMITS, MIXABLE_KINDS, ROW_DEFAULTS, ROW_KINDS, ROW_STYLES, SEE_ALL_KINDS,
+  SEE_ALL_LAYOUTS, TOTAL_RANGE, mixModes,
+  type BannerMode, type RowKind, type RowStyle, type SeeAllLayout,
 } from '@/lib/mittTvShared';
 import { api, type TvRow, type TvVideo } from '../_lib/api';
 import { Label, Modal, OrderedVideos, Switch, VideoPicker, inputCls } from './common';
 
 const KIND_ICON: Record<string, typeof Flame> = {
-  BANNER: GalleryHorizontal, CONTINUE: History, CURATED: ListVideo, MOST_WATCHED: Flame, NEW: Sparkles,
+  BANNER: GalleryHorizontal, CONTINUE: History, CURATED: ListVideo, MOST_WATCHED: Flame, NEW: Sparkles, CLASSES: GraduationCap,
 };
 const kindInfo = (k: string) => ROW_KINDS.find((x) => x.key === k);
 const styleLabel = (s: string) => ROW_STYLES.find((x) => x.key === s)?.label ?? s;
 const hasSeeAll = (k: string) => (SEE_ALL_KINDS as string[]).includes(k);
 const layoutLabel = (l?: string) => SEE_ALL_LAYOUTS.find((x) => x.key === l)?.label ?? SEE_ALL_LAYOUTS[0].label;
+const isMixable = (k: string) => (MIXABLE_KINDS as string[]).includes(k);
 
 // The rows of the MittTV screen under the banner, in order.
 export default function RowsTab({ rows, videos, videoMap, onChanged }: {
@@ -40,11 +42,26 @@ export default function RowsTab({ rows, videos, videoMap, onChanged }: {
     const order = [...(banner ? [banner.id] : []), ...next.map((r) => r.id)];
     run(() => api('/api/dashboard/mitttv/rows', 'PUT', { order }));
   };
+  const mine = (r: TvRow) => r.videoIds.filter((id) => videoMap.get(id)?.isActive).length;
+  // How an automatic row uses the admin's own videos, for the line under its title.
+  const mixText = (r: TvRow) => {
+    const n = mine(r);
+    if (r.settings.mode === 'MANUAL') return ` · only your ${n} video${n === 1 ? '' : 's'}`;
+    if (r.settings.mode === 'AUTO' || n === 0) return '';
+    return ` · your ${n} first`;
+  };
   const count = (r: TvRow) => {
-    if (r.kind === 'CURATED') return `${r.videoIds.filter((id) => videoMap.get(id)?.isActive).length} videos`;
-    if (r.kind === 'CONTINUE') return 'Different for each user';
-    if (r.kind === 'MOST_WATCHED') return `Top ${r.settings.limit ?? ROW_DEFAULTS.top10Limit} · last ${r.settings.days ?? 7} days`;
-    if (r.kind === 'NEW') return `Newest ${r.settings.limit ?? ROW_DEFAULTS.rowLimit}`;
+    if (r.kind === 'CURATED') return `${mine(r)} videos`;
+    if (r.kind === 'CONTINUE') {
+      const total = r.settings.total ?? ROW_DEFAULTS.continueTotal;
+      return `Different for each user · ${Math.min(r.settings.limit ?? ROW_DEFAULTS.rowLimit, total)} on screen · ${total} in all`;
+    }
+    if (r.kind === 'MOST_WATCHED') return `Top ${r.settings.limit ?? ROW_DEFAULTS.top10Limit} · last ${r.settings.days ?? 7} days${mixText(r)}`;
+    if (r.kind === 'NEW') {
+      const total = r.settings.total ?? ROW_DEFAULTS.newTotal;
+      return `Newest ${Math.min(r.settings.limit ?? ROW_DEFAULTS.rowLimit, total)} on screen · ${total} in all${mixText(r)}`;
+    }
+    if (r.kind === 'CLASSES') return 'Class tiles from the ERP · set up in Class Content';
     return '';
   };
 
@@ -85,7 +102,7 @@ export default function RowsTab({ rows, videos, videoMap, onChanged }: {
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-gray-800 truncate">{r.title}{r.subtitle && <span className="text-gray-400 font-normal"> · {r.subtitle}</span>}</p>
                 <p className="text-[11px] text-gray-400">
-                  {kindInfo(r.kind)?.label ?? r.kind} · {styleLabel(r.style)} · {count(r)}
+                  {kindInfo(r.kind)?.label ?? r.kind}{r.kind !== 'CLASSES' && <> · {styleLabel(r.style)}</>} · {count(r)}
                   {hasSeeAll(r.kind) && <> · See all: {layoutLabel(r.settings.seeAllLayout)}</>}
                 </p>
               </div>
@@ -117,9 +134,14 @@ function RowEditor({ row, videos, videoMap, onClose, onSaved }: {
   const [style, setStyle] = useState<RowStyle>((row?.style as RowStyle) ?? 'LANDSCAPE');
   const [limit, setLimit] = useState(row?.settings.limit ?? (kind === 'MOST_WATCHED' ? ROW_DEFAULTS.top10Limit : ROW_DEFAULTS.rowLimit));
   const [days, setDays] = useState(row?.settings.days ?? ROW_DEFAULTS.days);
+  const [total, setTotal] = useState(row?.settings.total ?? (row?.kind === 'CONTINUE' ? ROW_DEFAULTS.continueTotal : ROW_DEFAULTS.newTotal));
   const [seeAllLayout, setSeeAllLayout] = useState<SeeAllLayout>(row?.settings.seeAllLayout ?? 'AUTO');
   const [ids, setIds] = useState<string[]>(row?.videoIds ?? []);
+  // Top 10 / Newest: how the videos you choose mix with the automatic ones.
+  const [mode, setMode] = useState<BannerMode>(row?.settings.mode ?? 'MIXED');
   const [picking, setPicking] = useState(false);
+  const mixable = isMixable(kind);
+  const takesVideos = kind === 'CURATED' || mixable;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -133,14 +155,17 @@ function RowEditor({ row, videos, videoMap, onClose, onSaved }: {
     if (!title.trim()) { setError('The row needs a title'); return; }
     setSaving(true); setError('');
     try {
-      const settings = kind === 'MOST_WATCHED' ? { limit, days } : { limit, seeAllLayout };
+      const settings = kind === 'MOST_WATCHED' ? { limit, days, mode }
+        : kind === 'NEW' ? { limit, seeAllLayout, total, mode }
+          : kind === 'CONTINUE' ? { limit, seeAllLayout, total }
+          : { limit, seeAllLayout };
       if (row) {
         await api(`/api/dashboard/mitttv/rows/${row.id}`, 'PATCH', {
-          title, subtitle, style, settings, ...(kind === 'CURATED' ? { videoIds: ids } : {}),
+          title, subtitle, style, settings, ...(takesVideos ? { videoIds: ids } : {}),
         });
       } else {
         const created = await api<TvRow>('/api/dashboard/mitttv/rows', 'POST', { kind, title, subtitle, style, settings });
-        if (kind === 'CURATED' && ids.length) await api(`/api/dashboard/mitttv/rows/${created.id}`, 'PATCH', { videoIds: ids });
+        if (takesVideos && ids.length) await api(`/api/dashboard/mitttv/rows/${created.id}`, 'PATCH', { videoIds: ids });
       }
       onSaved();
     } catch (e: any) { setError(e.message); } finally { setSaving(false); }
@@ -181,6 +206,13 @@ function RowEditor({ row, videos, videoMap, onClose, onSaved }: {
           </div>
         </div>
 
+        {kind === 'CLASSES' && (
+          <p className="text-[11px] text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+            This row shows class tiles (PG, Nursery … Class 12) that open the ERP&apos;s books and chapters. Choose which classes, series and books show in the Class Content tab.
+          </p>
+        )}
+
+        {kind !== 'CLASSES' && (
         <div>
           <Label>Card style</Label>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -193,20 +225,38 @@ function RowEditor({ row, videos, videoMap, onClose, onSaved }: {
             ))}
           </div>
         </div>
+        )}
 
-        {kind !== 'CONTINUE' && (
+        {kind !== 'CLASSES' && (
           <div className="grid grid-cols-2 gap-3">
             <div>
               <Label>{kind === 'MOST_WATCHED' ? 'How many videos' : 'Videos on the MittTV screen'}</Label>
               <input type="number" min={LIMIT_RANGE.min} max={LIMIT_RANGE.max} value={limit}
                 onChange={(e) => setLimit(Math.max(LIMIT_RANGE.min, Math.min(LIMIT_RANGE.max, Number(e.target.value) || 1)))} className={inputCls} />
-              {kind !== 'MOST_WATCHED' && <p className="text-[10px] text-gray-400 mt-1">The rest open with &quot;See all&quot;.</p>}
+              {kind !== 'MOST_WATCHED' && (
+                <p className="text-[10px] text-gray-400 mt-1">
+                  The rest open with &quot;See all&quot;{kind === 'CONTINUE' && ' (it shows once a user has started more videos than this)'}.
+                </p>
+              )}
             </div>
             {kind === 'MOST_WATCHED' && (
               <div>
                 <Label>Views from the last (days)</Label>
                 <input type="number" min={DAYS_RANGE.min} max={DAYS_RANGE.max} value={days}
                   onChange={(e) => setDays(Math.max(DAYS_RANGE.min, Math.min(DAYS_RANGE.max, Number(e.target.value) || 1)))} className={inputCls} />
+              </div>
+            )}
+            {(kind === 'NEW' || kind === 'CONTINUE') && (
+              <div>
+                <Label>Videos in total</Label>
+                <input type="number" min={TOTAL_RANGE.min} max={TOTAL_RANGE.max} value={total}
+                  onChange={(e) => setTotal(Math.max(TOTAL_RANGE.min, Math.min(TOTAL_RANGE.max, Number(e.target.value) || 1)))} className={inputCls} />
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {kind === 'CONTINUE'
+                    ? <>Each user&apos;s last this-many started videos are kept in the row and its &quot;See all&quot;</>
+                    : <>Only this many videos are in the row and its &quot;See all&quot; (your own videos count too)</>}
+                  {total < limit && <> — so the screen shows {total}, not {limit}</>}.
+                </p>
               </div>
             )}
           </div>
@@ -225,6 +275,31 @@ function RowEditor({ row, videos, videoMap, onClose, onSaved }: {
               ))}
             </div>
             <p className="text-[10px] text-gray-400 mt-1">{SEE_ALL_LAYOUTS.find((l) => l.key === seeAllLayout)?.hint} Opens from &quot;See all&quot; when the row has more videos than it shows.</p>
+          </div>
+        )}
+
+        {mixable && (
+          <div>
+            <Label>Your own videos in this row</Label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {mixModes(kind).map((m) => (
+                <button key={m.key} type="button" onClick={() => setMode(m.key)}
+                  className={`text-left rounded-xl border px-3 py-2.5 ${mode === m.key ? 'border-[#004f9f] bg-[#004f9f]/5' : 'border-gray-200 hover:bg-gray-50'}`}>
+                  <span className="block text-sm font-semibold text-gray-700">{m.label}</span>
+                  <span className="block text-[11px] text-gray-400 mt-0.5">{m.hint}</span>
+                </button>
+              ))}
+            </div>
+            {mode !== 'AUTO' && (
+              <div className="mt-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <Label>Your videos ({ids.length}) — shown first, in this order</Label>
+                  <button onClick={() => setPicking(true)} className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#004f9f] hover:underline"><Plus size={12} /> Choose videos</button>
+                </div>
+                <OrderedVideos ids={ids} videos={videoMap} onChange={setIds}
+                  empty={mode === 'MANUAL' ? 'No videos chosen yet — the row stays hidden in the app until you add some.' : `None chosen — the row fills itself with the ${kind === 'NEW' ? 'newest' : 'most watched'} videos.`} />
+              </div>
+            )}
           </div>
         )}
 

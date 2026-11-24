@@ -1,22 +1,25 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Film, GalleryHorizontal, Info, Loader2, Rows3, Settings, Tv } from 'lucide-react';
+import { AlertCircle, Film, GalleryHorizontal, GraduationCap, Info, Loader2, Rows3, Settings, Tv } from 'lucide-react';
 import { api, type Snapshot, type TvVideo } from './_lib/api';
 import VideosTab from './_components/VideosTab';
 import BannerTab from './_components/BannerTab';
 import RowsTab from './_components/RowsTab';
 import SettingsTab from './_components/SettingsTab';
+import ClassContentTab from './_components/ClassContentTab';
 
 // SuperAdmin → MittTV: the app's Netflix-style video screen, opened from the
-// floating MittTV button on Home. Videos, the big banner, the rows under it
-// and who sees it. Server side: src/lib/mittTv.ts, mittTvAdmin.ts, mittTvShared.ts.
+// floating MittTV button on Home. Videos, the big banner, the rows under it,
+// the class videos read live from the Mittsure ERP, and who sees it.
+// Server side: src/lib/mittTv.ts, mittTvAdmin.ts, mittTvErp.ts, mittTvShared.ts.
 
-type Tab = 'videos' | 'banner' | 'rows' | 'settings';
+type Tab = 'videos' | 'banner' | 'rows' | 'classes' | 'settings';
 const TABS: { key: Tab; label: string; icon: typeof Film }[] = [
   { key: 'videos', label: 'Videos', icon: Film },
   { key: 'banner', label: 'Banner', icon: GalleryHorizontal },
   { key: 'rows', label: 'Screen Rows', icon: Rows3 },
+  { key: 'classes', label: 'Class Content', icon: GraduationCap },
   { key: 'settings', label: 'Settings', icon: Settings },
 ];
 
@@ -97,6 +100,8 @@ export default function MittTvPage() {
         banner ? <BannerTab row={banner} videos={data.videos} videoMap={videoMap} onSaved={() => load(true)} /> : null
       ) : tab === 'rows' ? (
         <RowsTab rows={data.rows} videos={data.videos} videoMap={videoMap} onChanged={() => load(true)} />
+      ) : tab === 'classes' ? (
+        <ClassContentTab onRowsChanged={() => load(true)} />
       ) : (
         <SettingsTab settings={data.settings} onSaved={(s) => setData((d) => d && ({ ...d, settings: s }))} />
       )}

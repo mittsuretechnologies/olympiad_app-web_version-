@@ -24,13 +24,31 @@ export const ROW_KINDS = [
   { key: 'CURATED', label: 'Hand-picked videos', hint: 'You choose the videos and their order (Stories, Rhymes…).', single: false },
   { key: 'MOST_WATCHED', label: 'Most watched (automatic)', hint: 'Videos with the most views in the last few days.', single: false },
   { key: 'NEW', label: 'Newest videos (automatic)', hint: 'The latest videos you added, newest first.', single: false },
+  // Read live from the ERP (lib/mittTvErp.ts); nothing of it is stored here.
+  { key: 'CLASSES', label: 'Learn by Class', hint: 'Class-wise and subject-wise videos from the ERP. Switch it on in the Class Content tab.', single: true },
 ] as const;
 export type RowKind = (typeof ROW_KINDS)[number]['key'];
 export const ROW_KIND_KEYS = ROW_KINDS.map((k) => k.key) as RowKind[];
 /** Kinds the admin can add more of. */
 export const CREATABLE_KINDS: RowKind[] = ['CURATED', 'MOST_WATCHED', 'NEW'];
-/** Kinds whose videos are a list kept in MittTvRowItem. */
-export const PICKED_KINDS: RowKind[] = ['BANNER', 'CURATED'];
+/**
+ * Kinds whose videos are (or can include) a list the admin picks, kept in
+ * MittTvRowItem. The banner, Top 10 / Most watched and Newest put the picked
+ * videos first and fill the rest themselves (their `mode`).
+ */
+export const PICKED_KINDS: RowKind[] = ['BANNER', 'CURATED', 'MOST_WATCHED', 'NEW'];
+/** Automatic rows that can also take the admin's own videos. */
+export const MIXABLE_KINDS: RowKind[] = ['MOST_WATCHED', 'NEW'];
+
+/** The three ways an automatic row mixes in the admin's videos, worded per row kind. */
+export function mixModes(kind: string) {
+  const auto = kind === 'NEW' ? 'newest' : 'most watched';
+  return [
+    { key: 'MIXED' as const, label: `Your videos first, then ${auto}`, hint: `The videos you choose, in your order, then the ${auto} ones fill the rest.` },
+    { key: 'AUTO' as const, label: `${auto.charAt(0).toUpperCase()}${auto.slice(1)} only`, hint: 'Fills itself; the videos you choose are not used.' },
+    { key: 'MANUAL' as const, label: 'Only your videos', hint: 'Only the videos you choose, in your order.' },
+  ];
+}
 
 export const ROW_STYLES = [
   { key: 'LANDSCAPE', label: 'Wide cards' },
@@ -141,11 +159,16 @@ export const ROW_DEFAULTS = {
   /** How many videos a row shows on the MittTV screen before "See all". */
   rowLimit: 20,
   top10Limit: 10,
+  /** "New on MittTV": how many of the newest videos it has in all (the row and its "See all"). */
+  newTotal: 30,
+  /** Continue Watching: how many of a user's started videos it keeps in all (the row and its "See all"). */
+  continueTotal: 50,
   /** Most watched looks at views from this many days. */
   days: 7,
 } as const;
 export const LIMIT_RANGE = { min: 1, max: 50 } as const;
 export const DAYS_RANGE = { min: 1, max: 90 } as const;
+export const TOTAL_RANGE = { min: 1, max: 200 } as const;
 
 export interface MittTvSettings {
   /** Master switch: off = no MittTV button and the screen answers "not available". */
@@ -170,14 +193,17 @@ export const DEFAULT_SETTINGS: MittTvSettings = {
 };
 
 /**
- * Banner: { mode, limit, days }. Most watched: { limit, days }.
- * Hand-picked, Newest, Continue Watching: { limit, seeAllLayout }.
+ * Banner: { mode, limit, days }. Most watched: { limit, days, mode }.
+ * Hand-picked: { limit, seeAllLayout }. Continue Watching: also { total }. Newest: also { total, mode }.
+ * `mode` = how the admin's chosen videos mix with the automatic ones (BANNER_MODES).
  */
 export interface RowSettings {
   mode?: BannerMode;
   limit?: number;
   days?: number;
   seeAllLayout?: SeeAllLayout;
+  /** Newest videos only: how many of the newest videos the row has in all (See all included). */
+  total?: number;
 }
 
 const clampInt = (v: unknown, lo: number, hi: number, fallback: number) => {
@@ -236,10 +262,23 @@ export function cleanRowSettings(kind: string, raw: any): RowSettings {
       return {
         limit: clampInt(r.limit, LIMIT_RANGE.min, LIMIT_RANGE.max, ROW_DEFAULTS.top10Limit),
         days: clampInt(r.days, DAYS_RANGE.min, DAYS_RANGE.max, ROW_DEFAULTS.days),
+        // MIXED with no videos chosen = fully automatic, as before.
+        mode: BANNER_MODES.some((m) => m.key === r.mode) ? r.mode : 'MIXED',
       };
     case 'NEW':
-    case 'CURATED':
+      return {
+        limit: clampInt(r.limit, LIMIT_RANGE.min, LIMIT_RANGE.max, ROW_DEFAULTS.rowLimit),
+        seeAllLayout: isSeeAllLayout(r.seeAllLayout) ? r.seeAllLayout : 'AUTO',
+        total: clampInt(r.total, TOTAL_RANGE.min, TOTAL_RANGE.max, ROW_DEFAULTS.newTotal),
+        mode: BANNER_MODES.some((m) => m.key === r.mode) ? r.mode : 'MIXED',
+      };
     case 'CONTINUE':
+      return {
+        limit: clampInt(r.limit, LIMIT_RANGE.min, LIMIT_RANGE.max, ROW_DEFAULTS.rowLimit),
+        seeAllLayout: isSeeAllLayout(r.seeAllLayout) ? r.seeAllLayout : 'AUTO',
+        total: clampInt(r.total, TOTAL_RANGE.min, TOTAL_RANGE.max, ROW_DEFAULTS.continueTotal),
+      };
+    case 'CURATED':
       return {
         limit: clampInt(r.limit, LIMIT_RANGE.min, LIMIT_RANGE.max, ROW_DEFAULTS.rowLimit),
         seeAllLayout: isSeeAllLayout(r.seeAllLayout) ? r.seeAllLayout : 'AUTO',
@@ -263,6 +302,71 @@ export function cleanRowTitle(v: unknown): string {
 
 export function cleanRowSubtitle(v: unknown): string {
   return text(v, MITTTV_LIMITS.rowSubtitle);
+}
+
+// ── Class content from the ERP ───────────────────────────────────────────────
+// The Mittsure ERP's digital content (Class → Series → Subject → Book →
+// Chapter → videos) is read live from its database and played from its own
+// server. Only these display choices are kept in Mittmee (AppSetting MITTTV_ERP).
+
+/** The ERP's classes, in school order (Book.className there). */
+export const ERP_CLASSES = [
+  { key: 'PG', label: 'PG', group: 'Pre-school' },
+  { key: 'NURSERY', label: 'Nursery', group: 'Pre-school' },
+  { key: 'LKG', label: 'LKG', group: 'Pre-school' },
+  { key: 'UKG', label: 'UKG', group: 'Pre-school' },
+  ...Array.from({ length: 12 }, (_, i) => ({ key: String(i + 1), label: `Class ${i + 1}`, group: 'Class' })),
+] as const;
+export type ErpClassKey = (typeof ERP_CLASSES)[number]['key'];
+
+export function isErpClass(v: unknown): v is ErpClassKey {
+  return typeof v === 'string' && ERP_CLASSES.some((c) => c.key === v);
+}
+export function erpClassLabel(key: string): string {
+  return ERP_CLASSES.find((c) => c.key === key)?.label ?? key;
+}
+
+/** The ERP's video languages (digitalContents[].language), in the order offered. */
+export const ERP_LANGUAGES = [
+  { key: 'bilingual', label: 'Bilingual' },
+  { key: 'english', label: 'English' },
+  { key: 'hindi', label: 'Hindi' },
+] as const;
+export function erpLanguageLabel(key: string): string {
+  const k = (key || '').trim().toLowerCase();
+  const known = ERP_LANGUAGES.find((l) => l.key === k)?.label;
+  return known ?? (k ? k.charAt(0).toUpperCase() + k.slice(1) : 'Video');
+}
+
+export interface ErpSettings {
+  /** Shows the "Learn by Class" row (and class videos in search) in the app. */
+  enabled: boolean;
+  /** Left out of the app. Everything else the ERP has is shown. */
+  hiddenClasses: string[];
+  hiddenSeries: string[];
+  hiddenBooks: string[];
+}
+
+export const DEFAULT_ERP_SETTINGS: ErpSettings = {
+  enabled: false,
+  hiddenClasses: [],
+  hiddenSeries: [],
+  hiddenBooks: [],
+};
+
+const ERP_ID = /^[0-9a-f]{24}$/i;
+const idList = (v: unknown, valid: (x: string) => boolean, max = 2000) => (Array.isArray(v)
+  ? [...new Set(v.filter((x): x is string => typeof x === 'string' && valid(x)))].slice(0, max)
+  : []);
+
+/** Merges what the page sent into the current class-content settings. */
+export function cleanErpSettings(raw: any, current: ErpSettings = DEFAULT_ERP_SETTINGS): ErpSettings {
+  const next: ErpSettings = { ...current };
+  if (raw && 'enabled' in raw) next.enabled = !!raw.enabled;
+  if (raw && 'hiddenClasses' in raw) next.hiddenClasses = idList(raw.hiddenClasses, isErpClass);
+  if (raw && 'hiddenSeries' in raw) next.hiddenSeries = idList(raw.hiddenSeries, (x) => ERP_ID.test(x));
+  if (raw && 'hiddenBooks' in raw) next.hiddenBooks = idList(raw.hiddenBooks, (x) => ERP_ID.test(x));
+  return next;
 }
 
 /** "1:05:09" / "4:07" for a length in seconds; '' when unknown. */

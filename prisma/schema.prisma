@@ -694,6 +694,7 @@ model AppUser {
   // MittTV (see the MittTv* models at the end of this file).
   mittTvProgress         MittTvProgress[]
   mittTvViews            MittTvView[]
+  mittTvErpProgress      MittTvErpProgress[]
 
   @@index([email])
   @@index([mobile])
@@ -1741,6 +1742,26 @@ model MittTvProgress {
   @@unique([userId, videoId])
   @@index([userId, updatedAt])
   @@index([videoId])
+  @@schema("public")
+}
+
+// Where a user stopped in a class video read live from the Mittsure ERP
+// (src/lib/mittTvErp.ts) — Continue Watching / Resume for those videos. Only
+// the user's position is kept: videoKey = "erp-<chapterId>-<hash>", nothing of
+// the ERP's content. SQL: prisma/manual-migrations/2026-11-19-mitttv-erp-progress.sql
+model MittTvErpProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  videoKey    String
+  positionSec Int      @default(0)
+  durationSec Int      @default(0)
+  finished    Boolean  @default(false)
+  hidden      Boolean  @default(false)
+  updatedAt   DateTime @default(now()) @updatedAt
+  user        AppUser  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, videoKey])
+  @@index([userId, updatedAt])
   @@schema("public")
 }
 

@@ -12,16 +12,19 @@ import {
   DEFAULT_SETTINGS, MITTTV_LIMITS, ROW_DEFAULTS, SEE_ALL_KINDS, cleanRowSettings, isRowKind, parseSettings,
   videoDetailsFromMeta, videoNotesFromMeta, type MittTvAudience, type MittTvSettings, type RowSettings,
 } from '@/lib/mittTvShared';
+import {
+  erpCardsByIds, erpClassTiles, erpConfigured, erpVideoForPlayer, isErpVideoId, loadErpSettings, searchErp, type ErpAppVideo,
+} from '@/lib/mittTvErp';
 
 // MittTV, server side: settings, the screen's rows, Continue Watching, views
 // and the media files. Shared rules and choices: mittTvShared.ts. Tables:
 // prisma/manual-migrations/2026-11-17-mitttv.sql.
 //
 // Videos uploaded in the dashboard have source UPLOAD. The class & subject
-// platform is meant to come in later as another source: its videos go into
-// MittTvVideo with their own source / externalId (so views, progress, the
-// banner and hand-picked rows work for them unchanged), and its class/subject
-// browser becomes a new row kind. Nothing here needs to change for that.
+// videos of the Mittsure ERP are not stored here at all: lib/mittTvErp.ts reads
+// them live, and they show through the CLASSES row ("Learn by Class") and search.
+// Only where each user stopped in one is kept (MittTvErpProgress), so they also
+// come in Continue Watching — mixed with uploaded videos by time.
 
 const SETTINGS_KEY = 'MITTTV';
 const SEEDED_KEY = 'MITTTV_SEEDED';
@@ -206,7 +209,11 @@ async function pickedIds(rowId: string, skip: number, take: number): Promise<str
  * whether there is more. The banner and the most-watched rows are capped at
  * their own limit (no "See all").
  */
-export async function rowIds(row: RowRecord, userId: string, offset: number, take: number): Promise<{ ids: string[]; hasMore: boolean }> {
+export async function rowIds(
+  row: RowRecord, userId: string, offset: number, take: number,
+  /** `screen`: for the MittTV screen itself (not "See all" / Up Next). */
+  opts: { screen?: boolean } = {},
+): Promise<{ ids: string[]; hasMore: boolean }> {
   const s = cleanRowSettings(row.kind, row.settings);
 
   switch (row.kind) {
@@ -218,7 +225,14 @@ export async function rowIds(row: RowRecord, userId: string, offset: number, tak
       return { ids: [...pinned, ...auto].slice(0, limit), hasMore: false };
     }
     case 'MOST_WATCHED': {
-      const all = await mostWatchedIds(s.days ?? ROW_DEFAULTS.days, s.limit ?? ROW_DEFAULTS.top10Limit);
+      // The admin's videos first (unless "most watched only"), then the most watched fill up to `limit`.
+      const limit = s.limit ?? ROW_DEFAULTS.top10Limit;
+      const pinned = s.mode === 'AUTO' ? [] : await pickedIds(row.id, 0, limit);
+      let all = pinned;
+      if (s.mode !== 'MANUAL' && pinned.length < limit) {
+        const auto = (await mostWatchedIds(s.days ?? ROW_DEFAULTS.days, limit + pinned.length)).filter((id) => !pinned.includes(id));
+        all = [...pinned, ...auto].slice(0, limit);
+      }
       return { ids: all.slice(offset, offset + take), hasMore: false };
     }
     case 'CURATED': {
@@ -226,17 +240,53 @@ export async function rowIds(row: RowRecord, userId: string, offset: number, tak
       return { ids: ids.slice(0, take), hasMore: ids.length > take };
     }
     case 'NEW': {
-      const rows = await prisma.mittTvVideo.findMany({
-        where: { isActive: true }, orderBy: { createdAt: 'desc' }, skip: offset, take: take + 1, select: { id: true },
-      });
-      return { ids: rows.slice(0, take).map((r) => r.id), hasMore: rows.length > take };
+      // `total` videos in all (set in Screen Rows), on the screen and in "See
+      // all": the admin's videos first (unless "newest only"), then the newest.
+      const total = s.total ?? ROW_DEFAULTS.newTotal;
+      const pinned = s.mode === 'AUTO' ? [] : await pickedIds(row.id, 0, Math.min(total, MITTTV_LIMITS.rowItems));
+      const newest = s.mode === 'MANUAL' || pinned.length >= total ? [] : (await prisma.mittTvVideo.findMany({
+        where: { isActive: true, id: { notIn: pinned } }, orderBy: { createdAt: 'desc' }, take: total - pinned.length, select: { id: true },
+      })).map((v) => v.id);
+      const list = [...pinned, ...newest];
+      if (opts.screen && userId) {
+        // On the MittTV screen, what this user has already watched is left out
+        // ("See all" still lists every video of the row). "See all" shows
+        // whenever it has more than the screen.
+        const watched = new Set((await prisma.mittTvProgress.findMany({
+          where: {
+            userId,
+            videoId: { in: list },
+            OR: [{ positionSec: { gte: CONTINUE_MIN_SEC } }, { finished: true }],
+          },
+          select: { videoId: true },
+        })).map((p) => p.videoId));
+        const ids = list.filter((id) => !watched.has(id)).slice(offset, offset + take);
+        return { ids, hasMore: list.length > ids.length };
+      }
+      return { ids: list.slice(offset, offset + take), hasMore: offset + take < list.length };
     }
     case 'CONTINUE': {
-      const rows = await prisma.mittTvProgress.findMany({
-        where: { userId, finished: false, hidden: false, positionSec: { gte: CONTINUE_MIN_SEC }, video: { isActive: true } },
-        orderBy: { updatedAt: 'desc' }, skip: offset, take: take + 1, select: { videoId: true },
-      });
-      return { ids: rows.slice(0, take).map((r) => r.videoId), hasMore: rows.length > take };
+      // Uploaded videos and class videos (ERP), most recently watched first —
+      // at most `total` in all (Screen Rows), on the screen and in "See all".
+      const total = s.total ?? ROW_DEFAULTS.continueTotal;
+      if (offset >= total) return { ids: [], hasMore: false };
+      take = Math.min(take, total - offset);
+      const want = offset + take + 1;
+      const [uploaded, classVideos] = await Promise.all([
+        prisma.mittTvProgress.findMany({
+          where: { userId, finished: false, hidden: false, positionSec: { gte: CONTINUE_MIN_SEC }, video: { isActive: true } },
+          orderBy: { updatedAt: 'desc' }, take: want, select: { videoId: true, updatedAt: true },
+        }),
+        prisma.mittTvErpProgress.findMany({
+          where: { userId, finished: false, hidden: false, positionSec: { gte: CONTINUE_MIN_SEC } },
+          orderBy: { updatedAt: 'desc' }, take: want, select: { videoKey: true, updatedAt: true },
+        }),
+      ]);
+      const page = [
+        ...uploaded.map((r) => ({ id: r.videoId, at: r.updatedAt.getTime() })),
+        ...classVideos.map((r) => ({ id: r.videoKey, at: r.updatedAt.getTime() })),
+      ].sort((a, b) => b.at - a.at).slice(offset, offset + take + 1);
+      return { ids: page.slice(0, take).map((r) => r.id), hasMore: page.length > take && offset + take < total };
     }
     default:
       return { ids: [], hasMore: false };
@@ -293,23 +343,81 @@ function toFullAppVideo(v: FullVideoRecord, p?: ProgressRecord | null) {
   };
 }
 
-/** The given ids as app videos, in the same order (missing / hidden ones dropped). */
-async function videosInOrder(ids: string[], userId: string): Promise<AppVideo[]> {
+/**
+ * The given ids as app videos, in the same order (missing / hidden ones
+ * dropped). Class video ids (erp-…) are built live from the ERP, with where
+ * this user stopped.
+ */
+async function videosInOrder(ids: string[], userId: string): Promise<(AppVideo | ErpAppVideo)[]> {
   if (ids.length === 0) return [];
   const unique = [...new Set(ids)];
-  const [videos, progress] = await Promise.all([
-    prisma.mittTvVideo.findMany({ where: { id: { in: unique }, isActive: true }, select: VIDEO_SELECT }),
-    prisma.mittTvProgress.findMany({
-      where: { userId, videoId: { in: unique } },
-      select: { videoId: true, positionSec: true, durationSec: true, finished: true },
-    }),
+  const uploadedIds = unique.filter((id) => !isErpVideoId(id));
+  const classIds = unique.filter(isErpVideoId);
+  const [videos, progress, classVideos] = await Promise.all([
+    uploadedIds.length
+      ? prisma.mittTvVideo.findMany({ where: { id: { in: uploadedIds }, isActive: true }, select: VIDEO_SELECT })
+      : Promise.resolve([]),
+    uploadedIds.length
+      ? prisma.mittTvProgress.findMany({
+        where: { userId, videoId: { in: uploadedIds } },
+        select: { videoId: true, positionSec: true, durationSec: true, finished: true },
+      })
+      : Promise.resolve([]),
+    classIds.length ? classVideosFor(classIds, userId) : Promise.resolve(new Map<string, ErpAppVideo>()),
   ]);
   const byId = new Map(videos.map((v) => [v.id, v]));
   const progById = new Map(progress.map((p) => [p.videoId, p]));
-  return ids.flatMap((id) => {
+  return ids.flatMap((id): (AppVideo | ErpAppVideo)[] => {
+    if (isErpVideoId(id)) {
+      const c = classVideos.get(id);
+      return c ? [c] : [];
+    }
     const v = byId.get(id);
     return v ? [toAppVideo(v, progById.get(id))] : [];
   });
+}
+
+type ErpProgressRecord = { positionSec: number; durationSec: number; finished: boolean };
+
+/** A class video card with this user's place in it (Resume, the progress bar). */
+function withErpProgress(v: ErpAppVideo, p?: ErpProgressRecord | null): ErpAppVideo {
+  if (!p) return v;
+  return {
+    ...v,
+    durationSec: v.durationSec || p.durationSec,
+    progress: !p.finished && p.positionSec > 0 ? { positionSec: p.positionSec, durationSec: p.durationSec } : null,
+  };
+}
+
+/** Class videos by id, live from the ERP; an unreachable ERP leaves them out instead of failing the screen. */
+async function classVideosFor(ids: string[], userId: string): Promise<Map<string, ErpAppVideo>> {
+  const [cards, progress] = await Promise.all([
+    erpCardsByIds(ids).catch((e) => {
+      console.error('MittTV class videos:', e.message);
+      return new Map<string, ErpAppVideo>();
+    }),
+    userId
+      ? prisma.mittTvErpProgress.findMany({
+        where: { userId, videoKey: { in: ids } },
+        select: { videoKey: true, positionSec: true, durationSec: true, finished: true },
+      })
+      : Promise.resolve([]),
+  ]);
+  const byKey = new Map(progress.map((p) => [p.videoKey, p]));
+  return new Map([...cards].map(([id, c]) => [id, withErpProgress(c, byKey.get(id))]));
+}
+
+/** A class video for its details page and the player (lib/mittTvErp.ts), with where this user stopped. */
+export async function classVideoForPlayer(id: string, userId: string) {
+  const [data, progress] = await Promise.all([
+    erpVideoForPlayer(id),
+    prisma.mittTvErpProgress.findUnique({
+      where: { userId_videoKey: { userId, videoKey: id } },
+      select: { positionSec: true, durationSec: true, finished: true },
+    }),
+  ]);
+  if (!data) return null;
+  return { ...data, video: { ...data.video, ...withErpProgress(data.video, progress) } };
 }
 
 const rowLimit = (row: RowRecord) => {
@@ -327,7 +435,10 @@ export async function buildHome(userId: string, settings: MittTvSettings = DEFAU
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })).filter((r) => isRowKind(r.kind));
 
-  const pages = await Promise.all(rows.map((r) => rowIds(r, userId, 0, rowLimit(r))));
+  const [pages, classes] = await Promise.all([
+    Promise.all(rows.map((r) => rowIds(r, userId, 0, rowLimit(r), { screen: true }))),
+    rows.some((r) => r.kind === 'CLASSES') ? classTiles() : Promise.resolve([]),
+  ]);
   const videos = await videosInOrder(pages.flatMap((p) => p.ids), userId);
   const byId = new Map(videos.map((v) => [v.id, v]));
   const built = rows.map((r, i) => ({
@@ -339,7 +450,9 @@ export async function buildHome(userId: string, settings: MittTvSettings = DEFAU
     seeAllLayout: seeAllLayoutOf(r),
     items: pages[i].ids.flatMap((id) => (byId.has(id) ? [byId.get(id)!] : [])),
     hasMore: pages[i].hasMore,
-  })).filter((r) => r.items.length > 0);
+    // "Learn by Class": the classes to open instead of videos.
+    ...(r.kind === 'CLASSES' ? { classes } : {}),
+  })).filter((r) => r.items.length > 0 || (r.kind === 'CLASSES' && classes.length > 0));
 
   const banner = built.find((r) => r.kind === 'BANNER') ?? null;
   return {
@@ -348,6 +461,17 @@ export async function buildHome(userId: string, settings: MittTvSettings = DEFAU
     banner: banner ? { id: banner.id, title: banner.title, items: banner.items } : null,
     rows: built.filter((r) => r.kind !== 'BANNER'),
   };
+}
+
+/** The "Learn by Class" tiles, or none when class content is off or the ERP can't be read. */
+async function classTiles() {
+  if (!erpConfigured() || !(await loadErpSettings()).enabled) return [];
+  try {
+    return await erpClassTiles();
+  } catch (e: any) {
+    console.error('MittTV Learn by Class:', e.message);
+    return [];
+  }
 }
 
 /** How the row's "See all" screen is laid out (AUTO for rows without one). */
@@ -453,29 +577,37 @@ const SEARCH_SCAN = 200;
 
 /**
  * Active videos whose title, description or tags contain every word of `q`
- * (any case). Best first: title starts with the search, title contains it,
- * title has every word, the rest — then the most viewed and newest.
+ * (any case), and class videos from the ERP whose chapter or book matches
+ * (lib/mittTvErp.ts → searchErp). Best first: title starts with the search,
+ * title contains it, title has every word, the rest — uploaded videos (most
+ * viewed, newest) before class videos within each.
  */
 export async function searchVideos(userId: string, rawQ: string, offset: number, limit: number) {
   const q = rawQ.trim().replace(/\s+/g, ' ').slice(0, MITTTV_LIMITS.search);
   const words = [...new Set(q.toLowerCase().split(' ').filter(Boolean))].slice(0, 5);
-  if (!words.length) return { q, items: [] as AppVideo[], nextOffset: null as number | null, total: 0 };
+  if (!words.length) return { q, items: [] as (AppVideo | ErpAppVideo)[], nextOffset: null as number | null, total: 0 };
 
-  const found = await prisma.mittTvVideo.findMany({
-    where: {
-      isActive: true,
-      AND: words.map((w) => ({
-        OR: [
-          { title: { contains: w, mode: 'insensitive' as const } },
-          { description: { contains: w, mode: 'insensitive' as const } },
-          { tags: { contains: w, mode: 'insensitive' as const } },
-        ],
-      })),
-    },
-    orderBy: [{ viewsCount: 'desc' }, { createdAt: 'desc' }],
-    take: SEARCH_SCAN,
-    select: { id: true, title: true },
-  });
+  const [uploaded, classVideos] = await Promise.all([
+    prisma.mittTvVideo.findMany({
+      where: {
+        isActive: true,
+        AND: words.map((w) => ({
+          OR: [
+            { title: { contains: w, mode: 'insensitive' as const } },
+            { description: { contains: w, mode: 'insensitive' as const } },
+            { tags: { contains: w, mode: 'insensitive' as const } },
+          ],
+        })),
+      },
+      orderBy: [{ viewsCount: 'desc' }, { createdAt: 'desc' }],
+      take: SEARCH_SCAN,
+      select: { id: true, title: true },
+    }),
+    // A slow or unreachable ERP must not break search for uploaded videos.
+    searchErp(words).catch((e) => { console.error('MittTV class search:', e.message); return []; }),
+  ]);
+  const erpById = new Map(classVideos.map((c) => [c.video.id, c.video]));
+  const found = [...uploaded, ...classVideos.map((c) => ({ id: c.video.id, title: c.title }))];
   const ql = q.toLowerCase();
   const rank = (title: string) => {
     const t = title.toLowerCase();
@@ -487,9 +619,13 @@ export async function searchVideos(userId: string, rawQ: string, offset: number,
   // A stable sort keeps the most viewed / newest order inside each rank.
   const ordered = found.map((v, i) => ({ id: v.id, r: rank(v.title), i })).sort((a, b) => a.r - b.r || a.i - b.i);
   const page = ordered.slice(offset, offset + limit).map((v) => v.id);
+  const pageUploaded = new Map((await videosInOrder(page.filter((id) => !erpById.has(id)), userId)).map((v) => [v.id, v]));
   return {
     q,
-    items: await videosInOrder(page, userId),
+    items: page.flatMap((id): (AppVideo | ErpAppVideo)[] => {
+      const v = erpById.get(id) ?? pageUploaded.get(id);
+      return v ? [v] : [];
+    }),
     nextOffset: offset + limit < ordered.length ? offset + limit : null,
     total: ordered.length,
   };
@@ -546,7 +682,31 @@ export async function saveProgress(videoId: string, userId: string, positionSec:
 
 /** "Remove from Continue Watching" (comes back if they play it again). */
 export async function hideProgress(videoId: string, userId: string) {
+  if (isErpVideoId(videoId)) {
+    await prisma.mittTvErpProgress.updateMany({ where: { userId, videoKey: videoId }, data: { hidden: true } });
+    return;
+  }
   await prisma.mittTvProgress.updateMany({ where: { userId, videoId }, data: { hidden: true } });
+}
+
+/**
+ * Where the user is in a class video (ERP). Only the position is stored. A
+ * video's first save checks that it really exists in the ERP and is shown.
+ */
+export async function saveClassProgress(videoKey: string, userId: string, positionSec: number, durationSec: number) {
+  const existing = await prisma.mittTvErpProgress.findUnique({
+    where: { userId_videoKey: { userId, videoKey } }, select: { durationSec: true },
+  });
+  if (!existing && !(await erpCardsByIds([videoKey])).has(videoKey)) return null;
+  const dur = Math.max(0, Math.round(durationSec || existing?.durationSec || 0));
+  const pos = Math.max(0, Math.min(Math.round(positionSec), dur || Number.MAX_SAFE_INTEGER));
+  const finished = isFinished(pos, dur);
+  return prisma.mittTvErpProgress.upsert({
+    where: { userId_videoKey: { userId, videoKey } },
+    update: { positionSec: pos, durationSec: dur, finished, hidden: false },
+    create: { userId, videoKey, positionSec: pos, durationSec: dur, finished },
+    select: { positionSec: true, durationSec: true, finished: true },
+  });
 }
 
 // ── Media files ──────────────────────────────────────────────────────────────
