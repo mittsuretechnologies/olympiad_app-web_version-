@@ -3,6 +3,7 @@ import { verify } from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { verifyDeletionOtp } from '@/lib/deletionOtp';
+import { recordDeletionConsent } from '@/lib/consent';
 
 const JWT_SECRET = getJwtSecret();
 
@@ -76,7 +77,7 @@ export async function POST(request: Request) {
   try {
     const user = await prisma.appUser.findUnique({
       where:  { id: appUser.id },
-      select: { olympiadId: true, deletionRequestedAt: true, schoolRefId: true },
+      select: { olympiadId: true, deletionRequestedAt: true, schoolRefId: true, userId: true, mobile: true, email: true },
     });
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
@@ -106,6 +107,20 @@ export async function POST(request: Request) {
     // dialog. Older builds have no checkbox and send nothing, so it is recorded
     // when present rather than required.
     const agreedAt = body.agreed === true ? new Date() : null;
+    // Permanent copy of the agreement that outlives the account and its
+    // 180-day archive. The OTP goes to the phone when one is registered
+    // (same rule as delete-otp), else to the email.
+    const saveConsent = async () => {
+      if (!agreedAt) return;
+      const phone = user.mobile && /^[6-9]\d{9}$/.test(user.mobile) ? user.mobile : null;
+      await recordDeletionConsent({
+        appUserId: appUser.id,
+        userHandle: user.userId,
+        verificationChannel: phone ? 'SMS_OTP' : 'EMAIL_OTP',
+        verificationTarget: phone ?? user.email ?? null,
+        request,
+      });
+    };
 
     if (isStudent) {
       const existing = await prisma.accountDeletionRequest.findFirst({
@@ -119,6 +134,7 @@ export async function POST(request: Request) {
       const created = await prisma.accountDeletionRequest.create({
         data: { appUserId: appUser.id, agreedAt },
       });
+      await saveConsent();
       return NextResponse.json({
         mode: 'STUDENT_REQUESTED', pending: true, requestedAt: created.createdAt,
       });
@@ -130,6 +146,7 @@ export async function POST(request: Request) {
         where: { id: appUser.id },
         data:  { deletionRequestedAt, deletionAgreedAt: agreedAt },
       });
+      await saveConsent();
     }
     const deleteAt = new Date(deletionRequestedAt.getTime() + 30 * 24 * 60 * 60 * 1000);
     return NextResponse.json({ mode: 'VIEWER_SCHEDULED', pending: true, requestedAt: deletionRequestedAt, deleteAt });

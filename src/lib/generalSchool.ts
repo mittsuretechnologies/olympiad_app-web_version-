@@ -90,3 +90,72 @@ export function getGeneralSchoolForUser(appUserId: string) {
     },
   });
 }
+
+/**
+ * Emails the school a copy of the accepted agreement with the acceptance
+ * record (Section 18.4), exactly as the Olympiad School Panel does. A mail
+ * failure never undoes the acceptance: it is already recorded, and the
+ * Super Admin Agreements page shows whether the copy went out.
+ * Returns the addresses the copy was sent to (empty if none).
+ */
+export async function emailGeneralSchoolAgreementCopy(input: {
+  record: {
+    id: string; acceptedAt: Date; signatoryDesignation: string; documentVersion: string;
+    ipAddress: string | null; documentHash: string; declarations: unknown;
+  };
+  schoolName: string;
+  schoolEmail: string | null | undefined;
+  userId: string | null | undefined;
+  verification: string;
+}): Promise<string[]> {
+  // Imported here so routes that only read schools don't load the mailer.
+  const { sendAgreementCopyEmail } = await import('@/lib/mailer');
+  const { isEmail, agreementEmailHtml, formatIst } = await import('@/lib/agreements/server');
+  const { SCHOOL_AGREEMENT_TITLE, agreementPlainText } = await import('@/lib/agreements/school-onboarding');
+
+  const { record, schoolName, schoolEmail, userId, verification } = input;
+  const to = isEmail(schoolEmail) ? schoolEmail!.trim().toLowerCase() : null;
+  if (!to) return [];
+  const declarations = Array.isArray(record.declarations) ? (record.declarations as string[]) : [];
+  try {
+    await sendAgreementCopyEmail({
+      to: [to],
+      schoolName,
+      agreementTitle: SCHOOL_AGREEMENT_TITLE,
+      record: [
+        { label: 'School', value: userId ? `${schoolName} (${userId})` : schoolName },
+        { label: 'Accepted by', value: record.signatoryDesignation },
+        { label: 'Accepted at', value: formatIst(record.acceptedAt) },
+        { label: 'Agreement version', value: record.documentVersion },
+        { label: 'Verification', value: verification },
+        { label: 'IP address', value: record.ipAddress || '—' },
+        { label: 'Declarations', value: declarations.map((d, i) => `(${i + 1}) ${d}`).join('  ') },
+        { label: 'Document fingerprint (SHA-256)', value: record.documentHash },
+      ],
+      agreementHtml: agreementEmailHtml(),
+      agreementText: agreementPlainText(),
+      attachmentName: `${SCHOOL_AGREEMENT_TITLE} v${record.documentVersion} - ${userId || schoolName}.txt`,
+    });
+    await prisma.agreementAcceptance.update({
+      where: { id: record.id },
+      data: { emailCopyTo: to, emailCopySentAt: new Date() },
+    });
+    return [to];
+  } catch (err) {
+    console.error('Agreement copy email failed for general school', userId || schoolName, err);
+    return [];
+  }
+}
+
+/** The receipt the app shows after acceptance (same fields as the web gate). */
+export const acceptanceReceipt = (r: {
+  id: string; acceptedAt: Date; signatoryName: string; signatoryDesignation: string;
+  documentVersion: string; ipAddress: string | null;
+}) => ({
+  id: r.id,
+  acceptedAt: r.acceptedAt,
+  signatoryName: r.signatoryName,
+  signatoryDesignation: r.signatoryDesignation,
+  documentVersion: r.documentVersion,
+  ipAddress: r.ipAddress,
+});

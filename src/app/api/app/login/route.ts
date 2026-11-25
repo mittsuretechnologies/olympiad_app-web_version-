@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { signAppUserToken } from '@/lib/appUserToken';
 import { currentGeneralSchoolAcceptance } from '@/lib/generalSchool';
 import { isSuspended, suspensionMessage } from '@/lib/accountSuspension';
+import { recordConsent } from '@/lib/consent';
 import { ensureSchoolAccount, currentOlympiadSchoolAcceptance, signSchoolToken } from '@/lib/schoolAccount';
 
 export async function POST(request: Request) {
@@ -109,6 +110,21 @@ export async function POST(request: Request) {
       const account = user ?? await ensureSchoolAccount(olympiadSchool);
       await prisma.appUser.update({ where: { id: account.id }, data: { lastLoginAt: new Date() } });
       const accepted = await currentOlympiadSchoolAcceptance(olympiadSchool.id);
+      // First app login of an Olympiad school: its Terms come through the School
+      // Onboarding Agreement, so once that is accepted, keep a permanent consent
+      // record for the app account. recordConsent skips documents already on
+      // record, so later logins add nothing. Never blocks the login.
+      if (accepted) {
+        await recordConsent({
+          appUserId: account.id,
+          userHandle: account.userId,
+          consentedByName: olympiadSchool.name,
+          method: 'SCHOOL_AGREEMENT',
+          verificationChannel: 'PASSWORD_LOGIN',
+          verificationTarget: null,
+          request,
+        }).catch((e) => console.error('school consent record failed:', e));
+      }
 
       const token = signAppUserToken(account);
 
