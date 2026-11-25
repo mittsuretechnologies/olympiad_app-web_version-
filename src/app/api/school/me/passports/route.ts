@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma';
 import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { getJwtSecret } from '@/lib/jwt-secret';
 import { getResultOverview } from '@/lib/result-overview';
+import { shownInApp } from '@/lib/passport-student-release';
 
 export const dynamic = 'force-dynamic';
 
@@ -37,7 +38,14 @@ export async function GET(request: Request) {
     if (!release) return NextResponse.json({ released: false, releasedAt: null, students: [] });
 
     const overview = await getResultOverview(school.schoolId, 'manual');
-    return NextResponse.json({ released: true, releasedAt: release.releasedAt, students: overview?.rows ?? [] });
+    const rows = overview?.rows ?? [];
+    // Per student: since when their passport is shown in the mittmee app.
+    const inApp = await shownInApp(rows.map(r => r.olympiadCode));
+    return NextResponse.json({
+      released: true,
+      releasedAt: release.releasedAt,
+      students: rows.map(r => ({ ...r, inAppSince: inApp.get(r.olympiadCode) ?? null })),
+    });
   } catch (err: any) {
     console.error('GET school/me/passports failed:', err);
     return NextResponse.json({ message: 'Failed to load passports' }, { status: 500 });

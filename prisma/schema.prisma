@@ -82,6 +82,7 @@ model School {
   supportTickets SchoolSupportTicket[]
   evaluatorAssignments EvaluatorSchool[]
   passportRelease PassportRelease?
+  studentPassportReleases StudentPassportRelease[]
   notifications SchoolNotification[]
   districtForwards DistrictForward[]
   examDateRequests ExamDateChangeRequest[]
@@ -1445,6 +1446,22 @@ model PassportRelease {
   releasedAt DateTime @default(now())
   releasedBy String?
 
+  @@schema("public")
+}
+
+// A row means that ONE student's passport is visible to the student in the
+// mittmee app. Shown per student by SuperAdmin (Result page) or by the school
+// (Student Passports page). The app also requires the school release above.
+model StudentPassportRelease {
+  id             String   @id @default(uuid())
+  olympiadCode   String   @unique
+  schoolId       String
+  school         School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  releasedAt     DateTime @default(now())
+  releasedBy     String?
+  releasedByRole String? // 'ADMIN' | 'SCHOOL'
+
+  @@index([schoolId])
   @@schema("public")
 }
 

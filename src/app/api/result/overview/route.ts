@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-guard';
 import { getResultOverview, type ExamSource } from '@/lib/result-overview';
 import { normaliseQuery, schoolMatchesQuery, studentMatchesQuery } from '@/lib/resultSearch';
+import { shownInApp } from '@/lib/passport-student-release';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,7 +32,9 @@ export async function GET(request: Request) {
       const out = result.filter(r =>
         (schoolHit || studentMatchesQuery(q, { name: r.name, code: r.olympiadCode })) &&
         (!statusParam || r.status === statusParam));
-      return NextResponse.json(out);
+      // Per student: since when their passport is shown in the mittmee app.
+      const inApp = await shownInApp(out.map(r => r.olympiadCode));
+      return NextResponse.json(out.map(r => ({ ...r, inAppSince: inApp.get(r.olympiadCode) ?? null })));
     }
 
     return NextResponse.json(result);

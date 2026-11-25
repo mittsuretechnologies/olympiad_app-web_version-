@@ -6,7 +6,7 @@ import { fetcher, authFetch } from '@/lib/swr';
 import {
   Loader2, Search, Download, ChevronDown, ChevronUp,
   Users, Filter, X, CheckCircle2, AlertCircle, Lock, Unlock, BookOpen, Star,
-  ChevronRight, ChevronLeft, School, GraduationCap, Send, Undo2,
+  ChevronRight, ChevronLeft, School, GraduationCap, Send, Undo2, Smartphone, EyeOff,
 } from 'lucide-react';
 import ResultPassportV2, { type PassportV2Student } from '@/components/ResultPassportV2';
 import { KOSH_CRITERIA, MAX_PER_CRITERION, VIDEO_MAX_SCORE, criterionLabel, type CriterionKey } from '@/lib/kosh';
@@ -82,6 +82,15 @@ interface StudentResult {
   koshBreakdown: KoshBreakdownEntry[];
   holisticPercent: number | null;
   status: 'Complete' | 'Incomplete';
+  /** Since when this passport is shown to the student in the mittmee app (opened-school rows only). */
+  inAppSince?: string | null;
+}
+
+// Selecting students to show (or hide) their passports in the mittmee app.
+// Only Complete passports can be selected.
+interface AppSelection {
+  selected: Set<string>; // olympiadCodes
+  setMany: (codes: string[], on: boolean) => void;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -158,18 +167,34 @@ function gradeBadgeClass(grade: string) {
 
 // The student rows (with their expandable detail and passport button) for one class.
 function StudentsTable({
-  list, expandedRow, setExpandedRow, setPassportFor,
+  list, expandedRow, setExpandedRow, setPassportFor, appSelection,
 }: {
   list: StudentResult[];
   expandedRow: string | null;
   setExpandedRow: (key: string | null) => void;
   setPassportFor: (row: StudentResult) => void;
+  appSelection: AppSelection;
 }) {
+  const selectable = list.filter(r => r.status === 'Complete').map(r => r.olympiadCode);
+  const allSelected = selectable.length > 0 && selectable.every(c => appSelection.selected.has(c));
+  const someSelected = selectable.some(c => appSelection.selected.has(c));
   return (
         <div className="overflow-x-auto">
           <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="bg-gradient-to-r from-gray-50 to-gray-100 border-b border-gray-200">
+                <th className="py-3 pl-3 pr-1 w-8">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                    disabled={selectable.length === 0}
+                    onChange={() => appSelection.setMany(selectable, !allSelected)}
+                    className="w-4 h-4 accent-[#009846] cursor-pointer disabled:cursor-not-allowed"
+                    aria-label="Select all ready passports in this class"
+                    title={selectable.length === 0 ? 'No ready passports in this class' : 'Select all ready passports'}
+                  />
+                </th>
                 <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider w-8"></th>
                 <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">#</th>
                 <th className="py-3 px-2 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student</th>
@@ -181,11 +206,12 @@ function StudentsTable({
                 <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Holistic</th>
                 <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Passport</th>
+                <th className="py-3 px-2 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Student App</th>
               </tr>
             </thead>
             <tbody>
               {list.length === 0 && (
-                <tr><td colSpan={11} className="py-16 text-center text-gray-400 font-medium">No students found.</td></tr>
+                <tr><td colSpan={13} className="py-16 text-center text-gray-400 font-medium">No students found.</td></tr>
               )}
               {list.map((row, idx) => {
                 const isExpanded = expandedRow === row.studentKey;
@@ -193,7 +219,18 @@ function StudentsTable({
                   <Fragment key={row.studentKey}>
                     <tr
                       onClick={() => setExpandedRow(isExpanded ? null : row.studentKey)}
-                      className={`border-b border-gray-100 cursor-pointer transition-colors ${isExpanded ? 'bg-amber-50/60' : 'hover:bg-gray-50'}`}>
+                      className={`border-b border-gray-100 cursor-pointer transition-colors ${isExpanded ? 'bg-amber-50/60' : appSelection.selected.has(row.olympiadCode) ? 'bg-emerald-50/50' : 'hover:bg-gray-50'}`}>
+                      <td className="py-3 pl-3 pr-1" onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={appSelection.selected.has(row.olympiadCode)}
+                          disabled={row.status !== 'Complete'}
+                          onChange={e => appSelection.setMany([row.olympiadCode], e.target.checked)}
+                          className="w-4 h-4 accent-[#009846] cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                          aria-label={`Select ${row.name}`}
+                          title={row.status !== 'Complete' ? 'Passport not ready yet' : undefined}
+                        />
+                      </td>
                       <td className="py-3 px-2">
                         {isExpanded ? <ChevronUp size={16} className="text-amber-500" /> : <ChevronDown size={16} className="text-gray-400" />}
                       </td>
@@ -252,11 +289,23 @@ function StudentsTable({
                           <BookOpen size={12} /> Open
                         </button>
                       </td>
+                      <td className="py-3 px-2 text-center">
+                        {row.inAppSince ? (
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[10.5px] font-bold text-emerald-700 whitespace-nowrap"
+                            title={`Shown in the mittmee app since ${new Date(row.inAppSince).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`}
+                          >
+                            <Smartphone size={11} /> In app
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-gray-300 font-semibold">{row.status === 'Complete' ? 'Not shown' : 'Not ready'}</span>
+                        )}
+                      </td>
                     </tr>
 
                     {isExpanded && (
                       <tr>
-                        <td colSpan={11} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
+                        <td colSpan={13} className="bg-amber-50/30 border-b border-amber-100 px-6 py-5">
                           <div className="space-y-5">
                             <LegendSection
                               title={`Olympiad Checker (Scanned Exam Sheet) — ${row.examQuestions.length} Questions`}
@@ -532,9 +581,9 @@ function Stat({ label, value, tone = 'text-gray-900' }: { label: string; value: 
 // The classes and students of ONE school. Fetched only when the school is opened,
 // so the page never loads more than the schools you actually look at.
 function SchoolStudents({
-  schoolId, examSource, q, status, expandedRow, setExpandedRow, setPassportFor, openClasses, toggleClass,
+  schoolId, schoolReleased, examSource, q, status, expandedRow, setExpandedRow, setPassportFor, openClasses, toggleClass,
 }: {
-  schoolId: string; examSource: 'ai' | 'manual'; q: string; status: string;
+  schoolId: string; schoolReleased: boolean; examSource: 'ai' | 'manual'; q: string; status: string;
   expandedRow: string | null; setExpandedRow: (key: string | null) => void;
   setPassportFor: (row: StudentResult) => void;
   openClasses: Set<string>; toggleClass: (key: string) => void;
@@ -544,6 +593,53 @@ function SchoolStudents({
   if (status !== 'All') params.set('status', status);
   const { data, error, isLoading, mutate } = useSWR<StudentResult[]>(`/api/result/overview?${params}`, fetcher);
   const classes = useMemo(() => groupClasses(Array.isArray(data) ? data : []), [data]);
+
+  // Select students (any number, across classes), then send them all to the
+  // mittmee app — or hide them — in one go. The school can do the same from
+  // its own Student Passports page.
+  const rows = useMemo(() => (Array.isArray(data) ? data : []), [data]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sending, setSending] = useState<'show' | 'hide' | null>(null);
+  const setMany = (codes: string[], on: boolean) => setSelected(prev => {
+    const next = new Set(prev);
+    for (const c of codes) { if (on) next.add(c); else next.delete(c); }
+    return next;
+  });
+  const appSelection: AppSelection = { selected, setMany };
+  const readyCodes = rows.filter(r => r.status === 'Complete').map(r => r.olympiadCode);
+  const selectedRows = rows.filter(r => selected.has(r.olympiadCode));
+  const toShow = selectedRows.filter(r => !r.inAppSince);
+  const toHide = selectedRows.filter(r => r.inAppSince);
+
+  const sendToApp = async (action: 'show' | 'hide') => {
+    const target = action === 'show' ? toShow : toHide;
+    if (target.length === 0) return;
+    const n = target.length;
+    const ok = window.confirm(action === 'show'
+      ? `Show ${n} passport${n === 1 ? '' : 's'} in the mittmee app?\n\nThese students will be able to open their passport in the app.`
+      : `Hide ${n} passport${n === 1 ? '' : 's'} from the mittmee app?\n\nThese students will no longer see it. The school can still see them.`);
+    if (!ok) return;
+    setSending(action);
+    try {
+      const res = await authFetch('/api/result/passport-student-release', {
+        method: action === 'show' ? 'POST' : 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ olympiadCodes: target.map(r => r.olympiadCode) }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(body?.message);
+      await mutate();
+      setSelected(new Set());
+      if (action === 'show' && Array.isArray(body.skipped) && body.skipped.length) {
+        alert(`${n - body.skipped.length} shown. ${body.skipped.length} skipped:\n\n` +
+          body.skipped.map((s: { olympiadCode: string; reason: string }) => `${s.olympiadCode}: ${s.reason}`).join('\n'));
+      }
+    } catch (e: any) {
+      alert(e?.message || (action === 'show' ? 'Could not show the passports. Please try again.' : 'Could not hide the passports. Please try again.'));
+    } finally {
+      setSending(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -566,6 +662,44 @@ function SchoolStudents({
 
   return (
     <div className="border-t border-gray-100 bg-gray-50/50 p-3 space-y-2">
+      {/* Student app: one action for every selected student */}
+      <div className={`flex flex-wrap items-center gap-2 rounded-xl border px-3.5 py-2.5 ${selected.size ? 'bg-emerald-50 border-emerald-200' : 'bg-white border-gray-200'}`}>
+        <Smartphone size={15} className={selected.size ? 'text-emerald-700' : 'text-gray-400'} />
+        {!schoolReleased ? (
+          <p className="text-[12px] font-semibold text-gray-500">Release passports to the school first, then select students to show their passport in the mittmee app.</p>
+        ) : selected.size === 0 ? (
+          <>
+            <p className="text-[12px] font-semibold text-gray-500">Select students to show their passport in the mittmee app.</p>
+            {readyCodes.length > 0 && (
+              <button type="button" onClick={() => setMany(readyCodes, true)}
+                className="text-[12px] font-bold text-[#004f9f] hover:underline cursor-pointer">
+                Select all ready ({readyCodes.length})
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <p className="text-[12px] font-bold text-emerald-800">{selected.size} selected</p>
+            <button type="button" onClick={() => setSelected(new Set())}
+              className="text-[12px] font-bold text-gray-500 hover:text-gray-700 hover:underline cursor-pointer">
+              Clear
+            </button>
+            <div className="ml-auto flex items-center gap-2">
+              {toHide.length > 0 && (
+                <button type="button" onClick={() => sendToApp('hide')} disabled={sending !== null}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-bold bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors cursor-pointer disabled:opacity-50 whitespace-nowrap">
+                  {sending === 'hide' ? <Loader2 size={12} className="animate-spin" /> : <EyeOff size={12} />} Hide from app ({toHide.length})
+                </button>
+              )}
+              <button type="button" onClick={() => sendToApp('show')} disabled={sending !== null || toShow.length === 0}
+                title={toShow.length === 0 ? 'All selected students can already see their passport' : undefined}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-[11px] font-bold bg-[#009846] text-white hover:bg-[#007a38] transition-colors cursor-pointer shadow-sm disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                {sending === 'show' ? <Loader2 size={12} className="animate-spin" /> : <Send size={12} />} Send to student app ({toShow.length})
+              </button>
+            </div>
+          </>
+        )}
+      </div>
       {classes.map(cg => {
         const ck = `${schoolId}|${cg.name}`;
         const classOpen = openClasses.has(ck);
@@ -591,7 +725,7 @@ function SchoolStudents({
             </button>
             {classOpen && (
               <div className="border-t border-gray-100">
-                <StudentsTable list={cg.students} expandedRow={expandedRow} setExpandedRow={setExpandedRow} setPassportFor={setPassportFor} />
+                <StudentsTable list={cg.students} expandedRow={expandedRow} setExpandedRow={setExpandedRow} setPassportFor={setPassportFor} appSelection={appSelection} />
               </div>
             )}
           </div>
@@ -654,7 +788,7 @@ export default function ResultPage() {
       ? `Release passports to ${sc.name}?
 
 ${sc.complete} completed passport${sc.complete === 1 ? '' : 's'} will become visible to the school (${sc.incomplete} not ready yet).`
-      : `Withdraw passports from ${sc.name}? The school will no longer be able to see them.`);
+      : `Withdraw passports from ${sc.name}? The school will no longer be able to see them, and students will no longer see theirs in the mittmee app.`);
     if (!ok) return;
     setReleasing(sc.schoolId);
     try {
@@ -883,6 +1017,7 @@ ${sc.complete} completed passport${sc.complete === 1 ? '' : 's'} will become vis
               {schoolOpen && (
                 <SchoolStudents
                   schoolId={sc.schoolId}
+                  schoolReleased={!!sc.passportReleasedAt}
                   examSource={examSource}
                   q={debouncedSearch}
                   status={filterStatus}
