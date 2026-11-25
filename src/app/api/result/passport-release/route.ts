@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
-// import { notifySchools } from '@/lib/schoolNotifications';
+import { notifySchools } from '@/lib/schoolNotifications';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,16 +28,17 @@ export async function POST(request: Request) {
       create: { schoolId: school.id, releasedBy: payload?.id ?? null },
       update: {},
     });
-    // // Tell the school once, when the passports first become visible to it.
-    // if (!already) {
-    //   await notifySchools([school.id], {
-    //     type: 'PASSPORTS_RELEASED',
-    //     title: 'Student passports are ready',
-    //     message: "Your students' Holistic Progress Passports have been released. Open Student Passports to view them or download them as PDFs.",
-    //     link: '/school/passports',
-    //     createdBy: payload?.id ?? null,
-    //   });
-    // }
+    // Tell the school once, when the passports first become visible to it.
+    // Best-effort: notifySchools never throws, so the release itself stands.
+    if (!already) {
+      await notifySchools([school.id], {
+        type: 'PASSPORTS_RELEASED',
+        title: 'Student passports are ready',
+        message: "Your students' Holistic Progress Passports have been released. Open Student Passports to view them or download them as PDFs.",
+        link: '/school/passports',
+        createdBy: payload?.id ?? null,
+      });
+    }
     return NextResponse.json({ releasedAt: release.releasedAt });
   } catch (err: any) {
     console.error('POST result/passport-release failed:', err);

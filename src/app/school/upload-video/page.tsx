@@ -310,11 +310,24 @@ export default function UploadVideoPage() {
       else fd.append('studentId', selectedStudent!.id);
       if (cropX !== null) fd.append('cropX', String(cropX));
 
-      const upRes = await fetch('/api/school/me/upload-video', {
-        method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
-      });
+      let upRes: Response;
+      try {
+        upRes = await fetch('/api/school/me/upload-video', {
+          method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: fd,
+        });
+      } catch {
+        // fetch only throws when no response came back at all.
+        throw new Error('Upload stopped — please check your internet connection and try again.');
+      }
       setProgress(60);
-      const { videoUrl, thumbnailUrl } = await readJson(upRes, 'Upload failed');
+      // A server in front of the app (not this route) answers these with an
+      // HTML page, so say what happened instead of a bare "Upload failed".
+      const uploadFallback =
+        upRes.status === 413 ? 'This video is too large for the server to accept. Please try a shorter or smaller video.'
+        : upRes.status === 502 || upRes.status === 503 || upRes.status === 504
+          ? 'The server took too long to process this video. Please try again in a minute.'
+        : 'Upload failed';
+      const { videoUrl, thumbnailUrl } = await readJson(upRes, uploadFallback);
 
       setUploadState('saving');
       setProgress(80);

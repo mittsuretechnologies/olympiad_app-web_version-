@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Contact, Loader2, Search, Download, Clock, BookOpen, ChevronDown, ChevronUp,
-  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, MessageSquare, AlertCircle,
+  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, MessageSquare, AlertCircle, Lock,
 } from 'lucide-react';
+import { CLASSES } from '@/lib/classes';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL, FOCUS,
   BTN_PRIMARY, BTN_SECONDARY, BTN_SUBTLE, BTN_ICON,
@@ -68,11 +69,16 @@ export default function SchoolOlympiadIdsPage() {
     smsSent: boolean; smsError: string | null;
   } | null>(null);
 
-  // Edit app account modal (for ALLOTTED rows — name, phone + email)
-  const [editAppModal, setEditAppModal] = useState<{ code: string } | null>(null);
+  // Edit modal (for ALLOTTED rows): name, phone + email when the ID has an app
+  // account, and the class for every allotted ID. The class can be corrected
+  // only until passports are released / the student's video is evaluated.
+  const [editAppModal, setEditAppModal] = useState<{ code: string; hasAppUser: boolean; className: string } | null>(null);
   const [editAppName, setEditAppName] = useState('');
   const [editAppPhone, setEditAppPhone] = useState('');
   const [editAppEmail, setEditAppEmail] = useState('');
+  const [editClass, setEditClass] = useState('');
+  // undefined = still checking, null = can change, string = why it can't
+  const [classLock, setClassLock] = useState<string | null | undefined>(undefined);
   const [editingApp, setEditingApp] = useState(false);
   const [editAppError, setEditAppError] = useState('');
 
@@ -175,32 +181,59 @@ export default function SchoolOlympiadIdsPage() {
 
   // Edit app account handlers (ALLOTTED rows)
   const openEditAppModal = (a: Allocation) => {
-    setEditAppModal({ code: a.code });
+    const className = a.className || CLASSES.find(c => c.code === a.classCode)?.name || '';
+    setEditAppModal({ code: a.code, hasAppUser: !!a.hasAppUser, className });
     setEditAppName(a.assignedName || '');
     setEditAppPhone(a.appUserPhone || '');
     setEditAppEmail(a.appUserEmail || '');
+    setEditClass(className);
+    setClassLock(undefined);
     setEditAppError('');
+    fetch(`/api/school/me/olympiad-ids/${a.code}/class`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setClassLock(d.locked ?? null))
+      .catch(() => setClassLock('Could not check whether the class can be changed. Please reopen this window.'));
   };
   const closeEditAppModal = () => {
     setEditAppModal(null); setEditAppName(''); setEditAppPhone(''); setEditAppEmail(''); setEditAppError('');
+    setEditClass(''); setClassLock(undefined);
   };
 
+  const classChanged = !!editAppModal && !!editClass && editClass !== editAppModal.className;
+
   const handleEditApp = async () => {
-    if (!editAppName.trim()) { setEditAppError('Student name is required'); return; }
-    if (!editAppPhone.trim() || editAppPhone.trim().length < 10) { setEditAppError('Valid phone number is required'); return; }
-    if (editAppEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAppEmail.trim())) { setEditAppError('Enter a valid email address'); return; }
+    const m = editAppModal!;
+    if (m.hasAppUser) {
+      if (!editAppName.trim()) { setEditAppError('Student name is required'); return; }
+      if (!editAppPhone.trim() || editAppPhone.trim().length < 10) { setEditAppError('Valid phone number is required'); return; }
+      if (editAppEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAppEmail.trim())) { setEditAppError('Enter a valid email address'); return; }
+    }
     setEditingApp(true); setEditAppError('');
     try {
-      const res = await fetch(`/api/school/me/olympiad-ids/${editAppModal!.code}/app-account`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ name: editAppName.trim(), phone: editAppPhone.trim(), email: editAppEmail.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message);
-      setAllocations(prev => prev.map(a =>
-        a.code === editAppModal!.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim(), appUserEmail: editAppEmail.trim().toLowerCase() || null } : a
-      ));
+      if (m.hasAppUser) {
+        const res = await fetch(`/api/school/me/olympiad-ids/${m.code}/app-account`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ name: editAppName.trim(), phone: editAppPhone.trim(), email: editAppEmail.trim() }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        setAllocations(prev => prev.map(a =>
+          a.code === m.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim(), appUserEmail: editAppEmail.trim().toLowerCase() || null } : a
+        ));
+      }
+      if (classChanged) {
+        const res = await fetch(`/api/school/me/olympiad-ids/${m.code}/class`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ className: editClass }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message);
+        setAllocations(prev => prev.map(a =>
+          a.code === m.code ? { ...a, classCode: data.classCode, className: data.className } : a
+        ));
+      }
       closeEditAppModal();
     } catch (e: any) {
       setEditAppError(e.message);
@@ -415,11 +448,12 @@ export default function SchoolOlympiadIdsPage() {
                             </td>
                             <td className={TD}>{renderStatus(a)}</td>
                             <td className={`${TD} text-center`}>
-                              {a.student ? (
-                                <span className="text-[#98A1B2]">—</span>
-                              ) : a.hasAppUser || a.assignedName ? (
+                              {a.student || a.hasAppUser || a.assignedName ? (
                                 <div className="flex items-center justify-center gap-1.5">
-                                  <button onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`} title="Edit name, phone & email">
+                                  <button
+                                    onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`}
+                                    title={a.hasAppUser ? 'Edit name, phone, email & class' : 'Edit class'}
+                                  >
                                     <Pencil size={12} />
                                   </button>
                                 </div>
@@ -669,6 +703,7 @@ export default function SchoolOlympiadIdsPage() {
           maxWidth="max-w-sm"
         >
           <div className="space-y-3.5 p-5">
+            {editAppModal.hasAppUser && (<>
             <div>
               <label htmlFor="edit-name" className={LABEL}>Student name</label>
               <input
@@ -701,17 +736,53 @@ export default function SchoolOlympiadIdsPage() {
                 />
               </div>
             </div>
+            </>)}
+            <div>
+              <label htmlFor="edit-class" className={LABEL}>Class</label>
+              <select
+                id="edit-class" value={editClass} onChange={e => setEditClass(e.target.value)}
+                disabled={classLock !== null}
+                className={`${INPUT} disabled:cursor-not-allowed disabled:bg-[#F8F9FB] disabled:text-[#677285]`}
+              >
+                {!editClass && <option value="">Select class</option>}
+                {/* An old/odd stored class still shows as itself until changed. */}
+                {editAppModal.className && !CLASSES.some(c => c.name === editAppModal.className) && (
+                  <option value={editAppModal.className}>{editAppModal.className}</option>
+                )}
+                {CLASSES.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
+              </select>
+              {classLock === undefined ? (
+                <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-[#677285]">
+                  <Loader2 size={11} className="animate-spin" /> Checking whether the class can be changed…
+                </p>
+              ) : classLock ? (
+                <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] leading-snug text-[#677285]">
+                  <Lock size={11} className="mt-[2px] flex-shrink-0" /> {classLock}
+                </p>
+              ) : classChanged ? (
+                <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] leading-snug text-[#A1530A]">
+                  <AlertCircle size={12} className="mt-[1px] flex-shrink-0" />
+                  The class changes from {editAppModal.className || 'none'} to {editClass}. The Olympiad ID, login and uploaded videos stay the same.
+                </p>
+              ) : null}
+            </div>
             {editAppError && (
               <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]" role="alert">
                 <AlertCircle size={12} /> {editAppError}
               </p>
             )}
-            <p className="rounded-lg border border-[#A1530A]/25 bg-[#A1530A]/[0.08] px-3 py-2 text-[12px] leading-snug text-[#A1530A]">
-              This updates the student&apos;s app account. The login password stays unchanged.
-            </p>
+            {editAppModal.hasAppUser && (
+              <p className="rounded-lg border border-[#A1530A]/25 bg-[#A1530A]/[0.08] px-3 py-2 text-[12px] leading-snug text-[#A1530A]">
+                This updates the student&apos;s app account. The login password stays unchanged.
+              </p>
+            )}
             <div className="flex gap-2">
               <button onClick={closeEditAppModal} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
-              <button onClick={handleEditApp} disabled={editingApp} className={`cursor-pointer ${BTN_PRIMARY} flex-1`}>
+              <button
+                onClick={handleEditApp}
+                disabled={editingApp || (!editAppModal.hasAppUser && !classChanged)}
+                className={`cursor-pointer ${BTN_PRIMARY} flex-1`}
+              >
                 {editingApp ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
                 Update
               </button>

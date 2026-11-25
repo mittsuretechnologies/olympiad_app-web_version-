@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireAdmin } from '@/lib/auth-guard';
-// import { notifySchools } from '@/lib/schoolNotifications';
+import { notifySchools } from '@/lib/schoolNotifications';
 
 export async function POST(
   request: Request,
@@ -22,16 +22,17 @@ export async function POST(
       data: { sentAt: new Date() },
     });
 
-    // if (result.count > 0) {
-    //   const n = result.count;
-    //   await notifySchools([id], {
-    //     type: 'OLYMPIAD_IDS_ADDED',
-    //     title: n === 1 ? '1 new Olympiad ID added' : `${n} new Olympiad IDs added`,
-    //     message: `${n} new Olympiad ID${n === 1 ? ' has' : 's have'} been sent to your school. You can assign ${n === 1 ? 'it' : 'them'} to students from Olympiad IDs.`,
-    //     link: '/school/olympiad-ids',
-    //     createdBy: payload?.id ?? null,
-    //   });
-    // }
+    // Best-effort: notifySchools never throws, so the IDs stay sent either way.
+    if (result.count > 0) {
+      const n = result.count;
+      await notifySchools([id], {
+        type: 'OLYMPIAD_IDS_ADDED',
+        title: n === 1 ? '1 new Olympiad ID added' : `${n} new Olympiad IDs added`,
+        message: `${n} new Olympiad ID${n === 1 ? ' has' : 's have'} been sent to your school. You can assign ${n === 1 ? 'it' : 'them'} to students from Olympiad IDs.`,
+        link: '/school/olympiad-ids',
+        createdBy: payload?.id ?? null,
+      });
+    }
 
     return NextResponse.json({
       sent: result.count,

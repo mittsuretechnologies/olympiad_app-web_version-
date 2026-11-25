@@ -39,6 +39,8 @@ export interface InspectResult {
   kbps: number;
   sizeBytes: number;
   moovAtFront: boolean;
+  /** Video codec as ffprobe names it ("h264", "hevc", …), when known. */
+  codec?: string;
 }
 
 /** True when the MP4/MOV index ("moov") comes before the media data ("mdat"). */
@@ -85,6 +87,7 @@ export async function inspectForStreaming(filePath: string): Promise<InspectResu
     kbps,
     sizeBytes: info.size,
     moovAtFront: front,
+    codec: meta.codec,
   };
 }
 
@@ -127,6 +130,8 @@ function runFfmpeg(args: string[], timeoutMs: number): Promise<void> {
 export interface TranscodeOptions {
   /** 0 = left edge … 1 = right edge. When set, a 9:16 slice is cut out first. */
   cropX?: number | null;
+  /** Video bitrate ceiling (kbps); defaults to TARGET_MAXRATE_KBPS. */
+  maxrateKbps?: number;
 }
 
 /**
@@ -178,12 +183,13 @@ async function transcodeOnce(
     `scale=w='if(gte(iw,ih),min(${MAX_LONG_EDGE},iw),-2)':h='if(gte(iw,ih),-2,min(${MAX_LONG_EDGE},ih))'`,
   );
 
+  const maxrate = opts.maxrateKbps ?? TARGET_MAXRATE_KBPS;
   await runFfmpeg([
     '-i', inputPath,
     '-map', '0:v:0', '-map', '0:a:0?',
     '-vf', filters.join(','),
     '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'high',
-    '-crf', '24', '-maxrate', `${TARGET_MAXRATE_KBPS}k`, '-bufsize', `${TARGET_MAXRATE_KBPS * 2}k`,
+    '-crf', '24', '-maxrate', `${maxrate}k`, '-bufsize', `${maxrate * 2}k`,
     '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '96k', '-ac', '2',
     // Phone recordings carry GPS and device info — not needed for playback.
@@ -217,19 +223,53 @@ export type OptimizeOutcome = 'none' | 'remux' | 'encode' | 'failed';
  * Never throws: an upload must not be lost because optimising it failed.
  * `cropX` forces a re-encode (the user asked for a crop).
  */
+export interface OptimizeOptions {
+  /**
+   * Size rule instead of the resolution/bitrate rule: a file of at most this
+   * many bytes is never re-encoded (only its index moved to the front if
+   * needed, which doesn't touch the picture); a larger one is always
+   * re-encoded to ~720p / 2.5 Mbps — and kept as it was if that didn't make
+   * it smaller. A crop still always re-encodes. A small file that isn't H.264
+   * (an iPhone HEVC .mov, a .webm) is still converted, since many phones can't
+   * play it otherwise — that is a format change, not compression.
+   */
+  compressAboveBytes?: number;
+  /** Video bitrate ceiling (kbps) for the re-encode; defaults to TARGET_MAXRATE_KBPS. */
+  maxrateKbps?: number;
+}
+
 export async function optimizeForStreaming(
   inputPath: string,
   outputPath: string,
   cropX: number | null = null,
+  opts: OptimizeOptions = {},
 ): Promise<OptimizeOutcome> {
   try {
     let action: 'none' | 'remux' | 'encode' = cropX !== null ? 'encode' : 'none';
+    // True when the output must be published even if it is larger (a format
+    // change, not a size reduction).
+    let mustConvert = false;
     if (cropX === null) {
       const info = await inspectForStreaming(inputPath);
+      let reason = info.plan.reason;
       action = info.plan.action;
+      if (opts.compressAboveBytes != null) {
+        const limitMb = (opts.compressAboveBytes / 1048576).toFixed(0);
+        if (info.sizeBytes > opts.compressAboveBytes) {
+          action = 'encode';
+          reason = `above ${limitMb}MB`;
+        } else if (info.codec && info.codec !== 'h264') {
+          action = 'encode';
+          mustConvert = true;
+          reason = `${limitMb}MB or under but ${info.codec}, converting to h264`;
+        } else {
+          action = info.moovAtFront ? 'none' : 'remux';
+          reason = `${limitMb}MB or under, ${info.moovAtFront ? 'kept as is' : 'index moved to front'}`;
+        }
+      }
       console.log(
         `[video-optimize] ${info.width}x${info.height} ${(info.sizeBytes / 1048576).toFixed(1)}MB `
-        + `${Math.round(info.kbps)}kbps -> ${action} (${info.plan.reason})`,
+        + `${Math.round(info.kbps)}kbps -> ${action} (${reason})`,
       );
     }
     if (action === 'none') return 'none';
@@ -239,11 +279,11 @@ export async function optimizeForStreaming(
       return 'remux';
     }
 
-    await withEncodeSlot(() => transcodeForStreaming(inputPath, outputPath, { cropX }));
+    await withEncodeSlot(() => transcodeForStreaming(inputPath, outputPath, { cropX, maxrateKbps: opts.maxrateKbps }));
     // Re-encoding should only ever make the file lighter. If it somehow did not
     // (already tightly compressed), keep the input — except for a crop, where
     // the picture itself was meant to change.
-    if (cropX === null) {
+    if (cropX === null && !mustConvert) {
       const [before, after] = await Promise.all([stat(inputPath), stat(outputPath)]);
       if (after.size >= before.size) {
         await unlink(outputPath).catch(() => {});

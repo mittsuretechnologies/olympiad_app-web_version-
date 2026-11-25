@@ -635,7 +635,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
             )}
 
-            {/* School Notifications (switched off for now):
+            {/* School Notifications — a message to schools' School Panel bell. */}
             {canSee('schools') && (
               <Link href="/dashboard/school-notifications"
                 className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 ${pathname.startsWith('/dashboard/school-notifications') ? 'bg-[#009846] text-white font-semibold shadow-md' : 'bg-white/10 text-white font-semibold shadow-md border border-white/10 hover:bg-white/20'}`}>
@@ -643,7 +643,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span className="text-sm font-semibold">School Notifications</span>
               </Link>
             )}
-            */}
 
             {/* Settings — only superadmin */}
             {role === 'SUPERADMIN' && (

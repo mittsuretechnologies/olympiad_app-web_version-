@@ -38,7 +38,10 @@ function timeAgo(iso: string) {
  * (passports released, new Olympiad IDs). Unread count on the bell; clicking a
  * notification marks it read and opens the page it points to.
  */
-export default function NotificationBell() {
+// align: which edge of the bell the list lines up with. 'right' (default) opens
+// it leftwards, for a bell at the right of a top bar; 'left' opens it
+// rightwards, for the bell in the sidebar.
+export default function NotificationBell({ align = 'right' }: { align?: 'left' | 'right' }) {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -124,7 +127,7 @@ export default function NotificationBell() {
         <div
           role="dialog"
           aria-label="Notifications"
-          className="absolute right-0 top-11 z-50 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-[#E6E8EC] bg-white shadow-[0_12px_32px_rgba(15,27,45,0.14)]"
+          className={`absolute ${align === 'left' ? 'left-0' : 'right-0'} top-11 z-50 w-[360px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-[#E6E8EC] bg-white shadow-[0_12px_32px_rgba(15,27,45,0.14)]`}
         >
           <div className="flex items-center justify-between border-b border-[#EEF0F3] px-4 py-3">
             <p className="text-[13.5px] font-semibold text-[#0F1B2D]">Notifications</p>

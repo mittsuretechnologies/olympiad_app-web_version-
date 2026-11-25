@@ -8,6 +8,8 @@ export interface VideoMeta {
   durationSeconds: number;
   width: number;
   height: number;
+  /** ffprobe's codec_name for the first video stream, e.g. "h264", "hevc", "vp9". */
+  codec?: string;
 }
 
 // Runs ffprobe and returns duration + the first video stream's dimensions
@@ -18,7 +20,7 @@ export function probeVideo(filePath: string): Promise<VideoMeta> {
     const proc = spawn(ffprobePath, [
       '-v', 'error',
       '-print_format', 'json',
-      '-show_entries', 'format=duration:stream=width,height,codec_type',
+      '-show_entries', 'format=duration:stream=width,height,codec_type,codec_name',
       filePath,
     ]);
 
@@ -37,6 +39,7 @@ export function probeVideo(filePath: string): Promise<VideoMeta> {
           durationSeconds: parseFloat(parsed.format?.duration) || 0,
           width: videoStream.width,
           height: videoStream.height,
+          codec: typeof videoStream.codec_name === 'string' ? videoStream.codec_name : undefined,
         });
       } catch (e) {
         reject(e);

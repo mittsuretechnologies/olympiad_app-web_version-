@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server';
 import { verify } from 'jsonwebtoken';
-import { writeFile, mkdir, unlink, stat, rename } from 'fs/promises';
+import { mkdir, unlink, rename } from 'fs/promises';
+import { createWriteStream } from 'fs';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
+import type { ReadableStream as NodeWebReadableStream } from 'stream/web';
 import path from 'path';
 import { spawn } from 'child_process';
-import { probeVideo, compressVideo } from '@/lib/videoProbe';
+import { probeVideo } from '@/lib/videoProbe';
 import { prisma } from '@/lib/prisma';
 import { inactiveSchoolResponse } from '@/lib/auth-guard';
 import { s3Enabled, uploadFileToS3 } from '@/lib/s3';
@@ -14,7 +18,12 @@ import { MAX_VIDEO_SECONDS } from '@/lib/uploadRules';
 const ffmpegPath: string = require('ffmpeg-static');
 
 const JWT_SECRET      = getJwtSecret();
-const MAX_BYTES       = 150 * 1024 * 1024; // 150 MB — above this, auto-compress (no hard upper cap)
+// Same rule as the app's own upload (COMPRESSION_OPTIONS in the app's
+// Components/screens/app/UploadScreen.js): up to 10 MB is published as
+// uploaded; anything larger is cut to 1280px on the long side (720p) at about
+// 3 Mbps. Keep these two in step with the app. No hard upper cap on uploads.
+const COMPRESS_ABOVE_BYTES = 10 * 1024 * 1024; // 10 MB  — app: minimumFileSizeForCompress: 10
+const COMPRESS_MAXRATE_KBPS = 3000;           // 3 Mbps — app: bitrate: 3_000_000 (long edge 1280 = app maxSize)
 
 export const dynamic     = 'force-dynamic';
 // Compressing / cropping a long video takes a while (same allowance as the
@@ -134,8 +143,17 @@ export async function POST(request: Request) {
 
     await mkdir(uploadDir, { recursive: true });
 
-    const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(rawPath, buffer);
+    // Streamed to disk rather than copied into one Buffer first, so a large
+    // video doesn't need a second full copy of itself in the server's memory.
+    try {
+      await pipeline(
+        Readable.fromWeb(file.stream() as unknown as NodeWebReadableStream<Uint8Array>),
+        createWriteStream(rawPath),
+      );
+    } catch (writeError) {
+      await unlink(rawPath).catch(() => {});
+      throw writeError;
+    }
 
     // Same two checks, with the same messages, as the app's upload
     // (/api/app/upload-video/finalize): the file must be readable, and at most
@@ -155,39 +173,22 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Video must be 2 minutes or shorter.' }, { status: 400 });
     }
 
-    let workingPath = rawPath;
+    await rename(rawPath, filePath);
 
-    // ── Compress if over the soft size limit ──────────────────────────────────
-    // Needs the duration to pick a bitrate; without it the streaming pass below
-    // still lightens the file.
-    const { size: workingSize } = await stat(workingPath);
-    if (meta.durationSeconds > 0 && workingSize > MAX_BYTES) {
-      const targetBitrateKbps = Math.max(
-        800,
-        Math.floor((MAX_BYTES * 8) / meta.durationSeconds / 1000 * 0.9) // 10% headroom under target
-      );
-      const compressedPath = path.join(uploadDir, `${baseName}_compressed.mp4`);
-      try {
-        await compressVideo(workingPath, compressedPath, targetBitrateKbps);
-        await unlink(workingPath).catch(() => {});
-        workingPath = compressedPath;
-      } catch (err) {
-        // Upload the original rather than refuse it.
-        console.error('compressVideo failed, keeping the original:', err);
-        await unlink(compressedPath).catch(() => {});
-      }
-    }
-
-    // Move the final working file into place as the canonical fileName
-    if (workingPath !== filePath) {
-      await rename(workingPath, filePath);
-    }
-
-    // Make it light enough for a phone to stream (about 720p / 2.5 Mbps), and
-    // apply the crop if one was chosen, in one pass. An already-light video is
-    // left alone; a failure keeps the file as is.
+    // One compression pass (no separate pre-compress, so the picture is never
+    // encoded twice):
+    //   • up to 10 MB — kept as uploaded (only its index moved to the front if
+    //     needed, which doesn't touch the picture);
+    //   • over 10 MB — re-encoded to 720p at up to 3 Mbps (H.264, CRF 24),
+    //     the same as the app compresses on the phone: looks clean and streams
+    //     without buffering. A 2-minute video ends up at most about 45 MB.
+    // A crop, if chosen, is applied in the same pass whatever the size. If the
+    // re-encode fails or wouldn't make the file smaller, the original is kept.
     const optimisedPath = path.join(uploadDir, `${baseName}_opt.mp4`);
-    const optimised = await optimizeForStreaming(filePath, optimisedPath, cropX);
+    const optimised = await optimizeForStreaming(filePath, optimisedPath, cropX, {
+      compressAboveBytes: COMPRESS_ABOVE_BYTES,
+      maxrateKbps: COMPRESS_MAXRATE_KBPS,
+    });
     if (optimised === 'remux' || optimised === 'encode') {
       await unlink(filePath).catch(() => {});
       await rename(optimisedPath, filePath);
