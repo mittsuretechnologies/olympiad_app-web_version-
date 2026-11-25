@@ -5,17 +5,7 @@ import { stateNameToCode } from '@/lib/indianStateCodes';
 import { requireAdmin } from '@/lib/auth-guard';
 import { olympiadPrefixForCrm } from '@/lib/olympiadIdFormat';
 import { crmIdProblem } from '@/lib/schoolCrm';
-
-async function generateSchoolId(): Promise<string> {
-  const last = await prisma.school.findFirst({
-    where: { schoolId: { startsWith: 'MITT' } },
-    orderBy: { schoolId: 'desc' },
-    select: { schoolId: true },
-  });
-  const lastNum = last ? parseInt(last.schoolId.replace('MITT', ''), 10) : 0;
-  const nextNum = (isNaN(lastNum) ? 0 : lastNum) + 1;
-  return `MITT${String(nextNum).padStart(3, '0')}`;
-}
+import { generateSchoolId } from '@/lib/schoolIdGen';
 
 function generatePassword(length = 10): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789abcdefghijkmnpqrstuvwxyz';

@@ -152,6 +152,11 @@ export default function SchoolShell({
             <Wordmark />
             <p className="mt-1 text-[11px] font-medium text-[#8A93A3]">School Panel</p>
           </div>
+          {/* Desktop: the bell sits here instead of taking a row above the page
+              (mobile has it in the top bar, and the close button is here). */}
+          <div className="ml-auto hidden lg:block">
+            <NotificationBell align="left" />
+          </div>
         </div>
 
         {/* School identity */}
@@ -217,10 +222,6 @@ export default function SchoolShell({
 
       {/* Main */}
       <div className="min-h-screen pt-14 lg:ml-[256px] lg:pt-0">
-        {/* Desktop top bar: just the bell, right-aligned (mobile has it in the header) */}
-        <div className="mx-auto hidden max-w-[1440px] justify-end px-6 pt-3 lg:flex">
-          <NotificationBell />
-        </div>
         <main className="mx-auto max-w-[1440px] px-4 py-4 sm:px-6 sm:py-5">{children}</main>
       </div>
     </div>

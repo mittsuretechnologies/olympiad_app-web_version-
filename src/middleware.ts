@@ -47,5 +47,10 @@ export const config = {
   // limit. It's a same-origin dashboard call, so it needs no CORS headers.
   // Also skips the development-only local-put video upload (see lib/localUploads.ts),
   // which streams a whole video and must not be cut off at the body-size limit.
-  matcher: '/api/((?!dashboard/home-videos/upload(?:/|$)|app/upload-video/local-put(?:/|$)).*)',
+  // Same for the school portal's and the student's multipart video uploads
+  // (school/me/upload-video, student/upload-video): a video over the limit
+  // arrives truncated and request.formData() fails with "Failed to parse body
+  // as FormData". The school portal calls it same-origin; the app sends no
+  // Origin, so neither needs CORS headers.
+  matcher: '/api/((?!dashboard/home-videos/upload(?:/|$)|app/upload-video/local-put(?:/|$)|school/me/upload-video(?:/|$)|student/upload-video(?:/|$)).*)',
 };

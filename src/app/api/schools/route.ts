@@ -10,6 +10,7 @@ import { stateNameToCode } from '@/lib/indianStateCodes';
 import { requireAdmin } from '@/lib/auth-guard';
 import { encryptPassword, decryptPassword } from '@/lib/password-crypto';
 import { recordAccessLog } from '@/lib/audit-log';
+import { generateSchoolId } from '@/lib/schoolIdGen';
 
 export async function GET(request: Request) {
   const { error, payload } = await requireAdmin(request, ['schools.register', 'schools.bulk', 'schools.view']);
@@ -64,17 +65,6 @@ export async function GET(request: Request) {
   } catch (error) {
     return NextResponse.json({ message: 'Failed to fetch schools' }, { status: 500 });
   }
-}
-
-async function generateSchoolId(): Promise<string> {
-  const last = await prisma.school.findFirst({
-    where: { schoolId: { startsWith: 'MITT' } },
-    orderBy: { schoolId: 'desc' },
-    select: { schoolId: true },
-  });
-  const lastNum = last ? parseInt(last.schoolId.replace('MITT', ''), 10) : 0;
-  const nextNum = (isNaN(lastNum) ? 0 : lastNum) + 1;
-  return `MITT${String(nextNum).padStart(3, '0')}`;
 }
 
 function generatePassword(length = 10): string {
