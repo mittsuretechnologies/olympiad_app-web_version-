@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Video as VideoIcon, User, School, CheckCircle, X, Star, Loader2, LayoutGrid } from 'lucide-react';
 import { KOSH_LABELS, KOSH_CRITERIA, criterionLabelFor, criterionRubricFor, MAX_PER_CRITERION, VIDEO_MAX_SCORE, type CriterionKey } from '@/lib/kosh';
 
@@ -77,6 +77,13 @@ export default function EvaluateContentPage() {
   const [columns, setColumns] = useState(2);
   const [activeColor, setActiveColor] = useState('bg-blue-50');
 
+  // Scoring unlocks only once the evaluator has played the video to the end.
+  // Seeking past the furthest point watched is blocked; videos watched this
+  // session, or already scored earlier, stay unlocked.
+  const [watchedIds, setWatchedIds] = useState<Set<string>>(() => new Set());
+  const [watchedPct, setWatchedPct] = useState(0);
+  const maxWatchedRef = useRef(0);
+
   // Both TalentEvaluator and SuperAdmin accounts can submit scores.
   const [canScore, setCanScore] = useState(false);
   // Real evaluators are blind: they see only the Olympiad ID (no student or
@@ -140,7 +147,11 @@ export default function EvaluateContentPage() {
       setRemarks('');
     }
     setError('');
+    maxWatchedRef.current = 0;
+    setWatchedPct(0);
   };
+
+  const markWatched = (id: string) => setWatchedIds(prev => (prev.has(id) ? prev : new Set(prev).add(id)));
 
   // Group the queue into one card per student, with videos placed by slot
   // (Video 1 left, Video 2 right) regardless of queue order.
@@ -156,11 +167,14 @@ export default function EvaluateContentPage() {
     return Array.from(map.values());
   }, [queue]);
 
+  const videoUnlocked = !!active && (watchedIds.has(active.id) || !!active.existingScore);
+
   const total = scoreTotal(scores);
   const percent = scorePercent(total);
 
   const handleSubmit = async () => {
     if (!active) return;
+    if (!videoUnlocked) { setError('Please watch the full video before scoring.'); return; }
     setSubmitting(true);
     setError('');
     try {
@@ -329,7 +343,32 @@ export default function EvaluateContentPage() {
               {/* Video */}
               <div>
                 <div className="rounded-xl overflow-hidden bg-black">
-                  <video src={active.videoUrl} controls controlsList="nodownload" disablePictureInPicture onContextMenu={e => e.preventDefault()}className="w-full max-h-80 object-contain" />
+                  <video
+                    key={active.id}
+                    src={active.videoUrl} controls controlsList="nodownload noplaybackrate" disablePictureInPicture
+                    onContextMenu={e => e.preventDefault()}
+                    onTimeUpdate={e => {
+                      const v = e.currentTarget;
+                      // Only count time reached by playing, not by a seek.
+                      if (!v.seeking && v.currentTime <= maxWatchedRef.current + 1.5) {
+                        maxWatchedRef.current = Math.max(maxWatchedRef.current, v.currentTime);
+                      }
+                      if (v.duration) {
+                        setWatchedPct(Math.min(100, Math.round((maxWatchedRef.current / v.duration) * 100)));
+                        if (maxWatchedRef.current >= v.duration - 0.5) markWatched(active.id);
+                      }
+                    }}
+                    onSeeking={e => {
+                      const v = e.currentTarget;
+                      if (!videoUnlocked && v.currentTime > maxWatchedRef.current + 1) v.currentTime = maxWatchedRef.current;
+                    }}
+                    onRateChange={e => { if (!videoUnlocked && e.currentTarget.playbackRate > 1) e.currentTarget.playbackRate = 1; }}
+                    onEnded={e => {
+                      const v = e.currentTarget;
+                      if (maxWatchedRef.current >= v.duration - 2) markWatched(active.id);
+                    }}
+                    className="w-full max-h-80 object-contain"
+                  />
                 </div>
                 {active.caption && <p className="text-sm text-gray-500 mt-3">{active.caption}</p>}
 
@@ -356,7 +395,12 @@ export default function EvaluateContentPage() {
                     This evaluation is published and locked. Unpublish it from Evaluation History to make changes.
                   </div>
                 )}
-                <fieldset disabled={!canScore || active.isFullyPublished} className="space-y-5 disabled:opacity-60">
+                {canScore && !active.isFullyPublished && !videoUnlocked && (
+                  <div className="bg-blue-50 border border-blue-200 text-[#004f9f] text-xs font-semibold rounded-xl px-3 py-2">
+                    Watch the full video to unlock scoring — {watchedPct}% watched.
+                  </div>
+                )}
+                <fieldset disabled={!canScore || active.isFullyPublished || !videoUnlocked} className="space-y-5 disabled:opacity-60">
                   {KOSH_CRITERIA.map(c => {
                     const rubric = criterionRubricFor(c, activeSlot, activeIsState);
                     const val = scores[c.key];
@@ -419,7 +463,7 @@ export default function EvaluateContentPage() {
                 {canScore && !active.isFullyPublished && (
                   <button
                     onClick={handleSubmit}
-                    disabled={submitting}
+                    disabled={submitting || !videoUnlocked}
                     className="w-full bg-[#06013E] text-white py-3 rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-[#0a0258] transition-colors disabled:opacity-50"
                   >
                     {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />}

@@ -51,6 +51,8 @@ export async function DELETE(request: Request) {
   try {
     const school = await readSchool(request);
     if (!school) return NextResponse.json({ message: 'School not found' }, { status: 404 });
+    // Students' app passports hide too: the app also requires this row
+    // (StudentPassportRelease rows are kept, so re-releasing restores them).
     await prisma.passportRelease.deleteMany({ where: { schoolId: school.id } });
     return NextResponse.json({ releasedAt: null });
   } catch (err: any) {

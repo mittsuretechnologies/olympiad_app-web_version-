@@ -152,9 +152,6 @@ function developmentStage(cls: string | null): string | null {
   return `${cls}/${stage} Stage`;
 }
 
-const formatAssessmentDate = (iso: string | null | undefined) =>
-  iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' }) : null;
-
 const BATCH = 'Junior Power Quest 2026';
 const firstName = (name: string) => name.trim().split(/\s+/)[0] || name;
 
@@ -230,8 +227,8 @@ function IdCardPage({ s }: { s: PassportV2Student }) {
     [242.25, developmentStage(s.className) || '—'],
     [282.5, s.schoolName || '—'],
     [324.25, s.olympiadCode],
-    [363.75, BATCH],
-    [402.75, formatAssessmentDate(s.examDate) || '—'],
+    [363.75, s.className || '—'],
+    [402.75, BATCH],
   ];
   const initials = s.name.split(/\s+/).map(w => w[0]).filter(Boolean).slice(0, 2).join('').toUpperCase();
   return (
@@ -254,6 +251,20 @@ function IdCardPage({ s }: { s: PassportV2Student }) {
       <img src="/passport/p02.webp" alt="" draggable={false} className="absolute select-none" style={{
         left: 0, top: 0, width: PW, height: PH, transform: `translateY(${-AGE_ROW_SHIFT}px)`,
         clipPath: `inset(${640 * K}px ${PW - 940 * K}px ${PH - 1225 * K}px ${470 * K}px)`,
+      }} />
+      {/* Artwork rows (px, before the Age shift): Batch 1006–1112, Assessment Date
+          1128–1222. Shown: Class in the Batch slot, Batch in the last slot. */}
+      <div className="absolute" style={{ left: 470 * K, top: (1006 - 117) * K, width: 440 * K, height: (1112 - 1006) * K, background: '#F6EBD1' }} />
+      <svg viewBox="4 2 16 20" className="absolute" style={{ left: 494 * K, top: (1143 - 234) * K, width: 58 * K, height: 73 * K }} fill={NAVY}>
+        <path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 4h5v8l-2.5-1.5L6 12V4z" />
+      </svg>
+      <Txt x={595 * K} y={(1168 - 234) * K} size={11.25} weight={500} color={NAVY}>CLASS</Txt>
+      {/* Last slot: the unshifted artwork there is exactly the Batch row. */}
+      <div className="absolute" style={{ left: 470 * K, top: (1128 - 117) * K, width: 440 * K, height: (1222 - 1128) * K, background: '#F6EBD1' }} />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/passport/p02.webp" alt="" draggable={false} className="absolute select-none" style={{
+        left: 0, top: 0, width: PW, height: PH,
+        clipPath: `inset(${1011 * K}px ${PW - 940 * K}px ${PH - 1105 * K}px ${470 * K}px)`,
       }} />
       {values.map(([y, v], i) => (
         <Txt key={i} x={198} y={i === 0 ? y : y - AGE_ROW_SHIFT} size={11.6} family={COND} weight={700} max={142}>{v}</Txt>
@@ -480,8 +491,6 @@ export default function ResultPassportV2({ student, onClose, initialPage = 0 }: 
     <PanchakoshaProfilePage key="profile" s={student} pageNo={after + 1} />,
     <PanchakoshaSummaryPage key="summary" s={student} pageNo={after + 2} level={level} />,
     <InsightsPage key="insights" s={student} pageNo={after + 3} />,
-    <StaticPage key="reflection" bg="p10" pageNo={after + 4} />,
-    <StaticPage key="tools" bg="p11" pageNo={after + 5} />,
     <StaticPage key="back" bg="p12" />,
   ];
 
