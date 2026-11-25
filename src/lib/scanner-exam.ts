@@ -144,8 +144,32 @@ function hasScannerColumn(table: string, column: string): Promise<boolean> {
 // no Student row at all). So callers must pass the id each group is really
 // keyed by — Student.id for web-source groups, AppUser.id for app-source —
 // and this just matches sheets.student_id against whatever it's given.
+// Postgres errors that mean "this database can't give us scanner data at all"
+// (schema missing, table missing, or the app's role has no grant on the
+// scanner schema). Results then show without exam marks instead of 500ing.
+const SCANNER_UNAVAILABLE_CODES = new Set(['42501', '42P01', '3F000']);
+const SCANNER_UNAVAILABLE_CODES_RE = /\b(42501|42P01|3F000)\b/;
+let warnedScannerUnavailable = false;
+
 export async function getLatestExamResults(studentIds: string[]): Promise<Map<string, ExamResult>> {
   if (studentIds.length === 0) return new Map();
+  try {
+    return await readLatestExamResults(studentIds);
+  } catch (err: any) {
+    const pgCode: string | undefined = err?.meta?.code ?? err?.code;
+    const msg = String(err?.message || '');
+    const unavailable = (pgCode && SCANNER_UNAVAILABLE_CODES.has(pgCode))
+      || SCANNER_UNAVAILABLE_CODES_RE.test(msg);
+    if (!unavailable) throw err;
+    if (!warnedScannerUnavailable) {
+      warnedScannerUnavailable = true;
+      console.warn('Scanner schema unavailable — exam results omitted:', msg.split('\n').filter(Boolean).pop());
+    }
+    return new Map();
+  }
+}
+
+async function readLatestExamResults(studentIds: string[]): Promise<Map<string, ExamResult>> {
 
   // Overall totals and per-kosha % still come from sheet_results — it's the
   // one place the scanner pre-aggregates a sheet's full score.

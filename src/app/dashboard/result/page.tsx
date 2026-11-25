@@ -788,7 +788,7 @@ export default function ResultPage() {
       ? `Release passports to ${sc.name}?
 
 ${sc.complete} completed passport${sc.complete === 1 ? '' : 's'} will become visible to the school (${sc.incomplete} not ready yet).`
-      : `Withdraw passports from ${sc.name}? The school will no longer be able to see them, and students will no longer see theirs in the mittmee app.`);
+      : `Withdraw passports from ${sc.name}? The school will no longer be able to see them, and students will no longer see theirs in the mittmee app.\n\nIf you release them again, students must be sent to the app again.`);
     if (!ok) return;
     setReleasing(sc.schoolId);
     try {
