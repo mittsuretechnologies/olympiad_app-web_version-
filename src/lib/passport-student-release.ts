@@ -5,8 +5,8 @@ import { getResultOverview } from '@/lib/result-overview';
 // students at once. Two gates, both needed for the app to return a passport:
 //   1. SuperAdmin has released the school's passports to the school (PassportRelease)
 //   2. SuperAdmin or the school has shown THIS student's passport (StudentPassportRelease)
-// Withdrawing from the school hides every one of them again, without losing
-// which students had been shown — re-releasing brings them back.
+// Withdrawing from the school removes every one of them from the app; after a
+// re-release each student has to be sent to the app again.
 //
 // Reads tolerate the StudentPassportRelease table not existing yet (migration
 // not applied): everything reads as "not shown".
