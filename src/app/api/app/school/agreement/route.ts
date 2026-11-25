@@ -15,6 +15,8 @@ import {
   generalSchoolDetailsSnapshot,
   getGeneralSchoolForUser,
   plausibleDate,
+  emailGeneralSchoolAgreementCopy,
+  acceptanceReceipt,
 } from '@/lib/generalSchool';
 
 export const dynamic = 'force-dynamic';
@@ -121,16 +123,19 @@ export async function POST(request: Request) {
       },
     });
 
+    // Copy to the school's registered email, as the School Panel does.
+    const emailedTo = await emailGeneralSchoolAgreementCopy({
+      record,
+      schoolName: school.name,
+      schoolEmail: school.email,
+      userId: user?.userId,
+      verification: 'School account login (Mittmee app)',
+    });
+
     return NextResponse.json({
       accepted: true,
-      acceptance: {
-        id: record.id,
-        acceptedAt: record.acceptedAt,
-        signatoryName: record.signatoryName,
-        signatoryDesignation: record.signatoryDesignation,
-        documentVersion: record.documentVersion,
-        ipAddress: record.ipAddress,
-      },
+      acceptance: acceptanceReceipt(record),
+      emailedTo,
     });
   } catch (err) {
     console.error('POST app/school/agreement failed:', err);

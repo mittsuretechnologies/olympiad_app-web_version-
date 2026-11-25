@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import { containsAbuse, ABUSIVE_MESSAGES } from '@/lib/profanity';
 import { prisma } from '@/lib/prisma';
 import { generateUserId } from '@/lib/generateUserId';
+import { recordConsent } from '@/lib/consent';
 import { signAppUserToken } from '@/lib/appUserToken';
 import { STATES, findDistrictByName } from '@/lib/locations';
 import {
@@ -16,6 +17,8 @@ import {
   GENERAL_SCHOOL_AGREEMENT_ROLE,
   generalSchoolDetailsSnapshot,
   plausibleDate,
+  emailGeneralSchoolAgreementCopy,
+  acceptanceReceipt,
 } from '@/lib/generalSchool';
 
 export const dynamic = 'force-dynamic';
@@ -133,7 +136,7 @@ export async function POST(request: Request) {
     const passwordHash = await bcrypt.hash(password, 10);
     const now = new Date();
 
-    const { user, school } = await prisma.$transaction(async (tx) => {
+    const { user, school, acceptance } = await prisma.$transaction(async (tx) => {
       const user = await tx.appUser.create({
         data: {
           userId,
@@ -161,7 +164,7 @@ export async function POST(request: Request) {
           address,
         },
       });
-      await tx.agreementAcceptance.create({
+      const acceptance = await tx.agreementAcceptance.create({
         data: {
           role: GENERAL_SCHOOL_AGREEMENT_ROLE,
           actorId: school.id,
@@ -189,15 +192,38 @@ export async function POST(request: Request) {
           acceptedAt: now,
         },
       });
-      return { user, school };
+      // Permanent consent record (no relation to AppUser, never deleted by
+      // account deletion or the 180-day purge), same as every other sign-up.
+      await recordConsent({
+        appUserId: user.id,
+        userHandle: userId,
+        consentedByName: contactPerson || schoolName,
+        method: 'SCHOOL_SIGNUP_AGREEMENT',
+        verificationChannel: 'SMS_OTP',
+        verificationTarget: mobile,
+        request,
+      }, tx);
+      return { user, school, acceptance };
     });
 
     await prisma.appOtp.delete({ where: { identifier: mobile } }).catch(() => {});
 
     const token = signAppUserToken(user);
 
+    // Copy of the accepted agreement to the school's email (Section 18.4),
+    // the same as an Olympiad school gets from the School Panel.
+    const emailedTo = await emailGeneralSchoolAgreementCopy({
+      record: acceptance,
+      schoolName: school.name,
+      schoolEmail: school.email,
+      userId,
+      verification: `Mobile OTP (${mobile})`,
+    });
+
     return NextResponse.json({
       message: 'School registered',
+      acceptance: acceptanceReceipt(acceptance),
+      emailedTo,
       token,
       user: {
         id: user.id,

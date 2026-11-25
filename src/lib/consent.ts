@@ -28,7 +28,10 @@ export type ConsentMethod =
   | 'SIGNUP_CHECKBOX'   // ticked "I agree to the Terms of Use & Policies" at app sign-up
   | 'SIGNUP_IMPLIED'    // sign-up from an old app build that sends no checkbox value
   | 'TERMS_GATE'        // tapped "I Agree" on the first-login terms screen (Olympiad accounts)
-  | 'LEGACY_BACKFILL';  // from AppUser.termsAcceptedAt, before this table existed
+  | 'LEGACY_BACKFILL'   // from AppUser.termsAcceptedAt, before this table existed
+  | 'DELETE_ACCOUNT_CHECKBOX' // ticked "I agree" in the app's Delete Account dialog
+  | 'SCHOOL_SIGNUP_AGREEMENT' // General School: accepted the School Onboarding Agreement at app sign-up
+  | 'SCHOOL_AGREEMENT';       // Olympiad School: has accepted the School Onboarding Agreement (recorded on its first app login / acceptance)
 
 export type VerificationChannel = 'SMS_OTP' | 'EMAIL_OTP' | 'PASSWORD_LOGIN';
 
@@ -76,6 +79,37 @@ export async function recordConsent(input: ConsentInput, db: Db = prisma) {
     })),
   });
   return count;
+}
+
+// The "I agree" ticked in the Delete Account dialog. Stored here because
+// ConsentRecord has no relation to AppUser and nothing ever deletes it: the
+// copies on AccountDeletionRequest / AppUser.deletionAgreedAt go with the
+// account, and the DeletedAccountArchive snapshot is purged after 180 days,
+// but this row stays as lasting proof that the user agreed to the deletion.
+// Always inserts (unlike recordConsent) — each deletion agreement is its own event.
+export async function recordDeletionConsent(input: {
+  appUserId: string;
+  userHandle: string;
+  verificationChannel: VerificationChannel;
+  verificationTarget: string | null;
+  request: Request;
+}) {
+  const doc = CONSENT_DOCUMENTS.find((d) => d.key === 'ACCOUNT_DELETION_POLICY')!;
+  await prisma.consentRecord.create({
+    data: {
+      appUserId: input.appUserId,
+      userHandle: input.userHandle,
+      consentedByName: null,
+      documentKey: doc.key,
+      documentVersion: doc.version,
+      documentUrl: `https://www.mittmee.com${doc.path}`,
+      method: 'DELETE_ACCOUNT_CHECKBOX',
+      verificationChannel: input.verificationChannel,
+      verificationTarget: mask(input.verificationTarget),
+      ipAddress: clientIp(input.request),
+      userAgent: userAgent(input.request),
+    },
+  });
 }
 
 // Withdrawal (Privacy Policy 11.3; Children's Privacy Policy 11): stamps every

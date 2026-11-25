@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { requireActiveSchool } from '@/lib/auth-guard';
+import { recordConsent } from '@/lib/consent';
 import {
   SCHOOL_AGREEMENT_KEY,
   SCHOOL_AGREEMENT_VERSION,
@@ -148,6 +149,23 @@ export async function POST(request: Request) {
         acceptedAt: now,
       },
     });
+
+    // Permanent consent record for the school's app account, if it has one yet
+    // (it is created on the school's first app login, which records it then).
+    const appAccount = await prisma.appUser.findUnique({
+      where: { schoolRefId: school.id }, select: { id: true, userId: true },
+    });
+    if (appAccount) {
+      await recordConsent({
+        appUserId: appAccount.id,
+        userHandle: appAccount.userId,
+        consentedByName: school.name,
+        method: 'SCHOOL_AGREEMENT',
+        verificationChannel: 'PASSWORD_LOGIN',
+        verificationTarget: null,
+        request,
+      }).catch((e) => console.error('school consent record failed:', e));
+    }
 
     // Copy of the agreement + acceptance record to the school's registered
     // email (Section 18.4), on acceptance and re-acceptance alike. A mail
