@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
 import { prisma } from '@/lib/prisma';
-import { inactiveSchoolResponse } from '@/lib/auth-guard';
+import { inactiveSchoolResponse, requireActiveSchool } from '@/lib/auth-guard';
+import { allotmentRemoveLock, removeAllotment } from '@/lib/olympiad-allotment-remove';
 import { getJwtSecret } from '@/lib/jwt-secret';
 
 export async function PATCH(
@@ -64,37 +65,43 @@ export async function PATCH(
   }
 }
 
-// Unassign
+// GET    → { locked: <reason> | null }  can this allotment still be removed?
+// DELETE → remove the allotment (wrong child allotted). The ID goes back to
+// Pending; the app account is unlinked, not deleted, and keeps working as a
+// general account. See lib/olympiad-allotment-remove.
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ code: string }> }
+) {
+  const { payload, error } = await requireActiveSchool(request);
+  if (error) return error;
+  try {
+    const { code } = await params;
+    const alloc = await prisma.olympiadIdAllocation.findUnique({ where: { code }, select: { schoolId: true } });
+    if (!alloc || alloc.schoolId !== payload.id) return NextResponse.json({ message: 'Olympiad ID not found' }, { status: 404 });
+    return NextResponse.json({ locked: await allotmentRemoveLock(code, payload.id) });
+  } catch (err) {
+    console.error('GET allotment lock failed:', err);
+    return NextResponse.json({ message: 'Failed to check' }, { status: 500 });
+  }
+}
+
 export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const { payload, error } = await requireActiveSchool(request);
+  if (error) return error;
   try {
-    const auth = request.headers.get('authorization') || '';
-    const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
-    if (!token) return NextResponse.json({ message: 'Unauthorized' }, { status: 401 });
-
-    let payload: any;
-    try {
-      payload = jwt.verify(token, getJwtSecret());
-    } catch {
-      return NextResponse.json({ message: 'Invalid token' }, { status: 401 });
-    }
-
-    if (payload?.role !== 'SCHOOL' || !payload?.id) {
-      return NextResponse.json({ message: 'Forbidden' }, { status: 403 });
-    }
-    const blocked = await inactiveSchoolResponse(payload.id);
-    if (blocked) return blocked;
-
-    // Schools are not allowed to remove an allocation once it's made — they can
-    // only edit the details (name/phone/email) via the app-account endpoint.
-    return NextResponse.json(
-      { message: 'Removing an allotted Olympiad ID is not allowed. You can edit the student details instead.' },
-      { status: 403 },
-    );
-  } catch (error) {
-    console.error('DELETE unassign failed:', error);
-    return NextResponse.json({ message: 'Failed to unassign' }, { status: 500 });
+    const { code } = await params;
+    const school = await prisma.school.findUnique({ where: { id: payload.id }, select: { name: true, schoolId: true } });
+    const result = await removeAllotment(code, payload.id, {
+      id: payload.id, role: 'SCHOOL', name: school ? `${school.name} (${school.schoolId})` : null,
+    });
+    if (!result.ok) return NextResponse.json({ message: result.message }, { status: result.status });
+    return NextResponse.json({ success: true, unlinkedUserId: result.unlinkedUserId });
+  } catch (err) {
+    console.error('DELETE remove allotment failed:', err);
+    return NextResponse.json({ message: 'Failed to remove allotment' }, { status: 500 });
   }
 }

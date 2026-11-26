@@ -1030,9 +1030,10 @@ export async function sendAgreementCopyEmail(data: AgreementCopyMail): Promise<v
 
 export interface DailyVideoReportMail {
   to: string[];
-  /** "26 Oct 2026" and "6:00 PM", already formatted in IST. */
+  /** "25 Nov 2026": the day the report window ends, in IST. */
   dateLabel: string;
-  timeLabel: string;
+  /** The window the "Today" lines cover, e.g. "24 Nov 2026, 6:00 PM – 25 Nov 2026, 6:00 PM", in IST. */
+  windowLabel: string;
   total: number;
   today: number;
   approved: number;
@@ -1049,7 +1050,7 @@ export function renderDailyVideoReportText(d: DailyVideoReportMail): string {
     : '  None';
   return (
     `Daily report of Mittmee videos\n` +
-    `${d.dateLabel}, data as of ${d.timeLabel} IST\n\n` +
+    `${d.windowLabel} IST\n\n` +
     `Total videos received: ${d.total}\n` +
     `Today videos received: ${d.today}\n` +
     `Total approved videos: ${d.approved}\n` +
@@ -1077,7 +1078,7 @@ export async function sendDailyVideoReportEmail(d: DailyVideoReportMail): Promis
     title: `Daily report of Mittmee videos — ${d.dateLabel}`,
     body: `
       <p style="margin:0 0 4px;font-size:17px;font-weight:bold;color:#0B2A5C;">Daily report of Mittmee videos</p>
-      <p style="margin:0 0 14px;font-size:13px;color:#5A6B80;">${escapeHtml(d.dateLabel)}, data as of ${escapeHtml(d.timeLabel)} IST</p>
+      <p style="margin:0 0 14px;font-size:13px;color:#5A6B80;">${escapeHtml(d.windowLabel)} IST</p>
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
              style="border:1px solid #E4ECF7;border-radius:8px;overflow:hidden;margin:0 0 16px;">
         ${rows.map(([k, v], i) => `<tr>
