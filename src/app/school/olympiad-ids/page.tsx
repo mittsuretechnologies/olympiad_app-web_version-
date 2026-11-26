@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   Contact, Loader2, Search, Download, Clock, BookOpen, ChevronDown, ChevronUp,
-  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, MessageSquare, AlertCircle, Lock,
+  UserPlus, Pencil, CheckCircle, CheckCircle2, Phone, Mail, MessageSquare, AlertCircle, Lock, Trash2,
 } from 'lucide-react';
-import { CLASSES } from '@/lib/classes';
 import {
   CARD, STACK, TABLE, TH, TD, TR, INPUT, LABEL, FOCUS,
   BTN_PRIMARY, BTN_SECONDARY, BTN_SUBTLE, BTN_ICON,
@@ -70,17 +69,18 @@ export default function SchoolOlympiadIdsPage() {
   } | null>(null);
 
   // Edit modal (for ALLOTTED rows): name, phone + email when the ID has an app
-  // account, and the class for every allotted ID. The class can be corrected
-  // only until passports are released / the student's video is evaluated.
-  const [editAppModal, setEditAppModal] = useState<{ code: string; hasAppUser: boolean; className: string } | null>(null);
+  // account, plus "Remove allotment" for when the wrong child was allotted.
+  const [editAppModal, setEditAppModal] = useState<{ code: string; hasAppUser: boolean } | null>(null);
   const [editAppName, setEditAppName] = useState('');
   const [editAppPhone, setEditAppPhone] = useState('');
   const [editAppEmail, setEditAppEmail] = useState('');
-  const [editClass, setEditClass] = useState('');
-  // undefined = still checking, null = can change, string = why it can't
-  const [classLock, setClassLock] = useState<string | null | undefined>(undefined);
   const [editingApp, setEditingApp] = useState(false);
   const [editAppError, setEditAppError] = useState('');
+  // Remove-allotment confirm step inside the edit modal.
+  // removeLock: undefined = still checking, null = can remove, string = why not.
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [removeLock, setRemoveLock] = useState<string | null | undefined>(undefined);
+  const [removing, setRemoving] = useState(false);
 
   const token = typeof window !== 'undefined' ? sessionStorage.getItem('schoolToken') : '';
 
@@ -181,64 +181,74 @@ export default function SchoolOlympiadIdsPage() {
 
   // Edit app account handlers (ALLOTTED rows)
   const openEditAppModal = (a: Allocation) => {
-    const className = a.className || CLASSES.find(c => c.code === a.classCode)?.name || '';
-    setEditAppModal({ code: a.code, hasAppUser: !!a.hasAppUser, className });
+    setEditAppModal({ code: a.code, hasAppUser: !!a.hasAppUser });
     setEditAppName(a.assignedName || '');
     setEditAppPhone(a.appUserPhone || '');
     setEditAppEmail(a.appUserEmail || '');
-    setEditClass(className);
-    setClassLock(undefined);
     setEditAppError('');
-    fetch(`/api/school/me/olympiad-ids/${a.code}/class`, { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.ok ? r.json() : Promise.reject())
-      .then(d => setClassLock(d.locked ?? null))
-      .catch(() => setClassLock('Could not check whether the class can be changed. Please reopen this window.'));
+    setConfirmRemove(false); setRemoveLock(undefined);
   };
   const closeEditAppModal = () => {
     setEditAppModal(null); setEditAppName(''); setEditAppPhone(''); setEditAppEmail(''); setEditAppError('');
-    setEditClass(''); setClassLock(undefined);
+    setConfirmRemove(false); setRemoveLock(undefined);
   };
-
-  const classChanged = !!editAppModal && !!editClass && editClass !== editAppModal.className;
 
   const handleEditApp = async () => {
     const m = editAppModal!;
-    if (m.hasAppUser) {
-      if (!editAppName.trim()) { setEditAppError('Student name is required'); return; }
-      if (!editAppPhone.trim() || editAppPhone.trim().length < 10) { setEditAppError('Valid phone number is required'); return; }
-      if (editAppEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAppEmail.trim())) { setEditAppError('Enter a valid email address'); return; }
-    }
+    if (!m.hasAppUser) return;
+    if (!editAppName.trim()) { setEditAppError('Student name is required'); return; }
+    if (!editAppPhone.trim() || editAppPhone.trim().length < 10) { setEditAppError('Valid phone number is required'); return; }
+    if (editAppEmail.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(editAppEmail.trim())) { setEditAppError('Enter a valid email address'); return; }
     setEditingApp(true); setEditAppError('');
     try {
-      if (m.hasAppUser) {
-        const res = await fetch(`/api/school/me/olympiad-ids/${m.code}/app-account`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ name: editAppName.trim(), phone: editAppPhone.trim(), email: editAppEmail.trim() }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message);
-        setAllocations(prev => prev.map(a =>
-          a.code === m.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim(), appUserEmail: editAppEmail.trim().toLowerCase() || null } : a
-        ));
-      }
-      if (classChanged) {
-        const res = await fetch(`/api/school/me/olympiad-ids/${m.code}/class`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-          body: JSON.stringify({ className: editClass }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.message);
-        setAllocations(prev => prev.map(a =>
-          a.code === m.code ? { ...a, classCode: data.classCode, className: data.className } : a
-        ));
-      }
+      const res = await fetch(`/api/school/me/olympiad-ids/${m.code}/app-account`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name: editAppName.trim(), phone: editAppPhone.trim(), email: editAppEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setAllocations(prev => prev.map(a =>
+        a.code === m.code ? { ...a, assignedName: editAppName.trim(), appUserPhone: editAppPhone.trim(), appUserEmail: editAppEmail.trim().toLowerCase() || null } : a
+      ));
       closeEditAppModal();
     } catch (e: any) {
       setEditAppError(e.message);
     } finally {
       setEditingApp(false);
+    }
+  };
+
+  // Remove allotment: first ask the server whether it is still allowed, then confirm.
+  const startRemove = () => {
+    const m = editAppModal!;
+    setConfirmRemove(true); setRemoveLock(undefined); setEditAppError('');
+    fetch(`/api/school/me/olympiad-ids/${m.code}/assign`, { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(d => setRemoveLock(d.locked ?? null))
+      .catch(() => setRemoveLock('Could not check. Please close and try again.'));
+  };
+
+  const handleRemove = async () => {
+    const m = editAppModal!;
+    setRemoving(true); setEditAppError('');
+    try {
+      const res = await fetch(`/api/school/me/olympiad-ids/${m.code}/assign`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
+      setAllocations(prev => prev.map(a =>
+        a.code === m.code
+          ? { ...a, assignedName: null, assignedAt: null, hasAppUser: false, appUserPhone: null, appUserEmail: null }
+          : a
+      ));
+      closeEditAppModal();
+    } catch (e: any) {
+      setEditAppError(e.message);
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -452,7 +462,7 @@ export default function SchoolOlympiadIdsPage() {
                                 <div className="flex items-center justify-center gap-1.5">
                                   <button
                                     onClick={() => openEditAppModal(a)} className={BTN_ICON} aria-label={`Edit details for ${a.code}`}
-                                    title={a.hasAppUser ? 'Edit name, phone, email & class' : 'Edit class'}
+                                    title={a.hasAppUser ? 'Edit details or remove allotment' : 'Remove allotment'}
                                   >
                                     <Pencil size={12} />
                                   </button>
@@ -702,6 +712,40 @@ export default function SchoolOlympiadIdsPage() {
           onClose={closeEditAppModal}
           maxWidth="max-w-sm"
         >
+          {confirmRemove ? (
+          <div className="space-y-3.5 p-5">
+            <p className="text-[13.5px] font-semibold text-[#0F1B2D]">Remove this allotment?</p>
+            <ul className="list-disc space-y-1 pl-4 text-[12.5px] leading-snug text-[#475265]">
+              <li>The ID goes back to <b>Pending</b>, so you can allot it to the right student.</li>
+              <li>The student&apos;s app login (User ID + password) keeps working, but only as a general app account, no longer linked to this Olympiad ID.</li>
+            </ul>
+            {removeLock === undefined ? (
+              <p className="flex items-center gap-1.5 text-[12px] text-[#677285]">
+                <Loader2 size={12} className="animate-spin" /> Checking whether it can be removed…
+              </p>
+            ) : removeLock ? (
+              <p className="flex items-start gap-1.5 rounded-lg bg-[#F8F9FB] px-3 py-2 text-[12px] leading-snug text-[#475265]">
+                <Lock size={12} className="mt-[2px] flex-shrink-0" /> {removeLock}
+              </p>
+            ) : null}
+            {editAppError && (
+              <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]" role="alert">
+                <AlertCircle size={12} /> {editAppError}
+              </p>
+            )}
+            <div className="flex gap-2">
+              <button onClick={() => { setConfirmRemove(false); setEditAppError(''); }} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Back</button>
+              <button
+                onClick={handleRemove}
+                disabled={removing || removeLock !== null}
+                className="inline-flex flex-1 cursor-pointer items-center justify-center gap-1.5 rounded-lg bg-[#B42323] px-3 py-2 text-[13px] font-semibold text-white transition-colors hover:bg-[#9A1D1D] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {removing ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                Remove allotment
+              </button>
+            </div>
+          </div>
+          ) : (
           <div className="space-y-3.5 p-5">
             {editAppModal.hasAppUser && (<>
             <div>
@@ -737,35 +781,6 @@ export default function SchoolOlympiadIdsPage() {
               </div>
             </div>
             </>)}
-            <div>
-              <label htmlFor="edit-class" className={LABEL}>Class</label>
-              <select
-                id="edit-class" value={editClass} onChange={e => setEditClass(e.target.value)}
-                disabled={classLock !== null}
-                className={`${INPUT} disabled:cursor-not-allowed disabled:bg-[#F8F9FB] disabled:text-[#677285]`}
-              >
-                {!editClass && <option value="">Select class</option>}
-                {/* An old/odd stored class still shows as itself until changed. */}
-                {editAppModal.className && !CLASSES.some(c => c.name === editAppModal.className) && (
-                  <option value={editAppModal.className}>{editAppModal.className}</option>
-                )}
-                {CLASSES.map(c => <option key={c.code} value={c.name}>{c.name}</option>)}
-              </select>
-              {classLock === undefined ? (
-                <p className="mt-1.5 flex items-center gap-1.5 text-[11.5px] text-[#677285]">
-                  <Loader2 size={11} className="animate-spin" /> Checking whether the class can be changed…
-                </p>
-              ) : classLock ? (
-                <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] leading-snug text-[#677285]">
-                  <Lock size={11} className="mt-[2px] flex-shrink-0" /> {classLock}
-                </p>
-              ) : classChanged ? (
-                <p className="mt-1.5 flex items-start gap-1.5 text-[11.5px] leading-snug text-[#A1530A]">
-                  <AlertCircle size={12} className="mt-[1px] flex-shrink-0" />
-                  The class changes from {editAppModal.className || 'none'} to {editClass}. The Olympiad ID, login and uploaded videos stay the same.
-                </p>
-              ) : null}
-            </div>
             {editAppError && (
               <p className="flex items-center gap-1.5 text-[12px] text-[#B42323]" role="alert">
                 <AlertCircle size={12} /> {editAppError}
@@ -776,18 +791,32 @@ export default function SchoolOlympiadIdsPage() {
                 This updates the student&apos;s app account. The login password stays unchanged.
               </p>
             )}
+            {!editAppModal.hasAppUser && (
+              <p className="text-[12.5px] leading-snug text-[#475265]">
+                Allotted the wrong student? Remove this allotment and allot the ID again.
+              </p>
+            )}
             <div className="flex gap-2">
               <button onClick={closeEditAppModal} className={`cursor-pointer ${BTN_SECONDARY} flex-1`}>Cancel</button>
-              <button
-                onClick={handleEditApp}
-                disabled={editingApp || (!editAppModal.hasAppUser && !classChanged)}
-                className={`cursor-pointer ${BTN_PRIMARY} flex-1`}
-              >
-                {editingApp ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
-                Update
-              </button>
+              {editAppModal.hasAppUser && (
+                <button
+                  onClick={handleEditApp}
+                  disabled={editingApp}
+                  className={`cursor-pointer ${BTN_PRIMARY} flex-1`}
+                >
+                  {editingApp ? <Loader2 size={14} className="animate-spin" /> : <Pencil size={14} />}
+                  Update
+                </button>
+              )}
             </div>
+            <button
+              onClick={startRemove}
+              className={`flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-lg border border-[#B42323]/30 px-3 py-2 text-[12.5px] font-semibold text-[#B42323] transition-colors hover:bg-[#B42323]/[0.06] ${FOCUS}`}
+            >
+              <Trash2 size={13} /> Remove allotment
+            </button>
           </div>
+          )}
         </ModalShell>
       )}
     </div>

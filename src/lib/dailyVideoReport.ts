@@ -65,16 +65,37 @@ export async function getDailyReportSettings(): Promise<DailyReportSettings> {
   };
 }
 
-export async function buildDailyVideoReport(now = new Date()): Promise<DailyVideoReport> {
+/**
+ * The "Today" lines cover report time to report time (e.g. 6 PM yesterday to
+ * 6 PM today), not midnight to midnight: the report goes out in the evening,
+ * so a midnight start would leave uploads made after it out of every report.
+ * The window always ends at today's report time (or now, if that is still
+ * ahead), so a late send does not shift where the next day's window starts.
+ */
+export function reportWindow(now: Date, time: string): { start: Date; end: Date } {
   const i = toIst(now);
-  const dayStart = new Date(Date.UTC(i.getUTCFullYear(), i.getUTCMonth(), i.getUTCDate()) - IST_OFFSET_MS);
+  const [h, m] = time.split(':').map(Number);
+  const todayAt = new Date(Date.UTC(i.getUTCFullYear(), i.getUTCMonth(), i.getUTCDate(), h, m) - IST_OFFSET_MS);
+  return { start: new Date(todayAt.getTime() - 24 * 60 * 60 * 1000), end: now < todayAt ? now : todayAt };
+}
+
+export async function buildDailyVideoReport(now = new Date(), time = DEFAULT_REPORT_TIME): Promise<DailyVideoReport> {
+  const { start, end } = reportWindow(now, time);
 
   const live = { deletedAt: null };
-  const [total, today, todayRejected, byStatus, pendingVideos] = await Promise.all([
+  const [total, today, [{ todayRejected }], byStatus, pendingVideos] = await Promise.all([
     prisma.video.count({ where: live }),
-    prisma.video.count({ where: { ...live, createdAt: { gte: dayStart } } }),
-    // No separate "rejected at" column: a rejected video's updatedAt is when it was last changed, i.e. the rejection.
-    prisma.video.count({ where: { ...live, status: 'REJECTED', updatedAt: { gte: dayStart } } }),
+    prisma.video.count({ where: { ...live, createdAt: { gte: start, lt: end } } }),
+    // Still-rejected videos whose latest rejection falls in the window, from the
+    // audit log: updatedAt also moves on edits that are not a rejection.
+    prisma.$queryRaw<{ todayRejected: number }[]>`
+      SELECT count(*)::int AS "todayRejected" FROM (
+        SELECT (SELECT max(a."createdAt") FROM public."AuditLog" a
+                WHERE a."entityType" = 'Video' AND a."entityId" = v.id AND a.action = 'VIDEO_REJECTED') AS "rejectedAt"
+        FROM public."Video" v
+        WHERE v."deletedAt" IS NULL AND v.status = 'REJECTED'
+      ) r
+      WHERE r."rejectedAt" >= ${start} AND r."rejectedAt" < ${end}`,
     prisma.video.groupBy({ by: ['status'], where: live, _count: { _all: true } }),
     prisma.video.findMany({
       where: { ...live, status: 'PENDING' },
@@ -85,8 +106,8 @@ export async function buildDailyVideoReport(now = new Date()): Promise<DailyVide
   const countOf = (status: string) => byStatus.find(s => s.status === status)?._count._all ?? 0;
 
   return {
-    dateLabel: istDate(now),
-    timeLabel: istTime(now),
+    dateLabel: istDate(end),
+    windowLabel: `${istDate(start)}, ${istTime(start)} – ${istDate(end)}, ${istTime(end)}`,
     total,
     today,
     approved: countOf('APPROVED'),
@@ -100,8 +121,8 @@ export function dailyVideoReportText(report: DailyVideoReport): string {
   return renderDailyVideoReportText({ ...report, to: [] });
 }
 
-export async function sendDailyVideoReport(to: string[], now = new Date()): Promise<DailyVideoReport> {
-  const report = await buildDailyVideoReport(now);
+export async function sendDailyVideoReport(to: string[], now = new Date(), time = DEFAULT_REPORT_TIME): Promise<DailyVideoReport> {
+  const report = await buildDailyVideoReport(now, time);
   await sendDailyVideoReportEmail({ ...report, to });
   return report;
 }
@@ -133,7 +154,7 @@ export async function runDailyReportIfDue(now = new Date()): Promise<boolean> {
 
   let error = '';
   try {
-    await sendDailyVideoReport(settings.emails, now);
+    await sendDailyVideoReport(settings.emails, now, settings.time);
   } catch (e: any) {
     error = `${istDate(now)} ${istTime(now)}: ${e?.message || 'Could not send'}`;
     console.error('daily video report send failed:', e);
