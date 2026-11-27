@@ -589,6 +589,8 @@ function HomeList({ layout, categories, slots, groups, counts, onToggleCategory,
     mittfest: 'The MittFest row (videos marked for MittFest).',
     trending: 'Trending Tots: a different option every day (set it up in the box below). The top carousel keeps the overall most watched.',
     school: 'The row of the viewer’s own school videos (only shown to users who belong to a school).',
+    games: 'The newest games, each opening straight into the game. Needs the app version that knows this row; older versions leave it out.',
+    continue: 'MittTV videos the viewer started and can resume. Only shown to someone with something to continue (and while MittTV is on).',
   };
   return (
     <>
